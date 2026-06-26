@@ -1,0 +1,21 @@
+# Rust build artifacts
+/target/
+/.kqode-research/
+
+# Local environment and logs
+.env
+.env.*
+!.env.example
+*.log
+
+# Editor and local workspace state
+.idea/
+.vscode/
+.obsidian/
+*.swp
+*.swo
+*~
+
+# OS-generated files
+.DS_Store
+Thumbs.db
