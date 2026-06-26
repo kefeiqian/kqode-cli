@@ -1,7 +1,6 @@
 ---
 name: kqode-commit
-description: "Create clear KQode git commits from the current working tree. Use when the user asks to commit or save changes. Categorizes changed files by content and creates multiple logical commits when the diff contains distinct concerns instead of forcing one single commit."
-argument-hint: "[optional: commit focus or message hint]"
+description: "Create clear KQode git commits from the current working tree on the current branch. Use when the user asks to commit or save changes. Categorizes changed files by content and creates multiple logical commits when the diff contains distinct concerns instead of forcing one single commit."
 ---
 
 # KQode Commit
@@ -29,11 +28,11 @@ If the working tree is clean, report that there is nothing to commit and stop.
 
 ## Workflow
 
-### 1. Resolve branch safety
+### 1. Confirm branch context
 
-If the current branch is empty, `main`, `master`, or the resolved default branch, create a meaningful feature branch before committing. Derive the branch name from the change content.
+Do not create, switch, or rename branches as part of this skill. Commit on the current branch reported by `git branch --show-current`, including `main`, `master`, or the resolved default branch.
 
-Do not commit directly on the default branch unless the user explicitly instructed that for this run.
+If the current branch is empty, stop and ask the user what branch to use before committing.
 
 ### 2. Determine commit convention
 
