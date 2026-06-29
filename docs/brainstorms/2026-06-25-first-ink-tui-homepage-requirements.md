@@ -78,13 +78,13 @@ Tip content / empty output area
 **Structure and visual style**
 - R12. The Ink TUI must be organized as components rather than one monolithic render function.
 - R13. The TUI source must live under `tui/`.
-- R14. The initial palette must be One Dark Pro-inspired: dark background, muted gray text, blue accents, and restrained purple/green logo accents.
+- R14. The initial palette must use centralized coding-agent CLI theme tokens; the active direction is GitHub/Gemini-inspired foreground colors with background rendering kept internal and fallback-aware.
 
 ---
 
 ## Acceptance Examples
 
-- AE1. **Covers R1, R2, R3, R4, R5, R14.** Given the TUI is started from the KQode repository, when the first screen renders, the user sees the KQode identity area, the current working directory above the composer, the bottom command hints, and `GPT-5.5` on the right in the One Dark Pro-inspired palette.
+- AE1. **Covers R1, R2, R3, R4, R5, R14.** Given the TUI is started from the KQode repository, when the first screen renders, the user sees the KQode identity area, the current working directory above the composer, the bottom command hints, and `GPT-5.5` on the right using the centralized GitHub/Gemini-inspired theme direction.
 - AE2. **Covers R6, R7.** Given the prompt composer is focused, when the user types a prompt longer than the terminal width, the composer wraps the text onto multiple visible lines without losing the typed content.
 - AE3. **Covers R8, R9, R10, R11.** Given the user has typed `hello from tui`, when they press Enter, the Rust backend receives that text, echoes `hello from tui`, and the TUI displays the echoed output without making any model or tool call.
 
@@ -104,7 +104,7 @@ Tip content / empty output area
 - Model selection, model list management, provider calls, and streaming assistant responses are deferred.
 - Session accounting, cost display, approval panels, diff panels, trace logging, and persistent session history are deferred.
 - A full daemon or mature JSON-RPC/JSONL session protocol is deferred; this slice only needs the smallest backend boundary that proves text submission.
-- Full theme configuration is deferred; the One Dark Pro-inspired palette is hardcoded for the first screen.
+- Full theme configuration is deferred; centralized GitHub/Gemini-inspired theme tokens are internal to the first screen.
 
 ---
 
