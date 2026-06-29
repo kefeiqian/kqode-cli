@@ -1,0 +1,75 @@
+body {
+  background:
+    radial-gradient(circle at 15% 10%, var(--page-glow-one), transparent 32rem),
+    radial-gradient(circle at 88% 16%, var(--page-glow-two), transparent 30rem),
+    linear-gradient(180deg, #ffffff 0%, var(--background) 45%, #eef4fb 100%);
+}
+
+html[data-theme='dark'] body {
+  background:
+    radial-gradient(circle at 62% 42%, rgba(58, 110, 212, 0.32), transparent 26rem),
+    radial-gradient(circle at 82% 18%, var(--page-glow-two), transparent 25rem),
+    linear-gradient(135deg, #020611 0%, var(--background) 48%, #08182a 100%);
+}
+
+.navbar {
+  box-shadow: 0 18px 48px rgba(79, 87, 121, 0.08);
+}
+
+.theme-doc-sidebar-container {
+  background: color-mix(in srgb, var(--ifm-navbar-background-color) 82%, transparent);
+  backdrop-filter: blur(20px);
+}
+
+.menu__link {
+  transition:
+    color var(--ifm-transition-fast) var(--ifm-transition-timing-default),
+    background var(--ifm-transition-fast) var(--ifm-transition-timing-default),
+    transform var(--ifm-transition-fast) var(--ifm-transition-timing-default);
+}
+
+.menu__link:hover {
+  transform: translateX(0.18rem);
+}
+
+.markdown table {
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow);
+}
+
+.markdown table thead {
+  background: var(--muted);
+}
+
+.markdown tr:nth-child(2n) {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+html[data-theme='dark'] .markdown tr:nth-child(2n) {
+  background: rgba(116, 168, 255, 0.06);
+}
+
+.theme-doc-markdown {
+  padding: clamp(1.5rem, 4vw, 3.25rem);
+  border: 1px solid var(--glass-border);
+  border-radius: 1.75rem;
+  background: var(--card);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(24px);
+}
+
+.theme-doc-markdown h1,
+.theme-doc-markdown h2,
+.theme-doc-markdown h3 {
+  letter-spacing: -0.045em;
+}
+
+.theme-doc-markdown h1 {
+  max-width: 15ch;
+}
+
+.theme-doc-markdown h2 {
+  margin-top: 3rem;
+}

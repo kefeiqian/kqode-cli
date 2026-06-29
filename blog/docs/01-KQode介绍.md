@@ -1,6 +1,7 @@
 ---
 id: index
 slug: /
+sidebar_position: 1
 title: 1. KQode介绍
 ---
 
@@ -9,7 +10,7 @@ title: 1. KQode介绍
 KQode 是一个基于Rust的Coding Agent，作为学习及研究Agent Runtime以及Harness使用。
 
 ## 笔者序
-最近所有文章、新闻、视频都在说 Agent Harness, 为了学习并研究最新的 Harness Engineering 的技术，没有什么是比做一个类似Copilot CLI/ Claude Code的Coding Agent更好的方式了。另外正好可以借此机会使用一下不熟悉的Rust，一鱼两吃。
+最近所有文章、新闻、视频都在说 Agent Harness, 为了学习并研究最新的 Agent Runtime 还有 Harness Engineering 的技术，没有什么是比做一个类似Copilot CLI/ Claude Code的Coding Agent更好的方式了。另外正好可以借此机会使用一下不熟悉的Rust，一鱼两吃。
 
 我们的目标是构建一个可以用于日常工作的生产级Coding Agent，对标Codex/Claude Code/Copilot CLI。
 

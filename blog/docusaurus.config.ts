@@ -43,12 +43,9 @@ const config: Config = {
           routeBasePath: '/',
           sidebarPath: './sidebars.ts',
         },
-        blog: {
-          routeBasePath: 'blog',
-          showReadingTime: true,
-        },
+        blog: false,
         theme: {
-          customCss: './src/css/custom.css',
+          customCss: ['./src/css/custom.css', './src/css/theme-surfaces.css'],
         },
       } satisfies Preset.Options,
     ],
