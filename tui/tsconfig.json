@@ -11,6 +11,14 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@components/*": ["./src/components/*"],
+      "@libs/*": ["./src/libs/*"],
+      "@state/*": ["./src/state/*"],
+      "@test/*": ["./src/test/*"],
+      "@theme/*": ["./src/theme/*"]
+    },
     "types": ["node", "vitest/globals"]
   },
   "include": ["main.tsx", "src/**/*.ts", "src/**/*.tsx", "vitest.config.ts"]
