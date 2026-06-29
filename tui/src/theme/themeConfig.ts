@@ -1,13 +1,14 @@
-export const githubDarkTheme = {
+export const geminiDarkTheme = {
   colors: {
-    foreground: '#c9d1d9',
-    muted: '#8b949e',
-    accentBlue: '#58a6ff',
-    accentGreen: '#3fb950',
-    warning: '#d29922',
-    errorRed: '#ff7b72',
-    border: '#30363d',
-    messageBackground: '#141b22',
-    inputBackground: '#141b22'
+    bodyBackground: '#000000',
+    foreground: '#FFFFFF',
+    muted: '#AFAFAF',
+    accentBlue: '#87AFFF',
+    accentGreen: '#D7FFD7',
+    warning: '#FFFFAF',
+    errorRed: '#FF87AF',
+    border: '#878787',
+    messageBackground: '#5F5F5F',
+    inputBackground: '#5F5F5F'
   }
 } as const;

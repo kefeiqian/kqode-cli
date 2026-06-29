@@ -1,9 +1,10 @@
 import { Box, Text } from 'ink';
-import { resolveBodyRows } from '@components/bodyRows.js';
-import type { BodyBackgroundMode, BodyEntry, BodyRow } from '@components/bodyRows.js';
-import { githubDarkTheme } from '@theme/themeConfig.js';
+import { DEFAULT_BODY_ENTRIES, resolveBodyRows } from '@libs/tui/bodyRows.js';
+import type { BodyEntry, BodyRow } from '@libs/tui/bodyRows.js';
+import { geminiDarkTheme } from '@theme/themeConfig.js';
 
-export type { BodyEntry } from '@components/bodyRows.js';
+export type { BodyEntry } from '@libs/tui/bodyRows.js';
+export { countBodyRows, DEFAULT_BODY_ENTRIES } from '@libs/tui/bodyRows.js';
 
 type ScrollbarCell = {
   color: string;
@@ -15,26 +16,24 @@ type BodyPaneProps = {
   rows: number;
   columns: number;
   scrollOffsetRows?: number;
-  backgroundMode?: BodyBackgroundMode;
 };
 
 const SCROLLBAR_TRACK = '│';
 const SCROLLBAR_THUMB = '┃';
 
-export const DEFAULT_BODY_ENTRIES: readonly BodyEntry[] = [];
-
 export function BodyPane({
   entries = DEFAULT_BODY_ENTRIES,
   rows,
   columns,
-  scrollOffsetRows = 0,
-  backgroundMode = 'disabled'
+  scrollOffsetRows = 0
 }: BodyPaneProps) {
   const visibleRows = Math.max(1, rows);
   const visibleColumns = Math.max(1, columns);
-  const allRows = resolveBodyRows(entries, visibleColumns, visibleRows, { backgroundMode });
+  const allRows = resolveBodyRows(entries, visibleColumns, visibleRows);
   const maxScrollOffset = Math.max(0, allRows.length - visibleRows);
   const scrollOffset = clamp(scrollOffsetRows, 0, maxScrollOffset);
+  // Offset counts rows back from the newest content at the bottom, matching
+  // terminal transcript behavior where scroll offset 0 means "stick to bottom".
   const end = allRows.length - scrollOffset;
   const start = Math.max(0, end - visibleRows);
   const isScrollable = maxScrollOffset > 0;
@@ -53,7 +52,7 @@ export function BodyPane({
     <Box flexDirection="column" height={renderedRows}>
       {Array.from({ length: renderedRows }, (_, index) => {
         const row = visibleRowsForOffset[index] ?? {
-          color: githubDarkTheme.colors.muted,
+          color: geminiDarkTheme.colors.muted,
           text: ''
         };
         const marker = row.marker ?? '';
@@ -74,7 +73,7 @@ export function BodyPane({
               {displayText}
             </Text>
             {isScrollable ? (
-              <Text color={scrollbarCells[index]?.color ?? githubDarkTheme.colors.border}>
+              <Text color={scrollbarCells[index]?.color ?? geminiDarkTheme.colors.border}>
                 {scrollbarCells[index]?.text ?? SCROLLBAR_TRACK}
               </Text>
             ) : null}
@@ -83,17 +82,6 @@ export function BodyPane({
       })}
     </Box>
   );
-}
-
-export function countBodyRows(
-  entries: readonly BodyEntry[],
-  columns: number,
-  visibleRows: number,
-  backgroundMode: BodyBackgroundMode = 'disabled'
-): number {
-  return resolveBodyRows(entries, Math.max(1, columns), Math.max(1, visibleRows), {
-    backgroundMode
-  }).length;
 }
 
 function renderScrollbar({
@@ -105,6 +93,8 @@ function renderScrollbar({
   totalRows: number;
   startRow: number;
 }): ScrollbarCell[] {
+  // Scale the thumb to the visible fraction, then map the first visible row to
+  // the same fraction of the scrollbar track so top/bottom positions align.
   const thumbRows = Math.max(1, Math.floor((rows / totalRows) * rows));
   const maxThumbStart = rows - thumbRows;
   const maxStartRow = totalRows - rows;
@@ -115,7 +105,7 @@ function renderScrollbar({
     const isThumb = index >= thumbStart && index < thumbStart + thumbRows;
 
     return {
-      color: isThumb ? githubDarkTheme.colors.foreground : githubDarkTheme.colors.border,
+      color: isThumb ? geminiDarkTheme.colors.foreground : geminiDarkTheme.colors.border,
       text: isThumb ? SCROLLBAR_THUMB : SCROLLBAR_TRACK
     };
   });

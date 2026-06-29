@@ -1,6 +1,6 @@
 import { Box, Text } from 'ink';
-import { COMPACT_HEADER_BELOW_COLUMNS, HIDE_HEADER_BELOW_COLUMNS } from '@components/layout.js';
-import { githubDarkTheme } from '@theme/themeConfig.js';
+import { COMPACT_HEADER_BELOW_COLUMNS, HIDE_HEADER_BELOW_COLUMNS } from '@libs/tui/layout.js';
+import { geminiDarkTheme } from '@theme/themeConfig.js';
 
 type HeaderProps = {
   productVersion: string;
@@ -13,15 +13,15 @@ export function Header({ productVersion, columns }: HeaderProps) {
   }
 
   if (columns < COMPACT_HEADER_BELOW_COLUMNS) {
-    return <Text color={githubDarkTheme.colors.accentBlue}>KQode</Text>;
+    return <Text color={geminiDarkTheme.colors.accentBlue}>KQode</Text>;
   }
 
   const versionLabel = ` v${productVersion}`;
 
   return (
     <Box>
-      <Text color={githubDarkTheme.colors.accentBlue}>KQode</Text>
-      <Text color={githubDarkTheme.colors.foreground}>{versionLabel}</Text>
+      <Text color={geminiDarkTheme.colors.accentBlue}>KQode</Text>
+      <Text color={geminiDarkTheme.colors.foreground}>{versionLabel}</Text>
     </Box>
   );
 }

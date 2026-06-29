@@ -13,5 +13,5 @@ const productVersion = readProductVersion(repoRoot);
 const gitStatusLabel = readGitStatusLabel(workspaceCwd);
 
 render(
-  <App productVersion={productVersion} workspaceCwd={workspaceCwd} gitStatusLabel={gitStatusLabel} />
+  <App screen={{ productVersion, workspaceCwd, gitStatusLabel }} />
 );

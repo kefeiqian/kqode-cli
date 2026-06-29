@@ -7,7 +7,7 @@ describe('App', () => {
   it('smoke renders product metadata and workspace cwd', () => {
     const workspaceCwd = 'C:\\Users\\kefeiqian\\Projects\\dummy-react-app';
     const { lastFrame } = render(
-      <App productVersion="0.1.0" workspaceCwd={workspaceCwd} columns={100} rows={20} />
+      <App screen={{ productVersion: '0.1.0', workspaceCwd, columns: 100, rows: 20 }} />
     );
 
     const output = lastFrame() ?? '';
@@ -21,7 +21,7 @@ describe('App', () => {
   it('reflows to the latest terminal size after stdout resize events', async () => {
     const workspaceCwd = 'C:\\Users\\kefeiqian\\Projects\\dummy-react-app';
     const { lastFrame, stdout } = render(
-      <App productVersion="0.1.0" workspaceCwd={workspaceCwd} />
+      <App screen={{ productVersion: '0.1.0', workspaceCwd }} />
     );
 
     await flushInput();
@@ -38,7 +38,7 @@ describe('App', () => {
   it('keeps the layout at the minimum height when the terminal shrinks below 10 rows', async () => {
     const workspaceCwd = 'C:\\Users\\kefeiqian\\Projects\\dummy-react-app';
     const { lastFrame, stdout } = render(
-      <App productVersion="0.1.0" workspaceCwd={workspaceCwd} />
+      <App screen={{ productVersion: '0.1.0', workspaceCwd }} />
     );
 
     await flushInput();

@@ -1,5 +1,8 @@
-import { LOWER_HALF_BLOCK, UPPER_HALF_BLOCK } from '@components/BackgroundBlock.js';
-import { githubDarkTheme } from '@theme/themeConfig.js';
+import {
+  LOWER_HALF_BLOCK,
+  UPPER_HALF_BLOCK
+} from '@libs/tui/backgroundBlock.js';
+import { geminiDarkTheme } from '@theme/themeConfig.js';
 
 export type BodyEntry = {
   id?: string;
@@ -16,13 +19,8 @@ export type BodyRow = {
   text: string;
 };
 
-export type BodyBackgroundMode = 'disabled' | 'enabled';
+export const DEFAULT_BODY_ENTRIES: readonly BodyEntry[] = [];
 
-export type BodyRowsOptions = {
-  backgroundMode?: BodyBackgroundMode;
-};
-
-const BODY_ROW_GAP_ROWS = 1;
 const ASSISTANT_MESSAGE_PREFIX = '• ';
 const USER_MESSAGE_PREFIX = '❯ ';
 const USER_MESSAGE_HORIZONTAL_PADDING = 2;
@@ -30,36 +28,33 @@ const USER_MESSAGE_HORIZONTAL_PADDING = 2;
 export function resolveBodyRows(
   entries: readonly BodyEntry[],
   columns: number,
-  visibleRows: number,
-  options: BodyRowsOptions = {}
+  visibleRows: number
 ): BodyRow[] {
-  const fullWidthRows = toBodyRowsWithEntryGaps(entries, columns, options);
+  const fullWidthRows = toBodyRowsWithEntryGaps(entries, columns);
+  // If content overflows vertically, reserve the final terminal column for the
+  // scrollbar and re-wrap text so body rows do not collide with it.
   const contentColumns = fullWidthRows.length > visibleRows ? Math.max(1, columns - 1) : columns;
 
   return contentColumns === columns
     ? fullWidthRows
-    : toBodyRowsWithEntryGaps(entries, contentColumns, options);
+    : toBodyRowsWithEntryGaps(entries, contentColumns);
 }
 
-function toBodyRowsWithEntryGaps(
+export function countBodyRows(
   entries: readonly BodyEntry[],
   columns: number,
-  options: BodyRowsOptions
-): BodyRow[] {
-  return entries.flatMap((entry, index) => {
-    const rows = toBodyRows(entry, columns, options);
-
-    if (index === entries.length - 1) {
-      return rows;
-    }
-
-    return [...rows, ...gapRows()];
-  });
+  visibleRows: number
+): number {
+  return resolveBodyRows(entries, Math.max(1, columns), Math.max(1, visibleRows)).length;
 }
 
-function toBodyRows(entry: BodyEntry, columns: number, options: BodyRowsOptions): BodyRow[] {
+function toBodyRowsWithEntryGaps(entries: readonly BodyEntry[], columns: number): BodyRow[] {
+  return entries.flatMap((entry) => toBodyRows(entry, columns));
+}
+
+function toBodyRows(entry: BodyEntry, columns: number): BodyRow[] {
   if (entry.kind === 'prompt') {
-    return toPromptRows(entry.text, columns, options);
+    return toPromptRows(entry.text, columns);
   }
 
   if (entry.kind === 'info') {
@@ -77,31 +72,26 @@ function toAssistantRows(text: string, columns: number): BodyRow[] {
   const wrappedText = wrapBodyText(text, Math.max(1, columns - ASSISTANT_MESSAGE_PREFIX.length));
 
   return wrappedText.map((line, index) => ({
-    color: githubDarkTheme.colors.foreground,
+    color: geminiDarkTheme.colors.foreground,
     marker: index === 0 ? ASSISTANT_MESSAGE_PREFIX : continuationPrefix,
-    markerColor: index === 0 ? githubDarkTheme.colors.accentBlue : githubDarkTheme.colors.foreground,
+    markerColor: index === 0 ? geminiDarkTheme.colors.accentBlue : geminiDarkTheme.colors.foreground,
     text: line
   }));
 }
 
-function toPromptRows(text: string, columns: number, options: BodyRowsOptions): BodyRow[] {
+function toPromptRows(text: string, columns: number): BodyRow[] {
   const promptIndent = USER_MESSAGE_HORIZONTAL_PADDING + USER_MESSAGE_PREFIX.length;
+  // User prompts have symmetric horizontal padding inside their message block;
+  // continuation rows replace the visible prefix with spaces to align wrapped text.
   const textColumns = Math.max(1, columns - promptIndent - USER_MESSAGE_HORIZONTAL_PADDING);
   const continuationPrefix = ' '.repeat(promptIndent);
-  const wrappedText = wrapBodyText(text, textColumns);
+  const wrappedText = wrapBodyText(text, textColumns, { preserveHardLines: true });
   const textRows = wrappedText.map((line, index) => ({
-    backgroundColor:
-      options.backgroundMode === 'enabled'
-        ? githubDarkTheme.colors.messageBackground
-        : undefined,
-    color: githubDarkTheme.colors.foreground,
-    fillColumns: options.backgroundMode === 'enabled',
+    backgroundColor: geminiDarkTheme.colors.messageBackground,
+    color: geminiDarkTheme.colors.foreground,
+    fillColumns: true,
     text: `${index === 0 ? promptPrefix() : continuationPrefix}${line}`
   }));
-
-  if (options.backgroundMode !== 'enabled') {
-    return textRows;
-  }
 
   return [
     halfLineRow(columns, LOWER_HALF_BLOCK),
@@ -116,7 +106,8 @@ function promptPrefix(): string {
 
 function halfLineRow(columns: number, glyph: string): BodyRow {
   return {
-    color: githubDarkTheme.colors.messageBackground,
+    backgroundColor: geminiDarkTheme.colors.bodyBackground,
+    color: geminiDarkTheme.colors.messageBackground,
     text: glyph.repeat(columns)
   };
 }
@@ -124,15 +115,15 @@ function halfLineRow(columns: number, glyph: string): BodyRow {
 function colorForEntry(kind: BodyEntry['kind']): string {
   switch (kind) {
     case 'error':
-      return githubDarkTheme.colors.errorRed;
+      return geminiDarkTheme.colors.errorRed;
     case 'pending':
-      return githubDarkTheme.colors.warning;
+      return geminiDarkTheme.colors.warning;
     case 'success':
-      return githubDarkTheme.colors.accentGreen;
+      return geminiDarkTheme.colors.accentGreen;
     case 'prompt':
-      return githubDarkTheme.colors.foreground;
+      return geminiDarkTheme.colors.foreground;
     case 'info':
-      return githubDarkTheme.colors.muted;
+      return geminiDarkTheme.colors.muted;
   }
 }
 
@@ -152,25 +143,26 @@ function fitBodyLine(text: string): string {
   return text.replace(/[\r\n]+/g, ' ');
 }
 
-function wrapBodyText(text: string, columns: number): string[] {
-  const singleLine = fitBodyLine(text);
-
-  if (singleLine.length === 0) {
-    return [''];
-  }
-
+function wrapBodyText(
+  text: string,
+  columns: number,
+  options: { preserveHardLines?: boolean } = {}
+): string[] {
   const wrappedRows: string[] = [];
+  const hardLines = options.preserveHardLines
+    ? text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
+    : [fitBodyLine(text)];
 
-  for (let start = 0; start < singleLine.length; start += columns) {
-    wrappedRows.push(singleLine.slice(start, start + columns));
+  for (const line of hardLines) {
+    if (line.length === 0) {
+      wrappedRows.push('');
+      continue;
+    }
+
+    for (let start = 0; start < line.length; start += columns) {
+      wrappedRows.push(line.slice(start, start + columns));
+    }
   }
 
   return wrappedRows;
-}
-
-function gapRows(): BodyRow[] {
-  return Array.from({ length: BODY_ROW_GAP_ROWS }, () => ({
-    color: githubDarkTheme.colors.muted,
-    text: ''
-  }));
 }

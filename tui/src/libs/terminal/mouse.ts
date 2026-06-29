@@ -22,6 +22,8 @@ export function parseMouseWheelInput(input: string): MouseWheelDirection | null 
     return null;
   }
 
+  // SGR mouse encodes wheel events starting at button 64; modulo strips any
+  // modifier bits while keeping 0/1 as vertical wheel up/down.
   const wheelButton = (buttonCode - WHEEL_BUTTON_OFFSET) % WHEEL_BUTTON_COUNT;
   if (wheelButton === 0) {
     return 'up';

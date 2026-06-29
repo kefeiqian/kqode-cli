@@ -1,18 +1,25 @@
+import { atom } from 'jotai';
+
 export const PROMPT_MAX_BYTES = 64 * 1024;
 
-type ComposerState = {
+export type ComposerState = {
   text: string;
   cursorIndex: number;
   validationError: string | null;
 };
 
-type ComposerAction =
-  | { type: 'insert'; text: string; maxBytes?: number }
-  | { type: 'deleteBackward'; maxBytes?: number }
-  | { type: 'moveCursorBackward' }
-  | { type: 'moveCursorForward' }
-  | { type: 'clear' }
-  | { type: 'setValidationError'; message: string | null };
+type SubmitValidation =
+  | { ok: true; text: string }
+  | { ok: false; reason: 'empty' | 'over-limit'; message: string };
+
+type InsertTextOptions = {
+  maxBytes?: number;
+  text: string;
+};
+
+type OptionalMaxBytes = {
+  maxBytes?: number;
+};
 
 export const initialComposerState: ComposerState = {
   text: '',
@@ -20,30 +27,32 @@ export const initialComposerState: ComposerState = {
   validationError: null
 };
 
-const textEncoder = new TextEncoder();
+export const composerStateAtom = atom<ComposerState>(initialComposerState);
 
-type SubmitValidation =
-  | { ok: true; text: string }
-  | { ok: false; reason: 'empty' | 'over-limit'; message: string };
+export const insertComposerTextAtom = atom(
+  null,
+  (_get, set, { maxBytes = PROMPT_MAX_BYTES, text: insertedText }: InsertTextOptions) => {
+    if (insertedText.length === 0) {
+      return;
+    }
 
-export function composerReducer(state: ComposerState, action: ComposerAction): ComposerState {
-  switch (action.type) {
-    case 'insert': {
-      if (action.text.length === 0) {
-        return state;
-      }
-
+    set(composerStateAtom, (state) => {
       const cursorIndex = clampCursorIndex(state.text, state.cursorIndex);
-      const text =
-        state.text.slice(0, cursorIndex) + action.text + state.text.slice(cursorIndex);
+      const text = state.text.slice(0, cursorIndex) + insertedText + state.text.slice(cursorIndex);
 
       return {
         text,
-        cursorIndex: cursorIndex + action.text.length,
-        validationError: overLimitMessage(text, action.maxBytes ?? PROMPT_MAX_BYTES)
+        cursorIndex: cursorIndex + insertedText.length,
+        validationError: overLimitMessage(text, maxBytes)
       };
-    }
-    case 'deleteBackward': {
+    });
+  }
+);
+
+export const deleteComposerBackwardAtom = atom(
+  null,
+  (_get, set, { maxBytes = PROMPT_MAX_BYTES }: OptionalMaxBytes = {}) => {
+    set(composerStateAtom, (state) => {
       const cursorIndex = clampCursorIndex(state.text, state.cursorIndex);
       if (cursorIndex === 0) {
         return state;
@@ -58,48 +67,64 @@ export function composerReducer(state: ComposerState, action: ComposerAction): C
       return {
         text,
         cursorIndex: previousCursorIndex,
-        validationError: overLimitMessage(text, action.maxBytes ?? PROMPT_MAX_BYTES)
+        validationError: overLimitMessage(text, maxBytes)
       };
-    }
-    case 'moveCursorBackward': {
-      const cursorIndex = clampCursorIndex(state.text, state.cursorIndex);
-      if (cursorIndex === 0) {
-        return state;
-      }
-
-      return {
-        ...state,
-        cursorIndex: previousCodePointStart(state.text, cursorIndex)
-      };
-    }
-    case 'moveCursorForward': {
-      const cursorIndex = clampCursorIndex(state.text, state.cursorIndex);
-      if (cursorIndex >= state.text.length) {
-        return state;
-      }
-
-      return {
-        ...state,
-        cursorIndex: nextCodePointEnd(state.text, cursorIndex)
-      };
-    }
-    case 'clear':
-      if (state.text.length === 0 && state.validationError === null) {
-        return state;
-      }
-
-      return initialComposerState;
-    case 'setValidationError':
-      if (state.validationError === action.message) {
-        return state;
-      }
-
-      return {
-        ...state,
-        validationError: action.message
-      };
+    });
   }
-}
+);
+
+export const moveComposerCursorBackwardAtom = atom(null, (_get, set) => {
+  set(composerStateAtom, (state) => {
+    const cursorIndex = clampCursorIndex(state.text, state.cursorIndex);
+    if (cursorIndex === 0) {
+      return state;
+    }
+
+    return {
+      ...state,
+      cursorIndex: previousCodePointStart(state.text, cursorIndex)
+    };
+  });
+});
+
+export const moveComposerCursorForwardAtom = atom(null, (_get, set) => {
+  set(composerStateAtom, (state) => {
+    const cursorIndex = clampCursorIndex(state.text, state.cursorIndex);
+    if (cursorIndex >= state.text.length) {
+      return state;
+    }
+
+    return {
+      ...state,
+      cursorIndex: nextCodePointEnd(state.text, cursorIndex)
+    };
+  });
+});
+
+export const clearComposerAtom = atom(null, (_get, set) => {
+  set(composerStateAtom, (state) => {
+    if (state.text.length === 0 && state.validationError === null) {
+      return state;
+    }
+
+    return initialComposerState;
+  });
+});
+
+export const setComposerValidationErrorAtom = atom(null, (_get, set, message: string | null) => {
+  set(composerStateAtom, (state) => {
+    if (state.validationError === message) {
+      return state;
+    }
+
+    return {
+      ...state,
+      validationError: message
+    };
+  });
+});
+
+const textEncoder = new TextEncoder();
 
 export function printableInput(input: string): string {
   return input.replace(/[\u0000-\u001f\u007f]/g, '');
@@ -117,7 +142,6 @@ export function validateComposerSubmit(
     };
   }
 
-  const byteLength = textEncoder.encode(text).length;
   const limitMessage = overLimitMessage(text, maxBytes);
   if (limitMessage !== null) {
     return {

@@ -1,33 +1,44 @@
+import { createStore } from 'jotai';
 import { describe, expect, it } from 'vitest';
 import {
-  composerReducer,
-  initialComposerState,
+  composerStateAtom,
+  deleteComposerBackwardAtom,
+  insertComposerTextAtom,
+  moveComposerCursorBackwardAtom,
+  moveComposerCursorForwardAtom,
   printableInput,
   validateComposerSubmit
-} from '@state/composerReducer.js';
+} from '@state/composerAtoms.js';
 
-describe('composerReducer', () => {
+describe('composerAtoms', () => {
   it('appends printable text and deletes the last character', () => {
-    const typed = composerReducer(initialComposerState, { type: 'insert', text: 'abc' });
-    const deleted = composerReducer(typed, { type: 'deleteBackward' });
+    const store = createStore();
 
-    expect(deleted.text).toBe('ab');
-    expect(deleted.cursorIndex).toBe(2);
+    store.set(insertComposerTextAtom, { text: 'abc' });
+    store.set(deleteComposerBackwardAtom, {});
+
+    expect(store.get(composerStateAtom).text).toBe('ab');
+    expect(store.get(composerStateAtom).cursorIndex).toBe(2);
   });
 
   it('moves the cursor left and right for middle insertion and deletion', () => {
-    const typed = composerReducer(initialComposerState, { type: 'insert', text: 'abc' });
-    const movedLeft = composerReducer(typed, { type: 'moveCursorBackward' });
-    const inserted = composerReducer(movedLeft, { type: 'insert', text: 'X' });
-    const deleted = composerReducer(inserted, { type: 'deleteBackward' });
-    const movedRight = composerReducer(inserted, { type: 'moveCursorForward' });
-    const insertedAfterMoveRight = composerReducer(movedRight, { type: 'insert', text: 'Y' });
+    const store = createStore();
+
+    store.set(insertComposerTextAtom, { text: 'abc' });
+    store.set(moveComposerCursorBackwardAtom);
+    store.set(insertComposerTextAtom, { text: 'X' });
+    const inserted = store.get(composerStateAtom);
+    store.set(deleteComposerBackwardAtom, {});
+    const deleted = store.get(composerStateAtom);
+    store.set(insertComposerTextAtom, { text: 'X' });
+    store.set(moveComposerCursorForwardAtom);
+    store.set(insertComposerTextAtom, { text: 'Y' });
 
     expect(inserted.text).toBe('abXc');
     expect(inserted.cursorIndex).toBe(3);
     expect(deleted.text).toBe('abc');
     expect(deleted.cursorIndex).toBe(2);
-    expect(insertedAfterMoveRight.text).toBe('abXcY');
+    expect(store.get(composerStateAtom).text).toBe('abXcY');
   });
 
   it('keeps slash, mention, and help affordance characters printable', () => {

@@ -1,5 +1,5 @@
 import { Box, Text } from 'ink';
-import { githubDarkTheme } from '@theme/themeConfig.js';
+import { geminiDarkTheme } from '@theme/themeConfig.js';
 
 type StatusBarProps = {
   columns: number;
@@ -12,10 +12,10 @@ export function StatusBar({ columns, modelLabel }: StatusBarProps) {
 
   return (
     <Box width={columns}>
-      <Text color={githubDarkTheme.colors.muted}>{leftHints}</Text>
+      <Text color={geminiDarkTheme.colors.muted}>{leftHints}</Text>
       {showModel ? (
         <Box flexGrow={1} justifyContent="flex-end">
-          <Text color={githubDarkTheme.colors.accentGreen}>{modelLabel}</Text>
+          <Text color={geminiDarkTheme.colors.accentGreen}>{modelLabel}</Text>
         </Box>
       ) : null}
     </Box>

@@ -2,19 +2,34 @@ import { render } from 'ink-testing-library';
 import { describe, expect, it } from 'vitest';
 import { BodyPane } from '@components/BodyPane.js';
 import { formatDisplayCwd } from '@components/CwdLine.js';
-import { HomeScreen } from '@components/HomeScreen.js';
-import { clipTextLeft } from '@libs/text/clipText.js';
-import { PROMPT_MAX_BYTES } from '@state/composerReducer.js';
+import { HomeScreen } from '@components/HomeScreen/index.js';
+import { PROMPT_MAX_BYTES } from '@state/composerAtoms.js';
+import { createHomeScreenConfig } from '@state/homeScreenAtoms.js';
+import type { HomeScreenOptions } from '@state/homeScreenAtoms.js';
 import { flushInput } from '@test/flushInput.js';
-import { githubDarkTheme } from '@theme/themeConfig.js';
+import { geminiDarkTheme } from '@theme/themeConfig.js';
 
 const workspaceCwd = 'C:\\Users\\kefeiqian\\Projects\\KQode';
 
+function renderHomeScreen({
+  productVersion = '0.1.0',
+  workspaceCwd: screenWorkspaceCwd = workspaceCwd,
+  ...options
+}: Partial<HomeScreenOptions> = {}) {
+  return render(
+    <HomeScreen
+      config={createHomeScreenConfig({
+        productVersion,
+        workspaceCwd: screenWorkspaceCwd,
+        ...options
+      })}
+    />
+  );
+}
+
 describe('HomeScreen', () => {
   it('renders the first-frame identity, cwd, composer, hints, and model label', () => {
-    const { lastFrame } = render(
-      <HomeScreen productVersion="0.1.0" workspaceCwd={workspaceCwd} columns={100} rows={20} />
-    );
+    const { lastFrame } = renderHomeScreen({ columns: 100, rows: 20 });
 
     const output = lastFrame() ?? '';
 
@@ -36,9 +51,7 @@ describe('HomeScreen', () => {
   it('displays the copied dummy React workspace cwd rather than the TUI package path', () => {
     const copiedWorkspace =
       'C:\\Users\\kefeiqian\\Projects\\KQode\\target\\kqode-test-workspaces\\workspace';
-    const { lastFrame } = render(
-      <HomeScreen productVersion="0.1.0" workspaceCwd={copiedWorkspace} columns={120} rows={20} />
-    );
+    const { lastFrame } = renderHomeScreen({ workspaceCwd: copiedWorkspace, columns: 120, rows: 20 });
 
     const output = lastFrame() ?? '';
 
@@ -47,12 +60,12 @@ describe('HomeScreen', () => {
     expect(output).not.toContain('tui');
   });
 
-  it('centralizes GitHub Dark text-only theme tokens including error red', () => {
-    expect(githubDarkTheme.colors.foreground).toBe('#c9d1d9');
-    expect(githubDarkTheme.colors.muted).toBe('#8b949e');
-    expect(githubDarkTheme.colors.accentBlue).toBe('#58a6ff');
-    expect(githubDarkTheme.colors.errorRed).toBe('#ff7b72');
-    expect(githubDarkTheme.colors.messageBackground).toBe('#141b22');
+  it('centralizes Gemini dark theme tokens including error red', () => {
+    expect(geminiDarkTheme.colors.foreground).toBe('#FFFFFF');
+    expect(geminiDarkTheme.colors.muted).toBe('#AFAFAF');
+    expect(geminiDarkTheme.colors.accentBlue).toBe('#87AFFF');
+    expect(geminiDarkTheme.colors.errorRed).toBe('#FF87AF');
+    expect(geminiDarkTheme.colors.messageBackground).toBe('#5F5F5F');
 
     const { lastFrame } = render(
       <BodyPane rows={3} columns={80} entries={[{ kind: 'error', text: 'backend failed' }]} />
@@ -104,21 +117,15 @@ describe('HomeScreen', () => {
       kind: 'info' as const,
       text: `entry ${index + 1}`
     }));
-    const { lastFrame } = render(
-      <HomeScreen
-        productVersion="0.1.0"
-        workspaceCwd={workspaceCwd}
-        bodyEntries={entries}
-        columns={80}
-        rows={16}
-      />
-    );
+    const { lastFrame } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 16 });
     const outputRows = (lastFrame() ?? '').split('\n');
     const cwdRow = outputRows.findIndex((row) => row.includes('Projects\\KQode'));
 
-    expect(cwdRow).toBe(13);
+    expect(cwdRow).toBe(11);
     expect(outputRows.at(cwdRow - 1)).toBe('');
-    expect(outputRows.at(14)).toBe('>');
+    expect(outputRows.at(cwdRow + 1)).toContain('▄');
+    expect(outputRows.at(cwdRow + 2)).toContain('>');
+    expect(outputRows.at(cwdRow + 3)).toContain('▀');
     expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
   });
 
@@ -130,10 +137,10 @@ describe('HomeScreen', () => {
     expect(lastFrame() ?? '').toBe('• first second');
   });
 
-  it('renders a blank gap row between body output rows', () => {
+  it('renders body output rows without entry gap rows', () => {
     const { lastFrame } = render(
       <BodyPane
-        rows={3}
+        rows={2}
         columns={80}
         entries={[
           { kind: 'info', text: 'first' },
@@ -141,31 +148,15 @@ describe('HomeScreen', () => {
         ]}
       />
     );
-
     const outputRows = (lastFrame() ?? '').split('\n');
     expect(outputRows.at(0)).toBe('• first');
-    expect(outputRows.at(1)?.trim()).toBe('');
-    expect(outputRows.at(2)).toBe('• second');
+    expect(outputRows.at(0)).toBe('• first');
+    expect(outputRows.at(1)).toBe('• second');
   });
 
-  it('renders user messages with a chevron prompt block style', () => {
+  it('renders user messages with default half-line background block rows', () => {
     const { lastFrame } = render(
-      <BodyPane rows={2} columns={40} entries={[{ kind: 'prompt', text: 'hello from user' }]} />
-    );
-    const outputRows = (lastFrame() ?? '').split('\n');
-
-    expect(outputRows.at(0)).toContain('  ❯ hello from user');
-    expect(outputRows.at(1)?.trim()).toBe('');
-  });
-
-  it('can render user messages with half-line background block rows', () => {
-    const { lastFrame } = render(
-      <BodyPane
-        backgroundMode="enabled"
-        rows={4}
-        columns={24}
-        entries={[{ kind: 'prompt', text: 'hello from user' }]}
-      />
+      <BodyPane rows={3} columns={24} entries={[{ kind: 'prompt', text: 'hello from user' }]} />
     );
     const outputRows = (lastFrame() ?? '').split('\n');
 
@@ -189,15 +180,11 @@ describe('HomeScreen', () => {
   });
 
   it('formats the cwd row with a home-relative path and bracketed git status', () => {
-    const { lastFrame } = render(
-      <HomeScreen
-        productVersion="0.1.0"
-        workspaceCwd={workspaceCwd}
-        gitStatusLabel="⎇ feat/first-ink-tui-jsonrpc-backend*+%"
-        columns={100}
-        rows={20}
-      />
-    );
+    const { lastFrame } = renderHomeScreen({
+      gitStatusLabel: '⎇ feat/first-ink-tui-jsonrpc-backend*+%',
+      columns: 100,
+      rows: 20
+    });
 
     const output = lastFrame() ?? '';
 
@@ -206,21 +193,20 @@ describe('HomeScreen', () => {
     expect(output).not.toContain('cwd ');
   });
 
-  it('compacts a long cwd from the left before it can crowd the composer and status bar', () => {
+  it('soft-wraps a long cwd without truncating it', () => {
     const longWorkspace =
       'C:\\Users\\kefeiqian\\Projects\\KQode\\target\\kqode-test-workspaces\\workspace\\dummy-react-app';
 
-    expect(clipTextLeft(longWorkspace, 32)).toBe('...ces\\workspace\\dummy-react-app');
-
-    const { lastFrame } = render(
-      <HomeScreen productVersion="0.1.0" workspaceCwd={longWorkspace} columns={40} rows={12} />
-    );
+    const { lastFrame } = renderHomeScreen({ workspaceCwd: longWorkspace, columns: 40, rows: 12 });
     const output = lastFrame() ?? '';
 
-    expect(output).toContain('...');
+    expect(output).not.toContain('...');
+    expect(output).toContain('target\\kqode-test-works');
+    expect(output).toContain('paces\\workspace\\dummy-react-app');
     expect(output).toContain('dummy-react-app');
-    expect(output.split('\n')).toContain('>');
     expect(output).not.toContain('Ask KQode...');
+    expect(output.split('\n')).toHaveLength(12);
+    expect(output.split('\n').at(-1)).toContain('/ | @ | ?');
   });
 
   it('keeps one blank separator row between body output and cwd', () => {
@@ -228,27 +214,18 @@ describe('HomeScreen', () => {
       kind: 'info' as const,
       text: `entry ${index + 1}`
     }));
-    const { lastFrame } = render(
-      <HomeScreen
-        productVersion="0.1.0"
-        workspaceCwd={workspaceCwd}
-        bodyEntries={entries}
-        columns={80}
-        rows={12}
-      />
-    );
+    const { lastFrame } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 12 });
     const outputRows = (lastFrame() ?? '').split('\n');
     const cwdRow = outputRows.findIndex((row) => row.includes('Projects\\KQode'));
 
     expect(outputRows.at(cwdRow - 1)).toBe('');
     expect(outputRows.at(cwdRow - 2)).toContain('entry 10');
-    expect(outputRows.at(cwdRow + 1)).toBe('>');
+    expect(outputRows.at(cwdRow + 1)).toContain('▄');
+    expect(outputRows.at(cwdRow + 2)).toContain('>');
   });
 
   it('keeps cwd, composer, and left status hints visible around 40 columns by 12 rows', async () => {
-    const { lastFrame, stdin } = render(
-      <HomeScreen productVersion="0.1.0" workspaceCwd={workspaceCwd} columns={40} rows={12} />
-    );
+    const { lastFrame, stdin } = renderHomeScreen({ columns: 40, rows: 12 });
 
     const output = lastFrame() ?? '';
 
@@ -271,22 +248,15 @@ describe('HomeScreen', () => {
     expect(wrappedOutput).toContain('l visible composer rows');
     const wrappedRows = wrappedOutput.split('\n');
     expect(wrappedRows).toHaveLength(12);
-    expect(wrappedRows.at(-3)).toContain('> a long prompt');
-    expect(wrappedRows.at(-2)).toContain('l visible composer rows');
+    expect(wrappedRows.at(-4)).toContain('> a long prompt');
+    expect(wrappedRows.at(-3)).toContain('l visible composer rows');
+    expect(wrappedRows.at(-2)).toContain('▀');
     expect(wrappedRows.at(-1)).toContain('/ | @ | ?');
   });
 
   it('soft-wraps long prompts instead of truncating them with an ellipsis', async () => {
     const longPrompt = 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const { lastFrame, stdin } = render(
-      <HomeScreen
-        productVersion="0.1.0"
-        workspaceCwd={workspaceCwd}
-        bodyEntries={[]}
-        columns={24}
-        rows={12}
-      />
-    );
+    const { lastFrame, stdin } = renderHomeScreen({ bodyEntries: [], columns: 24, rows: 12 });
 
     stdin.write(longPrompt);
     await flushInput();
@@ -295,16 +265,15 @@ describe('HomeScreen', () => {
     const outputRows = output.split('\n');
 
     expect(output).not.toContain('...');
-    expect(outputRows.at(-4)).toContain('> abcdefghijklmnopqrstuv');
-    expect(outputRows.at(-3)).toContain('wxyz0123456789ABCDEFGH');
-    expect(outputRows.at(-2)).toContain('IJKLMNOPQRSTUVWXYZ');
+    expect(outputRows.at(-5)).toContain('> abcdefghijklmnopqrstuv');
+    expect(outputRows.at(-4)).toContain('wxyz0123456789ABCDEFGH');
+    expect(outputRows.at(-3)).toContain('IJKLMNOPQRSTUVWXYZ');
+    expect(outputRows.at(-2)).toContain('▀');
     expect(outputRows.at(-1)).toContain('/ | @ | ?');
   });
 
   it('adds submitted prompts to the body when Enter is pressed', async () => {
-    const { lastFrame, stdin } = render(
-      <HomeScreen productVersion="0.1.0" workspaceCwd={workspaceCwd} columns={80} rows={12} />
-    );
+    const { lastFrame, stdin } = renderHomeScreen({ columns: 80, rows: 12 });
 
     stdin.write('show this in the body');
     await flushInput();
@@ -316,20 +285,31 @@ describe('HomeScreen', () => {
     expect(outputRows).toContain('>');
   });
 
+  it('keeps submitted multiline prompts on separate indented body rows', async () => {
+    const { lastFrame, stdin } = renderHomeScreen({ columns: 80, rows: 14 });
+
+    stdin.write('1');
+    await flushInput();
+    stdin.write('\u001B[13;5u');
+    await flushInput();
+    stdin.write('2');
+    await flushInput();
+    stdin.write('\u001B[13;5u');
+    await flushInput();
+    stdin.write('3');
+    await flushInput();
+    stdin.write('\r');
+    await flushInput();
+
+    expect(lastFrame() ?? '').toContain('  ❯ 1\n    2\n    3');
+  });
+
   it('scrolls body output with PageUp and PageDown while keeping the status bar pinned', async () => {
     const entries = Array.from({ length: 10 }, (_, index) => ({
       kind: 'info' as const,
       text: `entry ${index + 1}`
     }));
-    const { lastFrame, stdin } = render(
-      <HomeScreen
-        productVersion="0.1.0"
-        workspaceCwd={workspaceCwd}
-        bodyEntries={entries}
-        columns={80}
-        rows={12}
-      />
-    );
+    const { lastFrame, stdin } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 12 });
 
     expect(lastFrame() ?? '').toContain('entry 10');
 
@@ -372,15 +352,7 @@ describe('HomeScreen', () => {
       kind: 'info' as const,
       text: `entry ${index + 1}`
     }));
-    const { lastFrame, stdin } = render(
-      <HomeScreen
-        productVersion="0.1.0"
-        workspaceCwd={workspaceCwd}
-        bodyEntries={entries}
-        columns={80}
-        rows={12}
-      />
-    );
+    const { lastFrame, stdin } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 12 });
 
     stdin.write('\u001B[<64;1;1M');
     await flushInput();
@@ -397,9 +369,7 @@ describe('HomeScreen', () => {
   });
 
   it('fits over-limit validation feedback inside the 40x12 row budget', async () => {
-    const { lastFrame, stdin } = render(
-      <HomeScreen productVersion="0.1.0" workspaceCwd={workspaceCwd} columns={40} rows={12} />
-    );
+    const { lastFrame, stdin } = renderHomeScreen({ columns: 40, rows: 12 });
 
     stdin.write('a'.repeat(PROMPT_MAX_BYTES + 1));
     await flushInput();
@@ -407,7 +377,9 @@ describe('HomeScreen', () => {
     await flushInput();
 
     const errorOutput = lastFrame() ?? '';
-    expect(errorOutput).toContain('ERROR: Prompt is 65537 bytes; maximum...');
+    expect(errorOutput).not.toContain('...');
+    expect(errorOutput).toContain('ERROR: Prompt is 65537 bytes; maximum is');
+    expect(errorOutput).toContain('65536 bytes.');
     const errorRows = errorOutput.split('\n');
     expect(errorRows).toHaveLength(12);
     expect(errorRows.at(-1)).toContain('/ | @ | ?');
