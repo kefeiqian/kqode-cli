@@ -307,7 +307,7 @@ BackgroundBlock(width, backgroundColor, enabled)
 - **State lifecycle risks:** Background-enabled rendering must not change prompt state, body scroll state, composer visible row reporting, or cursor placement.
 - **API surface parity:** No public API, CLI flag, JSON-RPC method, or user setting is added.
 - **Integration coverage:** HomeScreen-level tests should prove that adding the primitive does not break layout priority or bottom-sticky behavior.
-- **Unchanged invariants:** The TUI remains replaceable and Rust remains headless-capable; theme rendering is not a backend concern.
+- [ ] **Unchanged invariants:** Ink remains the committed TUI and Rust remains headless-capable; theme rendering is not a backend concern.
 
 ---
 

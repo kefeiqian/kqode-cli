@@ -18,7 +18,7 @@ Rust kqode daemon / CLI
   -> eval runner
 ```
 
-The TUI must be replaceable. The Rust core must run headless without the TUI.
+Ink is the committed TUI framework. The Rust core must still run headless without the TUI for automation, tests, replay, and non-interactive CLI workflows.
 
 ## Milestones
 

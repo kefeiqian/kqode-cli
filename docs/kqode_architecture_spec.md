@@ -21,7 +21,7 @@ Rust owns:
 
 ### TypeScript
 
-Use TypeScript for surfaces where iteration speed and ecosystem matter.
+Use TypeScript for surfaces where iteration speed and ecosystem matter. Ink is the committed terminal UI framework for KQode.
 
 TypeScript owns:
 - Ink TUI.
@@ -69,7 +69,7 @@ docs/
   *.md
 ```
 
-The final layout can change during planning, but the boundary should remain: Rust core, TypeScript surface.
+The final layout can change during planning, but the boundary should remain: Rust core, TypeScript Ink TUI and related TypeScript surfaces.
 
 ## Process model
 

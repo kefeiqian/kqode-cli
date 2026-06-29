@@ -2,7 +2,7 @@
 
 [![GitHub Pages](https://github.com/kefeiqian/KQode/actions/workflows/github-pages.yml/badge.svg)](https://github.com/kefeiqian/KQode/actions/workflows/github-pages.yml)
 
-KQode is a Rust-first coding-agent harness with a replaceable TypeScript Ink TUI.
+KQode is a Rust-first coding-agent harness with TypeScript Ink as its committed TUI.
 The project is currently in the foundation stage: the checked-in implementation is
 small, while the product direction lives in the planning and architecture docs.
 
@@ -17,8 +17,9 @@ small, while the product direction lives in the planning and architecture docs.
 
 KQode is designed around a headless Rust core that owns agent execution,
 provider normalization, tools, virtual file operations, sandbox policy, session
-logs, replay, and evaluation. Rich surfaces such as the terminal UI, protocol
-client, and future IDE or web companions live in TypeScript.
+logs, replay, and evaluation. The terminal experience is built permanently with
+Ink, while related protocol clients and future IDE or web companions live in
+TypeScript.
 
 ```text
 TypeScript Ink TUI
@@ -85,4 +86,5 @@ cargo xtask blog-install
 cargo xtask blog-build
 cargo xtask blog-typecheck
 cargo xtask blog-serve
+cargo xtask blog-preview
 ```

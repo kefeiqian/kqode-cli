@@ -13,7 +13,7 @@ Build the first KQode Ink TUI as a static Copilot CLI-style home screen with a w
 
 ## Problem Frame
 
-KQode is currently at the project-foundation stage: the Rust binary exists, but the planned TypeScript Ink TUI has not been created yet. The product direction already calls for a replaceable TypeScript surface over a Rust core, so the first TUI slice should prove the visual shell and the frontend/backend boundary without pulling in later agent-loop, session, command, or model features.
+KQode is currently at the project-foundation stage: the Rust binary exists, but the planned TypeScript Ink TUI has not been created yet. The product direction commits to Ink as the terminal UI over a Rust core, so the first TUI slice should prove the visual shell and the frontend/backend boundary without pulling in later agent-loop, session, command, or model features.
 
 The immediate need is a credible terminal home screen that establishes KQode's visual identity, mirrors the familiar coding-agent CLI layout, and gives future work a stable place to attach real agent behavior.
 

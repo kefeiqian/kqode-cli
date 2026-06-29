@@ -15,7 +15,7 @@ Add a small TypeScript Ink package under `tui/`, a minimal Rust JSON-RPC stdio b
 ---
 
 ## Problem Frame
-KQode currently has a starter Rust binary and a checked-in starter TypeScript TUI scaffold. The architecture calls for a replaceable Ink surface over a Rust core, so this plan turns that scaffold into the first visual shell and text-submission path without making the UI responsible for core agent behavior.
+KQode currently has a starter Rust binary and a checked-in starter TypeScript TUI scaffold. The architecture commits to Ink as the terminal UI over a Rust core, so this plan turns that scaffold into the first visual shell and text-submission path without making the UI responsible for core agent behavior.
 
 ---
 
@@ -105,7 +105,7 @@ KQode currently has a starter Rust binary and a checked-in starter TypeScript TU
 - [x] `Cargo.toml` defines a single Rust package named `KQode`, version `0.1.0`, edition `2024`, with no dependencies yet.
 - [x] `src/main.rs` is the only Rust runtime source today and currently prints a starter message; this plan moves the binary entrypoint to root `main.rs` and keeps implementation modules under `src/`.
 - [x] `docs/kqode_architecture_spec.md` assigns the Rust core runtime to Rust and the Ink TUI/protocol client to TypeScript. Its older daemon-mode direction is superseded for this product slice by the explicit no-daemon decision in this plan.
-- [x] `docs/kqode_build_path.md` requires the Rust core to run headless and the TUI to remain replaceable.
+- [ ] `docs/kqode_build_path.md` requires the Rust core to run headless while Ink remains the committed TUI.
 - [x] `.cargo/config.toml` exposes `cargo xtask ...` as the contributor-facing command shape for nested TUI and fixture workflows.
 - [x] `.gitignore` covers Rust artifacts, TUI dependency/build artifacts, generated fixture workspaces, and local/editor files.
 - [x] `tui/package.json` records the Bun-managed package baseline (`bun@1.3.12`, Bun `>=1.3.0`, Node `>=24.0.0`) and keeps package-local `dev`, `typecheck`, and `test` scripts available behind Cargo-facing xtask commands.
@@ -132,7 +132,7 @@ KQode currently has a starter Rust binary and a checked-in starter TypeScript TU
 - [x] Use a nested Bun-managed TypeScript package in `tui/`: This satisfies the origin path requirement without forcing a root JavaScript workspace before the broader M0 structure exists.
 - [x] Use Bun 1.3.x plus Node 24+ as the TUI source baseline: Record both the Bun package manager and Node runtime expectation in package metadata so Ink/ESM/Vitest behavior is reproducible.
 - [x] Expose source workflows through Cargo-facing xtask commands: contributors should reach TUI install/typecheck/test/dev and fixture preparation from the repository root, while Bun/package scripts remain the nested implementation detail.
-- [x] Keep Ink components prop-driven and backend-agnostic: Layout components should not import process-spawning code, preserving the replaceable TUI boundary.
+- [ ] Keep Ink components prop-driven and backend-agnostic: Layout components should not import process-spawning code, preserving the Rust core / Ink TUI boundary.
 - [x] Use a small library-backed JSON-RPC message seam: The TUI calls a backend client now, and that seam can later expand into a real protocol client without rewriting the UI tree.
 - [x] Use a TUI-owned Rust JSON-RPC stdio server for the first backend: This is not a daemon, exposes no socket/port, and exits with the TUI, but it is closer to KQode's intended Rust-core/TypeScript-surface boundary than one process per submit.
 - [x] Make the backend launch path clean-checkout-safe: The documented demo path must build or run the Rust backend from source rather than assuming an ignored `target/` artifact already exists.
@@ -569,7 +569,7 @@ After each commit-sized unit lands, run code review on the completed unit, then 
 - [x] Keep optional message background rendering internal and Gemini-inspired: body prompt blocks may use half-line `▄`/`▀` rows, while the composer uses row background without changing vertical row accounting.
 
 **Patterns to follow:**
-- [x] `docs/kqode_architecture_spec.md` keeps UI surfaces replaceable; layout components should remain display-only.
+- [ ] `docs/kqode_architecture_spec.md` commits to Ink for the TUI; layout components should remain display-only.
 - [x] `docs/brainstorms/2026-06-25-first-ink-tui-homepage-requirements.md` provides the visual wireframe and status labels.
 - [x] Gemini CLI background rendering is product-behavior reference only: copy the half-line block idea, not source.
 
@@ -852,7 +852,7 @@ After each commit-sized unit lands, run code review on the completed unit, then 
 - [ ] Keep session management minimal: no delete, rename, archive, export, checkpoint, rewind, or fork in this slice.
 
 **Patterns to follow:**
-- [ ] Use a replaceable display component for the picker; App owns command routing and backend calls.
+- [ ] Use a display-only Ink component for the picker; App owns command routing and backend calls.
 - [ ] Keep loading animations terminal-safe, deterministic in tests, and isolated from persisted transcript/session state.
 - [ ] Keep important states distinguishable without color: errors include text markers, selected rows include a pointer marker, loading includes static fallback text, and pending rows retain `(pending)`.
 - [ ] Reference research favors project/workdir-scoped session lists and explicit workdir validation before resume; this slice tightens that to same-canonical-workspace-only.
