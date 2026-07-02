@@ -1,0 +1,3 @@
+# Ensure shell scripts always use LF so they run on Unix and in Git Bash,
+# even when checked out on Windows.
+*.sh text eol=lf

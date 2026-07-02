@@ -2,6 +2,7 @@ use crate::commands::CommandSpec;
 
 pub mod dev;
 pub mod install;
+pub mod prod;
 pub mod test;
 pub mod typecheck;
 
@@ -9,6 +10,12 @@ pub const DEV: CommandSpec = CommandSpec {
     name: "tui-dev",
     description: "Run the TUI from the workspace, choosing a fixture if missing",
     run: dev::run,
+};
+
+pub const PROD: CommandSpec = CommandSpec {
+    name: "tui-prod",
+    description: "Package the standalone kqode executable and run it from the workspace",
+    run: prod::run,
 };
 
 pub const INSTALL: CommandSpec = CommandSpec {
@@ -29,4 +36,4 @@ pub const TEST: CommandSpec = CommandSpec {
     run: test::run,
 };
 
-pub const COMMANDS: &[CommandSpec] = &[DEV, INSTALL, TYPECHECK, TEST];
+pub const COMMANDS: &[CommandSpec] = &[DEV, PROD, INSTALL, TYPECHECK, TEST];

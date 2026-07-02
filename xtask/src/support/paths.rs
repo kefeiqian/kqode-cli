@@ -36,6 +36,12 @@ pub fn tui_entrypoint(repo_root: &Path) -> PathBuf {
     tui_package_root(repo_root).join("main.tsx")
 }
 
+/// Path to the packaged standalone executable produced by `cargo xtask package`.
+pub fn tui_packaged_exe(repo_root: &Path) -> PathBuf {
+    let name = if cfg!(windows) { "kqode.exe" } else { "kqode" };
+    tui_package_root(repo_root).join("dist").join(name)
+}
+
 pub fn tui_tsconfig(repo_root: &Path) -> PathBuf {
     tui_package_root(repo_root).join("tsconfig.json")
 }

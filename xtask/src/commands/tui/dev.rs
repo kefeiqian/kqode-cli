@@ -39,7 +39,7 @@ pub fn run(repo_root: &Path) -> Result<(), String> {
 ///
 /// Returns an error when the existing workspace is incomplete, the fixture
 /// selection cannot be read, or the selected fixture command fails.
-fn ensure_workspace(repo_root: &Path) -> Result<(), String> {
+pub(crate) fn ensure_workspace(repo_root: &Path) -> Result<(), String> {
     let workspace = paths::workspace(repo_root);
 
     if workspace.is_dir() {
