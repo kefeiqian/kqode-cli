@@ -1,0 +1,77 @@
+# Publishes the single `@kqode/kqode-cli` npm package using npm Trusted
+# Publishing (OIDC) — no long-lived npm token. Kept OUT of release.yml (per U13):
+# run it by hand for a tag, or when a Release is published.
+#
+# The package ships no binary; its postinstall downloads the matching
+# `kqode-<target>` archive from the GitHub Release for its version, so publish
+# only AFTER release.yml has uploaded that tag's archives + checksums.
+#
+# One-time setup: create the `@kqode` npm org, do the first publish to create the
+# package (trusted publishers cannot be configured for a nonexistent package),
+# then add a Trusted Publisher on npmjs.com (GitHub Actions, repo
+# kefeiqian/kqode-cli, workflow `npm-publish.yml`). See
+# docs/release/kqode_distribution_registration.md.
+#
+# Note: a Release created by release.yml's GITHUB_TOKEN does not re-trigger the
+# `release: published` event, so the reliable path is the manual dispatch below.
+name: Publish npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish, e.g. v0.1.0"
+        required: true
+        type: string
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish-${{ inputs.tag || github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      id-token: write # OIDC token for npm Trusted Publishing
+    defaults:
+      run:
+        working-directory: packaging/npm/kqode
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Use a Trusted-Publishing-capable npm
+        run: npm install -g npm@latest
+
+      - name: Resolve version
+        id: rel
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag || github.event.release.tag_name }}
+        run: |
+          [ -n "$TAG" ] || { echo "::error::no release tag provided"; exit 1; }
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish via Trusted Publishing (OIDC)
+        shell: bash
+        env:
+          VERSION: ${{ steps.rel.outputs.version }}
+        run: |
+          set -euo pipefail
+          npm version "$VERSION" --no-git-tag-version --allow-same-version >/dev/null
+          name="$(node -p "require('./package.json').name")"
+          if npm view "$name@$VERSION" version >/dev/null 2>&1; then
+            echo "$name@$VERSION already published; skipping."
+          else
+            # OIDC is auto-detected (id-token: write); no NPM_TOKEN. Provenance is
+            # generated automatically on public repos.
+            npm publish --access public
+          fi
