@@ -1,0 +1,28 @@
+{
+  "name": "@kqode/kqode-cli",
+  "version": "0.1.0",
+  "description": "KQode — a Rust-core coding-agent harness with a TypeScript Ink terminal UI.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kefeiqian/kqode-cli.git"
+  },
+  "homepage": "https://github.com/kefeiqian/kqode-cli#readme",
+  "bugs": {
+    "url": "https://github.com/kefeiqian/kqode-cli/issues"
+  },
+  "bin": {
+    "kqode": "bin/kqode.cjs"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node lib/install.cjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

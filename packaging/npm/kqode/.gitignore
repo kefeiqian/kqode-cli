@@ -1,0 +1,3 @@
+# The platform executable is downloaded here at install/first-run; never publish
+# or commit it.
+vendor/
