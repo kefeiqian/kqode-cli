@@ -6,6 +6,16 @@ pub const BACKEND_MODE_ARG: &str = "--__kqode-json-rpc-backend";
 /// ACK text returned by the first-slice backend proof.
 pub const ACK_MESSAGE: &str = "ACK: message received";
 
+/// JSON-RPC notification the backend emits exactly once, immediately after its
+/// stdio transport is live and before it handles any request.
+///
+/// It signals "I am listening and speaking JSON-RPC," so a client can bound
+/// startup readiness on this notification instead of the OS process-spawn event
+/// (a backend that spawns but never speaks would otherwise slip past the startup
+/// timeout). The mirrored TypeScript constant lives in
+/// `tui/src/contracts/backend/messages.ts` (`BACKEND_READY_METHOD`).
+pub const BACKEND_READY_METHOD: &str = "kqode.backend.ready";
+
 /// JSON-RPC code for method lookup failures.
 pub const JSON_RPC_METHOD_NOT_FOUND: i32 = -32601;
 

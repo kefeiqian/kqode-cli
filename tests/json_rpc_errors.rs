@@ -13,7 +13,7 @@ use kqode::protocol::{
 };
 use serde_json::json;
 
-use rpc::{backend_output, parse_stdout_frames, request_frame};
+use rpc::{backend_output, request_frame, response_frames};
 
 fn response_frame(id: i64) -> Vec<u8> {
     let body = json!({
@@ -77,7 +77,7 @@ fn unsupported_method_and_invalid_params_return_json_rpc_errors() {
     );
 
     assert!(output.status.success(), "{output:?}");
-    let frames = parse_stdout_frames(&output.stdout);
+    let frames = response_frames(&output.stdout);
     assert_eq!(frames[0]["id"], 1);
     assert_eq!(frames[0]["error"]["code"], JSON_RPC_METHOD_NOT_FOUND);
     assert_eq!(frames[1]["id"], 2);

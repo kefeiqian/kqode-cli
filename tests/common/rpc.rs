@@ -3,7 +3,7 @@ use std::{
     process::{Command, Output, Stdio},
 };
 
-use kqode::protocol::BACKEND_MODE_ARG;
+use kqode::protocol::{BACKEND_MODE_ARG, BACKEND_READY_METHOD};
 use serde_json::{Value, json};
 
 pub fn backend_output(input: &[u8]) -> Output {
@@ -62,5 +62,29 @@ pub fn parse_stdout_frames(stdout: &[u8]) -> Vec<Value> {
         offset = body_end;
     }
 
+    frames
+}
+
+/// Consumes the backend's leading ready notification and returns the response
+/// frames that follow.
+///
+/// Every backend run now emits a one-shot [`BACKEND_READY_METHOD`] notification
+/// before it handles requests, so response-oriented tests skip that first frame
+/// while still asserting it was announced correctly.
+pub fn response_frames(stdout: &[u8]) -> Vec<Value> {
+    let mut frames = parse_stdout_frames(stdout);
+    assert!(
+        !frames.is_empty(),
+        "backend must emit a ready notification before any response"
+    );
+    let ready = frames.remove(0);
+    assert_eq!(
+        ready["method"], BACKEND_READY_METHOD,
+        "first stdout frame must be the ready notification: {ready}"
+    );
+    assert!(
+        ready.get("id").is_none(),
+        "ready is a notification and must not carry an id: {ready}"
+    );
     frames
 }
