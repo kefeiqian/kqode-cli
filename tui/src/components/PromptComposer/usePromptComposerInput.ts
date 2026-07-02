@@ -1,7 +1,7 @@
 import { useInput } from 'ink';
 import { useSetAtom } from 'jotai';
-import { MODIFIED_ENTER_INPUTS } from '@components/PromptComposer/constants.js';
-import { isMouseInput } from '@libs/terminal/mouse.js';
+import { MODIFIED_ENTER_INPUTS } from '@components/PromptComposer/constants.ts';
+import { isMouseInput } from '@libs/terminal/mouse.ts';
 import {
   clearComposerAtom,
   deleteComposerBackwardAtom,
@@ -11,7 +11,7 @@ import {
   printableInput,
   setComposerValidationErrorAtom,
   validateComposerSubmit
-} from '@state/composerAtoms.js';
+} from '@state/composer/index.ts';
 
 type PromptComposerInputState = {
   cursorIndex: number;

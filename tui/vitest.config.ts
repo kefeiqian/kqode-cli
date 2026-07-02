@@ -6,10 +6,19 @@ const tuiRoot = path.dirname(fileURLToPath(import.meta.url));
 const srcRoot = path.join(tuiRoot, 'src');
 
 export default defineConfig({
+  // Inject the build-env flags so `__TEST__`-gated seams are active under Vitest.
+  define: {
+    __TEST__: 'true',
+    __DEV__: 'false',
+    __PROD__: 'false'
+  },
   resolve: {
     alias: {
       '@': srcRoot,
+      '@backend': path.join(srcRoot, 'backend'),
       '@components': path.join(srcRoot, 'components'),
+      '@constants': path.join(srcRoot, 'constants'),
+      '@contracts': path.join(srcRoot, 'contracts'),
       '@libs': path.join(srcRoot, 'libs'),
       '@state': path.join(srcRoot, 'state'),
       '@test': path.join(srcRoot, 'test'),

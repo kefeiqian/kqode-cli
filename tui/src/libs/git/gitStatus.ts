@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import {execFileSync} from 'node:child_process';
 
 const GIT_BRANCH_ICON = '⎇';
 const UNSTAGED_CHANGE_FLAG = '*';
@@ -95,11 +95,9 @@ function parseBranchName(branchLine: string | undefined): string | undefined {
 }
 
 function formatGitStatusFlags(status: GitStatus): string {
-  const flags = [
+  return [
     status.hasUnstagedChanges ? UNSTAGED_CHANGE_FLAG : '',
     status.hasStagedChanges ? STAGED_CHANGE_FLAG : '',
     status.hasUntrackedChanges ? UNTRACKED_CHANGE_FLAG : ''
   ].join('');
-
-  return flags;
 }

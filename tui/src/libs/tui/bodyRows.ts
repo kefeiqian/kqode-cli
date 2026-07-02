@@ -1,8 +1,8 @@
 import {
   LOWER_HALF_BLOCK,
   UPPER_HALF_BLOCK
-} from '@libs/tui/backgroundBlock.js';
-import { geminiDarkTheme } from '@theme/themeConfig.js';
+} from '@libs/tui/backgroundBlock.ts';
+import { theme } from '@theme/themeConfig.ts';
 
 export type BodyEntry = {
   id?: string;
@@ -72,9 +72,9 @@ function toAssistantRows(text: string, columns: number): BodyRow[] {
   const wrappedText = wrapBodyText(text, Math.max(1, columns - ASSISTANT_MESSAGE_PREFIX.length));
 
   return wrappedText.map((line, index) => ({
-    color: geminiDarkTheme.colors.foreground,
+    color: theme.colors.foreground,
     marker: index === 0 ? ASSISTANT_MESSAGE_PREFIX : continuationPrefix,
-    markerColor: index === 0 ? geminiDarkTheme.colors.accentBlue : geminiDarkTheme.colors.foreground,
+    markerColor: index === 0 ? theme.colors.accentBlue : theme.colors.foreground,
     text: line
   }));
 }
@@ -87,8 +87,8 @@ function toPromptRows(text: string, columns: number): BodyRow[] {
   const continuationPrefix = ' '.repeat(promptIndent);
   const wrappedText = wrapBodyText(text, textColumns, { preserveHardLines: true });
   const textRows = wrappedText.map((line, index) => ({
-    backgroundColor: geminiDarkTheme.colors.messageBackground,
-    color: geminiDarkTheme.colors.foreground,
+    backgroundColor: theme.colors.messageBackground,
+    color: theme.colors.foreground,
     fillColumns: true,
     text: `${index === 0 ? promptPrefix() : continuationPrefix}${line}`
   }));
@@ -106,8 +106,8 @@ function promptPrefix(): string {
 
 function halfLineRow(columns: number, glyph: string): BodyRow {
   return {
-    backgroundColor: geminiDarkTheme.colors.bodyBackground,
-    color: geminiDarkTheme.colors.messageBackground,
+    backgroundColor: theme.colors.bodyBackground,
+    color: theme.colors.messageBackground,
     text: glyph.repeat(columns)
   };
 }
@@ -115,15 +115,15 @@ function halfLineRow(columns: number, glyph: string): BodyRow {
 function colorForEntry(kind: BodyEntry['kind']): string {
   switch (kind) {
     case 'error':
-      return geminiDarkTheme.colors.errorRed;
+      return theme.colors.errorRed;
     case 'pending':
-      return geminiDarkTheme.colors.warning;
+      return theme.colors.warning;
     case 'success':
-      return geminiDarkTheme.colors.accentGreen;
+      return theme.colors.accentGreen;
     case 'prompt':
-      return geminiDarkTheme.colors.foreground;
+      return theme.colors.foreground;
     case 'info':
-      return geminiDarkTheme.colors.muted;
+      return theme.colors.muted;
   }
 }
 

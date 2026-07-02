@@ -1,25 +1,28 @@
 import { Box, useBoxMetrics, useCursor } from 'ink';
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import type { DOMElement } from 'ink';
 import { useEffect, useRef } from 'react';
-import { ComposerFrame } from '@components/PromptComposer/ComposerFrame.js';
-import { PROMPT_PREFIX } from '@components/PromptComposer/constants.js';
-import { resolveComposerCursorPosition } from '@components/PromptComposer/cursorPosition.js';
+import { ComposerFrame } from '@components/PromptComposer/ComposerFrame.tsx';
+import { PROMPT_PREFIX } from '@constants/ui.ts';
+import { resolveComposerCursorPosition } from '@components/PromptComposer/cursorPosition.ts';
 import {
   countVisibleComposerRows,
   formatVisiblePrompt,
   formatVisiblePromptView
-} from '@components/PromptComposer/promptTextView.js';
-import { usePromptComposerInput } from '@components/PromptComposer/usePromptComposerInput.js';
-import { DEFAULT_COMPOSER_VISIBLE_LINES } from '@libs/tui/layout.js';
+} from '@components/PromptComposer/promptTextView.ts';
+import { usePromptComposerInput } from '@components/PromptComposer/usePromptComposerInput.ts';
+import { DEFAULT_COMPOSER_VISIBLE_LINES } from '@constants/ui.ts';
+import { enqueuePromptAtom } from '@state/backend/index.ts';
 import {
   composerStateAtom,
   PROMPT_MAX_BYTES
-} from '@state/composerAtoms.js';
+} from '@state/composer/index.ts';
+import { composerRowsAtom, composerTopAtom, layoutAtom } from '@state/homeScreen/index.ts';
+import { columnsAtom, inputLockedAtom } from '@state/global/index.ts';
 
 type PromptComposerProps = {
-  columns: number;
-  onSubmit: (prompt: string) => void;
+  columns?: number;
+  onSubmit?: (prompt: string) => void;
   isActive?: boolean;
   maxBytes?: number;
   maxVisibleLines?: number;
@@ -32,24 +35,37 @@ export { formatVisiblePrompt, resolveComposerCursorPosition };
 export function PromptComposer({
   columns,
   onSubmit,
-  isActive = true,
+  isActive,
   maxBytes = PROMPT_MAX_BYTES,
-  maxVisibleLines = DEFAULT_COMPOSER_VISIBLE_LINES,
+  maxVisibleLines,
   cursorTop,
   onVisibleRowsChange
 }: PromptComposerProps) {
   const state = useAtomValue(composerStateAtom);
+  const atomColumns = useAtomValue(columnsAtom);
+  const atomInputLocked = useAtomValue(inputLockedAtom);
+  const atomLayout = useAtomValue(layoutAtom);
+  const atomComposerTop = useAtomValue(composerTopAtom);
+  const enqueuePrompt = useSetAtom(enqueuePromptAtom);
+  const setComposerRows = useSetAtom(composerRowsAtom);
   const composerRef = useRef<DOMElement | null>(null);
   const composerMetrics = useBoxMetrics(composerRef);
   const { setCursorPosition } = useCursor();
 
-  usePromptComposerInput({ isActive, maxBytes, onSubmit, state });
+  const resolvedColumns = columns ?? atomColumns;
+  const resolvedSubmit = onSubmit ?? ((prompt: string) => void enqueuePrompt(prompt));
+  const resolvedIsActive = isActive ?? !atomInputLocked;
+  const resolvedMaxVisibleLines = maxVisibleLines ?? atomLayout.composerVisibleRows ?? DEFAULT_COMPOSER_VISIBLE_LINES;
+  const resolvedCursorTop = cursorTop ?? atomComposerTop;
+  const resolvedVisibleRowsChange = onVisibleRowsChange ?? setComposerRows;
 
-  const inputColumns = Math.max(1, columns - PROMPT_PREFIX.length);
+  usePromptComposerInput({ isActive: resolvedIsActive, maxBytes, onSubmit: resolvedSubmit, state });
+
+  const inputColumns = Math.max(1, resolvedColumns - PROMPT_PREFIX.length);
   const visiblePrompt = formatVisiblePromptView(
     state.text,
     inputColumns,
-    maxVisibleLines,
+    resolvedMaxVisibleLines,
     state.cursorIndex
   );
   const visibleText = visiblePrompt.text;
@@ -61,15 +77,15 @@ export function PromptComposer({
   );
 
   useEffect(() => {
-    onVisibleRowsChange?.(visibleRows);
-  }, [onVisibleRowsChange, visibleRows]);
+    resolvedVisibleRowsChange?.(visibleRows);
+  }, [resolvedVisibleRowsChange, visibleRows]);
 
-  if (isActive && composerMetrics.hasMeasured) {
+  if (resolvedIsActive && composerMetrics.hasMeasured) {
     setCursorPosition(
       resolveComposerCursorPosition(
         visibleText,
         inputColumns,
-        cursorTop ?? composerMetrics.top,
+        resolvedCursorTop ?? composerMetrics.top,
         visiblePrompt.cursorIndex,
         shouldRenderBackground
       )
@@ -81,7 +97,7 @@ export function PromptComposer({
   return (
     <Box ref={composerRef} flexDirection="column">
       <ComposerFrame
-        columns={columns}
+        columns={resolvedColumns}
         shouldRenderBackground={shouldRenderBackground}
         validationError={state.validationError}
         visibleTextRows={visibleText.split('\n')}

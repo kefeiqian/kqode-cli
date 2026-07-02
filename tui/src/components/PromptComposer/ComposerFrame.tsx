@@ -1,8 +1,8 @@
 import { Box, Text } from 'ink';
-import { LOWER_HALF_BLOCK, UPPER_HALF_BLOCK } from '@libs/tui/backgroundBlock.js';
-import { PROMPT_PREFIX } from '@components/PromptComposer/constants.js';
-import { formatValidationError } from '@components/PromptComposer/promptTextView.js';
-import { geminiDarkTheme } from '@theme/themeConfig.js';
+import { LOWER_HALF_BLOCK, UPPER_HALF_BLOCK } from '@libs/tui/backgroundBlock.ts';
+import { PROMPT_PREFIX } from '@constants/ui.ts';
+import { formatValidationError } from '@components/PromptComposer/promptTextView.ts';
+import { theme } from '@theme/themeConfig.ts';
 
 type ComposerFrameProps = {
   columns: number;
@@ -32,7 +32,7 @@ export function ComposerFrame({
       {validationError === null ? null : (
         <Text
           backgroundColor={backgroundColor(shouldRenderBackground)}
-          color={geminiDarkTheme.colors.errorRed}
+          color={theme.colors.errorRed}
         >
           {formatValidationError(validationError, columns, shouldRenderBackground)}
         </Text>
@@ -60,13 +60,13 @@ function ComposerTextRow({
     <Box backgroundColor={backgroundColor(shouldRenderBackground)}>
       <Text
         backgroundColor={backgroundColor(shouldRenderBackground)}
-        color={rowIndex === 0 ? geminiDarkTheme.colors.accentBlue : geminiDarkTheme.colors.foreground}
+        color={rowIndex === 0 ? theme.colors.accentBlue : theme.colors.foreground}
       >
         {prefix}
       </Text>
       <Text
         backgroundColor={backgroundColor(shouldRenderBackground)}
-        color={geminiDarkTheme.colors.foreground}
+        color={theme.colors.foreground}
       >
         {shouldRenderBackground ? row.padEnd(rowColumns, ' ') : row}
       </Text>
@@ -77,8 +77,8 @@ function ComposerTextRow({
 function ComposerHalfLine({ glyph, columns }: { glyph: string; columns: number }) {
   return (
     <Text
-      backgroundColor={geminiDarkTheme.colors.bodyBackground}
-      color={geminiDarkTheme.colors.inputBackground}
+      backgroundColor={theme.colors.bodyBackground}
+      color={theme.colors.inputBackground}
     >
       {glyph.repeat(Math.max(1, columns))}
     </Text>
@@ -90,5 +90,5 @@ function promptPrefixForRow(index: number): string {
 }
 
 function backgroundColor(isEnabled: boolean): string | undefined {
-  return isEnabled ? geminiDarkTheme.colors.inputBackground : undefined;
+  return isEnabled ? theme.colors.inputBackground : undefined;
 }

@@ -1,4 +1,5 @@
-import { COMPOSER_BACKGROUND_PADDING_ROWS } from '@components/PromptComposer/constants.js';
+import { COMPOSER_BACKGROUND_PADDING_ROWS } from '@constants/ui.ts';
+import { clamp } from '@libs/math/clamp.ts';
 
 type WrappedPromptRow = {
   text: string;
@@ -28,12 +29,12 @@ export function formatVisiblePromptView(
   const safeColumns = Math.max(1, columns);
   const safeMaxVisibleLines = Math.max(1, maxVisibleLines);
   const rows = wrapText(text, safeColumns);
-  const safeCursorIndex = Math.max(0, Math.min(cursorIndex, text.length));
+  const safeCursorIndex = clamp(cursorIndex, 0, text.length);
   const cursorRowIndex = resolveCursorRowIndex(rows, safeCursorIndex);
   const lastVisibleStart = Math.max(0, rows.length - safeMaxVisibleLines);
   // Keep the active cursor row visible by sliding the window upward only when
   // the cursor would otherwise fall below the last visible composer row.
-  const visibleStart = Math.min(Math.max(0, cursorRowIndex - safeMaxVisibleLines + 1), lastVisibleStart);
+  const visibleStart = clamp(cursorRowIndex - safeMaxVisibleLines + 1, 0, lastVisibleStart);
   const visibleRows = rows.slice(visibleStart, visibleStart + safeMaxVisibleLines);
   const visibleCursorIndex = resolveVisibleCursorIndex(visibleRows, safeCursorIndex);
 

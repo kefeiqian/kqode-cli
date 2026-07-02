@@ -8,7 +8,7 @@ import {
   moveComposerCursorForwardAtom,
   printableInput,
   validateComposerSubmit
-} from '@state/composerAtoms.js';
+} from '@state/composer/index.ts';
 
 describe('composerAtoms', () => {
   it('appends printable text and deletes the last character', () => {

@@ -1,27 +1,28 @@
 import { Box, Text } from 'ink';
-import { COMPACT_HEADER_BELOW_COLUMNS, HIDE_HEADER_BELOW_COLUMNS } from '@libs/tui/layout.js';
-import { geminiDarkTheme } from '@theme/themeConfig.js';
+import { useAtomValue } from 'jotai';
+import { COMPACT_HEADER_BELOW_COLUMNS, HIDE_HEADER_BELOW_COLUMNS } from '@constants/ui.ts';
+import { PRODUCT_NAME } from '@constants/product.ts';
+import { columnsAtom, productVersionAtom } from '@state/global/index.ts';
+import { theme } from '@theme/themeConfig.ts';
 
-type HeaderProps = {
-  productVersion: string;
-  columns: number;
-};
+export function Header() {
+  const columns = useAtomValue(columnsAtom);
+  const productVersion = useAtomValue(productVersionAtom);
 
-export function Header({ productVersion, columns }: HeaderProps) {
   if (columns < HIDE_HEADER_BELOW_COLUMNS) {
     return null;
   }
 
   if (columns < COMPACT_HEADER_BELOW_COLUMNS) {
-    return <Text color={geminiDarkTheme.colors.accentBlue}>KQode</Text>;
+    return <Text color={theme.colors.accentBlue}>{PRODUCT_NAME}</Text>;
   }
 
   const versionLabel = ` v${productVersion}`;
 
   return (
     <Box>
-      <Text color={geminiDarkTheme.colors.accentBlue}>KQode</Text>
-      <Text color={geminiDarkTheme.colors.foreground}>{versionLabel}</Text>
+      <Text color={theme.colors.accentBlue}>{PRODUCT_NAME}</Text>
+      <Text color={theme.colors.foreground}>{versionLabel}</Text>
     </Box>
   );
 }

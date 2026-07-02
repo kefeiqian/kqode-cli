@@ -1,10 +1,19 @@
 import { Box, Text } from 'ink';
-import { DEFAULT_BODY_ENTRIES, resolveBodyRows } from '@libs/tui/bodyRows.js';
-import type { BodyEntry, BodyRow } from '@libs/tui/bodyRows.js';
-import { geminiDarkTheme } from '@theme/themeConfig.js';
+import { useAtomValue } from 'jotai';
+import { DEFAULT_BODY_ENTRIES, resolveBodyRows } from '@libs/tui/bodyRows.ts';
+import type { BodyEntry, BodyRow } from '@libs/tui/bodyRows.ts';
+import { clamp } from '@libs/math/clamp.ts';
+import {
+  bodyScrollOffsetRowsAtom,
+  displayedBodyEntriesAtom,
+  layoutAtom
+} from '@state/homeScreen/index.ts';
+import { columnsAtom } from '@state/global/index.ts';
+import { theme } from '@theme/themeConfig.ts';
+import { SCROLLBAR_THUMB, SCROLLBAR_TRACK } from '@constants/ui.ts';
 
-export type { BodyEntry } from '@libs/tui/bodyRows.js';
-export { countBodyRows, DEFAULT_BODY_ENTRIES } from '@libs/tui/bodyRows.js';
+export type { BodyEntry } from '@libs/tui/bodyRows.ts';
+export { countBodyRows, DEFAULT_BODY_ENTRIES } from '@libs/tui/bodyRows.ts';
 
 type ScrollbarCell = {
   color: string;
@@ -13,25 +22,31 @@ type ScrollbarCell = {
 
 type BodyPaneProps = {
   entries?: readonly BodyEntry[];
-  rows: number;
-  columns: number;
+  rows?: number;
+  columns?: number;
   scrollOffsetRows?: number;
 };
 
-const SCROLLBAR_TRACK = '│';
-const SCROLLBAR_THUMB = '┃';
-
 export function BodyPane({
-  entries = DEFAULT_BODY_ENTRIES,
+  entries,
   rows,
   columns,
-  scrollOffsetRows = 0
+  scrollOffsetRows
 }: BodyPaneProps) {
-  const visibleRows = Math.max(1, rows);
-  const visibleColumns = Math.max(1, columns);
-  const allRows = resolveBodyRows(entries, visibleColumns, visibleRows);
+  const atomEntries = useAtomValue(displayedBodyEntriesAtom);
+  const atomLayout = useAtomValue(layoutAtom);
+  const atomColumns = useAtomValue(columnsAtom);
+  const atomScrollOffsetRows = useAtomValue(bodyScrollOffsetRowsAtom);
+
+  const resolvedEntries = entries ?? atomEntries ?? DEFAULT_BODY_ENTRIES;
+  const resolvedRows = rows ?? atomLayout.bodyRows;
+  const resolvedColumns = columns ?? atomColumns;
+  const resolvedScrollOffsetRows = scrollOffsetRows ?? atomScrollOffsetRows;
+  const visibleRows = Math.max(1, resolvedRows);
+  const visibleColumns = Math.max(1, resolvedColumns);
+  const allRows = resolveBodyRows(resolvedEntries, visibleColumns, visibleRows);
   const maxScrollOffset = Math.max(0, allRows.length - visibleRows);
-  const scrollOffset = clamp(scrollOffsetRows, 0, maxScrollOffset);
+  const scrollOffset = clamp(resolvedScrollOffsetRows, 0, maxScrollOffset);
   // Offset counts rows back from the newest content at the bottom, matching
   // terminal transcript behavior where scroll offset 0 means "stick to bottom".
   const end = allRows.length - scrollOffset;
@@ -52,7 +67,7 @@ export function BodyPane({
     <Box flexDirection="column" height={renderedRows}>
       {Array.from({ length: renderedRows }, (_, index) => {
         const row = visibleRowsForOffset[index] ?? {
-          color: geminiDarkTheme.colors.muted,
+          color: theme.colors.muted,
           text: ''
         };
         const marker = row.marker ?? '';
@@ -73,7 +88,7 @@ export function BodyPane({
               {displayText}
             </Text>
             {isScrollable ? (
-              <Text color={scrollbarCells[index]?.color ?? geminiDarkTheme.colors.border}>
+              <Text color={scrollbarCells[index]?.color ?? theme.colors.border}>
                 {scrollbarCells[index]?.text ?? SCROLLBAR_TRACK}
               </Text>
             ) : null}
@@ -105,7 +120,7 @@ function renderScrollbar({
     const isThumb = index >= thumbStart && index < thumbStart + thumbRows;
 
     return {
-      color: isThumb ? geminiDarkTheme.colors.foreground : geminiDarkTheme.colors.border,
+      color: isThumb ? theme.colors.foreground : theme.colors.border,
       text: isThumb ? SCROLLBAR_THUMB : SCROLLBAR_TRACK
     };
   });
@@ -113,8 +128,4 @@ function renderScrollbar({
 
 function padBodyText(text: string, contentColumns: number): string {
   return text.padEnd(contentColumns, ' ');
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }

@@ -2,7 +2,8 @@ import {
   COMPOSER_BACKGROUND_TOP_PADDING_ROWS,
   INK_CURSOR_ROW_ORIGIN_OFFSET,
   PROMPT_PREFIX
-} from '@components/PromptComposer/constants.js';
+} from '@constants/ui.ts';
+import { clamp } from '@libs/math/clamp.ts';
 
 export function resolveComposerCursorPosition(
   visibleText: string,
@@ -16,8 +17,9 @@ export function resolveComposerCursorPosition(
 
   return {
     x: PROMPT_PREFIX.length + cursorPosition.x,
-    // Ink's cursor row origin is one row below the measured box top, so the
-    // measured composer top plus any half-line padding lands on the editable row.
+    // The measured composer top plus any half-line padding lands on the editable
+    // row; INK_CURSOR_ROW_ORIGIN_OFFSET absorbs Ink's cursor-baseline origin
+    // (0 while rendering just under fullscreen — see its definition).
     y: composerTop + topPaddingRows + cursorPosition.y + INK_CURSOR_ROW_ORIGIN_OFFSET
   };
 }
@@ -27,7 +29,7 @@ function cursorPositionForVisibleText(
   columns: number,
   cursorIndex: number
 ): { x: number; y: number } {
-  const textBeforeCursor = text.slice(0, Math.max(0, Math.min(cursorIndex, text.length)));
+  const textBeforeCursor = text.slice(0, clamp(cursorIndex, 0, text.length));
   const lines = textBeforeCursor.split('\n');
   const lastLine = lines.at(-1) ?? '';
   return {

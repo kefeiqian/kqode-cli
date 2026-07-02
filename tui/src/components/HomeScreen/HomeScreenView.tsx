@@ -1,35 +1,30 @@
 import { Box, useInput, useStdout } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect } from 'react';
-import { BodyPane } from '@components/BodyPane.js';
-import { CwdLine } from '@components/CwdLine.js';
-import { Header } from '@components/Header.js';
-import { PromptComposer } from '@components/PromptComposer.js';
-import { StatusBar } from '@components/StatusBar.js';
+import { BodyPane } from '@components/BodyPane.tsx';
+import { CwdLine } from '@components/CwdLine.tsx';
+import { Header } from '@components/Header.tsx';
+import { PromptComposer } from '@components/PromptComposer/index.tsx';
+import { StatusBar } from '@components/StatusBar.tsx';
 import {
   DISABLE_SGR_MOUSE_TRACKING,
   ENABLE_SGR_MOUSE_TRACKING,
   parseMouseWheelInput
-} from '@libs/terminal/mouse.js';
+} from '@libs/terminal/mouse.ts';
 import {
   BODY_CWD_GAP_ROWS,
-  bodyScrollOffsetRowsAtom,
   bottomSpacerRowsAtom,
-  composerRowsAtom,
-  composerTopAtom,
-  displayedBodyEntriesAtom,
-  homeScreenConfigAtom,
   layoutAtom,
-  scrollBodyByRowsAtom,
-  submitPromptAtom
-} from '@state/homeScreenAtoms.js';
-import { geminiDarkTheme } from '@theme/themeConfig.js';
-
-const MOUSE_WHEEL_SCROLL_ROWS = 3;
+  scrollBodyByRowsAtom
+} from '@state/homeScreen/index.ts';
+import { columnsAtom, rowsAtom } from '@state/global/index.ts';
+import { theme } from '@theme/themeConfig.ts';
+import { MOUSE_WHEEL_SCROLL_ROWS } from '@constants/ui.ts';
 
 export function HomeScreenView() {
   const { stdout } = useStdout();
-  const config = useAtomValue(homeScreenConfigAtom);
+  const columns = useAtomValue(columnsAtom);
+  const rows = useAtomValue(rowsAtom);
   const layout = useAtomValue(layoutAtom);
   const scrollBodyByRows = useSetAtom(scrollBodyByRowsAtom);
 
@@ -71,76 +66,47 @@ export function HomeScreenView() {
   return (
     <Box
       flexDirection="column"
-      width={config.columns}
-      height={config.rows}
-      backgroundColor={geminiDarkTheme.colors.bodyBackground}
+      width={columns}
+      height={rows}
+      backgroundColor={theme.colors.bodyBackground}
     >
       <HomeHeader />
       <HomeBody />
       <HomeCwd />
       <HomeComposer />
-      <HomeStatus />
+      <StatusBar />
     </Box>
   );
 }
 
 function HomeHeader() {
-  const { columns, productVersion } = useAtomValue(homeScreenConfigAtom);
-  return <Header productVersion={productVersion} columns={columns} />;
+  return <Header />;
 }
 
 function HomeBody() {
-  const config = useAtomValue(homeScreenConfigAtom);
   const layout = useAtomValue(layoutAtom);
-  const bodyScrollOffsetRows = useAtomValue(bodyScrollOffsetRowsAtom);
-  const displayedBodyEntries = useAtomValue(displayedBodyEntriesAtom);
 
   return (
     <Box
       height={layout.bodyRows}
       flexDirection="column"
-      backgroundColor={geminiDarkTheme.colors.bodyBackground}
+      backgroundColor={theme.colors.bodyBackground}
     >
-      <BodyPane
-        entries={displayedBodyEntries}
-        rows={layout.bodyRows}
-        columns={config.columns}
-        scrollOffsetRows={bodyScrollOffsetRows}
-      />
+      <BodyPane rows={layout.bodyRows} />
     </Box>
   );
 }
 
 function HomeCwd() {
-  const { columns, gitStatusLabel, workspaceCwd } = useAtomValue(homeScreenConfigAtom);
   const bottomSpacerRows = useAtomValue(bottomSpacerRowsAtom);
 
   return (
     <Box marginTop={bottomSpacerRows + BODY_CWD_GAP_ROWS}>
-      <CwdLine workspaceCwd={workspaceCwd} gitStatusLabel={gitStatusLabel} columns={columns} />
+      <CwdLine />
     </Box>
   );
 }
 
 function HomeComposer() {
-  const { columns } = useAtomValue(homeScreenConfigAtom);
-  const layout = useAtomValue(layoutAtom);
-  const composerTop = useAtomValue(composerTopAtom);
-  const setComposerRows = useSetAtom(composerRowsAtom);
-  const submitPrompt = useSetAtom(submitPromptAtom);
-
-  return (
-    <PromptComposer
-      columns={columns}
-      cursorTop={composerTop}
-      maxVisibleLines={layout.composerVisibleRows}
-      onSubmit={submitPrompt}
-      onVisibleRowsChange={setComposerRows}
-    />
-  );
-}
-
-function HomeStatus() {
-  const { columns, modelLabel } = useAtomValue(homeScreenConfigAtom);
-  return <StatusBar columns={columns} modelLabel={modelLabel} />;
+  return <PromptComposer />;
 }

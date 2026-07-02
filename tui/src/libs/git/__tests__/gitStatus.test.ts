@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatGitStatusLabel, parseGitStatus } from '@libs/git/gitStatus.js';
+import { formatGitStatusLabel, parseGitStatus } from '@libs/git/gitStatus.ts';
 
 describe('git status labels', () => {
   it('formats branch labels with staged, unstaged, and untracked flags', () => {

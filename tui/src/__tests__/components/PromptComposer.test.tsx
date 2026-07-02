@@ -3,9 +3,9 @@ import {
   formatVisiblePrompt,
   PromptComposer,
   resolveComposerCursorPosition
-} from '@components/PromptComposer.js';
-import { flushInput } from '@test/flushInput.js';
-import { renderWithJotai } from '@test/renderWithJotai.js';
+} from '@components/PromptComposer/index.tsx';
+import { flushInput } from '@test/flushInput.ts';
+import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
 describe('PromptComposer', () => {
   it('preserves long prompt content while rendering a wrapped visible view', () => {
@@ -81,23 +81,23 @@ describe('PromptComposer', () => {
   });
 
   it('places the terminal cursor on the active composer row instead of the cwd row', () => {
-    expect(resolveComposerCursorPosition('', 38, 7)).toEqual({ x: 2, y: 9 });
-    expect(resolveComposerCursorPosition('123', 38, 7)).toEqual({ x: 5, y: 9 });
+    expect(resolveComposerCursorPosition('', 38, 7)).toEqual({ x: 2, y: 8 });
+    expect(resolveComposerCursorPosition('123', 38, 7)).toEqual({ x: 5, y: 8 });
   });
 
   it('places the terminal cursor on the active authored multiline composer row', () => {
-    expect(resolveComposerCursorPosition('first\nsecond', 38, 7)).toEqual({ x: 8, y: 10 });
+    expect(resolveComposerCursorPosition('first\nsecond', 38, 7)).toEqual({ x: 8, y: 9 });
   });
 
   it('places the terminal cursor on the active soft-wrapped composer row', () => {
     const visibleText = formatVisiblePrompt('abcdefghijklmnop', 8, 3);
 
     expect(visibleText).toBe('abcdefgh\nijklmnop');
-    expect(resolveComposerCursorPosition(visibleText, 8, 7)).toEqual({ x: 10, y: 10 });
+    expect(resolveComposerCursorPosition(visibleText, 8, 7)).toEqual({ x: 10, y: 9 });
   });
 
   it('places the terminal cursor at an authored middle position', () => {
-    expect(resolveComposerCursorPosition('abcd', 38, 7, 2)).toEqual({ x: 4, y: 9 });
+    expect(resolveComposerCursorPosition('abcd', 38, 7, 2)).toEqual({ x: 4, y: 8 });
   });
 
   it('submits exact non-empty text with leading and trailing spaces, then clears', async () => {
