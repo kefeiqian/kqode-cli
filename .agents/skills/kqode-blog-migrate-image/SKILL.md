@@ -30,5 +30,6 @@ python .agents/skills/kqode-blog-migrate-image/scripts/migrate_images.py blog/do
 - Only migrate images referenced by the requested doc.
 - Do not migrate remote URLs, absolute paths, anchors, or images already under `images/`.
 - Prefer English slug filenames, even when the article is Chinese.
+- Preserve or improve Chinese alt text with spaces on both sides of English words, acronyms, and product names when adjacent to Chinese characters, for example `RustRover 欢迎页` and `Rust XTask 自动化`.
 - Keep the image folder name as a stable English kebab-case topic slug, with numeric prefixes stripped and translated titles avoided. Example: `02-创建Rust项目.md` -> `images/create-rust-project/`.
 - If the helper produces an awkward filename because the alt text is poor, improve the alt text first and rerun, or rename that image manually and update the link.
