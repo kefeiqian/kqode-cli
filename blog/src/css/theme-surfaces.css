@@ -1,15 +1,8 @@
-body {
-  background:
-    radial-gradient(circle at 15% 10%, var(--page-glow-one), transparent 32rem),
-    radial-gradient(circle at 88% 16%, var(--page-glow-two), transparent 30rem),
-    linear-gradient(180deg, #ffffff 0%, var(--background) 45%, #eef4fb 100%);
-}
-
-html[data-theme='dark'] body {
-  background:
-    radial-gradient(circle at 62% 42%, rgba(58, 110, 212, 0.32), transparent 26rem),
-    radial-gradient(circle at 82% 18%, var(--page-glow-two), transparent 25rem),
-    linear-gradient(135deg, #020611 0%, var(--background) 48%, #08182a 100%);
+#__docusaurus,
+.main-wrapper,
+.docsWrapper_hBAB,
+.docRoot_UBD9 {
+  background: transparent;
 }
 
 .navbar {
@@ -33,6 +26,8 @@ html[data-theme='dark'] body {
 }
 
 .markdown table {
+  display: table;
+  width: 100%;
   overflow: hidden;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
@@ -57,17 +52,12 @@ html[data-theme='dark'] .markdown tr:nth-child(2n) {
   border-radius: 1.75rem;
   background: var(--card);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(24px);
 }
 
 .theme-doc-markdown h1,
 .theme-doc-markdown h2,
 .theme-doc-markdown h3 {
   letter-spacing: -0.045em;
-}
-
-.theme-doc-markdown h1 {
-  max-width: 15ch;
 }
 
 .theme-doc-markdown h2 {

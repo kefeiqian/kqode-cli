@@ -1,0 +1,14 @@
+{
+  "version.label": {
+    "message": "Next",
+    "description": "The label for version current"
+  },
+  "sidebar.docs.category.U1-研发脚手架": {
+    "message": "U1 Development Scaffolding",
+    "description": "The label for category 'U1-研发脚手架' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.U1-研发脚手架.link.generated-index.description": {
+    "message": "Rust project, Ink TUI, xtask automation, and summary for KQode U1.",
+    "description": "The generated-index page description for category 'U1-研发脚手架' in sidebar 'docs'"
+  }
+}

@@ -10,7 +10,9 @@
   "scripts": {
     "build": "node ./node_modules/@docusaurus/core/bin/docusaurus.mjs build",
     "clear": "node ./node_modules/@docusaurus/core/bin/docusaurus.mjs clear",
-    "serve": "node ./node_modules/@docusaurus/core/bin/docusaurus.mjs serve --dir build --host 127.0.0.1 --port 3000 --build",
+    "serve": "node ./node_modules/@docusaurus/core/bin/docusaurus.mjs start --host 127.0.0.1 --port 3000",
+    "serve:en": "node ./node_modules/@docusaurus/core/bin/docusaurus.mjs start --locale en --host 127.0.0.1 --port 3000",
+    "preview": "node ./node_modules/@docusaurus/core/bin/docusaurus.mjs serve --dir build --host 127.0.0.1 --port 3000 --build",
     "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit"
   },
   "dependencies": {

@@ -71,9 +71,6 @@ const config: Config = {
         },
       ],
     },
-    footer: {
-      style: 'dark',
-    },
   } satisfies Preset.ThemeConfig,
 };
 

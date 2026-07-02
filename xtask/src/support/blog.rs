@@ -31,7 +31,7 @@ pub fn typecheck(repo_root: &Path) -> Result<(), String> {
     bun::run_in(&paths::blog_root(repo_root), &["run", "typecheck"])
 }
 
-/// Serves the Docusaurus blog locally.
+/// Starts the Docusaurus blog dev server with hot reload.
 ///
 /// # Errors
 ///
@@ -39,6 +39,26 @@ pub fn typecheck(repo_root: &Path) -> Result<(), String> {
 pub fn serve(repo_root: &Path) -> Result<(), String> {
     ensure_dependencies(repo_root)?;
     bun::run_in(&paths::blog_root(repo_root), &["run", "serve"])
+}
+
+/// Starts the English Docusaurus blog dev server with hot reload.
+///
+/// # Errors
+///
+/// Returns an error when dependencies cannot be installed or the dev server fails.
+pub fn serve_en(repo_root: &Path) -> Result<(), String> {
+    ensure_dependencies(repo_root)?;
+    bun::run_in(&paths::blog_root(repo_root), &["run", "serve:en"])
+}
+
+/// Serves a production build of the Docusaurus blog locally.
+///
+/// # Errors
+///
+/// Returns an error when dependencies cannot be installed or static preview fails.
+pub fn preview(repo_root: &Path) -> Result<(), String> {
+    ensure_dependencies(repo_root)?;
+    bun::run_in(&paths::blog_root(repo_root), &["run", "preview"])
 }
 
 fn ensure_dependencies(repo_root: &Path) -> Result<(), String> {

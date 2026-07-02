@@ -1,0 +1,9 @@
+{
+  "label": "U1 Development Scaffolding",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "slug": "/category/u1-development-scaffolding",
+    "description": "Rust project, Ink TUI, xtask automation, and summary for KQode U1."
+  }
+}
