@@ -1,14 +1,56 @@
-import { render } from 'ink-testing-library';
-import { describe, expect, it } from 'vitest';
-import { App } from '@/App.js';
-import { flushInput } from '@test/flushInput.js';
+import { createStore } from 'jotai';
+import { describe, expect, it, vi } from 'vitest';
+import { App } from '@/App.tsx';
+import {
+  columnsTestOverrideAtom,
+  FULLSCREEN_GUARD_ROWS,
+  productVersionAtom,
+  rowsTestOverrideAtom,
+  workspaceCwdAtom
+} from '@state/global/index.ts';
+import { flushInput } from '@test/flushInput.ts';
+import { renderWithJotai } from '@test/renderWithJotai.tsx';
+
+const workspaceCwd = 'C:\\Users\\kefeiqian\\Projects\\dummy-react-app';
+
+function renderApp({ columns, rows }: { columns?: number; rows?: number } = {}) {
+  const store = createStore();
+  store.set(productVersionAtom, '0.1.0');
+  store.set(workspaceCwdAtom, workspaceCwd);
+  if (columns !== undefined) {
+    store.set(columnsTestOverrideAtom, columns);
+  }
+  if (rows !== undefined) {
+    store.set(rowsTestOverrideAtom, rows);
+  }
+  return renderWithJotai(<App />, store);
+}
+
+function deferredPromise<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((innerResolve) => {
+    resolve = innerResolve;
+  });
+  return { promise, resolve };
+}
+
+async function waitForFrame(
+  getFrame: () => string | undefined,
+  predicate: (frame: string) => boolean
+): Promise<string> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const frame = getFrame() ?? '';
+    if (predicate(frame)) {
+      return frame;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error(`timed out waiting for frame. Last frame:\n${getFrame() ?? ''}`);
+}
 
 describe('App', () => {
   it('smoke renders product metadata and workspace cwd', () => {
-    const workspaceCwd = 'C:\\Users\\kefeiqian\\Projects\\dummy-react-app';
-    const { lastFrame } = render(
-      <App screen={{ productVersion: '0.1.0', workspaceCwd, columns: 100, rows: 20 }} />
-    );
+    const { lastFrame } = renderApp({ columns: 100, rows: 20 });
 
     const output = lastFrame() ?? '';
 
@@ -19,10 +61,7 @@ describe('App', () => {
   });
 
   it('reflows to the latest terminal size after stdout resize events', async () => {
-    const workspaceCwd = 'C:\\Users\\kefeiqian\\Projects\\dummy-react-app';
-    const { lastFrame, stdout } = render(
-      <App screen={{ productVersion: '0.1.0', workspaceCwd }} />
-    );
+    const { lastFrame, stdout } = renderApp();
 
     await flushInput();
     Object.defineProperty(stdout, 'columns', { configurable: true, value: 80 });
@@ -31,15 +70,13 @@ describe('App', () => {
     await flushInput();
 
     const outputRows = (lastFrame() ?? '').split('\n');
-    expect(outputRows).toHaveLength(18);
+    // One row is reserved below the UI to keep frames under fullscreen.
+    expect(outputRows).toHaveLength(18 - FULLSCREEN_GUARD_ROWS);
     expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
   });
 
   it('keeps the layout at the minimum height when the terminal shrinks below 10 rows', async () => {
-    const workspaceCwd = 'C:\\Users\\kefeiqian\\Projects\\dummy-react-app';
-    const { lastFrame, stdout } = render(
-      <App screen={{ productVersion: '0.1.0', workspaceCwd }} />
-    );
+    const { lastFrame, stdout } = renderApp();
 
     await flushInput();
     Object.defineProperty(stdout, 'columns', { configurable: true, value: 80 });
@@ -50,5 +87,17 @@ describe('App', () => {
     const outputRows = (lastFrame() ?? '').split('\n');
     expect(outputRows).toHaveLength(10);
     expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
+  });
+
+  it('preloads startup tasks on mount, locks composer input, then restores the default hints', async () => {
+    const { lastFrame, stdin } = renderApp({ columns: 100, rows: 20 });
+
+    stdin.write('blocked while loading');
+    await flushInput();
+    expect(lastFrame() ?? '').toContain('> blocked while loading');
+
+    stdin.write('ready now');
+    await flushInput();
+    expect(lastFrame() ?? '').toContain('> blocked while loadingready now');
   });
 });
