@@ -11,12 +11,16 @@
   "scripts": {
     "dev": "tsx main.tsx",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "package": "bun scripts/buildPackaged.ts",
+    "package-release": "bun scripts/packageRelease.ts"
   },
   "dependencies": {
     "ink": "^7.1.0",
     "jotai": "^2.20.1",
-    "react": "^19.2.7"
+    "react": "^19.2.7",
+    "tree-kill": "^1.2.2",
+    "vscode-jsonrpc": "^9.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",
