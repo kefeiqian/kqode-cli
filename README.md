@@ -70,11 +70,62 @@ Use the Cargo-facing xtask commands instead of calling the package manager
 directly.
 
 ```bash
-cargo xtask tui-install
-cargo xtask tui-typecheck
-cargo xtask tui-test
-cargo xtask tui-dev
+cargo xtask tui-install    # install nested TUI dependencies
+cargo xtask tui-typecheck  # type-check the TUI (tsc --noEmit)
+cargo xtask tui-test       # run TUI tests (vitest)
+cargo xtask tui-dev        # run the TUI from a throwaway fixture workspace
 ```
+
+`cargo xtask tui-dev` runs the Ink TUI against a copied fixture workspace, so the
+displayed working directory is a realistic project rather than the KQode repo.
+Today the TUI talks to a local Rust JSON-RPC backend that acknowledges each
+submitted prompt (`ACK: message received`); it does not yet call a model, run
+tools, or execute an agent loop, and the slash-command, mention, and model
+affordances are inert placeholders for now.
+
+Prepare or reset that fixture workspace explicitly with:
+
+```bash
+cargo xtask fixture-prepare-react-simple   # committed simple React fixture
+cargo xtask fixture-prepare-react-complex  # cached official Vite React template
+```
+
+`tui-dev` prepares a workspace on demand, so these are only needed to reset it or
+switch to a specific fixture.
+
+### Standalone executable
+
+`kqode` ships as a single native executable that bundles the Ink frontend with a
+prebuilt Rust backend, so packaged users need neither Cargo, Rust, Node, nor npm.
+
+```bash
+cargo xtask package    # build the standalone executable at tui/dist/kqode[.exe]
+cargo xtask tui-prod   # build and run the standalone executable
+```
+
+Cargo is required only for this source-mode build. The packaged executable
+materializes its embedded backend into a per-user cache under `~/.kqcode/` and
+runs the same local ACK path as source mode.
+
+### Distribution
+
+Every install channel delivers the same standalone executable from GitHub Release
+assets — no channel builds from source:
+
+- Direct download of `kqode-<os>-<arch>.tar.gz` / `.zip` plus checksums.
+- npm: `npm install -g @kqode/kqode-cli` downloads and verifies the matching
+  release archive on install.
+- Homebrew and winget manifests that point at the Release asset URLs.
+
+Maintainer commands:
+
+```bash
+cargo xtask package-release    # archive + checksums for the host target
+cargo xtask set-version X.Y.Z  # bump every manifest in lockstep before tagging
+```
+
+The [distribution registration guide](docs/release/kqode_distribution_registration.md)
+walks through GitHub Release, npm, Homebrew, and winget publishing.
 
 ### Documentation site
 
@@ -86,5 +137,6 @@ cargo xtask blog-install
 cargo xtask blog-build
 cargo xtask blog-typecheck
 cargo xtask blog-serve
+cargo xtask blog-serve-en
 cargo xtask blog-preview
 ```

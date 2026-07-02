@@ -50,7 +50,18 @@ cargo xtask blog-install
 cargo xtask blog-build
 cargo xtask blog-typecheck
 cargo xtask blog-serve
+cargo xtask blog-serve-en
 cargo xtask blog-preview
+```
+
+Running two or more `cargo xtask` commands at once fails on Windows: `cargo xtask` expands to `cargo run -p xtask`, which relinks the shared `target\debug\xtask.exe` on each call, and a long-running command keeps that executable locked so the next call cannot replace it (os error 32, or os error 5 on the remove step). To run long-lived or multiple commands in parallel, use the launcher, which builds once then runs a per-invocation copy under `target/debug/xtask-run/`:
+
+```powershell
+./scripts/xtask.ps1 blog-serve   # Windows (PowerShell)
+```
+
+```bash
+./scripts/xtask.sh blog-serve    # macOS/Linux
 ```
 
 Keep xtask command modules as thin wrappers around reusable implementation modules. When adding or renaming an xtask command, add a matching checked-in IDE run profile under `.run/` using the `xtask: <command>` naming pattern.
@@ -103,6 +114,7 @@ For functions that can fail in non-obvious ways, include a `# Errors` section. U
 - Build model context from bounded fragments with source, token estimate, priority, expiry/persistence, and trace citation. Do not add unbounded repo dumps to prompt context.
 - Every meaningful coding task should end with a reviewable diff, check results, and final summary, and should produce trace evidence for model calls, tool calls, approvals, diffs, costs, and outcome.
 - Start evaluation with deterministic harness tests before provider or benchmark tests. The first golden tasks should dogfood KQode on this repository.
+- `docs/solutions/` holds documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (`module`, `tags`, `problem_type`); relevant when implementing or debugging in documented areas.
 
 ## Commit workflow
 

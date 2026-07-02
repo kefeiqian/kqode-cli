@@ -5,9 +5,13 @@
 # TUI Node artifacts
 /tui/node_modules/
 /tui/dist/
+/tui/packaged/assets/
 /tui/coverage/
 /tui/.vite/
 /tui/.vitest/
+
+# npm distribution staging
+/packaging/npm/dist/
 
 # Blog Node artifacts
 /blog/node_modules/
@@ -41,3 +45,5 @@
 # OS-generated files
 .DS_Store
 Thumbs.db
+
+.playwright-mcp/
