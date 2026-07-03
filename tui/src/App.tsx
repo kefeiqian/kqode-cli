@@ -3,9 +3,11 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { useLayoutEffect } from 'react';
 import { HomeScreen } from '@components/HomeScreen/index.tsx';
 import { TerminalTooSmall } from '@components/TerminalTooSmall.tsx';
+import { useGlobalKeys } from '@/useGlobalKeys.ts';
 import { terminalTooSmallAtom, windowColumnsAtom, windowRowsAtom } from '@state/global/index.ts';
 
 export function App() {
+  useGlobalKeys();
   const windowSize = useWindowSize();
   const setWindowColumns = useSetAtom(windowColumnsAtom);
   const setWindowRows = useSetAtom(windowRowsAtom);

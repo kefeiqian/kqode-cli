@@ -2,6 +2,7 @@ import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '@/App.tsx';
 import {
+  armedActionAtom,
   columnsTestOverrideAtom,
   FULLSCREEN_GUARD_ROWS,
   productVersionAtom,
@@ -23,7 +24,7 @@ function renderApp({ columns, rows }: { columns?: number; rows?: number } = {}) 
   if (rows !== undefined) {
     store.set(rowsTestOverrideAtom, rows);
   }
-  return renderWithJotai(<App />, store);
+  return { store, ...renderWithJotai(<App />, store) };
 }
 
 function deferredPromise<T>() {
@@ -118,5 +119,19 @@ describe('App', () => {
     stdin.write('ready now');
     await flushInput();
     expect(lastFrame() ?? '').toContain('> blocked while loadingready now');
+  });
+
+  it('exits on the second Ctrl+C after arming on the first', async () => {
+    const { store, lastFrame, stdin } = renderApp({ columns: 100, rows: 20 });
+    await flushInput();
+
+    stdin.write('\u0003');
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBe('exit');
+    expect(lastFrame() ?? '').toContain('ctrl+c again to exit');
+
+    stdin.write('\u0003');
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBeNull();
   });
 });

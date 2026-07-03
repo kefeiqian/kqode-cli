@@ -26,7 +26,9 @@ async function launchTui({ entryUrl, loadPackagedAsset }: RunKqodeCliOptions): P
     // Rewrite only changed lines instead of repainting the whole screen each
     // frame. Paired with FULLSCREEN_GUARD_ROWS keeping us under fullscreen, this
     // avoids the per-keystroke clear+repaint that blinks in WezTerm on Windows.
-    { incrementalRendering: true }
+    // exitOnCtrlC is off so Ctrl+C flows to the global two-step-exit handler
+    // (useGlobalKeys) instead of quitting on the first press.
+    { incrementalRendering: true, exitOnCtrlC: false }
   );
 
   // Restore the terminal, then print the exit summary card into the recovered
