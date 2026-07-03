@@ -2,16 +2,19 @@ import { Box, Text } from 'ink';
 import { useAtomValue } from 'jotai';
 import { useEffect, useState } from 'react';
 import {
+  armedActionAtom,
   columnsAtom,
   modelLabelAtom,
   statusHintAtom
 } from '@state/global/index.ts';
+import { PRESS_AGAIN_TO_CLEAR_HINT, PRESS_AGAIN_TO_EXIT_HINT } from '@constants/ui.ts';
 import { theme } from '@theme/themeConfig.ts';
 
 export function StatusBar() {
   const columns = useAtomValue(columnsAtom);
   const modelLabel = useAtomValue(modelLabelAtom);
   const statusHint = useAtomValue(statusHintAtom);
+  const armedAction = useAtomValue(armedActionAtom);
   const loadingFrame = useLoadingFrame(statusHint?.kind === 'loading');
   const baseHints =
     statusHint === undefined
@@ -21,8 +24,15 @@ export function StatusBar() {
       : columns >= 60
         ? statusHint.full
         : statusHint.compact;
+  const armedHint =
+    armedAction === 'clear-input'
+      ? PRESS_AGAIN_TO_CLEAR_HINT
+      : armedAction === 'exit'
+        ? PRESS_AGAIN_TO_EXIT_HINT
+        : undefined;
   const leftHints =
-    statusHint?.kind === 'loading' ? `${baseHints}${'.'.repeat(loadingFrame)}` : baseHints;
+    armedHint ??
+    (statusHint?.kind === 'loading' ? `${baseHints}${'.'.repeat(loadingFrame)}` : baseHints);
   const showModel = columns >= 60;
 
   return (

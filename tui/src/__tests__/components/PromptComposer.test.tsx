@@ -7,6 +7,7 @@ import {
 } from '@components/PromptComposer/index.tsx';
 import { enqueuePromptAtom } from '@state/backend/index.ts';
 import { commandMenuDismissedAtom } from '@state/commands/index.ts';
+import { armedActionAtom } from '@state/global/index.ts';
 import { submittedPromptEntriesAtom } from '@state/homeScreen/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
@@ -303,5 +304,39 @@ describe('PromptComposer', () => {
     await flushInput();
 
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('clears the composer on a second Esc after arming, keeping text on the first', async () => {
+    const store = createStore();
+    const { lastFrame, stdin } = renderWithJotai(<PromptComposer columns={40} />, store);
+
+    stdin.write('hello');
+    await flushInput();
+    stdin.write('\u001B');
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    expect(store.get(armedActionAtom)).toBe('clear-input');
+    expect(lastFrame() ?? '').toContain('hello');
+
+    stdin.write('\u001B');
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    expect(store.get(armedActionAtom)).toBeNull();
+    expect(lastFrame() ?? '').not.toContain('hello');
+  });
+
+  it('disarms the clear confirmation when another key is pressed', async () => {
+    const store = createStore();
+    const { stdin } = renderWithJotai(<PromptComposer columns={40} />, store);
+
+    stdin.write('hello');
+    await flushInput();
+    stdin.write('\u001B');
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(store.get(armedActionAtom)).toBe('clear-input');
+
+    stdin.write('x');
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBeNull();
   });
 });

@@ -22,6 +22,7 @@ import {
   setComposerValidationErrorAtom,
   validateComposerSubmit
 } from '@state/composer/index.ts';
+import { armedActionAtom } from '@state/global/index.ts';
 
 type PromptComposerInputState = {
   cursorIndex: number;
@@ -64,11 +65,23 @@ export function usePromptComposerInput({
   const moveCommandHighlight = useSetAtom(moveCommandHighlightAtom);
   const resetCommandHighlight = useSetAtom(resetCommandHighlightAtom);
   const setCommandMenuDismissed = useSetAtom(commandMenuDismissedAtom);
+  const armedAction = useAtomValue(armedActionAtom);
+  const setArmedAction = useSetAtom(armedActionAtom);
 
   useInput(
     (input, key) => {
       if (isMouseInput(input)) {
         return;
+      }
+
+      // Ctrl+C is owned by the global two-step-exit hook; never handle it here.
+      if (key.ctrl === true && input === 'c') {
+        return;
+      }
+
+      // Any real key other than Esc cancels a pending two-step confirmation.
+      if (key.escape !== true) {
+        setArmedAction(null);
       }
 
       const newlineInput = promptNewlineInput(input, key, state);
@@ -112,6 +125,16 @@ export function usePromptComposerInput({
           }
           return;
         }
+      }
+
+      if (key.escape === true) {
+        if (armedAction === 'clear-input') {
+          clearComposer();
+          setArmedAction(null);
+        } else if (state.text.length > 0) {
+          setArmedAction('clear-input');
+        }
+        return;
       }
 
       if (key.leftArrow) {

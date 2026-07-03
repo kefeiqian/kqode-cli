@@ -3,6 +3,7 @@ export * from '@state/global/body.ts';
 export * from '@state/global/dimensions.ts';
 export * from '@state/global/gitStatus.ts';
 export * from '@state/global/inputLock.ts';
+export * from '@state/global/keyArm.ts';
 export * from '@state/global/model.ts';
 export * from '@state/global/session.ts';
 export * from '@state/global/statusHint.ts';

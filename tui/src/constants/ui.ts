@@ -38,6 +38,12 @@ export const COMPOSER_BACKGROUND_TOP_PADDING_ROWS = 1;
  */
 export const MAX_COMMAND_MENU_ROWS = 8;
 
+// --- Two-step key confirmations ---
+
+/** Status-bar hints shown while a two-step key confirmation is armed. */
+export const PRESS_AGAIN_TO_CLEAR_HINT = 'esc again to clear input';
+export const PRESS_AGAIN_TO_EXIT_HINT = 'ctrl+c again to exit';
+
 // --- Body scrolling / scrollbar ---
 
 /** Glyph for the scrollbar track (inactive portion). */
