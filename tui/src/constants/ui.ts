@@ -29,6 +29,15 @@ export const INK_CURSOR_ROW_ORIGIN_OFFSET = 0;
 export const COMPOSER_BACKGROUND_PADDING_ROWS = 2;
 export const COMPOSER_BACKGROUND_TOP_PADDING_ROWS = 1;
 
+// --- Slash commands ---
+
+/**
+ * Maximum command rows shown in the autocomplete menu before it stops growing.
+ * Inert with the three built-in commands today; exercised once the deferred
+ * markdown/config command source adds more.
+ */
+export const MAX_COMMAND_MENU_ROWS = 8;
+
 // --- Body scrolling / scrollbar ---
 
 /** Glyph for the scrollbar track (inactive portion). */
