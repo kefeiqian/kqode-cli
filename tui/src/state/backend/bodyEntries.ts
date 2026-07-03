@@ -14,10 +14,16 @@ export type QueueItem = {
   text: string;
   state: QueueItemState;
   result?: BackendResult;
+  /** `'note'` items are client-side output (e.g. `/help`); they never reach the backend. */
+  kind?: 'prompt' | 'note';
 };
 
 export function queueToBodyEntries(queue: readonly QueueItem[]): BodyEntry[] {
   return queue.flatMap((item) => {
+    if (item.kind === 'note') {
+      return noteToBodyEntries(item);
+    }
+
     const promptText = sanitizeDisplayText(item.text);
     const promptEntry: BodyEntry =
       item.state === 'queued'
@@ -28,6 +34,17 @@ export function queueToBodyEntries(queue: readonly QueueItem[]): BodyEntry[] {
       ? [promptEntry]
       : [promptEntry, { id: `result-${item.id}`, kind: item.result.kind, text: item.result.text }];
   });
+}
+
+/**
+ * Renders a client-side note as one `info` row per line. A single multi-line
+ * `info` entry would flatten, because the assistant-row renderer wraps without
+ * preserving hard line breaks — so `/help` needs one entry per command line.
+ */
+function noteToBodyEntries(item: QueueItem): BodyEntry[] {
+  return sanitizeDisplayText(item.text)
+    .split('\n')
+    .map((line, index) => ({ id: `note-${item.id}-${index}`, kind: 'info', text: line }));
 }
 
 export function backendErrorMessage(error: unknown): string {

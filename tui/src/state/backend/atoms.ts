@@ -9,6 +9,7 @@ import {
   queueToBodyEntries
 } from '@state/backend/bodyEntries.ts';
 import type { BackendResult, QueueItem } from '@state/backend/bodyEntries.ts';
+import { COMMAND_REGISTRY } from '@state/commands/registry.ts';
 
 let nextQueueItemId = 0;
 
@@ -37,6 +38,31 @@ export const enqueuePromptAtom = atom(null, async (get, set, rawText: string) =>
   set(bodyScrollOffsetRowsAtom, 0);
   syncBodyEntries(get, set);
   await drainQueue(get, set);
+});
+
+/** Clears all transcript entries (prompts, results, and command notes) and resets scroll. */
+export const clearTranscriptAtom = atom(null, (get, set) => {
+  set(promptQueueAtom, []);
+  set(bodyScrollOffsetRowsAtom, 0);
+  syncBodyEntries(get, set);
+});
+
+/**
+ * Appends the `/help` listing as a client-side note — one transcript line per
+ * command. The note is `settled` and `kind: 'note'`, so the drain loop skips it
+ * and nothing reaches the backend. The shared id counter keeps it correctly
+ * ordered against prompts.
+ */
+export const appendHelpAtom = atom(null, (get, set) => {
+  const width = Math.max(...COMMAND_REGISTRY.map((command) => command.name.length));
+  const text = COMMAND_REGISTRY.map(
+    (command) => `${command.name.padEnd(width)}  ${command.description}`
+  ).join('\n');
+  const item: QueueItem = { id: nextQueueItemId++, text, state: 'settled', kind: 'note' };
+
+  set(promptQueueAtom, (queue) => [...queue, item]);
+  set(bodyScrollOffsetRowsAtom, 0);
+  syncBodyEntries(get, set);
 });
 
 async function drainQueue(get: Getter, set: Setter): Promise<void> {
