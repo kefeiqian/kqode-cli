@@ -11,6 +11,7 @@ import {
   rowsAtom,
   workspaceCwdAtom
 } from '@state/global/index.ts';
+import { commandMenuDesiredRowsAtom } from '@state/commands/index.ts';
 import {
   BODY_CWD_GAP_ROWS,
   DEFAULT_COMPOSER_ROWS,
@@ -30,6 +31,28 @@ export const displayedBodyEntriesAtom = atom((get) => {
     : [...baseBodyEntries, ...submittedPromptEntries];
 });
 
+/**
+ * Rows the open command menu actually occupies: the desired height (U2) clamped
+ * to the rows free above a one-row-minimum body, so the menu is truncated or
+ * suppressed rather than pushing the total past the canvas at small sizes.
+ */
+export const commandMenuRowsAtom = atom((get) => {
+  const desired = get(commandMenuDesiredRowsAtom);
+  if (desired === 0) {
+    return 0;
+  }
+
+  const columns = get(columnsAtom);
+  const rows = get(rowsAtom);
+  const composerRows = get(composerRowsAtom);
+  const cwdRows = countCwdRows(get(workspaceCwdAtom), get(gitStatusLabelAtom), columns);
+  const freeMenuRows = Math.max(
+    0,
+    rows - headerRowCount(columns) - BODY_CWD_GAP_ROWS - cwdRows - 1 - composerRows - 1
+  );
+  return Math.min(desired, freeMenuRows);
+});
+
 export const layoutAtom = atom((get) => {
   const columns = get(columnsAtom);
   const rows = get(rowsAtom);
@@ -43,7 +66,8 @@ export const layoutAtom = atom((get) => {
     rows,
     bodyEntryRows,
     composerRows,
-    countCwdRows(get(workspaceCwdAtom), gitStatusLabel, columns)
+    countCwdRows(get(workspaceCwdAtom), gitStatusLabel, columns),
+    get(commandMenuRowsAtom)
   );
 });
 
@@ -70,7 +94,8 @@ export const bottomSpacerRowsAtom = atom((get) => {
       BODY_CWD_GAP_ROWS -
       layout.cwdRows -
       composerRows -
-      1
+      1 -
+      get(commandMenuRowsAtom)
   );
 });
 

@@ -11,7 +11,8 @@ export function resolveHomeScreenLayout(
   rows: number,
   bodyEntryCount = Number.POSITIVE_INFINITY,
   composerRows = DEFAULT_COMPOSER_ROWS,
-  cwdRows = 1
+  cwdRows = 1,
+  commandMenuRows = 0
 ): { bodyRows: number; composerVisibleRows: number; cwdRows: number } {
   const headerRows = headerRowCount(columns);
   const resolvedCwdRows = Math.max(1, cwdRows);
@@ -25,7 +26,10 @@ export function resolveHomeScreenLayout(
     1,
     rows - fixedRows - COMPOSER_BACKGROUND_PADDING_ROWS - composerErrorReserveRows - minBodyRows
   );
-  const maxBodyRows = rows - fixedRows - composerRows;
+  // The command menu (when open) renders above the composer; its rows come out
+  // of the body budget so the composer and status stay pinned to the bottom and
+  // the total never exceeds the canvas.
+  const maxBodyRows = rows - fixedRows - composerRows - commandMenuRows;
 
   return {
     bodyRows: Math.max(1, Math.min(maxBodyRows, bodyEntryCount + 1)),
