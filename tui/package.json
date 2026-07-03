@@ -17,6 +17,7 @@
     "package-release": "bun scripts/packageRelease.ts"
   },
   "dependencies": {
+    "citty": "^0.2.2",
     "ink": "^7.1.0",
     "jotai": "^2.20.1",
     "react": "^19.2.7",
