@@ -6,6 +6,7 @@ resolver = "3"
 name = "KQode"
 version = "0.1.1"
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [lib]
 name = "kqode"
