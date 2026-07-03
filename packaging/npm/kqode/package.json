@@ -1,6 +1,6 @@
 {
   "name": "@kqode/kqode-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "KQode — a Rust-core coding-agent harness with a TypeScript Ink terminal UI.",
   "repository": {
     "type": "git",
