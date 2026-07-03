@@ -5,7 +5,7 @@ through the four supported channels: **GitHub Release direct download**, **npm
 global install**, **Homebrew**, and **winget**.
 
 Every channel distributes the *same* per-platform standalone executable. Package
-managers are thin installers that select or download that executable; none of
+managers are thin installers that select, bundle, or download that executable; none of
 them build KQode from source or require Cargo, Node, or npm at runtime (except
 npm, which is itself the installer for the npm channel).
 
@@ -16,8 +16,9 @@ In scope:
 - Building direct-download release archives and checksums.
 - Uploading them as GitHub Release assets (automated by
   `.github/workflows/release.yml`).
-- Publishing the single `@kqode/kqode-cli` npm package via Trusted Publishing
-  (automated by `.github/workflows/npm-publish.yml`).
+- Publishing the `@kqode/kqode-cli` npm launcher and its five per-platform
+  packages via Trusted Publishing (automated by
+  `.github/workflows/npm-publish.yml`).
 - Manually registering the Homebrew and winget packages that point at the GitHub
   Release asset URLs.
 
@@ -87,8 +88,9 @@ cargo xtask set-version 0.2.0
 ```
 
 This sets the version in root `Cargo.toml`, `xtask/Cargo.toml`,
-`packaging/npm/kqode/package.json`, and `tui/package.json`, and refreshes
-`Cargo.lock` (workspace members only). Then commit and tag to match:
+`packaging/npm/kqode/package.json` (including its `@kqode/kqode-cli-*`
+optional-dependency pins), and `tui/package.json`, and refreshes `Cargo.lock`
+(workspace members only). Then commit and tag to match:
 
 ```bash
 git commit -am "chore: release v0.2.0"
@@ -137,16 +139,25 @@ matches the published release and npm version.
 
 ## 2. npm
 
-npm distributes a **single** package, `@kqode/kqode-cli`, published under the
-`@kqode` org. It ships no binary: on install (postinstall) and, as a fallback, on
-first run, it downloads the matching `kqode-<os>-<arch>` archive for the host from
-this version's GitHub Release, verifies its SHA-256 against the published
-checksum, and extracts the self-contained executable locally. The `kqode`
-launcher then execs it.
+npm distributes the CLI as a **launcher plus per-platform packages** (the model
+esbuild and SWC use), all under the `@kqode` org:
 
-Because the download targets `v<package-version>`, npm is published only **after**
-`release.yml` has uploaded that tag's archives and checksums; the pipeline
-enforces that ordering automatically (see below).
+- `@kqode/kqode-cli` — the launcher. It ships no binary and lists one platform
+  package per target under `optionalDependencies`.
+- `@kqode/kqode-cli-<platform>-<arch>` — five packages (`darwin-arm64`,
+  `linux-arm64`, `linux-x64`, `win32-arm64`, `win32-x64`), each carrying that
+  host's self-contained executable and declaring `os`/`cpu`.
+
+On `npm install -g @kqode/kqode-cli`, npm installs the launcher plus **only** the
+platform package matching the host's `os`/`cpu`; the launcher then resolves that
+package's executable and execs it. Nothing is downloaded on install or first run,
+so the install is self-contained and works offline (`win32-arm64` carries the
+`win32-x64` binary, run via emulation).
+
+The platform packages are **generated at publish time** from the GitHub Release
+archives, so npm is published only **after** `release.yml` has uploaded that tag's
+archives and checksums; the pipeline enforces that ordering automatically (see
+below).
 
 Users install with:
 
@@ -154,45 +165,57 @@ Users install with:
 npm install -g @kqode/kqode-cli
 ```
 
-> Tradeoff: install/first-run needs network access to GitHub Releases, and
-> `npm install --ignore-scripts` skips the postinstall (the first `kqode` run
-> performs the download instead). The alternative `os`/`cpu`
-> optional-dependency layout avoids this but needs one npm package per target.
+> Trade-off vs. the earlier download-on-install launcher: publishing produces six
+> packages instead of one, and each needs its own npm trusted publisher. In
+> return, installs need no network beyond the registry, never fail on a transient
+> GitHub outage, and work offline.
 
 ### What to register and set (one-time)
 
 1. An **npm account** and the **`@kqode` organization** (npmjs.com → Add
    Organization → `kqode`; the free plan covers public packages).
-2. **Bootstrap the first publish.** A trusted publisher cannot be configured for
-   a package that does not exist yet, so create it once with a short-lived
-   Granular token (write access to `@kqode/kqode-cli`):
+2. **Bootstrap the first publish of every package.** A trusted publisher cannot be
+   configured for a package that does not exist yet, so create all six once with a
+   short-lived Granular token (write access to the `@kqode` scope). After a
+   `v<version>` GitHub Release exists, generate the platform packages and publish
+   them plus the launcher:
    ```bash
-   cd packaging/npm/kqode
-   npm version <version> --no-git-tag-version --allow-same-version
-   NODE_AUTH_TOKEN=<granular-token> npm publish --access public
+   gh release download v<version> --dir staging
+   node packaging/npm/scripts/generate-platform-packages.cjs \
+     --archives staging --out dist-packages --version <version>
+   export NODE_AUTH_TOKEN=<granular-token>
+   for d in dist-packages/*/; do (cd "$d" && npm publish --access public); done
+   (cd packaging/npm/kqode && npm publish --access public)
    ```
    Then revoke that token.
-3. **Add the Trusted Publisher** on npmjs.com → Packages → `@kqode/kqode-cli` →
-   Settings → **Trusted Publisher** → GitHub Actions:
+3. **Add a Trusted Publisher to each of the six packages** on npmjs.com → Packages
+   → `<package>` → Settings → **Trusted Publisher** → GitHub Actions:
    - Organization/owner: `kefeiqian`
    - Repository: `kqode-cli`
    - Workflow filename: `npm-publish.yml` (exact, case-sensitive)
-4. **Restrict tokens (recommended).** Package → Settings → Publishing access →
-   **Require two-factor authentication and disallow tokens**. Trusted publishing
-   keeps working over OIDC; only long-lived tokens are disallowed.
-5. Ensure the package's `repository.url` matches the GitHub repo
+
+   The packages are `@kqode/kqode-cli`, `@kqode/kqode-cli-darwin-arm64`,
+   `@kqode/kqode-cli-linux-arm64`, `@kqode/kqode-cli-linux-x64`,
+   `@kqode/kqode-cli-win32-arm64`, and `@kqode/kqode-cli-win32-x64`.
+4. **Restrict tokens (recommended).** For each package → Settings → Publishing
+   access → **Require two-factor authentication and disallow tokens**. Trusted
+   publishing keeps working over OIDC; only long-lived tokens are disallowed.
+5. Ensure each package's `repository.url` matches the GitHub repo
    (`git+https://github.com/kefeiqian/kqode-cli.git`) — npm validates it for
-   trusted publishing. It is already set in `packaging/npm/kqode/package.json`.
+   trusted publishing. The launcher manifest already sets it, and the generator
+   stamps it into every platform manifest.
 
 No `NPM_TOKEN` secret is needed for automated publishing; OIDC replaces it.
 
 ### Automated publishing (recommended)
 
-`.github/workflows/npm-publish.yml` publishes `@kqode/kqode-cli` via Trusted
-Publishing (OIDC): it stamps the tag's version into `package.json` and runs
-`npm publish --access public`, skipping the publish if that version already
-exists. npm auto-detects the OIDC environment (`id-token: write`) and, on public
-repos, attaches provenance automatically.
+`.github/workflows/npm-publish.yml` publishes all six packages via Trusted
+Publishing (OIDC). It checks out the released commit, downloads the tag's Release
+archives, runs the generator to assemble the platform packages, then publishes the
+platform packages first and the launcher last (so the launcher's optional
+dependencies already exist), skipping any `name@version` already on the registry.
+npm auto-detects the OIDC environment (`id-token: write`) and, on public repos,
+attaches provenance to every package automatically.
 
 It runs **automatically** on a pushed version tag: `npm-publish.yml` has a
 `workflow_run` trigger on the **Release** workflow, so when `release.yml` finishes
@@ -205,8 +228,8 @@ Crucially, `workflow_run` keeps `npm-publish.yml` as the **top-level** workflow.
 npm Trusted Publishing validates the *top-level* workflow's filename (not the file
 that runs `npm publish`), so npm-publish must **not** be invoked via
 `workflow_call` from `release.yml` — npm would then validate `release.yml` and
-reject the publish (`ENEEDAUTH`). Keeping it top-level means the Trusted Publisher
-config (workflow `npm-publish.yml`) needs no change.
+reject the publish (`ENEEDAUTH`). Keeping it top-level means every package's
+Trusted Publisher config (workflow `npm-publish.yml`) needs no change.
 
 You can still publish (or re-publish) a tag by hand from **Actions → Publish npm
 → Run workflow**; the idempotency guard makes a duplicate run a no-op.
@@ -218,10 +241,15 @@ You can still publish (or re-publish) a tag by hand from **Actions → Publish n
 
 ### Manual publishing
 
+Publish every package for a tag whose GitHub Release already exists (the same
+steps the workflow runs, with your own npm auth):
+
 ```bash
-cd packaging/npm/kqode
-npm version <version> --no-git-tag-version --allow-same-version
-npm publish --access public
+gh release download v<version> --dir staging
+node packaging/npm/scripts/generate-platform-packages.cjs \
+  --archives staging --out dist-packages --version <version>
+for d in dist-packages/*/; do (cd "$d" && npm publish --access public); done
+(cd packaging/npm/kqode && npm publish --access public)
 ```
 
 ## 3. Homebrew
