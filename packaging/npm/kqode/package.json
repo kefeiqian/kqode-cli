@@ -1,6 +1,6 @@
 {
   "name": "@kqode/kqode-cli",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "KQode — a Rust-core coding-agent harness with a TypeScript Ink terminal UI.",
   "license": "MIT OR Apache-2.0",
   "repository": {
@@ -22,11 +22,11 @@
     "README.md"
   ],
   "optionalDependencies": {
-    "@kqode/kqode-cli-darwin-arm64": "0.1.2",
-    "@kqode/kqode-cli-linux-arm64": "0.1.2",
-    "@kqode/kqode-cli-linux-x64": "0.1.2",
-    "@kqode/kqode-cli-win32-arm64": "0.1.2",
-    "@kqode/kqode-cli-win32-x64": "0.1.2"
+    "@kqode/kqode-cli-darwin-arm64": "0.1.3",
+    "@kqode/kqode-cli-linux-arm64": "0.1.3",
+    "@kqode/kqode-cli-linux-x64": "0.1.3",
+    "@kqode/kqode-cli-win32-arm64": "0.1.3",
+    "@kqode/kqode-cli-win32-x64": "0.1.3"
   },
   "scripts": {
     "test": "node --test"
