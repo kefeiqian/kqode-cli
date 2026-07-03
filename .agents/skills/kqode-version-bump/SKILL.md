@@ -1,6 +1,6 @@
 ---
 name: kqode-version-bump
-description: "Interactively bump the KQode product version. Use when asked to bump/release a new version, cut a release, or change the version number. Shows the current version, asks whether to bump major/minor/patch (or a custom version), then runs `cargo xtask set-version` to update every manifest in lockstep."
+description: "Interactively bump the KQode product version. Use when asked to bump/release a new version, cut a release, or change the version number. Shows the current version, asks whether to bump major/minor/patch (or a custom version), runs `cargo xtask set-version` to update every manifest in lockstep, commits and tags the release, then offers to push (triggering the release pipeline) and publish to npm, and prints the GitHub Release and npm links."
 ---
 
 # KQode Version Bump
@@ -55,24 +55,76 @@ cargo xtask set-version <chosen-version>
 Report the files it changed (the command prints each one). If the command fails
 (for example an invalid version), surface the error and stop.
 
-### 4. Remind about commit and tag
+### 4. Commit and tag the release (automatic)
 
-The version must equal the release tag. After a successful bump, tell the user
-the next steps (offer to do them, but do not tag without confirmation):
+The version must equal the release tag, so create both automatically after a
+successful bump — no confirmation needed for the local commit and tag. First
+make sure the working tree contains only the bump's changes, then commit and
+tag:
 
 ```bash
 git commit -am "chore: release v<chosen-version>"
-git tag v<chosen-version> && git push origin v<chosen-version>
+git tag v<chosen-version>
 ```
 
-The tag drives `release.yml` (archives + GitHub Release) and `npm-publish.yml`
-(npm version). See `docs/release/kqode_distribution_registration.md`.
+If the tag `v<chosen-version>` already exists, stop and report it instead of
+moving it.
+
+### 5. Ask whether to push (triggers the release pipeline)
+
+Use the ask_user tool: "Push the release commit and tag `v<chosen-version>` now
+to trigger the release pipeline?" Do not push without explicit confirmation. If
+the user declines, print the commands below and stop.
+
+```bash
+git push origin HEAD
+git push origin v<chosen-version>
+```
+
+Pushing the `v*` tag triggers `release.yml`, which builds the standalone
+executables for every target and creates/updates the GitHub Release with the
+archives and checksums. Watch it to success (`gh run watch <run-id> --exit-status`)
+before the npm step.
+
+### 6. Publish to npm (separate, confirmed step)
+
+`release.yml` does NOT publish to npm, and a GitHub Release created by its
+`GITHUB_TOKEN` does not re-fire the `release: published` event — so npm keeps
+serving the old version until `npm-publish.yml` runs. Because the npm package's
+postinstall downloads the tag's release archive, publish to npm only AFTER
+`release.yml` has finished uploading that tag's assets.
+
+Once the release run has succeeded, ask the user whether to publish to npm. On
+confirmation, dispatch the workflow (OIDC Trusted Publishing — no token) and
+watch it:
+
+```bash
+gh workflow run npm-publish.yml -f tag=v<chosen-version>
+gh run watch <run-id> --exit-status
+```
+
+### 7. Show the release and npm links
+
+Report the new-version links (get the release URL from `gh`, and use the stable
+npm package name `@kqode/kqode-cli`):
+
+```bash
+gh release view v<chosen-version> --json url -q .url
+# npm: https://www.npmjs.com/package/@kqode/kqode-cli/v/<chosen-version>
+```
+
+The npm link only resolves after `npm-publish.yml` succeeds; verify with
+`npm view @kqode/kqode-cli version` (or the registry JSON) if in doubt.
 
 ## Rules
 
 - Never hand-edit version fields; always go through `cargo xtask set-version`.
 - Show the current version and the concrete resulting version for every choice.
 - Do not choose the bump type for the user; ask and wait.
+- Create the release commit and tag automatically, but never push or publish to
+  npm without explicit user confirmation.
 - Keep the git tag equal to the new version (`v<version>`), or `kqode --version`
   will not match the published npm/release version.
-- Do not create the tag or push without explicit user confirmation.
+- Publish npm only after `release.yml` has uploaded the tag's archives, and only
+  via `npm-publish.yml` (never `npm publish` by hand). See
+  `docs/release/kqode_distribution_registration.md`.
