@@ -1,19 +1,31 @@
 # Publishes the single `@kqode/kqode-cli` npm package using npm Trusted
-# Publishing (OIDC) — no long-lived npm token. Kept OUT of release.yml (per U13):
-# run it by hand for a tag, or when a Release is published.
+# Publishing (OIDC) — no long-lived npm token.
 #
 # The package ships no binary; its postinstall downloads the matching
 # `kqode-<target>` archive from the GitHub Release for its version, so publish
 # only AFTER release.yml has uploaded that tag's archives + checksums.
+#
+# How it runs (every path keeps THIS file as the top-level workflow, which is what
+# npm's Trusted Publisher matches — see the OIDC note):
+#   - workflow_run: fires automatically when the "Release" workflow finishes. On a
+#     successful tag-push release it publishes the just-released version, so a
+#     pushed version tag reaches npm with no manual step. Ordering is safe because
+#     by "completed" release.yml has already uploaded the tag's assets.
+#   - workflow_dispatch: manual (re-)publish for a given tag.
+#   - release: published — covers a Release published by hand in the UI.
+#
+# OIDC note: npm Trusted Publishing validates the TOP-LEVEL workflow's filename,
+# NOT the file that runs `npm publish`. So this must stay a top-level workflow and
+# must never be invoked via `workflow_call` from release.yml (npm would then
+# validate it as `release.yml` and reject with ENEEDAUTH). workflow_run keeps the
+# identity as `npm-publish.yml`, matching the configured Trusted Publisher with no
+# npmjs.com change.
 #
 # One-time setup: create the `@kqode` npm org, do the first publish to create the
 # package (trusted publishers cannot be configured for a nonexistent package),
 # then add a Trusted Publisher on npmjs.com (GitHub Actions, repo
 # kefeiqian/kqode-cli, workflow `npm-publish.yml`). See
 # docs/release/kqode_distribution_registration.md.
-#
-# Note: a Release created by release.yml's GITHUB_TOKEN does not re-trigger the
-# `release: published` event, so the reliable path is the manual dispatch below.
 name: Publish npm
 
 on:
@@ -23,6 +35,9 @@ on:
         description: "Release tag to publish, e.g. v0.1.0"
         required: true
         type: string
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
   release:
     types: [published]
 
@@ -30,12 +45,19 @@ permissions:
   contents: read
 
 concurrency:
-  group: npm-publish-${{ inputs.tag || github.event.release.tag_name }}
+  group: npm-publish-${{ inputs.tag || github.event.release.tag_name || github.event.workflow_run.head_sha }}
   cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-22.04
+    # For workflow_run, only publish after a SUCCESSFUL tag-push release.
+    # release.yml only pushes on `v*` tags, so event == 'push' implies a version
+    # tag; workflow_dispatch and release:published always proceed.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
     permissions:
       contents: read
       id-token: write # OIDC token for npm Trusted Publishing
@@ -44,6 +66,10 @@ jobs:
         working-directory: packaging/npm/kqode
     steps:
       - uses: actions/checkout@v4
+        with:
+          # For workflow_run, check out the exact released commit; its manifest
+          # carries the version release.yml just built. Empty elsewhere -> default.
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -55,10 +81,20 @@ jobs:
         id: rel
         shell: bash
         env:
-          TAG: ${{ inputs.tag || github.event.release.tag_name }}
+          EVENT: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          [ -n "$TAG" ] || { echo "::error::no release tag provided"; exit 1; }
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          if [ "$EVENT" = "workflow_run" ]; then
+            version="$(node -p "require('./package.json').version")"
+          else
+            tag="${INPUT_TAG:-$RELEASE_TAG}"
+            [ -n "$tag" ] || { echo "::error::no release tag provided"; exit 1; }
+            version="${tag#v}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Resolved npm version: $version"
 
       - name: Publish via Trusted Publishing (OIDC)
         shell: bash

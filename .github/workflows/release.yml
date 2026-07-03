@@ -4,9 +4,12 @@
 #
 # Authenticity controls: least-privilege permissions (only the release job gets
 # `contents: write`), third-party actions pinned by version, build-provenance
-# attestations, and published checksums. Registry publishing (npm/Homebrew/
-# winget), signing, notarization, and auto-update are intentionally NOT performed
-# here — see docs/release/kqode_distribution_registration.md.
+# attestations, and published checksums. npm publishing is handled separately by
+# npm-publish.yml, which runs automatically after this workflow completes (its
+# workflow_run trigger) — kept separate so it stays a top-level workflow for npm
+# Trusted Publishing. Homebrew/winget registration, signing, notarization, and
+# auto-update are intentionally NOT performed here — see
+# docs/release/kqode_distribution_registration.md.
 #
 # Triggers: pushing a `v*` tag publishes a release; `workflow_dispatch` is a
 # dry run that builds and uploads workflow artifacts without touching a release.

@@ -95,10 +95,10 @@ git commit -am "chore: release v0.2.0"
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
-The tag drives `release.yml` (which builds the archives + Release) and
-`npm-publish.yml` (which stamps the npm version from the tag). Keeping
-`Cargo.toml` equal to the tag ensures `kqode --version` matches the published
-release and npm version.
+The tag drives `release.yml` (which builds the archives + GitHub Release); when it
+finishes, `npm-publish.yml` runs automatically (its `workflow_run` trigger) and
+publishes npm. Keeping `Cargo.toml` equal to the tag ensures `kqode --version`
+matches the published release and npm version.
 
 ## 1. GitHub Release direct download
 
@@ -144,8 +144,9 @@ this version's GitHub Release, verifies its SHA-256 against the published
 checksum, and extracts the self-contained executable locally. The `kqode`
 launcher then execs it.
 
-Because the download targets `v<package-version>`, only publish the npm package
-**after** `release.yml` has uploaded that tag's archives and checksums.
+Because the download targets `v<package-version>`, npm is published only **after**
+`release.yml` has uploaded that tag's archives and checksums; the pipeline
+enforces that ordering automatically (see below).
 
 Users install with:
 
@@ -191,11 +192,29 @@ No `NPM_TOKEN` secret is needed for automated publishing; OIDC replaces it.
 Publishing (OIDC): it stamps the tag's version into `package.json` and runs
 `npm publish --access public`, skipping the publish if that version already
 exists. npm auto-detects the OIDC environment (`id-token: write`) and, on public
-repos, attaches provenance automatically. Trigger it from **Actions → Publish npm
-→ Run workflow** and enter the tag (e.g. `v0.1.0`).
+repos, attaches provenance automatically.
 
-> A Release created by `release.yml`'s `GITHUB_TOKEN` does not re-trigger the
-> `release: published` event, so the manual dispatch above is the reliable path.
+It runs **automatically** on a pushed version tag: `npm-publish.yml` has a
+`workflow_run` trigger on the **Release** workflow, so when `release.yml` finishes
+a successful tag-push run, npm-publish runs and publishes the just-released
+version — after that tag's archives and checksums are uploaded, with no manual
+step. It reads the version from the released commit's `package.json` (checked out
+at the run's `head_sha`).
+
+Crucially, `workflow_run` keeps `npm-publish.yml` as the **top-level** workflow.
+npm Trusted Publishing validates the *top-level* workflow's filename (not the file
+that runs `npm publish`), so npm-publish must **not** be invoked via
+`workflow_call` from `release.yml` — npm would then validate `release.yml` and
+reject the publish (`ENEEDAUTH`). Keeping it top-level means the Trusted Publisher
+config (workflow `npm-publish.yml`) needs no change.
+
+You can still publish (or re-publish) a tag by hand from **Actions → Publish npm
+→ Run workflow**; the idempotency guard makes a duplicate run a no-op.
+
+> A Release *published by hand in the UI* fires `release: published`, which this
+> workflow also handles. A Release created by `release.yml`'s `GITHUB_TOKEN` does
+> not re-fire that event — which is why the automatic path is the `workflow_run`
+> trigger, not `release`.
 
 ### Manual publishing
 
