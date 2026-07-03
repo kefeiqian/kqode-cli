@@ -5,6 +5,7 @@ import { BodyPane } from '@components/BodyPane.tsx';
 import { CwdLine } from '@components/CwdLine.tsx';
 import { Header } from '@components/Header.tsx';
 import { PromptComposer } from '@components/PromptComposer/index.tsx';
+import { SlashCommandMenu } from '@components/SlashCommandMenu/index.tsx';
 import { StatusBar } from '@components/StatusBar.tsx';
 import {
   DISABLE_SGR_MOUSE_TRACKING,
@@ -73,6 +74,7 @@ export function HomeScreenView() {
       <HomeHeader />
       <HomeBody />
       <HomeCwd />
+      <SlashCommandMenu />
       <HomeComposer />
       <StatusBar />
     </Box>
