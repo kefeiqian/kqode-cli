@@ -1,14 +1,29 @@
 # KQode
 
-[![GitHub Pages](https://github.com/kefeiqian/KQode/actions/workflows/github-pages.yml/badge.svg)](https://github.com/kefeiqian/KQode/actions/workflows/github-pages.yml)
+[![GitHub Pages](https://github.com/kefeiqian/kqode-cli/actions/workflows/github-pages.yml/badge.svg)](https://github.com/kefeiqian/kqode-cli/actions/workflows/github-pages.yml)
 
 KQode is a Rust-first coding-agent harness with TypeScript Ink as its committed TUI.
 The project is currently in the foundation stage: the checked-in implementation is
 small, while the product direction lives in the planning and architecture docs.
 
+## Development blog
+
+KQode is built in the open, and its documentation site doubles as a **development
+blog** — an explanation of the build route and a running diary of the project as
+it grows from a starter crate into a full coding-agent harness.
+
+- Read it online: <https://kefeiqian.github.io/kqode-cli/>
+- Available in 简体中文 (default) and English.
+- Source lives under [`blog/`](blog/) and is published automatically by the
+  GitHub Pages workflow.
+
+It opens with an introduction and the development approach, then follows the
+implementation unit by unit (`U1` scaffolding, `U2` interactive home screen, …),
+mirroring the `U#` commit tags. Each entry captures the reasoning, decisions, and
+trade-offs behind that step rather than only the final code.
+
 ## Links
 
-- Documentation site: <https://kefeiqian.github.io/KQode/>
 - Architecture spec: [`docs/kqode_architecture_spec.md`](docs/kqode_architecture_spec.md)
 - Build path: [`docs/kqode_build_path.md`](docs/kqode_build_path.md)
 - Detailed requirements: [`docs/kqode_detailed_requirements_index.md`](docs/kqode_detailed_requirements_index.md)
@@ -129,8 +144,9 @@ walks through GitHub Release, npm, Homebrew, and winget publishing.
 
 ### Documentation site
 
-The Docusaurus site lives under `blog/` and is deployed by the GitHub Pages
-workflow.
+The [development blog](#development-blog) is a Docusaurus site under `blog/`,
+deployed by the GitHub Pages workflow. Work on it with the Cargo-facing xtask
+commands:
 
 ```bash
 cargo xtask blog-install
