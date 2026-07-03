@@ -1,7 +1,17 @@
 import { useInput } from 'ink';
-import { useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { MODIFIED_ENTER_INPUTS } from '@components/PromptComposer/constants.ts';
+import { exactCommandMatch, unknownCommandMessage } from '@components/PromptComposer/commandMenuInput.ts';
 import { isMouseInput } from '@libs/terminal/mouse.ts';
+import { executeCommand } from '@state/commands/executeCommand.ts';
+import type { CommandActions } from '@state/commands/executeCommand.ts';
+import {
+  commandMenuDismissedAtom,
+  commandMenuOpenAtom,
+  highlightedCommandAtom,
+  moveCommandHighlightAtom,
+  resetCommandHighlightAtom
+} from '@state/commands/index.ts';
 import {
   clearComposerAtom,
   deleteComposerBackwardAtom,
@@ -23,6 +33,7 @@ type PromptComposerInputOptions = {
   maxBytes: number;
   onSubmit: (prompt: string) => void;
   state: PromptComposerInputState;
+  commandActions: CommandActions;
 };
 
 type EnterKey = {
@@ -38,7 +49,8 @@ export function usePromptComposerInput({
   isActive,
   maxBytes,
   onSubmit,
-  state
+  state,
+  commandActions
 }: PromptComposerInputOptions): void {
   const clearComposer = useSetAtom(clearComposerAtom);
   const deleteComposerBackward = useSetAtom(deleteComposerBackwardAtom);
@@ -46,6 +58,12 @@ export function usePromptComposerInput({
   const moveComposerCursorBackward = useSetAtom(moveComposerCursorBackwardAtom);
   const moveComposerCursorForward = useSetAtom(moveComposerCursorForwardAtom);
   const setComposerValidationError = useSetAtom(setComposerValidationErrorAtom);
+
+  const menuOpen = useAtomValue(commandMenuOpenAtom);
+  const highlightedCommand = useAtomValue(highlightedCommandAtom);
+  const moveCommandHighlight = useSetAtom(moveCommandHighlightAtom);
+  const resetCommandHighlight = useSetAtom(resetCommandHighlightAtom);
+  const setCommandMenuDismissed = useSetAtom(commandMenuDismissedAtom);
 
   useInput(
     (input, key) => {
@@ -65,6 +83,37 @@ export function usePromptComposerInput({
         return;
       }
 
+      if (menuOpen) {
+        if (key.upArrow) {
+          moveCommandHighlight(-1);
+          return;
+        }
+        if (key.downArrow) {
+          moveCommandHighlight(1);
+          return;
+        }
+        if (key.tab) {
+          if (highlightedCommand !== undefined) {
+            clearComposer();
+            insertComposerText({ maxBytes, text: highlightedCommand.name });
+          }
+          return;
+        }
+        if (key.escape) {
+          setCommandMenuDismissed(true);
+          return;
+        }
+        if (key.return) {
+          if (highlightedCommand !== undefined) {
+            executeCommand(highlightedCommand.id, commandActions);
+            clearComposer();
+          } else {
+            setComposerValidationError(unknownCommandMessage(state.text));
+          }
+          return;
+        }
+      }
+
       if (key.leftArrow) {
         moveComposerCursorBackward();
         return;
@@ -78,6 +127,7 @@ export function usePromptComposerInput({
       if (key.return) {
         submitPrompt({
           clearComposer,
+          commandActions,
           maxBytes,
           onSubmit,
           setComposerValidationError,
@@ -88,6 +138,8 @@ export function usePromptComposerInput({
 
       if (key.backspace || key.delete) {
         deleteComposerBackward({ maxBytes });
+        resetCommandHighlight();
+        setCommandMenuDismissed(false);
         return;
       }
 
@@ -98,6 +150,8 @@ export function usePromptComposerInput({
       const printable = printableInput(input);
       if (printable.length > 0) {
         insertComposerText({ maxBytes, text: printable });
+        resetCommandHighlight();
+        setCommandMenuDismissed(false);
       }
     },
     { isActive }
@@ -106,12 +160,14 @@ export function usePromptComposerInput({
 
 function submitPrompt({
   clearComposer,
+  commandActions,
   maxBytes,
   onSubmit,
   setComposerValidationError,
   text
 }: {
   clearComposer: () => void;
+  commandActions: CommandActions;
   maxBytes: number;
   onSubmit: (prompt: string) => void;
   setComposerValidationError: (message: string | null) => void;
@@ -121,6 +177,17 @@ function submitPrompt({
   if (!validation.ok) {
     if (validation.reason === 'over-limit') {
       setComposerValidationError(validation.message);
+    }
+    return;
+  }
+
+  if (validation.text.startsWith('/')) {
+    const command = exactCommandMatch(validation.text);
+    if (command !== undefined) {
+      executeCommand(command.id, commandActions);
+      clearComposer();
+    } else {
+      setComposerValidationError(unknownCommandMessage(validation.text));
     }
     return;
   }

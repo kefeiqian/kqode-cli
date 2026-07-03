@@ -1,7 +1,7 @@
-import { Box, useBoxMetrics, useCursor } from 'ink';
+import { Box, useApp, useBoxMetrics, useCursor } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
 import type { DOMElement } from 'ink';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { ComposerFrame } from '@components/PromptComposer/ComposerFrame.tsx';
 import { PROMPT_PREFIX } from '@constants/ui.ts';
 import { resolveComposerCursorPosition } from '@components/PromptComposer/cursorPosition.ts';
@@ -12,7 +12,7 @@ import {
 } from '@components/PromptComposer/promptTextView.ts';
 import { usePromptComposerInput } from '@components/PromptComposer/usePromptComposerInput.ts';
 import { DEFAULT_COMPOSER_VISIBLE_LINES } from '@constants/ui.ts';
-import { enqueuePromptAtom } from '@state/backend/index.ts';
+import { appendHelpAtom, clearTranscriptAtom, enqueuePromptAtom } from '@state/backend/index.ts';
 import {
   composerStateAtom,
   PROMPT_MAX_BYTES
@@ -48,6 +48,9 @@ export function PromptComposer({
   const atomComposerTop = useAtomValue(composerTopAtom);
   const enqueuePrompt = useSetAtom(enqueuePromptAtom);
   const setComposerRows = useSetAtom(composerRowsAtom);
+  const { exit } = useApp();
+  const clearTranscript = useSetAtom(clearTranscriptAtom);
+  const appendHelp = useSetAtom(appendHelpAtom);
   const composerRef = useRef<DOMElement | null>(null);
   const composerMetrics = useBoxMetrics(composerRef);
   const { setCursorPosition } = useCursor();
@@ -59,7 +62,18 @@ export function PromptComposer({
   const resolvedCursorTop = cursorTop ?? atomComposerTop;
   const resolvedVisibleRowsChange = onVisibleRowsChange ?? setComposerRows;
 
-  usePromptComposerInput({ isActive: resolvedIsActive, maxBytes, onSubmit: resolvedSubmit, state });
+  const commandActions = useMemo(
+    () => ({ exit, clearTranscript, showHelp: appendHelp }),
+    [exit, clearTranscript, appendHelp]
+  );
+
+  usePromptComposerInput({
+    isActive: resolvedIsActive,
+    maxBytes,
+    onSubmit: resolvedSubmit,
+    state,
+    commandActions
+  });
 
   const inputColumns = Math.max(1, resolvedColumns - PROMPT_PREFIX.length);
   const visiblePrompt = formatVisiblePromptView(

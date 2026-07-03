@@ -1,0 +1,26 @@
+import { CommandId } from '@state/commands/registry.ts';
+
+/** Client-side side effects a command can trigger; injected by the composer. */
+export type CommandActions = {
+  exit: () => void;
+  clearTranscript: () => void;
+  showHelp: () => void;
+};
+
+/**
+ * Runs the client-side effect for `id`. The caller is responsible for clearing
+ * the composer afterward, so `/help` closes the menu and empties the input.
+ */
+export function executeCommand(id: CommandId, actions: CommandActions): void {
+  switch (id) {
+    case CommandId.Exit:
+      actions.exit();
+      return;
+    case CommandId.Clear:
+      actions.clearTranscript();
+      return;
+    case CommandId.Help:
+      actions.showHelp();
+      return;
+  }
+}
