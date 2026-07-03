@@ -241,8 +241,12 @@ mod tests {
 
     #[test]
     fn platform_dependency_line_excludes_the_package_name() {
-        assert!(is_platform_dependency_line("    \"@kqode/kqode-cli-win32-x64\": \"0.1.2\","));
-        assert!(!is_platform_dependency_line("  \"name\": \"@kqode/kqode-cli\","));
+        assert!(is_platform_dependency_line(
+            "    \"@kqode/kqode-cli-win32-x64\": \"0.1.2\","
+        ));
+        assert!(!is_platform_dependency_line(
+            "  \"name\": \"@kqode/kqode-cli\","
+        ));
         assert!(!is_platform_dependency_line(
             "  \"homepage\": \"https://github.com/kefeiqian/kqode-cli\","
         ));
