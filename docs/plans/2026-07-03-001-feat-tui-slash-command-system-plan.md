@@ -1,7 +1,7 @@
 ---
 title: "feat: TUI slash-command system with autocomplete"
 type: feat
-status: active
+status: completed
 date: 2026-07-03
 origin: docs/brainstorms/2026-07-03-tui-slash-command-system-requirements.md
 ---
