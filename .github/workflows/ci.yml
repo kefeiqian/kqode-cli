@@ -1,0 +1,65 @@
+# Continuous integration for pushes to `main` and every pull request.
+#
+# Runs the same checks documented in AGENTS.md and used locally, split into two
+# parallel jobs so a failure points at either the Rust core or the nested TUI:
+#   - rust: cargo fmt --check, clippy (warnings denied), build, and test.
+#   - tui:  cargo xtask tui-typecheck and tui-test (Bun + vscode-jsonrpc).
+#
+# Authenticity controls mirror the other workflows: read-only permissions and
+# third-party actions pinned by version. This workflow only reads the repo and
+# never publishes, so it never needs write scopes.
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+# CI only reads the repository; it never needs write scopes.
+permissions:
+  contents: read
+
+# Supersede in-flight runs for the same ref so a new push cancels a stale run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: Rust (fmt, clippy, build, test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Build
+        run: cargo build --workspace --all-targets
+      - name: Test
+        run: cargo test --workspace
+
+  tui:
+    name: TUI (typecheck, test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.12
+      - name: Install TUI dependencies
+        working-directory: tui
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        run: cargo xtask tui-typecheck
+      - name: Test
+        run: cargo xtask tui-test
