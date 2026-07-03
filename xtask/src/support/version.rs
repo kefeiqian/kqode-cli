@@ -5,15 +5,22 @@ use crate::support::cargo;
 /// Cargo manifests carrying the product version, bumped together by `set-version`.
 const TOML_MANIFESTS: &[&str] = &["Cargo.toml", "xtask/Cargo.toml"];
 
-/// npm package manifests carrying the product version.
-const JSON_MANIFESTS: &[&str] = &["packaging/npm/kqode/package.json", "tui/package.json"];
+/// npm package manifests carrying the product version as a single top-level field.
+const JSON_MANIFESTS: &[&str] = &["tui/package.json"];
+
+/// The launcher package, whose top-level version AND its `@kqode/kqode-cli-*`
+/// optional-dependency pins must move together so npm resolves the matching
+/// platform packages for the released version.
+const NPM_MAIN_MANIFEST: &str = "packaging/npm/kqode/package.json";
 
 /// Validates `version`, writes it into every product manifest, then refreshes
 /// `Cargo.lock` so the workspace members' locked versions match.
 ///
 /// Root `Cargo.toml` is the displayed product version and is baked into the
 /// packaged executable, so all manifests are kept in lockstep and equal to the
-/// release tag `v<version>`.
+/// release tag `v<version>`. The launcher package's `@kqode/kqode-cli-*`
+/// optional-dependency pins are bumped alongside its own version so the platform
+/// packages resolve at install time.
 ///
 /// # Errors
 ///
@@ -29,6 +36,7 @@ pub fn set_all(repo_root: &Path, version: &str) -> Result<(), String> {
     for rel in JSON_MANIFESTS {
         rewrite(repo_root, rel, version, set_json_version)?;
     }
+    rewrite(repo_root, NPM_MAIN_MANIFEST, version, set_npm_main_version)?;
 
     cargo::update_workspace_lock(repo_root)?;
     println!("refreshed Cargo.lock");
@@ -115,6 +123,38 @@ fn set_json_version(contents: &str, version: &str) -> Result<String, String> {
     }
 }
 
+/// Sets the launcher package's top-level version and its platform dependency pins.
+///
+/// First bumps the top-level `"version"` (like every other JSON manifest), then
+/// rewrites the pinned version of each `@kqode/kqode-cli-<platform>-<arch>`
+/// optional dependency so the platform packages stay in lockstep.
+fn set_npm_main_version(contents: &str, version: &str) -> Result<String, String> {
+    let with_top_level = set_json_version(contents, version)?;
+    Ok(set_platform_dependency_pins(&with_top_level, version))
+}
+
+/// Rewrites the pinned version of every `@kqode/kqode-cli-<platform>-<arch>`
+/// optional-dependency line, leaving the package's own `"name"` untouched.
+fn set_platform_dependency_pins(contents: &str, version: &str) -> String {
+    let lines = contents
+        .lines()
+        .map(|line| {
+            if is_platform_dependency_line(line) {
+                replace_json_value(line, version)
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>();
+    rejoin(contents, &lines)
+}
+
+/// A `"@kqode/kqode-cli-...": "..."` dependency key (note the trailing hyphen,
+/// which excludes the package's own `"@kqode/kqode-cli"` name).
+fn is_platform_dependency_line(line: &str) -> bool {
+    line.trim_start().starts_with("\"@kqode/kqode-cli-")
+}
+
 /// Rewrites the quoted value after the first colon, preserving indentation and trailing comma.
 fn replace_json_value(line: &str, version: &str) -> String {
     let Some(colon) = line.find(':') else {
@@ -183,6 +223,29 @@ mod tests {
         assert!(output.contains("  \"version\": \"0.2.0\","));
         assert!(output.contains("  \"name\": \"@kqode/kqode-cli\","));
         assert!(output.ends_with("}\n"));
+    }
+
+    #[test]
+    fn set_npm_main_version_bumps_top_level_and_platform_pins() {
+        let input = "{\n  \"name\": \"@kqode/kqode-cli\",\n  \"version\": \"0.1.2\",\n  \"homepage\": \"https://github.com/kefeiqian/kqode-cli\",\n  \"optionalDependencies\": {\n    \"@kqode/kqode-cli-linux-x64\": \"0.1.2\",\n    \"@kqode/kqode-cli-win32-x64\": \"0.1.2\"\n  }\n}\n";
+        let output = set_npm_main_version(input, "0.2.0").unwrap();
+        assert!(output.contains("\"version\": \"0.2.0\""));
+        assert!(output.contains("\"@kqode/kqode-cli-linux-x64\": \"0.2.0\""));
+        assert!(output.contains("\"@kqode/kqode-cli-win32-x64\": \"0.2.0\""));
+        // The package's own name and homepage (which carry no version) are intact.
+        assert!(output.contains("\"name\": \"@kqode/kqode-cli\","));
+        assert!(output.contains("\"https://github.com/kefeiqian/kqode-cli\","));
+        // No stale pin remains anywhere.
+        assert!(!output.contains("0.1.2"));
+    }
+
+    #[test]
+    fn platform_dependency_line_excludes_the_package_name() {
+        assert!(is_platform_dependency_line("    \"@kqode/kqode-cli-win32-x64\": \"0.1.2\","));
+        assert!(!is_platform_dependency_line("  \"name\": \"@kqode/kqode-cli\","));
+        assert!(!is_platform_dependency_line(
+            "  \"homepage\": \"https://github.com/kefeiqian/kqode-cli\","
+        ));
     }
 
     #[test]
