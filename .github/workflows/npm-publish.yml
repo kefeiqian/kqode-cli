@@ -1,9 +1,13 @@
-# Publishes the single `@kqode/kqode-cli` npm package using npm Trusted
-# Publishing (OIDC) — no long-lived npm token.
+# Publishes the @kqode/kqode-cli npm packages using npm Trusted Publishing (OIDC)
+# — no long-lived npm token.
 #
-# The package ships no binary; its postinstall downloads the matching
-# `kqode-<target>` archive from the GitHub Release for its version, so publish
-# only AFTER release.yml has uploaded that tag's archives + checksums.
+# The launcher package (@kqode/kqode-cli) ships no binary; the per-platform
+# packages (@kqode/kqode-cli-<platform>-<arch>) carry it and are listed as its
+# optionalDependencies. This workflow downloads the tag's GitHub Release archives,
+# generates the platform packages from them, then publishes the platform packages
+# FIRST and the launcher LAST, so the launcher's optional dependencies already
+# exist when a user installs it. Publish only AFTER release.yml has uploaded that
+# tag's archives + checksums.
 #
 # How it runs (every path keeps THIS file as the top-level workflow, which is what
 # npm's Trusted Publisher matches — see the OIDC note):
@@ -14,6 +18,11 @@
 #   - workflow_dispatch: manual (re-)publish for a given tag.
 #   - release: published — covers a Release published by hand in the UI.
 #
+# Every path checks out the released commit (workflow_run: its head_sha;
+# dispatch/release: the tag), so the launcher package.json — including its pinned
+# @kqode/kqode-cli-<platform>-<arch> versions, kept in lockstep by
+# `cargo xtask set-version` — already matches the released version.
+#
 # OIDC note: npm Trusted Publishing validates the TOP-LEVEL workflow's filename,
 # NOT the file that runs `npm publish`. So this must stay a top-level workflow and
 # must never be invoked via `workflow_call` from release.yml (npm would then
@@ -21,11 +30,11 @@
 # identity as `npm-publish.yml`, matching the configured Trusted Publisher with no
 # npmjs.com change.
 #
-# One-time setup: create the `@kqode` npm org, do the first publish to create the
-# package (trusted publishers cannot be configured for a nonexistent package),
-# then add a Trusted Publisher on npmjs.com (GitHub Actions, repo
-# kefeiqian/kqode-cli, workflow `npm-publish.yml`). See
-# docs/release/kqode_distribution_registration.md.
+# One-time setup: EACH package (the launcher plus the five platform packages)
+# needs its own npm Trusted Publisher (GitHub Actions, repo kefeiqian/kqode-cli,
+# workflow `npm-publish.yml`) and a one-time bootstrap first publish, because a
+# trusted publisher cannot be configured for a package that does not exist yet.
+# See docs/release/kqode_distribution_registration.md.
 name: Publish npm
 
 on:
@@ -59,17 +68,17 @@ jobs:
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'push')
     permissions:
-      contents: read
+      contents: read # checkout + gh release download
       id-token: write # OIDC token for npm Trusted Publishing
-    defaults:
-      run:
-        working-directory: packaging/npm/kqode
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
         with:
-          # For workflow_run, check out the exact released commit; its manifest
-          # carries the version release.yml just built. Empty elsewhere -> default.
-          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          # Check out the exact released commit so the launcher package.json (its
+          # version and platform-dependency pins) matches the released version.
+          ref: ${{ github.event.workflow_run.head_sha || inputs.tag || github.event.release.tag_name || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -87,7 +96,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$EVENT" = "workflow_run" ]; then
-            version="$(node -p "require('./package.json').version")"
+            version="$(node -p "require('./packaging/npm/kqode/package.json').version")"
           else
             tag="${INPUT_TAG:-$RELEASE_TAG}"
             [ -n "$tag" ] || { echo "::error::no release tag provided"; exit 1; }
@@ -96,18 +105,58 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Resolved npm version: $version"
 
-      - name: Publish via Trusted Publishing (OIDC)
-        shell: bash
+      - name: Download the release archives
         env:
           VERSION: ${{ steps.rel.outputs.version }}
         run: |
           set -euo pipefail
-          npm version "$VERSION" --no-git-tag-version --allow-same-version >/dev/null
-          name="$(node -p "require('./package.json').name")"
-          if npm view "$name@$VERSION" version >/dev/null 2>&1; then
-            echo "$name@$VERSION already published; skipping."
-          else
-            # OIDC is auto-detected (id-token: write); no NPM_TOKEN. Provenance is
-            # generated automatically on public repos.
-            npm publish --access public
-          fi
+          rm -rf staging && mkdir -p staging
+          gh release download "v$VERSION" --dir staging --clobber
+          echo "Downloaded assets:"; ls -1 staging
+
+      - name: Generate the platform packages
+        env:
+          VERSION: ${{ steps.rel.outputs.version }}
+        run: |
+          set -euo pipefail
+          node packaging/npm/scripts/generate-platform-packages.cjs \
+            --archives staging --out dist-packages --version "$VERSION"
+
+      - name: Publish via Trusted Publishing (OIDC)
+        env:
+          VERSION: ${{ steps.rel.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          # Publish a package dir only if that exact name@version is not on the
+          # registry yet, so reruns are idempotent. OIDC is auto-detected
+          # (id-token: write); provenance is attached automatically on public repos.
+          publish_if_absent() {
+            local name ver
+            name="$(node -p "require('./package.json').name")"
+            ver="$(node -p "require('./package.json').version")"
+            if npm view "$name@$ver" version >/dev/null 2>&1; then
+              echo "$name@$ver already published; skipping."
+            else
+              npm publish --access public
+              echo "published $name@$ver"
+            fi
+          }
+
+          # Platform packages first so the launcher's optionalDependencies resolve.
+          published=0
+          for dir in dist-packages/*/; do
+            ( cd "$dir" && publish_if_absent )
+            published=$((published + 1))
+          done
+          [ "$published" -ge 5 ] || { echo "::error::expected >=5 platform packages, saw $published"; exit 1; }
+
+          # Then the launcher (stamp its version for the dispatch/release paths;
+          # the checked-out commit already carries the matching dependency pins).
+          (
+            cd packaging/npm/kqode
+            npm version "$VERSION" --no-git-tag-version --allow-same-version >/dev/null
+            publish_if_absent
+          )
