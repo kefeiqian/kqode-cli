@@ -146,12 +146,14 @@ jobs:
           }
 
           # Platform packages first so the launcher's optionalDependencies resolve.
+          # Expect exactly one package per supported target (single source of truth).
+          expected="$(node -p "require('./packaging/npm/kqode/lib/resolve.cjs').SUPPORTED_TARGETS.length")"
           published=0
           for dir in dist-packages/*/; do
             ( cd "$dir" && publish_if_absent )
             published=$((published + 1))
           done
-          [ "$published" -ge 5 ] || { echo "::error::expected >=5 platform packages, saw $published"; exit 1; }
+          [ "$published" -eq "$expected" ] || { echo "::error::expected $expected platform packages, generated $published"; exit 1; }
 
           # Then the launcher (stamp its version for the dispatch/release paths;
           # the checked-out commit already carries the matching dependency pins).
