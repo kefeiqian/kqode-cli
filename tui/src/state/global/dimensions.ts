@@ -42,3 +42,21 @@ export const rowsAtom = atom((get) => {
   const windowRows = get(windowRowsAtom) ?? DEFAULT_ROWS;
   return Math.max(MIN_ROWS, windowRows - FULLSCREEN_GUARD_ROWS);
 });
+
+/** Smallest real terminal height that can render the home screen without overflowing the canvas. */
+export const MIN_USABLE_TERMINAL_ROWS = MIN_ROWS + FULLSCREEN_GUARD_ROWS;
+
+/**
+ * True when the real terminal is too short to render the home screen usably.
+ * Reads the raw window height (test override first) and is false while the size
+ * is still unmeasured, so the app does not flash the notice at startup.
+ */
+export const terminalTooSmallAtom = atom((get) => {
+  const override = __TEST__ ? get(rowsTestOverrideAtom) : undefined;
+  const windowRows = override ?? get(windowRowsAtom);
+  if (windowRows === undefined) {
+    return false;
+  }
+
+  return windowRows < MIN_USABLE_TERMINAL_ROWS;
+});

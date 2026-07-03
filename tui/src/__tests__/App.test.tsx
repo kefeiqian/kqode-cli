@@ -75,7 +75,7 @@ describe('App', () => {
     expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
   });
 
-  it('keeps the layout at the minimum height when the terminal shrinks below 10 rows', async () => {
+  it('shows the enlarge notice when the terminal shrinks below the usable height', async () => {
     const { lastFrame, stdout } = renderApp();
 
     await flushInput();
@@ -84,9 +84,28 @@ describe('App', () => {
     stdout.emit('resize');
     await flushInput();
 
-    const outputRows = (lastFrame() ?? '').split('\n');
-    expect(outputRows).toHaveLength(10);
-    expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
+    const frame = lastFrame() ?? '';
+    expect(frame).toContain('Terminal too small');
+    expect(frame).not.toContain('/ commands');
+  });
+
+  it('restores the home screen when the terminal grows back', async () => {
+    const { lastFrame, stdout } = renderApp();
+
+    await flushInput();
+    Object.defineProperty(stdout, 'columns', { configurable: true, value: 80 });
+    Object.defineProperty(stdout, 'rows', { configurable: true, value: 8 });
+    stdout.emit('resize');
+    await flushInput();
+    expect(lastFrame() ?? '').toContain('Terminal too small');
+
+    Object.defineProperty(stdout, 'rows', { configurable: true, value: 24 });
+    stdout.emit('resize');
+    await flushInput();
+
+    const frame = lastFrame() ?? '';
+    expect(frame).not.toContain('Terminal too small');
+    expect(frame).toContain('/ commands');
   });
 
   it('preloads startup tasks on mount, locks composer input, then restores the default hints', async () => {
