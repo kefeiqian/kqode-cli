@@ -3,12 +3,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  MAIN_PACKAGE,
   binaryName,
   isSupported,
   platformKey,
-  releaseTargetName,
-  archiveExt,
-  releaseBaseUrl,
+  platformPackageName,
   SUPPORTED_TARGETS
 } = require('../lib/resolve.cjs');
 
@@ -16,34 +15,28 @@ test('platformKey joins platform and arch', () => {
   assert.equal(platformKey('win32', 'x64'), 'win32-x64');
 });
 
-test('releaseTargetName maps win32 to the windows asset name', () => {
-  assert.equal(releaseTargetName('win32', 'x64'), 'kqode-windows-x64');
-  assert.equal(releaseTargetName('darwin', 'arm64'), 'kqode-darwin-arm64');
-  assert.equal(releaseTargetName('linux', 'x64'), 'kqode-linux-x64');
+test('platformPackageName names the per-host optional dependency', () => {
+  assert.equal(platformPackageName('win32', 'x64'), '@kqode/kqode-cli-win32-x64');
+  assert.equal(platformPackageName('darwin', 'arm64'), '@kqode/kqode-cli-darwin-arm64');
+  assert.equal(platformPackageName('linux', 'x64'), '@kqode/kqode-cli-linux-x64');
+  assert.equal(platformPackageName('win32', 'arm64'), '@kqode/kqode-cli-win32-arm64');
 });
 
-test('win32-arm64 falls back to the windows-x64 asset (x64 emulation)', () => {
-  assert.equal(releaseTargetName('win32', 'arm64'), 'kqode-windows-x64');
-  assert.ok(isSupported('win32', 'arm64'));
-});
-
-test('archiveExt is zip on Windows and tar.gz elsewhere', () => {
-  assert.equal(archiveExt('win32'), 'zip');
-  assert.equal(archiveExt('linux'), 'tar.gz');
-  assert.equal(archiveExt('darwin'), 'tar.gz');
+test('every supported target maps to a distinct platform package under the main scope', () => {
+  const names = new Set();
+  for (const target of SUPPORTED_TARGETS) {
+    const [platform, arch] = target.split('-');
+    const name = platformPackageName(platform, arch);
+    assert.ok(name.startsWith(`${MAIN_PACKAGE}-`), `${name} should be scoped under ${MAIN_PACKAGE}`);
+    names.add(name);
+  }
+  assert.equal(names.size, SUPPORTED_TARGETS.length);
 });
 
 test('binaryName appends .exe only on Windows', () => {
   assert.equal(binaryName('win32'), 'kqode.exe');
   assert.equal(binaryName('linux'), 'kqode');
   assert.equal(binaryName('darwin'), 'kqode');
-});
-
-test('releaseBaseUrl points at the versioned GitHub Release', () => {
-  assert.equal(
-    releaseBaseUrl('1.2.3'),
-    'https://github.com/kefeiqian/kqode-cli/releases/download/v1.2.3'
-  );
 });
 
 test('isSupported matches exactly the five published targets', () => {

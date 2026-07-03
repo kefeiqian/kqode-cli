@@ -21,8 +21,14 @@
     "LICENSE-MIT",
     "README.md"
   ],
+  "optionalDependencies": {
+    "@kqode/kqode-cli-darwin-arm64": "0.1.2",
+    "@kqode/kqode-cli-linux-arm64": "0.1.2",
+    "@kqode/kqode-cli-linux-x64": "0.1.2",
+    "@kqode/kqode-cli-win32-arm64": "0.1.2",
+    "@kqode/kqode-cli-win32-x64": "0.1.2"
+  },
   "scripts": {
-    "postinstall": "node lib/install.cjs",
     "test": "node --test"
   },
   "engines": {

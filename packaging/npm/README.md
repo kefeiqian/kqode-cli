@@ -1,42 +1,49 @@
 # npm distribution
 
-This directory holds the npm distribution for the `kqode` CLI: a single package,
-`@kqode/kqode-cli`, published under the `@kqode` org.
+This directory holds the npm distribution for the `kqode` CLI.
+
+## Packages
+
+- **`@kqode/kqode-cli`** (`kqode/`, committed) — the published launcher. It ships
+  no binary; it locates and execs the platform executable and lists the platform
+  packages under `optionalDependencies`.
+- **`@kqode/kqode-cli-<platform>-<arch>`** — one package per supported target,
+  each carrying that host's self-contained executable plus `os`/`cpu` fields.
+  These are generated at publish time from the GitHub Release archives (by
+  `.github/workflows/npm-publish.yml`), not committed here.
 
 ## Layout
 
 ```text
 packaging/npm/
-  kqode/                     # the published package @kqode/kqode-cli (committed)
-    package.json             #   name, bin, postinstall
-    bin/kqode.cjs            #   launcher: ensure the binary, then exec it
-    lib/resolve.cjs          #   pure host → release-asset mapping
-    lib/install.cjs          #   download + SHA-256 verify + extract the binary
-    test/resolve.test.cjs    #   node:test for the mapping (run with `node --test`)
+  kqode/                     # @kqode/kqode-cli (committed)
+    package.json             #   bin + optionalDependencies (the platform packages)
+    bin/kqode.cjs            #   launcher: locate the platform binary, then exec it
+    lib/resolve.cjs          #   pure host → package-name / binary-name mapping
+    lib/locate.cjs           #   resolve the installed platform binary (or KQODE_BINARY_PATH)
+    test/*.test.cjs          #   node:test for the mapping/resolution (run with `node --test`)
 ```
 
 ## Design
 
-The package ships **no** binary. On install (postinstall) and, as a fallback, on
-first run, `lib/install.cjs` downloads the matching `kqode-<os>-<arch>` archive
-for the host from the GitHub Release for the package's version
-(`kefeiqian/kqode-cli`), verifies its SHA-256 against the published checksum,
-extracts the self-contained executable into a local `vendor/` directory, and the
-`bin/kqode.cjs` launcher execs it — forwarding arguments, stdio, and the exit
-code.
+npm installs `@kqode/kqode-cli` plus exactly one
+`@kqode/kqode-cli-<platform>-<arch>` optional dependency — the one whose `os`/`cpu`
+matches the host. That platform package carries the self-contained executable, so
+`npm install` alone is enough to run `kqode`: nothing is downloaded on install or
+first run, and it works offline. At runtime the launcher resolves the executable
+from the platform package via `require.resolve` and execs it, forwarding
+arguments, stdio, and the exit code.
 
-This "thin launcher" pattern keeps npm to one package (no per-target packages)
-while still delivering a platform-specific, self-contained executable that needs
-neither a Node runtime nor a Rust toolchain at execution time.
+This replaces the earlier "thin launcher that downloads from GitHub Releases"
+design; the trade-off is that publishing produces one package per target instead
+of one, each with its own npm trusted publisher.
 
-Tradeoff: install/first-run needs network access to GitHub Releases, and
-`npm install --ignore-scripts` skips the postinstall (the first `kqode` run then
-performs the download instead). The alternative `os`/`cpu` optional-dependency
-layout avoids that but requires one npm package per target.
+`win32-arm64` has no native build yet; its package carries the `win32-x64`
+executable, which Windows 11 on ARM runs via emulation.
 
 ## Publishing
 
 Publishing is automated by `.github/workflows/npm-publish.yml` via npm Trusted
 Publishing (OIDC). See `docs/release/kqode_distribution_registration.md` for the
-one-time org/trusted-publisher setup and the manual bootstrap for the first
-publish.
+one-time per-package trusted-publisher setup and the manual bootstrap for the
+first publish of each package.

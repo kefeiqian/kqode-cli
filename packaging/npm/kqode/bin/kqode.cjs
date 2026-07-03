@@ -2,23 +2,22 @@
 'use strict';
 
 const { spawn } = require('node:child_process');
-const { ensureBinary } = require('../lib/install.cjs');
-const { REPO } = require('../lib/resolve.cjs');
+const { resolveBinary, describeResolutionError } = require('../lib/locate.cjs');
 
 /**
- * Launches the platform-specific `kqode` executable, downloading and verifying
- * it on first run if the postinstall step did not (for example after
- * `npm install --ignore-scripts`). Arguments, stdio, and the exit code/signal
- * are forwarded to the executable.
+ * Launches the platform-specific `kqode` executable that npm installed as an
+ * optional dependency (or the `KQODE_BINARY_PATH` override), forwarding
+ * arguments, stdio, and the exit code/signal.
+ *
+ * No download happens: the executable ships inside its platform package, so a
+ * completed `npm install` is fully self-contained and works offline.
  */
-async function main() {
+function main() {
   let binary;
   try {
-    binary = await ensureBinary();
+    binary = resolveBinary();
   } catch (error) {
-    console.error(error.message);
-    console.error(`kqode: unable to obtain the executable. Download it manually from`);
-    console.error(`  https://github.com/${REPO}/releases`);
+    console.error(describeResolutionError(error));
     process.exit(1);
   }
 

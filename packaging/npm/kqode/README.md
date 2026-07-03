@@ -1,8 +1,6 @@
 # @kqode/kqode-cli
 
-The `kqode` command-line interface. Installing this package downloads the
-prebuilt standalone executable for your platform and exposes it as the `kqode`
-binary.
+The `kqode` command-line interface.
 
 ```bash
 npm install -g @kqode/kqode-cli
@@ -11,14 +9,16 @@ kqode
 
 ## How it works
 
-This package ships no platform binary. On install (and, as a fallback, on first
-run) it downloads the matching `kqode-<os>-<arch>` archive for your host from the
-GitHub Release for this version, verifies its SHA-256 against the published
-checksum, and extracts the self-contained executable locally. The `kqode`
-launcher then execs it, forwarding all arguments, stdio, and the exit code.
+This package is a small launcher. The platform-specific, self-contained `kqode`
+executable ships inside a per-host package (for example
+`@kqode/kqode-cli-win32-x64`) listed under `optionalDependencies`. npm installs
+**only** the one whose `os`/`cpu` matches your machine, so `npm install` delivers
+a ready-to-run binary — no post-install download, and it works offline.
 
-Because the executable is self-contained, running `kqode` needs neither a Node
-runtime nor a Rust toolchain at execution time.
+At runtime the `kqode` launcher resolves the executable from that platform
+package and execs it, forwarding all arguments, stdio, and the exit code. Because
+the executable is self-contained, running `kqode` needs neither a Node runtime
+nor a Rust toolchain.
 
 ## Supported platforms
 
@@ -29,7 +29,9 @@ error instead of failing silently.
 
 ## Notes
 
-Install and first run need network access to GitHub Releases. If you install
-with `--ignore-scripts`, the postinstall download is skipped and happens on the
-first `kqode` run instead. You can always download the executable directly from
+Installing needs no network beyond the npm registry, and nothing is downloaded
+on first run. If your install skipped optional dependencies (for example
+`npm install --omit=optional`), the matching platform package is absent; reinstall
+without that flag. As an escape hatch you can point `KQODE_BINARY_PATH` at a
+`kqode` executable downloaded directly from
 <https://github.com/kefeiqian/kqode-cli/releases>.
