@@ -6,9 +6,9 @@ const config: Config = {
   tagline: 'Build journal and project notes',
 
   url: 'https://kefeiqian.github.io',
-  baseUrl: '/KQode/',
+  baseUrl: '/kqode-cli/',
   organizationName: 'kefeiqian',
-  projectName: 'KQode',
+  projectName: 'kqode-cli',
 
   onBrokenLinks: 'throw',
   markdown: {
@@ -64,7 +64,7 @@ const config: Config = {
           position: 'right',
         },
         {
-          href: 'https://github.com/kefeiqian/KQode',
+          href: 'https://github.com/kefeiqian/kqode-cli',
           position: 'right',
           className: 'header-github-link',
           'aria-label': 'GitHub repository',
