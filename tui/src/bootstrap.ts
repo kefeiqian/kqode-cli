@@ -15,14 +15,13 @@ import {
   enterAlternateScreen,
   leaveAlternateScreen
 } from '@libs/terminal/alternateScreen.ts';
-import { resolveSessionSeed } from '@components/exitSummary/resolveSessionSeed.ts';
+import { resolveSessionSeed } from '@components/AppExitSummary/resolveSessionSeed.ts';
+import { windowColumnsAtom, windowRowsAtom } from '@state/ui/index.ts';
 import {
   productVersionAtom,
   repoRootAtom,
   sessionGitBaselineAtom,
   sessionStartedAtAtom,
-  windowColumnsAtom,
-  windowRowsAtom,
   workspaceCwdAtom
 } from '@state/global/index.ts';
 import { theme } from '@theme/themeConfig.ts';

@@ -7,8 +7,8 @@ import {
   bodyScrollOffsetRowsAtom,
   displayedBodyEntriesAtom,
   layoutAtom
-} from '@state/homeScreen/index.ts';
-import { columnsAtom } from '@state/global/index.ts';
+} from '@state/ui/index.ts';
+import { columnsAtom } from '@state/ui/index.ts';
 import { theme } from '@theme/themeConfig.ts';
 import { SCROLLBAR_THUMB, SCROLLBAR_TRACK } from '@constants/ui.ts';
 

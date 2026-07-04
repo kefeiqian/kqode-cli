@@ -1,0 +1,128 @@
+import { atom } from 'jotai';
+import type { Getter, Setter } from 'jotai';
+import { BodyEntryKind } from '@constants/bodyEntry.ts';
+import { sanitizeDisplayText } from '@libs/text/sanitizeDisplayText.ts';
+import { unknownCommandMessage } from '@libs/commands/unknownCommand.ts';
+import { backendClientAtom } from '@state/global/index.ts';
+import { bodyScrollOffsetRowsAtom, submittedPromptEntriesAtom } from '@state/ui/index.ts';
+import {
+  BACKEND_UNAVAILABLE_MESSAGE,
+  backendErrorMessage,
+  queueToBodyEntries
+} from '@libs/promptQueue/promptQueue.ts';
+import type { BackendResult, QueueItem } from '@libs/promptQueue/promptQueue.ts';
+
+let nextQueueItemId = 0;
+
+/** Ordered record of submitted prompts and their backend outcomes. */
+export const promptQueueAtom = atom<QueueItem[]>([]);
+
+const drainingAtom = atom(false);
+
+/**
+ * Appends a submitted prompt and drains the backend queue one request at a time.
+ *
+ * The prompt is shown immediately: the first item is active with no marker and
+ * later items render `(pending)` until they become active. Raw text is sent to
+ * the backend while only sanitized text reaches the body, and validation/queue
+ * state stays in memory for this slice.
+ */
+export const enqueuePromptAtom = atom(null, async (get, set, rawText: string) => {
+  const hasActive = get(promptQueueAtom).some((item) => item.state === 'active');
+  const item: QueueItem = {
+    id: nextQueueItemId++,
+    text: rawText,
+    state: hasActive ? 'queued' : 'active'
+  };
+
+  set(promptQueueAtom, (queue) => [...queue, item]);
+  set(bodyScrollOffsetRowsAtom, 0);
+  syncBodyEntries(get, set);
+  await drainQueue(get, set);
+});
+
+/** Clears all transcript entries (prompts and results) and resets scroll. */
+export const clearTranscriptAtom = atom(null, (get, set) => {
+  set(promptQueueAtom, []);
+  set(bodyScrollOffsetRowsAtom, 0);
+  syncBodyEntries(get, set);
+});
+
+/**
+ * Records an unknown `/command` submission in the transcript instead of the
+ * composer: the raw text renders as a prompt entry and a red error entry names
+ * the unmatched command. The item is pre-settled so the backend queue never
+ * sends it, mirroring how a real prompt and its result appear in the body.
+ */
+export const appendUnknownCommandAtom = atom(null, (get, set, rawText: string) => {
+  const item: QueueItem = {
+    id: nextQueueItemId++,
+    text: rawText,
+    state: 'settled',
+    result: { kind: BodyEntryKind.Error, text: sanitizeDisplayText(unknownCommandMessage(rawText)) }
+  };
+
+  set(promptQueueAtom, (queue) => [...queue, item]);
+  set(bodyScrollOffsetRowsAtom, 0);
+  syncBodyEntries(get, set);
+});
+
+async function drainQueue(get: Getter, set: Setter): Promise<void> {
+  if (get(drainingAtom)) {
+    return;
+  }
+
+  set(drainingAtom, true);
+  try {
+    let active = findActive(get);
+    while (active !== undefined) {
+      const result = await runBackendRequest(get, active.text);
+      settleActive(get, set, active.id, result);
+      active = findActive(get);
+    }
+  } finally {
+    set(drainingAtom, false);
+  }
+}
+
+async function runBackendRequest(get: Getter, text: string): Promise<BackendResult> {
+  const backendClient = get(backendClientAtom);
+  if (backendClient === undefined) {
+    return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(BACKEND_UNAVAILABLE_MESSAGE) };
+  }
+
+  try {
+    const ack = await backendClient.submitMessage({ text });
+    return {
+      kind: BodyEntryKind.Success,
+      text: sanitizeDisplayText(`Rust backend ACK - received: ${ack.receivedText}`)
+    };
+  } catch (error) {
+    return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(backendErrorMessage(error)) };
+  }
+}
+
+function settleActive(get: Getter, set: Setter, id: number, result: BackendResult): void {
+  set(promptQueueAtom, (queue) => {
+    let promoted = false;
+    return queue.map((item) => {
+      if (item.id === id) {
+        return { ...item, state: 'settled' as const, result };
+      }
+      if (!promoted && item.state === 'queued') {
+        promoted = true;
+        return { ...item, state: 'active' as const };
+      }
+      return item;
+    });
+  });
+  syncBodyEntries(get, set);
+}
+
+function findActive(get: Getter): QueueItem | undefined {
+  return get(promptQueueAtom).find((item) => item.state === 'active');
+}
+
+function syncBodyEntries(get: Getter, set: Setter): void {
+  set(submittedPromptEntriesAtom, queueToBodyEntries(get(promptQueueAtom)));
+}

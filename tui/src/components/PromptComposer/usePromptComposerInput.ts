@@ -1,51 +1,59 @@
 import { useInput } from 'ink';
-import { useSetAtom } from 'jotai';
-import { MODIFIED_ENTER_INPUTS } from '@components/PromptComposer/constants.ts';
+import { useStore } from 'jotai';
+import { handleCursorMove } from '@components/PromptComposer/input/handleCursorMove.ts';
+import { handleEscArmedClear } from '@components/PromptComposer/input/handleEscArmedClear.ts';
+import { handleNewline } from '@components/PromptComposer/input/handleNewline.ts';
+import { handleSubmit } from '@components/PromptComposer/input/handleSubmit.ts';
+import { handleTextEdit } from '@components/PromptComposer/input/handleTextEdit.ts';
+import type {
+  ComposerInputState,
+  ComposerKeyContext,
+  ComposerKeyHandler
+} from '@components/PromptComposer/input/types.ts';
+import { handleMenuKey } from '@components/SlashCommandMenu/handleMenuKey.ts';
 import { isMouseInput } from '@libs/terminal/mouse.ts';
-import {
-  clearComposerAtom,
-  deleteComposerBackwardAtom,
-  insertComposerTextAtom,
-  moveComposerCursorBackwardAtom,
-  moveComposerCursorForwardAtom,
-  printableInput,
-  setComposerValidationErrorAtom,
-  validateComposerSubmit
-} from '@state/composer/index.ts';
-
-type PromptComposerInputState = {
-  cursorIndex: number;
-  text: string;
-};
+import type { CommandActions } from '@libs/commands/executeCommand.ts';
+import { armedActionAtom } from '@state/ui/index.ts';
 
 type PromptComposerInputOptions = {
   isActive: boolean;
   maxBytes: number;
   onSubmit: (prompt: string) => void;
-  state: PromptComposerInputState;
+  state: ComposerInputState;
+  commandActions: CommandActions;
 };
 
-type EnterKey = {
-  return?: boolean;
-  shift?: boolean;
-  ctrl?: boolean;
-  meta?: boolean;
-};
+/**
+ * Priority-ordered branches of the composer's single `useInput`. The dispatcher
+ * runs them in order and stops at the first that reports it handled the key, so
+ * the order is behavior: newline (incl. modified Enter) precedes the open menu,
+ * which precedes Esc-clear, cursor moves, bare-Enter submit, and text editing.
+ * Adding a key is a new handler plus one entry here — not more lines in the hook.
+ */
+const COMPOSER_KEY_HANDLERS: readonly ComposerKeyHandler[] = [
+  handleNewline,
+  handleMenuKey,
+  handleEscArmedClear,
+  handleCursorMove,
+  handleSubmit,
+  handleTextEdit
+];
 
-type PromptNewlineInput = 'insert-newline' | 'replace-backslash';
-
+/**
+ * The composer's only keyboard entry point. It reads the Jotai store once and
+ * hands each keypress to the ordered handlers as a {@link ComposerKeyContext};
+ * handlers do their own `store.get`/`store.set`. There is intentionally no second
+ * `useInput`: Ink delivers every key to every active handler, so one dispatcher
+ * prevents double-handling. Ctrl+C is owned by `useGlobalKeys` and ignored here.
+ */
 export function usePromptComposerInput({
   isActive,
   maxBytes,
   onSubmit,
-  state
+  state,
+  commandActions
 }: PromptComposerInputOptions): void {
-  const clearComposer = useSetAtom(clearComposerAtom);
-  const deleteComposerBackward = useSetAtom(deleteComposerBackwardAtom);
-  const insertComposerText = useSetAtom(insertComposerTextAtom);
-  const moveComposerCursorBackward = useSetAtom(moveComposerCursorBackwardAtom);
-  const moveComposerCursorForward = useSetAtom(moveComposerCursorForwardAtom);
-  const setComposerValidationError = useSetAtom(setComposerValidationErrorAtom);
+  const store = useStore();
 
   useInput(
     (input, key) => {
@@ -53,98 +61,32 @@ export function usePromptComposerInput({
         return;
       }
 
-      const newlineInput = promptNewlineInput(input, key, state);
-      if (newlineInput === 'replace-backslash') {
-        deleteComposerBackward({ maxBytes });
-        insertComposerText({ maxBytes, text: '\n' });
+      // Ctrl+C is owned by the global two-step-exit hook; never handle it here.
+      if (key.ctrl === true && input === 'c') {
         return;
       }
 
-      if (newlineInput === 'insert-newline') {
-        insertComposerText({ maxBytes, text: '\n' });
-        return;
+      // Any real key other than Esc cancels a pending two-step confirmation.
+      if (key.escape !== true) {
+        store.set(armedActionAtom, null);
       }
 
-      if (key.leftArrow) {
-        moveComposerCursorBackward();
-        return;
-      }
+      const context: ComposerKeyContext = {
+        input,
+        key,
+        state,
+        maxBytes,
+        onSubmit,
+        commandActions,
+        store
+      };
 
-      if (key.rightArrow) {
-        moveComposerCursorForward();
-        return;
-      }
-
-      if (key.return) {
-        submitPrompt({
-          clearComposer,
-          maxBytes,
-          onSubmit,
-          setComposerValidationError,
-          text: state.text
-        });
-        return;
-      }
-
-      if (key.backspace || key.delete) {
-        deleteComposerBackward({ maxBytes });
-        return;
-      }
-
-      if (key.tab) {
-        return;
-      }
-
-      const printable = printableInput(input);
-      if (printable.length > 0) {
-        insertComposerText({ maxBytes, text: printable });
+      for (const handle of COMPOSER_KEY_HANDLERS) {
+        if (handle(context)) {
+          return;
+        }
       }
     },
     { isActive }
   );
-}
-
-function submitPrompt({
-  clearComposer,
-  maxBytes,
-  onSubmit,
-  setComposerValidationError,
-  text
-}: {
-  clearComposer: () => void;
-  maxBytes: number;
-  onSubmit: (prompt: string) => void;
-  setComposerValidationError: (message: string | null) => void;
-  text: string;
-}): void {
-  const validation = validateComposerSubmit(text, maxBytes);
-  if (!validation.ok) {
-    if (validation.reason === 'over-limit') {
-      setComposerValidationError(validation.message);
-    }
-    return;
-  }
-
-  onSubmit(validation.text);
-  clearComposer();
-}
-
-function promptNewlineInput(
-  input: string,
-  key: EnterKey,
-  state: PromptComposerInputState
-): PromptNewlineInput | null {
-  if (MODIFIED_ENTER_INPUTS.has(input)) {
-    return 'insert-newline';
-  }
-
-  if (key.return !== true) {
-    return null;
-  }
-
-  if (key.shift === true || key.ctrl === true || key.meta === true) {
-    return 'insert-newline';
-  }
-
-  return state.text.at(state.cursorIndex - 1) === '\\' ? 'replace-backslash' : null;
 }

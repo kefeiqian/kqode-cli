@@ -5,13 +5,9 @@ import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.t
 import type { BackendClient } from '@contracts/backend/index.ts';
 import { ACK_MESSAGE } from '@contracts/backend/index.ts';
 import type { MessageSubmitParams, MessageSubmitResult } from '@contracts/backend/index.ts';
-import {
-  backendClientAtom,
-  columnsTestOverrideAtom,
-  productVersionAtom,
-  rowsTestOverrideAtom,
-  workspaceCwdAtom
-} from '@state/global/index.ts';
+import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/index.ts';
+import { backendClientAtom, productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
+import { promptQueueAtom } from '@state/promptQueue/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
@@ -24,7 +20,7 @@ function renderApp(backendClient: BackendClient, columns = 80, rows = 40) {
   store.set(columnsTestOverrideAtom, columns);
   store.set(rowsTestOverrideAtom, rows);
   store.set(backendClientAtom, backendClient);
-  return renderWithJotai(<App />, store);
+  return { store, ...renderWithJotai(<App />, store) };
 }
 
 function echoBackend() {
@@ -154,5 +150,19 @@ describe('App submit and ACK output', () => {
     await flushInput();
 
     expect(submitMessage).not.toHaveBeenCalled();
+  });
+
+  it('posts an unknown slash command and its error into the body without a backend call', async () => {
+    const submitMessage = echoBackend();
+    const { lastFrame, stdin, store } = renderApp({ submitMessage });
+
+    await submit(stdin, '/nope');
+
+    const frame = await waitForFrame(lastFrame, (output) =>
+      output.includes('Unknown command: /nope')
+    );
+    expect(frame).toContain('❯ /nope');
+    expect(submitMessage).not.toHaveBeenCalled();
+    expect(store.get(promptQueueAtom).some((item) => item.state === 'active')).toBe(false);
   });
 });

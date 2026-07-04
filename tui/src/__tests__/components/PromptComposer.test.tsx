@@ -1,9 +1,17 @@
+import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import {
   formatVisiblePrompt,
   PromptComposer,
   resolveComposerCursorPosition
 } from '@components/PromptComposer/index.tsx';
+import { enqueuePromptAtom } from '@state/promptQueue/index.ts';
+import { commandMenuDismissedAtom, highlightedCommandAtom } from '@state/ui/commands/index.ts';
+import { armedActionAtom } from '@state/ui/index.ts';
+import { ArmedAction } from '@constants/ui.ts';
+import { helpVisibleAtom } from '@state/ui/help/index.ts';
+import { composerStateAtom } from '@state/ui/composer/index.ts';
+import { submittedPromptEntriesAtom } from '@state/ui/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
@@ -78,6 +86,20 @@ describe('PromptComposer', () => {
     await flushInput();
 
     expect(onSubmit).toHaveBeenCalledWith('first\nsecond');
+  });
+
+  it('submits a trailing backslash instead of inserting a newline when the cursor is at the start', async () => {
+    const onSubmit = vi.fn();
+    const { stdin } = renderWithJotai(<PromptComposer columns={40} onSubmit={onSubmit} />);
+
+    stdin.write('\\');
+    await flushInput();
+    stdin.write('\u001B[D');
+    await flushInput();
+    stdin.write('\r');
+    await flushInput();
+
+    expect(onSubmit).toHaveBeenCalledWith('\\');
   });
 
   it('places the terminal cursor on the active composer row instead of the cwd row', () => {
@@ -210,5 +232,151 @@ describe('PromptComposer', () => {
 
     expect(onSubmit).toHaveBeenCalledWith('first');
     expect(lastFrame() ?? '').toContain('second');
+  });
+
+  it('runs the default-highlighted /clear on Enter and clears the transcript', async () => {
+    const store = createStore();
+    await store.set(enqueuePromptAtom, 'hello');
+    expect(store.get(submittedPromptEntriesAtom).length).toBeGreaterThan(0);
+
+    const { stdin } = renderWithJotai(<PromptComposer columns={40} />, store);
+
+    stdin.write('/');
+    await flushInput();
+    stdin.write('\r');
+    await flushInput();
+
+    expect(store.get(submittedPromptEntriesAtom)).toEqual([]);
+  });
+
+  it('moves the highlighted command with the arrow keys', async () => {
+    const store = createStore();
+    const { stdin } = renderWithJotai(<PromptComposer columns={40} />, store);
+
+    stdin.write('/');
+    await flushInput();
+    expect(store.get(highlightedCommandAtom)?.name).toBe('/clear');
+
+    stdin.write('\u001B[B');
+    await flushInput();
+    expect(store.get(highlightedCommandAtom)?.name).toBe('/exit');
+
+    stdin.write('\u001B[A');
+    await flushInput();
+    expect(store.get(highlightedCommandAtom)?.name).toBe('/clear');
+  });
+
+  it('opens the help viewer when /help is submitted', async () => {
+    const store = createStore();
+    const { stdin } = renderWithJotai(<PromptComposer columns={40} />, store);
+
+    stdin.write('/help');
+    await flushInput();
+    stdin.write('\r');
+    await flushInput();
+
+    expect(store.get(helpVisibleAtom)).toBe(true);
+    expect(store.get(submittedPromptEntriesAtom)).toEqual([]);
+  });
+
+  it('completes the highlighted command with Tab without executing it', async () => {
+    const store = createStore();
+    const { lastFrame, stdin } = renderWithJotai(<PromptComposer columns={40} />, store);
+
+    stdin.write('/cl');
+    await flushInput();
+    stdin.write('\t');
+    await flushInput();
+
+    expect(lastFrame() ?? '').toContain('/clear');
+    expect(store.get(submittedPromptEntriesAtom)).toEqual([]);
+  });
+
+  it('posts an unknown command and its error into the transcript without sending it', async () => {
+    const store = createStore();
+    const onSubmit = vi.fn();
+    const { stdin } = renderWithJotai(
+      <PromptComposer columns={60} onSubmit={onSubmit} />,
+      store
+    );
+
+    stdin.write('/zzz');
+    await flushInput();
+    stdin.write('\r');
+    await flushInput();
+
+    const entries = store.get(submittedPromptEntriesAtom);
+    expect(entries.map((entry) => ({ kind: entry.kind, text: entry.text }))).toEqual([
+      { kind: 'user', text: '/zzz' },
+      { kind: 'error', text: 'Unknown command: /zzz' }
+    ]);
+    expect(store.get(composerStateAtom).text).toBe('');
+    expect(store.get(composerStateAtom).validationError).toBeNull();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('dismisses the menu with Esc while keeping the typed text', async () => {
+    const store = createStore();
+    const { lastFrame, stdin } = renderWithJotai(<PromptComposer columns={40} />, store);
+
+    stdin.write('/help');
+    await flushInput();
+    stdin.write('\u001B');
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    expect(lastFrame() ?? '').toContain('/help');
+    expect(store.get(commandMenuDismissedAtom)).toBe(true);
+
+    stdin.write('x');
+    await flushInput();
+    expect(store.get(commandMenuDismissedAtom)).toBe(false);
+  });
+
+  it('keeps modified Enter as a newline even while a command is being typed', async () => {
+    const onSubmit = vi.fn();
+    const { stdin } = renderWithJotai(<PromptComposer columns={40} onSubmit={onSubmit} />);
+
+    stdin.write('/');
+    await flushInput();
+    stdin.write('\u001B[13;5u');
+    await flushInput();
+
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('clears the composer on a second Esc after arming, keeping text on the first', async () => {
+    const store = createStore();
+    const { lastFrame, stdin } = renderWithJotai(<PromptComposer columns={40} />, store);
+
+    stdin.write('hello');
+    await flushInput();
+    stdin.write('\u001B');
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    expect(store.get(armedActionAtom)).toBe(ArmedAction.ClearInput);
+    expect(lastFrame() ?? '').toContain('hello');
+
+    stdin.write('\u001B');
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    expect(store.get(armedActionAtom)).toBeNull();
+    expect(lastFrame() ?? '').not.toContain('hello');
+  });
+
+  it('disarms the clear confirmation when another key is pressed', async () => {
+    const store = createStore();
+    const { lastFrame, stdin } = renderWithJotai(<PromptComposer columns={40} />, store);
+
+    stdin.write('hello');
+    await flushInput();
+    stdin.write('\u001B');
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(store.get(armedActionAtom)).toBe(ArmedAction.ClearInput);
+
+    stdin.write('x');
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBeNull();
+    expect(store.get(composerStateAtom).text).toBe('hellox');
+    expect(lastFrame() ?? '').toContain('hellox');
   });
 });

@@ -5,7 +5,7 @@ import type { EmbeddedBackendAsset } from '@backend/packaged/materializeBackend.
 import { App } from '@/App.tsx';
 import { buildKqodeMeta } from '@/cli/meta.ts';
 import { createAppRuntime } from '@/bootstrap.ts';
-import { finishSession } from '@components/exitSummary/finishSession.ts';
+import { finishSession } from '@components/AppExitSummary/finishSession.ts';
 
 /** Inputs for the root CLI command; `loadPackagedAsset` is supplied only in packaged mode. */
 export type RunKqodeCliOptions = {
@@ -24,10 +24,11 @@ async function launchTui({ entryUrl, loadPackagedAsset }: RunKqodeCliOptions): P
       <App />
     </Provider>,
     // Rewrite only changed lines instead of repainting the whole screen each
-    // frame. The UI now fills the terminal fullscreen (FULLSCREEN_GUARD_ROWS = 0),
-    // so terminals that force a whole-screen clear on fullscreen frames still
-    // repaint per keystroke (WezTerm blinks; Windows Terminal does not).
-    { incrementalRendering: true }
+    // frame. Paired with FULLSCREEN_GUARD_ROWS keeping us under fullscreen, this
+    // avoids the per-keystroke clear+repaint that blinks in WezTerm on Windows.
+    // exitOnCtrlC is off so Ctrl+C flows to the global two-step-exit handler
+    // (useGlobalKeys) instead of quitting on the first press.
+    { incrementalRendering: true, exitOnCtrlC: false }
   );
 
   // Restore the terminal, then print the exit summary card into the recovered
