@@ -21,6 +21,8 @@ import {
   repoRootAtom,
   sessionGitBaselineAtom,
   sessionStartedAtAtom,
+  windowColumnsAtom,
+  windowRowsAtom,
   workspaceCwdAtom
 } from '@state/global/index.ts';
 import { theme } from '@theme/themeConfig.ts';
@@ -67,6 +69,22 @@ export async function createAppRuntime({
   const store = createStore();
   const workspaceCwd = resolveWorkspaceCwd();
   store.set(workspaceCwdAtom, workspaceCwd);
+
+  // Seed the live terminal size before the first render so the opening frame is
+  // already full-size. `App` mirrors `process.stdout` into these atoms, but only
+  // via a layout effect that runs *after* the first frame is committed — so
+  // without this seed the first paint uses the DEFAULT_* fallback (80x24),
+  // briefly rendering the UI at a fraction of a larger terminal before it snaps
+  // to full size. We read the same source (and match the truthy guard) that
+  // Ink's `useWindowSize` reads, so the effect's first write is a no-op; a
+  // non-TTY stdout leaves these undefined and the derived atoms use DEFAULT_*.
+  const { columns, rows } = process.stdout;
+  if (columns) {
+    store.set(windowColumnsAtom, columns);
+  }
+  if (rows) {
+    store.set(windowRowsAtom, rows);
+  }
 
   // Snapshot the session start time and git baseline at boot so the exit summary
   // can report real Duration and a working-tree Changes delta. Seeding here (not
