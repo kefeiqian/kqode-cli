@@ -2,12 +2,14 @@ import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '@/App.tsx';
 import {
+  armedActionAtom,
   columnsTestOverrideAtom,
   FULLSCREEN_GUARD_ROWS,
-  productVersionAtom,
-  rowsTestOverrideAtom,
-  workspaceCwdAtom
-} from '@state/global/index.ts';
+  rowsTestOverrideAtom
+} from '@state/ui/index.ts';
+import { ArmedAction } from '@constants/ui.ts';
+import { productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
+import { helpVisibleAtom } from '@state/ui/help/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
@@ -23,7 +25,7 @@ function renderApp({ columns, rows }: { columns?: number; rows?: number } = {}) 
   if (rows !== undefined) {
     store.set(rowsTestOverrideAtom, rows);
   }
-  return renderWithJotai(<App />, store);
+  return { store, ...renderWithJotai(<App />, store) };
 }
 
 function deferredPromise<T>() {
@@ -75,7 +77,7 @@ describe('App', () => {
     expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
   });
 
-  it('keeps the layout at the minimum height when the terminal shrinks below 10 rows', async () => {
+  it('shows the enlarge notice when the terminal shrinks below the usable height', async () => {
     const { lastFrame, stdout } = renderApp();
 
     await flushInput();
@@ -84,9 +86,42 @@ describe('App', () => {
     stdout.emit('resize');
     await flushInput();
 
-    const outputRows = (lastFrame() ?? '').split('\n');
-    expect(outputRows).toHaveLength(10);
-    expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
+    const frame = lastFrame() ?? '';
+    expect(frame).toContain('Terminal too small');
+    expect(frame).not.toContain('/ commands');
+  });
+
+  it('shows the enlarge notice when the terminal shrinks below the usable width', async () => {
+    const { lastFrame, stdout } = renderApp();
+
+    await flushInput();
+    Object.defineProperty(stdout, 'columns', { configurable: true, value: 40 });
+    Object.defineProperty(stdout, 'rows', { configurable: true, value: 24 });
+    stdout.emit('resize');
+    await flushInput();
+
+    const frame = lastFrame() ?? '';
+    expect(frame).toContain('Terminal too small');
+    expect(frame).not.toContain('/ commands');
+  });
+
+  it('restores the home screen when the terminal grows back', async () => {
+    const { lastFrame, stdout } = renderApp();
+
+    await flushInput();
+    Object.defineProperty(stdout, 'columns', { configurable: true, value: 80 });
+    Object.defineProperty(stdout, 'rows', { configurable: true, value: 8 });
+    stdout.emit('resize');
+    await flushInput();
+    expect(lastFrame() ?? '').toContain('Terminal too small');
+
+    Object.defineProperty(stdout, 'rows', { configurable: true, value: 24 });
+    stdout.emit('resize');
+    await flushInput();
+
+    const frame = lastFrame() ?? '';
+    expect(frame).not.toContain('Terminal too small');
+    expect(frame).toContain('/ commands');
   });
 
   it('preloads startup tasks on mount, locks composer input, then restores the default hints', async () => {
@@ -99,5 +134,64 @@ describe('App', () => {
     stdin.write('ready now');
     await flushInput();
     expect(lastFrame() ?? '').toContain('> blocked while loadingready now');
+  });
+
+  it('exits on the second Ctrl+C after arming on the first', async () => {
+    const { store, lastFrame, stdin } = renderApp({ columns: 100, rows: 20 });
+    await flushInput();
+
+    stdin.write('\u0003');
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBe(ArmedAction.Exit);
+    expect(lastFrame() ?? '').toContain('ctrl+c again to exit');
+
+    stdin.write('\u0003');
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBeNull();
+  });
+
+  it('disarms a pending Ctrl+C exit on another key outside the home screen', async () => {
+    const { store, stdin, stdout } = renderApp({ columns: 100, rows: 20 });
+    await flushInput();
+
+    stdin.write('\u0003');
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBe(ArmedAction.Exit);
+
+    Object.defineProperty(stdout, 'rows', { configurable: true, value: 8 });
+    stdout.emit('resize');
+    await flushInput();
+
+    stdin.write('x');
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBeNull();
+
+    stdin.write('\u0003');
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBe(ArmedAction.Exit);
+  });
+
+  it('opens the fullscreen help viewer on /help and returns home on Esc', async () => {
+    const { store, lastFrame, stdin } = renderApp({ columns: 100, rows: 24 });
+    await flushInput();
+
+    stdin.write('/help');
+    await flushInput();
+    stdin.write('\r');
+    await flushInput();
+
+    expect(store.get(helpVisibleAtom)).toBe(true);
+    const helpFrame = lastFrame() ?? '';
+    expect(helpFrame).toContain('↑/↓ scroll · esc close');
+    expect(helpFrame).toContain('COMMANDS');
+    expect(helpFrame).not.toContain('/ commands | @ mention | ? help');
+
+    stdin.write('\u001B');
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    expect(store.get(helpVisibleAtom)).toBe(false);
+    const homeFrame = lastFrame() ?? '';
+    expect(homeFrame).toContain('/ commands | @ mention | ? help');
+    expect(homeFrame).not.toContain('↑/↓ scroll · esc close');
   });
 });
