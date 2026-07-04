@@ -1,5 +1,6 @@
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
+import {themes as prismThemes} from 'prism-react-renderer';
 
 const config: Config = {
   title: 'KQode',
@@ -56,6 +57,35 @@ const config: Config = {
       defaultMode: 'dark',
       respectPrefersColorScheme: false,
     },
+    // Algolia DocSearch domain-ownership verification (Meta Tag method).
+    // github.io is owned by GitHub, so the DNS/TXT method cannot be used. This
+    // meta tag is injected on every page, so the crawler finds it at the start
+    // URL https://kefeiqian.github.io/kqode-cli/ . The content value comes from
+    // the Algolia "Verify your domain" > Meta Tag tab. Safe to keep after
+    // verification succeeds.
+    metadata: [
+      {name: 'algolia-site-verification', content: 'C0A874BCCAF381EC'},
+    ],
+    prism: {
+      theme: prismThemes.palenight,
+      darkTheme: prismThemes.palenight,
+      // Bundled by prism-react-renderer: ts/tsx/js/jsx/rust/json/yaml/md/py/xml/text.
+      // These three are not, so their fenced blocks render unhighlighted without this.
+      additionalLanguages: ['bash', 'diff', 'toml'],
+    },
+    // Algolia DocSearch (navbar search box). The @docusaurus/theme-search-algolia
+    // theme is already bundled by preset-classic, so no install is needed.
+    // Apply for the free program at https://docsearch.algolia.com/apply/ ; once
+    // approved you'll receive appId, a search-only apiKey (public, safe to commit),
+    // and indexName. Paste them below and uncomment. contextualSearch keeps the
+    // zh-Hans and en locale results separate. Search only returns results after
+    // Algolia's first crawl of the deployed site completes.
+    // algolia: {
+    //   appId: 'YOUR_APP_ID',
+    //   apiKey: 'YOUR_SEARCH_ONLY_KEY',
+    //   indexName: 'YOUR_INDEX_NAME',
+    //   contextualSearch: true,
+    // },
     navbar: {
       title: 'KQode',
       items: [
