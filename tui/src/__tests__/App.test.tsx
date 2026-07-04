@@ -70,7 +70,7 @@ describe('App', () => {
     await flushInput();
 
     const outputRows = (lastFrame() ?? '').split('\n');
-    // One row is reserved below the UI to keep frames under fullscreen.
+    // The UI fills the full terminal height (FULLSCREEN_GUARD_ROWS = 0).
     expect(outputRows).toHaveLength(18 - FULLSCREEN_GUARD_ROWS);
     expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
   });

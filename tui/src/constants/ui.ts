@@ -17,15 +17,15 @@ export const DEFAULT_COMPOSER_VISIBLE_LINES = 3;
 
 export const PROMPT_PREFIX = '> ';
 
-// The app renders just under fullscreen (see FULLSCREEN_GUARD_ROWS), so Ink
-// appends a trailing newline each frame and its cursor baseline lands exactly on
-// the output's bottom row. The measured composer top therefore maps straight to
-// the editable row with no extra origin offset. (This was 1 while the app filled
-// the terminal exactly, where Ink omits the trailing newline and shifts the
-// baseline up one row.) NOTE: this assumes a non-fullscreen frame; below ~11 rows
-// the MIN_ROWS floor can re-enter fullscreen and make this off by one — a
-// degenerate, already-unusable terminal size.
-export const INK_CURSOR_ROW_ORIGIN_OFFSET = 0;
+// The app fills the terminal exactly (FULLSCREEN_GUARD_ROWS = 0), so Ink treats
+// each frame as fullscreen, omits its trailing newline, and shifts the cursor
+// baseline up one row. This offset adds that row back so the measured composer
+// top maps onto the editable row. (It was 0 while the app rendered just under
+// fullscreen, where Ink appends the trailing newline and the baseline already
+// lands on the output's bottom row.) NOTE: below ~10 rows the MIN_ROWS floor
+// makes content overflow the terminal and this can be off by one — a degenerate,
+// already-unusable terminal size.
+export const INK_CURSOR_ROW_ORIGIN_OFFSET = 1;
 export const COMPOSER_BACKGROUND_PADDING_ROWS = 2;
 export const COMPOSER_BACKGROUND_TOP_PADDING_ROWS = 1;
 

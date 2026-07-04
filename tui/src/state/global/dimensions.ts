@@ -17,20 +17,22 @@ export const columnsAtom = atom((get) => {
 });
 
 /**
- * Rows reserved below the UI so a frame never fills the terminal *exactly*.
+ * Rows reserved below the UI. Now `0`: the UI fills the full terminal height so
+ * no blank row sits at the bottom (tighter, edge-to-edge layout).
  *
- * Rendering at full terminal height makes Ink treat every frame as fullscreen;
- * on Windows that forces a whole-screen clear (`ESC[2J ESC[3J`) and full repaint
- * on **every** keystroke, which wipes scrollback and blinks in terminals that do
- * not coalesce the clear (e.g. WezTerm). Reserving one row keeps Ink on its
- * incremental path so only changed lines are rewritten. The trade-off is a
- * single blank row at the bottom of the terminal.
+ * The trade-off: filling the terminal *exactly* makes Ink treat every frame as
+ * fullscreen and, on terminals that do not coalesce the clear, forces a
+ * whole-screen clear (`ESC[2J ESC[3J`) and full repaint on **every** keystroke
+ * (WezTerm blinks; Windows Terminal does not). Fullscreen frames also make Ink
+ * omit its trailing newline and shift the cursor baseline up one row, which
+ * {@link INK_CURSOR_ROW_ORIGIN_OFFSET} adds back. Raise this to `1` to restore
+ * the incremental, non-fullscreen path (one blank row, no per-keystroke clear).
  */
-export const FULLSCREEN_GUARD_ROWS = 1;
+export const FULLSCREEN_GUARD_ROWS = 0;
 
 /**
- * Rows the UI renders into. Production reserves {@link FULLSCREEN_GUARD_ROWS}
- * from the live terminal height so frames stay just under fullscreen; test
+ * Rows the UI renders into. Production subtracts {@link FULLSCREEN_GUARD_ROWS}
+ * from the live terminal height (now `0`, so the UI fills the full height); test
  * overrides pin the canvas directly and bypass the reservation.
  */
 export const rowsAtom = atom((get) => {

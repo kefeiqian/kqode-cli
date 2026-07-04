@@ -24,8 +24,9 @@ async function launchTui({ entryUrl, loadPackagedAsset }: RunKqodeCliOptions): P
       <App />
     </Provider>,
     // Rewrite only changed lines instead of repainting the whole screen each
-    // frame. Paired with FULLSCREEN_GUARD_ROWS keeping us under fullscreen, this
-    // avoids the per-keystroke clear+repaint that blinks in WezTerm on Windows.
+    // frame. The UI now fills the terminal fullscreen (FULLSCREEN_GUARD_ROWS = 0),
+    // so terminals that force a whole-screen clear on fullscreen frames still
+    // repaint per keystroke (WezTerm blinks; Windows Terminal does not).
     { incrementalRendering: true }
   );
 
