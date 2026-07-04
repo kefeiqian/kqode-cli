@@ -1,0 +1,9 @@
+{
+  "label": "U5-JSON-RPC 协议",
+  "position": 5,
+  "link": {
+    "type": "generated-index",
+    "slug": "/category/u5-jsonrpc-protocol",
+    "description": "KQode U5 阶段（tag U5 / commit ac566c70）：在 TypeScript 侧定义 KQode 前后端之间的 JSON-RPC 消息协议，把请求、响应、通知与错误收敛成一套可搜索的类型与常量。"
+  }
+}

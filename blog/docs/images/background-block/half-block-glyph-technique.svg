@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 350" role="img"
+     aria-label="半块字符渲染技巧示意图：半块字符只给一个字符格涂上下其中一半，把它们拼起来给气泡做出半行的上下留白">
+  <g font-family="'PingFang SC','Microsoft YaHei','Noto Sans CJK SC','Segoe UI',sans-serif">
+    <rect x="0" y="0" width="760" height="350" rx="10" fill="#0d1117"/>
+    <text x="380" y="30" text-anchor="middle" fill="#c9d1d9" font-size="17" font-weight="600">半块字符：一个字符格 = 上下两个“半格”</text>
+    <line x1="392" y1="52" x2="392" y2="308" stroke="#21262d" stroke-width="1"/>
+
+    <!-- LEFT: single half-block cells -->
+    <text x="200" y="66" text-anchor="middle" fill="#8b949e" font-size="13">① 半块只涂格子的一半</text>
+
+    <!-- cell for LOWER HALF BLOCK ▄ -->
+    <text x="140" y="90" text-anchor="middle" fill="#c9d1d9" font-size="13">U+2584 · 下半块</text>
+    <rect x="95" y="100" width="90" height="130" fill="#0d1117" stroke="#30363d" stroke-width="1.5"/>
+    <rect x="95" y="165" width="90" height="65" fill="#58a6ff"/>
+    <line x1="95" y1="165" x2="185" y2="165" stroke="#6e7681" stroke-width="1" stroke-dasharray="4 3"/>
+    <text x="140" y="138" text-anchor="middle" fill="#8b949e" font-size="11">终端底色</text>
+    <text x="140" y="203" text-anchor="middle" fill="#0d1117" font-size="11" font-weight="600">前景色</text>
+
+    <!-- cell for UPPER HALF BLOCK ▀ -->
+    <text x="290" y="90" text-anchor="middle" fill="#c9d1d9" font-size="13">U+2580 · 上半块</text>
+    <rect x="245" y="100" width="90" height="130" fill="#0d1117" stroke="#30363d" stroke-width="1.5"/>
+    <rect x="245" y="100" width="90" height="65" fill="#58a6ff"/>
+    <line x1="245" y1="165" x2="335" y2="165" stroke="#6e7681" stroke-width="1" stroke-dasharray="4 3"/>
+    <text x="290" y="138" text-anchor="middle" fill="#0d1117" font-size="11" font-weight="600">前景色</text>
+    <text x="290" y="203" text-anchor="middle" fill="#8b949e" font-size="11">终端底色</text>
+
+    <text x="200" y="262" text-anchor="middle" fill="#8b949e" font-size="11">这里的“前景色”就是块的背景色，</text>
+    <text x="200" y="280" text-anchor="middle" fill="#8b949e" font-size="11">另一半保持终端底色 → 于是画出“半行”</text>
+
+    <!-- RIGHT: stacking into a seamless block -->
+    <text x="576" y="66" text-anchor="middle" fill="#8b949e" font-size="13">② 半块做上下边缘 = 半行留白</text>
+
+    <!-- glyph column mini-icons (vector, font-independent) -->
+    <rect x="474" y="114" width="16" height="16" fill="#0d1117" stroke="#6e7681" stroke-width="1"/>
+    <rect x="474" y="122" width="16" height="8" fill="#58a6ff"/>
+    <rect x="474" y="150" width="16" height="16" fill="#58a6ff" stroke="#6e7681" stroke-width="1"/>
+    <rect x="474" y="186" width="16" height="16" fill="#58a6ff" stroke="#6e7681" stroke-width="1"/>
+    <rect x="474" y="222" width="16" height="16" fill="#0d1117" stroke="#6e7681" stroke-width="1"/>
+    <rect x="474" y="222" width="16" height="8" fill="#58a6ff"/>
+
+    <!-- block rows: x 510..660, row height 36, top y=104 -->
+    <!-- r1 top edge (LOWER HALF BLOCK): only bottom half filled -->
+    <rect x="510" y="104" width="150" height="36" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+    <rect x="510" y="122" width="150" height="18" fill="#58a6ff"/>
+    <line x1="510" y1="122" x2="660" y2="122" stroke="#6e7681" stroke-width="1" stroke-dasharray="4 3"/>
+    <!-- r2, r3 full content rows -->
+    <rect x="510" y="140" width="150" height="36" fill="#58a6ff" stroke="#21262d" stroke-width="1"/>
+    <rect x="510" y="176" width="150" height="36" fill="#58a6ff" stroke="#21262d" stroke-width="1"/>
+    <text x="585" y="182" text-anchor="middle" fill="#0d1117" font-size="12" font-weight="600">正文内容</text>
+    <!-- r4 bottom edge (UPPER HALF BLOCK): only top half filled -->
+    <rect x="510" y="212" width="150" height="36" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+    <rect x="510" y="212" width="150" height="18" fill="#58a6ff"/>
+    <line x1="510" y1="230" x2="660" y2="230" stroke="#6e7681" stroke-width="1" stroke-dasharray="4 3"/>
+
+    <!-- brace marking the visible colored span (half-row edges) -->
+    <path d="M 672 122 h 8 v 108 h -8" fill="none" stroke="#3fb950" stroke-width="1.5"/>
+    <text x="688" y="166" fill="#3fb950" font-size="11">上下边缘</text>
+    <text x="688" y="182" fill="#3fb950" font-size="11">落在半行处</text>
+
+    <text x="576" y="282" text-anchor="middle" fill="#8b949e" font-size="11">半行 = 气泡上下的柔和留白（不是补接缝）</text>
+  </g>
+</svg>

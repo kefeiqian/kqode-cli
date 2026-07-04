@@ -1,0 +1,9 @@
+{
+  "label": "U3-Jotai 状态重构",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "slug": "/category/u3-jotai-state-refactor",
+    "description": "KQode U3 阶段（tag U3 / commit 5432e018）：把主界面共享状态从 props 透传迁移到 Jotai，按 200 行约定拆分 HomeScreen 与 PromptComposer，并把纯函数 helper 抽到 libs/tui。"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "label": "U2-交互式主界面",
+  "position": 2,
+  "link": {
+    "type": "generated-index",
+    "slug": "/category/u2-interactive-home-screen",
+    "description": "KQode U2 阶段（tag U2 / commit dd15b678）：把 U1 的静态空壳升级成一个可交互的 Ink 主界面，逐模块拆解主题、布局、正文转录、输入框、Git 感知的 cwd 与鼠标滚动。"
+  }
+}

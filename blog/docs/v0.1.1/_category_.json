@@ -1,0 +1,9 @@
+{
+  "label": "v0.1.1",
+  "position": 5,
+  "link": {
+    "type": "generated-index",
+    "slug": "/category/v0-1-1",
+    "description": "v0.1.1 版本：新增退出总结卡片、统一 TUI 与 Rust 核心的构建开关、加入锁步升级所有 manifest 的 set-version xtask，以及配套的 version-bump 技能。"
+  }
+}

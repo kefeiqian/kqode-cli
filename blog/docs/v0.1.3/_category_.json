@@ -1,0 +1,9 @@
+{
+  "label": "v0.1.3",
+  "position": 7,
+  "link": {
+    "type": "generated-index",
+    "slug": "/category/v0-1-3",
+    "description": "v0.1.3 版本：引入基于 optionalDependencies 的 npm 平台包分发模型（启动器 + 5 个平台包），打通自动发布流水线，并为 kqode CLI 增加基于 citty 的 --version 与 --help。"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "label": "U6-后端进程启动器",
+  "position": 6,
+  "link": {
+    "type": "generated-index",
+    "slug": "/category/u6-backend-launcher",
+    "description": "KQode U6 阶段（tag U6 / commit 29eaf0a2）：受控地从源码启动 Rust 后端进程的 launcher，处理可执行文件解析、参数、环境与生命周期。"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "label": "U7-后端客户端",
+  "position": 7,
+  "link": {
+    "type": "generated-index",
+    "slug": "/category/u7-backend-client",
+    "description": "KQode U7 阶段（tag U7 / commit 7c9d43fa）：基于进程的 JSON-RPC 后端客户端，负责编解码消息、匹配请求与响应，并向 UI 暴露稳定的调用接口。"
+  }
+}

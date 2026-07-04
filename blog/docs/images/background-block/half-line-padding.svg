@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 392" role="img"
+     aria-label="三种给消息气泡加上下留白的做法对比：A 只给文字行刷背景，1 行、无留白、显得局促；B 上下各加一整行实色留白，3 行、留白太厚、笨重；C 用半块字形上下各补半行留白，3 行但边缘只涂半格、轻盈且柔和（KQode 采用）。终端背景色只能整格填充，所以留白粒度只能在无留白、整行、半行三档里选">
+  <g font-family="'PingFang SC','Microsoft YaHei','Noto Sans CJK SC','Segoe UI',sans-serif">
+    <rect x="0" y="0" width="760" height="392" rx="10" fill="#0d1117"/>
+    <text x="380" y="30" text-anchor="middle" fill="#c9d1d9" font-size="16" font-weight="600">三种给消息气泡加“上下留白”的做法</text>
+    <text x="380" y="54" text-anchor="middle" fill="#8b949e" font-size="12">终端背景色只能“整格”填充，没有“半格背景”——留白粒度只能在下面三档里选</text>
+
+    <!-- column headers -->
+    <text x="140" y="140" text-anchor="middle" fill="#c9d1d9" font-size="13" font-weight="600">A · 只刷文字行</text>
+    <text x="380" y="140" text-anchor="middle" fill="#c9d1d9" font-size="13" font-weight="600">B · 加整行实色</text>
+    <text x="620" y="140" text-anchor="middle" fill="#c9d1d9" font-size="13" font-weight="600">C · 半块补半行（采用）</text>
+
+    <!-- Column A: single text row only (rows would be 150-184 / 184-218 / 218-252) -->
+    <rect x="65" y="184" width="150" height="34" fill="#58a6ff" stroke="#21262d" stroke-width="1"/>
+    <text x="140" y="205" text-anchor="middle" fill="#0d1117" font-size="12" font-weight="600">正文</text>
+
+    <!-- Column B: three full solid rows -->
+    <rect x="305" y="150" width="150" height="34" fill="#58a6ff" stroke="#21262d" stroke-width="1"/>
+    <rect x="305" y="184" width="150" height="34" fill="#58a6ff" stroke="#21262d" stroke-width="1"/>
+    <rect x="305" y="218" width="150" height="34" fill="#58a6ff" stroke="#21262d" stroke-width="1"/>
+    <text x="380" y="205" text-anchor="middle" fill="#0d1117" font-size="12" font-weight="600">正文</text>
+
+    <!-- Column C: half-block top + solid text + half-block bottom -->
+    <rect x="545" y="150" width="150" height="34" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+    <rect x="545" y="167" width="150" height="17" fill="#58a6ff"/>
+    <line x1="545" y1="167" x2="695" y2="167" stroke="#6e7681" stroke-width="1" stroke-dasharray="4 3"/>
+    <rect x="545" y="184" width="150" height="34" fill="#58a6ff" stroke="#21262d" stroke-width="1"/>
+    <text x="620" y="205" text-anchor="middle" fill="#0d1117" font-size="12" font-weight="600">正文</text>
+    <rect x="545" y="218" width="150" height="34" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+    <rect x="545" y="218" width="150" height="17" fill="#58a6ff"/>
+    <line x1="545" y1="235" x2="695" y2="235" stroke="#6e7681" stroke-width="1" stroke-dasharray="4 3"/>
+
+    <!-- per-column verdicts -->
+    <text x="140" y="278" text-anchor="middle" fill="#8b949e" font-size="11">1 行 · 无留白</text>
+    <text x="140" y="296" text-anchor="middle" fill="#ff7b72" font-size="11">→ 局促</text>
+    <text x="380" y="278" text-anchor="middle" fill="#8b949e" font-size="11">3 行实色 · 留白太厚</text>
+    <text x="380" y="296" text-anchor="middle" fill="#d29922" font-size="11">→ 笨重</text>
+    <text x="620" y="278" text-anchor="middle" fill="#8b949e" font-size="11">3 行 · 边缘只涂半格</text>
+    <text x="620" y="296" text-anchor="middle" fill="#3fb950" font-size="11">→ 轻盈、柔和 ✓</text>
+
+    <line x1="30" y1="330" x2="730" y2="330" stroke="#21262d" stroke-width="1"/>
+    <text x="380" y="356" text-anchor="middle" fill="#8b949e" font-size="11">A 太挤、B 太重，C 用半块把留白做成“半行”，是介于两者之间的轻量选择。</text>
+    <text x="380" y="376" text-anchor="middle" fill="#8b949e" font-size="11">下面两张实拍图，对比的就是 A（朴素单行）与 C（半块）。</text>
+  </g>
+</svg>

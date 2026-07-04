@@ -1,0 +1,9 @@
+{
+  "label": "U4-ACK 后端",
+  "position": 4,
+  "link": {
+    "type": "generated-index",
+    "slug": "/category/u4-ack-backend",
+    "description": "KQode U4 阶段（tag U4 / commit f86f87f3）：第一个 Rust JSON-RPC ACK 后端，验证前端 TUI 与 Rust 核心之间的进程与消息通路。"
+  }
+}

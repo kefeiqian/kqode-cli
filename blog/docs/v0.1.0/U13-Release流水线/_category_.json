@@ -1,0 +1,9 @@
+{
+  "label": "U13-Release 流水线",
+  "position": 13,
+  "link": {
+    "type": "generated-index",
+    "slug": "/category/u13-release-pipeline",
+    "description": "KQode U13 阶段（tag U13 = v0.1.0 / commit a1953dbd）：加入 GitHub Release 资产流水线，把跨平台构建产物自动发布为 Release assets，标志着 v0.1.0 的完成。"
+  }
+}

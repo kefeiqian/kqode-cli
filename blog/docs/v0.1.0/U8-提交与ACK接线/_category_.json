@@ -1,0 +1,9 @@
+{
+  "label": "U8-提交与 ACK 接线",
+  "position": 8,
+  "link": {
+    "type": "generated-index",
+    "slug": "/category/u8-submit-ack-wiring",
+    "description": "KQode U8 阶段（tag U8 / commit bcc8130e）：把主界面输入框的提交状态接到后端客户端，输入 prompt 后收到后端 ACK 并回显到正文，第一次打通端到端回路。"
+  }
+}

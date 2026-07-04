@@ -1,0 +1,9 @@
+{
+  "label": "附录 A：术语表（Glossary）",
+  "position": 99,
+  "link": {
+    "type": "generated-index",
+    "slug": "/category/glossary",
+    "description": "本附录收录本博客里直接使用的英文词，按主题分页。KQode 属于 Coding Agent / Agent Harness 这个偏新的领域：一部分是暂时没有精准中文译法的领域术语，另一部分是中文译法别扭、或英文表达更精准的常用词。遇到不熟悉的词，可以按下面的分类查阅。"
+  }
+}

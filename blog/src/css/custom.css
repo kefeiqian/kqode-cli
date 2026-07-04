@@ -141,3 +141,49 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
 }
+
+/* Code blocks soft-wrap by default. The word-wrap toggle button is removed
+   (see src/theme/CodeBlock/Buttons/WordWrapButton) so readers get one
+   consistent reading mode with no horizontal scrollbar. These declarations
+   mirror the inline styles Docusaurus' word-wrap toggle would otherwise set. */
+.theme-code-block pre code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* prism-react-renderer's palenight theme styles `keyword` tokens as italic with
+   NO color, so const/export/function/if/return inherit the plain text color and
+   read as unhighlighted (keyword-heavy blocks then look washed out). Give
+   keywords palenight's canonical mauve so they clearly stand out. */
+.token.keyword {
+  color: #c792ea;
+}
+
+/* --- Reading rhythm: more breathing room for math and dense pages --- */
+
+/* Display math (KaTeX): more vertical space and a slightly larger size, and
+   scroll a wide (annotated) formula instead of letting it overflow the column. */
+.katex-display {
+  margin: 1.9rem 0;
+  padding: 0.2rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.katex-display > .katex {
+  font-size: 1.05em;
+}
+
+/* A touch more space between paragraphs and above sections so long,
+   code-heavy articles feel less cramped. */
+:root {
+  --ifm-paragraph-margin-bottom: 1.5rem;
+}
+
+.markdown h2 {
+  margin-top: 2.75rem;
+}
+
+.markdown h3 {
+  margin-top: 2rem;
+}

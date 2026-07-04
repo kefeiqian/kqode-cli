@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 392" role="img"
+     aria-label="两条消息气泡叠放示意图：每条消息都是独立的三整行（下半块行 + 正文整行 + 上半块行）；终端里一个格子只放一个字符，下一条消息从新的一行开始、有自己的背景；上一条的上半块行下半格是底色，加上下一条下半块行的上半格底色，正好拼成一整行底色，把两条消息自然分开">
+  <g font-family="'PingFang SC','Microsoft YaHei','Noto Sans CJK SC','Segoe UI',sans-serif">
+    <rect x="0" y="0" width="760" height="392" rx="10" fill="#0d1117"/>
+    <text x="380" y="28" text-anchor="middle" fill="#c9d1d9" font-size="16" font-weight="600">“下一行”怎么处理？每一段都是独立的一整行</text>
+    <text x="380" y="52" text-anchor="middle" fill="#8b949e" font-size="12">终端一行一行地画，一个格子只放一个字符；下一条消息从新的一行开始，有自己的背景</text>
+
+    <!-- row grid: x 250..470, row height 38, start y=86 -->
+    <!-- r1: message A, lower-half-block row (▄) -->
+    <rect x="250" y="86" width="220" height="38" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+    <rect x="250" y="105" width="220" height="19" fill="#58a6ff"/>
+    <line x1="250" y1="105" x2="470" y2="105" stroke="#6e7681" stroke-width="1" stroke-dasharray="4 3"/>
+    <text x="238" y="109" text-anchor="end" fill="#8b949e" font-size="11">① A · 下半块行</text>
+    <!-- r2: message A, text (full row) -->
+    <rect x="250" y="124" width="220" height="38" fill="#58a6ff" stroke="#21262d" stroke-width="1"/>
+    <text x="360" y="147" text-anchor="middle" fill="#0d1117" font-size="12" font-weight="600">消息 A · 正文</text>
+    <text x="238" y="147" text-anchor="end" fill="#8b949e" font-size="11">② A · 正文整行</text>
+    <!-- r3: message A, upper-half-block row (▀) -->
+    <rect x="250" y="162" width="220" height="38" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+    <rect x="250" y="162" width="220" height="19" fill="#58a6ff"/>
+    <line x1="250" y1="181" x2="470" y2="181" stroke="#6e7681" stroke-width="1" stroke-dasharray="4 3"/>
+    <text x="238" y="185" text-anchor="end" fill="#8b949e" font-size="11">③ A · 上半块行</text>
+    <!-- r4: message B, lower-half-block row (▄) -->
+    <rect x="250" y="200" width="220" height="38" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+    <rect x="250" y="219" width="220" height="19" fill="#58a6ff"/>
+    <line x1="250" y1="219" x2="470" y2="219" stroke="#6e7681" stroke-width="1" stroke-dasharray="4 3"/>
+    <text x="238" y="223" text-anchor="end" fill="#8b949e" font-size="11">④ B · 下半块行</text>
+    <!-- r5: message B, text (full row) -->
+    <rect x="250" y="238" width="220" height="38" fill="#58a6ff" stroke="#21262d" stroke-width="1"/>
+    <text x="360" y="261" text-anchor="middle" fill="#0d1117" font-size="12" font-weight="600">消息 B · 正文</text>
+    <text x="238" y="261" text-anchor="end" fill="#8b949e" font-size="11">⑤ B · 正文整行</text>
+    <!-- r6: message B, upper-half-block row (▀) -->
+    <rect x="250" y="276" width="220" height="38" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+    <rect x="250" y="276" width="220" height="19" fill="#58a6ff"/>
+    <line x1="250" y1="295" x2="470" y2="295" stroke="#6e7681" stroke-width="1" stroke-dasharray="4 3"/>
+    <text x="238" y="299" text-anchor="end" fill="#8b949e" font-size="11">⑥ B · 上半块行</text>
+
+    <!-- separation band: r3 bottom half (181..200) + r4 top half (200..219) = one full row of body color -->
+    <rect x="250" y="181" width="220" height="38" fill="none" stroke="#3fb950" stroke-width="1.5" stroke-dasharray="5 3"/>
+    <path d="M 476 181 h 6 v 38 h -6" fill="none" stroke="#3fb950" stroke-width="1.5"/>
+    <text x="488" y="194" fill="#3fb950" font-size="11" font-weight="600">这一整行 = 底色</text>
+    <text x="488" y="211" fill="#3fb950" font-size="11">（③ 的下半 + ④ 的上半）</text>
+    <text x="488" y="228" fill="#3fb950" font-size="11">→ 两条消息被自然分开</text>
+
+    <!-- bubble grouping notes -->
+    <text x="488" y="105" fill="#c9d1d9" font-size="12" font-weight="600">①②③ = 消息 A 的三行</text>
+    <text x="488" y="290" fill="#c9d1d9" font-size="12" font-weight="600">④⑤⑥ = 消息 B 的三行</text>
+
+    <!-- bottom clarification -->
+    <line x1="30" y1="332" x2="730" y2="332" stroke="#21262d" stroke-width="1"/>
+    <text x="380" y="356" text-anchor="middle" fill="#8b949e" font-size="11">关键：一个格子只放一个字符 —— 下一行不会挤进上一条“上半块行”没上色的那半格，</text>
+    <text x="380" y="374" text-anchor="middle" fill="#8b949e" font-size="11">它总是另起一行、有自己的背景，所以正文既不会丢背景、也不会出现行间缝。</text>
+  </g>
+</svg>

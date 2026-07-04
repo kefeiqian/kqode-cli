@@ -1,0 +1,9 @@
+{
+  "label": "U11-终端控制与渲染",
+  "position": 11,
+  "link": {
+    "type": "generated-index",
+    "slug": "/category/u11-terminal-control-rendering",
+    "description": "KQode U11 阶段（tag U11 / commit 97a9a65d）：接入终端控制序列与渲染稳健性，包括窗口标题、终端背景探测、鼠标追踪等 TTY 守卫的转义序列 helper。"
+  }
+}

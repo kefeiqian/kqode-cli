@@ -35,23 +35,23 @@ KQode 的研发会遵循几个原则：
 
 KQode 的研发会重度使用 [compound-engineering-plugin](https://github.com/EveryInc/compound-engineering-plugin)。
 
-在真正写代码之前，我们会先用 `ce-brainstorm` 把模糊想法整理成需求，再用 `ce-plan` 把需求整理成可以执行、可以评审、可以验证的计划。
+在真正写代码之前，我们会先用 `ce-brainstorm` 把模糊想法整理成需求，再用 `ce-plan` 把需求整理成可以执行、可以评审、可以验证的方案。
 
-每个计划项都会被逐条 review，确认范围、边界、风险和验收方式都没有问题之后，才开始进入实现阶段。比如第一个 Ink TUI 首页功能对应的计划文档是 `docs/plans/2026-06-25-003-feat-first-ink-tui-homepage-plan.md`，里面把需求、范围边界、技术约束、上下文研究、测试策略和任务拆分都整理成了可勾选的条目。
+整个方案由许细项组成，每一条都会被review，确认范围、边界、风险和验收方式都没有问题之后，才开始进入实现阶段。比如第一个 Ink TUI 首页功能对应的方案文档是 `docs/plans/2026-06-25-003-feat-first-ink-tui-homepage-plan.md`，里面把需求、范围边界、技术约束、上下文研究、测试策略和任务拆分都整理成了可勾选的 item。
 
 这种做法很适合 KQode 这类项目：一方面我们确实在用 Coding Agent 加速开发；另一方面，我们不希望 Agent 直接从一句模糊指令直接跳到代码实现。先 brainstorm、再 plan、逐条 review，能让人类把控产品方向和架构边界，也能让 Agent 在明确上下文里完成更稳定的实现。
 
-计划 review 通过之后，我们会把它继续拆成 U1、U2 这样的 commit-sized 小单元，并通过 `ce-work` 逐个实现。每个小单元实现完成后，都会进入人类 + Agent 的双重 review：Agent 侧使用 `ce-code-review` 做结构化检查，发现问题后先修复并再次验证；最后再由人类，也就是笔者本人，进行最终 review。只有确认每个 commit 都经过人类 review 之后，才会真正提交代码，以此保证研发质量，同时保证人类对整体项目的把控。
+方案 review 通过之后，我们会把它继续拆成 U1、U2 这样的 commit-sized 小单元，并通过 `ce-work` 逐个实现。每个小单元实现完成后，都会进入人类 + Agent 的双重 review：Agent 侧使用 `ce-code-review` 做结构化检查，发现问题后先修复并再次验证；最后再由人类，也就是笔者本人，进行最终 review。只有确认每个 commit 都经过人类 review 之后，才会真正提交代码，以此保证研发质量，同时保证人类对整体项目的把控。
 
 ## 使用的 Coding Agent 和模型
 
-在日常研发中，我们主要使用 [GitHub Copilot CLI](https://github.com/features/copilot/cli/) 作为 Coding Agent 的交互入口。它运行在终端里，适合直接围绕当前仓库做代码搜索、编辑、构建、测试和提交准备，也和 KQode 未来想实现的本地终端 Agent 体验比较接近。
+在日常研发中，我们主要使用 [GitHub Copilot CLI](https://github.com/features/copilot/cli/) 作为 Coding Agent 的交互入口。
 
-模型方面，主要使用 GPT-5.5 和 Claude Opus 4.8。前者适合多数代码实现、重构和验证任务；后者适合复杂架构推理、长上下文审阅和高风险方案判断。KQode 本身也会参考这种“工具入口 + 多模型能力 + 明确计划约束”的工作方式，逐步沉淀出自己的 Agent Runtime。
+模型方面，主要使用 GPT-5.5 和 Claude Opus 4.8。前者适合多数代码实现、重构和验证任务；后者适合复杂架构推理、长上下文审阅和高风险方案判断。KQode 本身也会参考这种“工具入口 + 多模型能力 + 明确方案约束”的工作方式，逐步沉淀出自己的 Agent Runtime。
 
 ## 文档和代码一起演进
 
-这个系列文章不是项目完成后的倒叙教程，而是跟着 KQode 的研发过程同步前进。因此文章里会保留一些阶段性的判断：有些方案后面可能会调整，有些模块会从简单实现逐步拆分成独立 crate。
+这个系列文章不是项目完成后的总览教程，而是随着 KQode 不断迭代同步写作，因此文章里会保留一些阶段性的判断：有些方案后面可能会调整，有些模块会从简单实现逐步拆分成独立 crate。
 
 这样写的好处是读者可以看到一个 Coding Agent 从零开始长出来的过程，而不是只看到最后整理好的结果。对于学习 Agent Runtime 和 Harness Engineering 来说，过程中的取舍往往比最终代码更重要。
 

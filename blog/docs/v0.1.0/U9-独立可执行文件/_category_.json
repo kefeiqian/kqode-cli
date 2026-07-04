@@ -1,0 +1,9 @@
+{
+  "label": "U9-独立可执行文件",
+  "position": 9,
+  "link": {
+    "type": "generated-index",
+    "slug": "/category/u9-standalone-executable",
+    "description": "KQode U9 阶段（tag U9 / commit f642fb3b）：把 Ink 前端打包成独立的 kqode 可执行文件，并把 Rust 后端作为内容寻址的资产随之分发。"
+  }
+}

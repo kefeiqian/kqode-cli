@@ -1,9 +1,0 @@
-{
-  "label": "U1-研发脚手架",
-  "position": 3,
-  "link": {
-    "type": "generated-index",
-    "slug": "/category/u1-development-scaffolding",
-    "description": "KQode U1 阶段的 Rust 项目、Ink TUI、xtask 自动化和阶段总结。"
-  }
-}

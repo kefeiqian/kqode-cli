@@ -1,9 +1,0 @@
-{
-  "label": "U2-交互式主屏",
-  "position": 4,
-  "link": {
-    "type": "generated-index",
-    "slug": "/category/u2-interactive-home-screen",
-    "description": "KQode U2 阶段：把空壳预览升级成可交互的 Ink 主屏，逐模块拆解状态、布局、正文转录、输入框、鼠标滚动与主题实现。"
-  }
-}

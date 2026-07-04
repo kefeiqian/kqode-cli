@@ -1,0 +1,9 @@
+{
+  "label": "U12-跨平台分发",
+  "position": 12,
+  "link": {
+    "type": "generated-index",
+    "slug": "/category/u12-cross-platform-distribution",
+    "description": "KQode U12 阶段（tag U12 / commit a667e95e）：准备跨平台分发所需的构建产物，为多平台的 kqode 二进制与后端资产打好打包基础。"
+  }
+}

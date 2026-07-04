@@ -1,0 +1,9 @@
+{
+  "label": "v0.1.0",
+  "position": 4,
+  "link": {
+    "type": "generated-index",
+    "slug": "/category/v0-1-0",
+    "description": "KQode 的第一个发布版本 v0.1.0：从研发脚手架（U1）一路到交互式主界面、JSON-RPC 后端、独立可执行文件，再到跨平台 Release 流水线（U13）。每个 U 单元对应一个打了 tag 的 commit。"
+  }
+}
