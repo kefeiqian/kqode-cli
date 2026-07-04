@@ -124,7 +124,7 @@ export const initializeRuntimeAtom = atom(null, async (get, set) => {
 - `tui/src/App.tsx` — window-size wiring only; no backend effect.
 - `tui/src/backend/runtime/__tests__/backendRuntime.test.ts` — verifies eager start, hint set/clear, dispose handle, and the start-failure path with a fake client (no real process).
 
-Supporting structure introduced alongside this: backend code lives under `tui/src/backend/` (alias `@backend`) split into `client/`, `protocol/`, `process/`, `runtime/`; backend-related state lives under `tui/src/state/backend/`.
+Supporting structure introduced alongside this: backend code lives under `tui/src/backend/` (alias `@backend`) split into `client/`, `protocol/`, `process/`, `runtime/`; the prompt-queue state that drains through the backend lives under `tui/src/state/promptQueue/`.
 
 ## Related
 
