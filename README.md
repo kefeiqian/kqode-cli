@@ -1,5 +1,7 @@
 # KQode
 
+**English** | [简体中文](README.zh-CN.md)
+
 [![GitHub Pages](https://github.com/kefeiqian/kqode-cli/actions/workflows/github-pages.yml/badge.svg)](https://github.com/kefeiqian/kqode-cli/actions/workflows/github-pages.yml)
 
 KQode is a Rust-first coding-agent harness with TypeScript Ink as its committed TUI.
@@ -156,6 +158,11 @@ cargo xtask blog-serve
 cargo xtask blog-serve-en
 cargo xtask blog-preview
 ```
+
+## Contributing
+
+Contributions are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md) for build
+instructions, conventions, and the pull request workflow.
 
 ## License
 
