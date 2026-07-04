@@ -5,19 +5,21 @@ import { BodyPane } from '@components/BodyPane.tsx';
 import { CwdLine } from '@components/CwdLine.tsx';
 import { Header } from '@components/Header.tsx';
 import { PromptComposer } from '@components/PromptComposer/index.tsx';
+import { SlashCommandMenu } from '@components/SlashCommandMenu/index.tsx';
 import { StatusBar } from '@components/StatusBar.tsx';
 import {
   DISABLE_SGR_MOUSE_TRACKING,
   ENABLE_SGR_MOUSE_TRACKING,
   parseMouseWheelInput
 } from '@libs/terminal/mouse.ts';
+import { BODY_CWD_GAP_ROWS } from '@libs/tui/layout.ts';
 import {
-  BODY_CWD_GAP_ROWS,
   bottomSpacerRowsAtom,
   layoutAtom,
   scrollBodyByRowsAtom
-} from '@state/homeScreen/index.ts';
-import { columnsAtom, rowsAtom } from '@state/global/index.ts';
+} from '@state/ui/index.ts';
+import { columnsAtom, rowsAtom } from '@state/ui/index.ts';
+import { commandMenuOpenAtom } from '@state/ui/commands/index.ts';
 import { theme } from '@theme/themeConfig.ts';
 import { MOUSE_WHEEL_SCROLL_ROWS } from '@constants/ui.ts';
 
@@ -72,7 +74,7 @@ export function HomeScreenView() {
     >
       <HomeHeader />
       <HomeBody />
-      <HomeCwd />
+      <HomeBottomStack />
       <HomeComposer />
       <StatusBar />
     </Box>
@@ -97,12 +99,18 @@ function HomeBody() {
   );
 }
 
-function HomeCwd() {
+function HomeBottomStack() {
   const bottomSpacerRows = useAtomValue(bottomSpacerRowsAtom);
+  const menuOpen = useAtomValue(commandMenuOpenAtom);
 
+  // The cwd line and the command palette share the row directly above the
+  // composer: the palette replaces the cwd while it is open. The spacer + gap
+  // margin sits on this wrapper so the cwd/menu block, composer, and status row
+  // stay pinned to the bottom whether or not the cwd is shown.
   return (
-    <Box marginTop={bottomSpacerRows + BODY_CWD_GAP_ROWS}>
-      <CwdLine />
+    <Box marginTop={bottomSpacerRows + BODY_CWD_GAP_ROWS} flexDirection="column">
+      {menuOpen ? null : <CwdLine />}
+      <SlashCommandMenu />
     </Box>
   );
 }

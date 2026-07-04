@@ -5,15 +5,14 @@ import { App } from '@/App.tsx';
 import { BodyPane } from '@components/BodyPane.tsx';
 import { formatDisplayCwd } from '@libs/tui/cwdLine.ts';
 import type { BodyEntry } from '@libs/tui/bodyRows.ts';
-import { PROMPT_MAX_BYTES } from '@state/composer/index.ts';
+import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import {
   bodyEntriesAtom,
   columnsTestOverrideAtom,
   gitStatusLabelTestOverrideAtom,
-  productVersionAtom,
-  rowsTestOverrideAtom,
-  workspaceCwdAtom
-} from '@state/global/index.ts';
+  rowsTestOverrideAtom
+} from '@state/ui/index.ts';
+import { productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 import { theme } from '@theme/themeConfig.ts';
@@ -108,7 +107,7 @@ describe('HomeScreen', () => {
         rows={1}
         columns={80}
         entries={[
-          { kind: 'prompt', text: 'first' },
+          { kind: 'user', text: 'first' },
           { kind: 'success', text: 'second' },
           { kind: 'error', text: 'third' }
         ]}
@@ -123,7 +122,7 @@ describe('HomeScreen', () => {
 
   it('keeps short BodyPane entries reachable when scrolling', () => {
     const entries = Array.from({ length: 5 }, (_, index) => ({
-      kind: 'info' as const,
+      kind: 'assistant' as const,
       text: `entry ${index + 1}`
     }));
 
@@ -142,7 +141,7 @@ describe('HomeScreen', () => {
 
   it('keeps the cwd, composer, and status rows pinned to the bottom when body content is short', () => {
     const entries = Array.from({ length: 4 }, (_, index) => ({
-      kind: 'info' as const,
+      kind: 'assistant' as const,
       text: `entry ${index + 1}`
     }));
     const { lastFrame } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 16 });
@@ -157,12 +156,14 @@ describe('HomeScreen', () => {
     expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
   });
 
-  it('normalizes multiline body entries before applying the row budget', () => {
+  it('keeps multiline body entries on separate rows', () => {
     const { lastFrame } = render(
-      <BodyPane rows={1} columns={80} entries={[{ kind: 'info', text: 'first\nsecond' }]} />
+      <BodyPane rows={4} columns={80} entries={[{ kind: 'assistant', text: 'first\nsecond' }]} />
     );
+    const rows = (lastFrame() ?? '').split('\n');
 
-    expect(lastFrame() ?? '').toBe('• first second');
+    expect(rows.some((row) => row.includes('• first') && !row.includes('second'))).toBe(true);
+    expect(rows.some((row) => row.includes('second') && !row.includes('first'))).toBe(true);
   });
 
   it('renders body output rows without entry gap rows', () => {
@@ -171,8 +172,8 @@ describe('HomeScreen', () => {
         rows={2}
         columns={80}
         entries={[
-          { kind: 'info', text: 'first' },
-          { kind: 'info', text: 'second' }
+          { kind: 'assistant', text: 'first' },
+          { kind: 'assistant', text: 'second' }
         ]}
       />
     );
@@ -184,7 +185,7 @@ describe('HomeScreen', () => {
 
   it('renders user messages with default half-line background block rows', () => {
     const { lastFrame } = render(
-      <BodyPane rows={3} columns={24} entries={[{ kind: 'prompt', text: 'hello from user' }]} />
+      <BodyPane rows={3} columns={24} entries={[{ kind: 'user', text: 'hello from user' }]} />
     );
     const outputRows = (lastFrame() ?? '').split('\n');
 
@@ -196,7 +197,7 @@ describe('HomeScreen', () => {
   it('soft-wraps long body entries without adding entry gaps between wrapped lines', () => {
     const longBody = 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const { lastFrame } = render(
-      <BodyPane rows={3} columns={24} entries={[{ kind: 'info', text: longBody }]} />
+      <BodyPane rows={3} columns={24} entries={[{ kind: 'assistant', text: longBody }]} />
     );
     const output = lastFrame() ?? '';
     const outputRows = output.split('\n');
@@ -225,24 +226,30 @@ describe('HomeScreen', () => {
     const longWorkspace =
       'C:\\Users\\kefeiqian\\Projects\\KQode\\target\\kqode-test-workspaces\\workspace\\dummy-react-app';
 
-    const { lastFrame } = renderHomeScreen({ workspaceCwd: longWorkspace, columns: 40, rows: 12 });
+    const { lastFrame } = renderHomeScreen({ workspaceCwd: longWorkspace, columns: 60, rows: 15 });
     const output = lastFrame() ?? '';
+    // The cwd wraps across rows; rejoining the trimmed rows must reproduce the
+    // full home-relative path, proving it soft-wrapped rather than truncated.
+    const flattened = output
+      .split('\n')
+      .map((row) => row.replace(/\s+$/, ''))
+      .join('');
 
     expect(output).not.toContain('...');
-    expect(output).toContain('target\\kqode-test-works');
-    expect(output).toContain('paces\\workspace\\dummy-react-app');
-    expect(output).toContain('dummy-react-app');
     expect(output).not.toContain('Ask KQode...');
-    expect(output.split('\n')).toHaveLength(12);
-    expect(output.split('\n').at(-1)).toContain('/ | @ | ?');
+    expect(flattened).toContain(
+      '~\\Projects\\KQode\\target\\kqode-test-workspaces\\workspace\\dummy-react-app'
+    );
+    expect(output.split('\n')).toHaveLength(15);
+    expect(output.split('\n').at(-1)).toContain('/ commands | @ mention | ? help');
   });
 
   it('keeps one blank separator row between body output and cwd', () => {
     const entries = Array.from({ length: 10 }, (_, index) => ({
-      kind: 'info' as const,
+      kind: 'assistant' as const,
       text: `entry ${index + 1}`
     }));
-    const { lastFrame } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 12 });
+    const { lastFrame } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 15 });
     const outputRows = (lastFrame() ?? '').split('\n');
     const cwdRow = outputRows.findIndex((row) => row.includes('Projects\\KQode'));
 
@@ -252,56 +259,80 @@ describe('HomeScreen', () => {
     expect(outputRows.at(cwdRow + 2)).toContain('>');
   });
 
-  it('keeps cwd, composer, and left status hints visible around 40 columns by 12 rows', async () => {
-    const { lastFrame, stdin } = renderHomeScreen({ columns: 40, rows: 12 });
+  it('hides the cwd line while the command palette is open, keeping the status row pinned', async () => {
+    const { lastFrame, stdin } = renderHomeScreen({ columns: 80, rows: 16 });
+    await flushInput();
+    expect(lastFrame() ?? '').toContain('Projects\\KQode');
+
+    stdin.write('/');
+    await flushInput();
+
+    const openOutput = lastFrame() ?? '';
+    expect(openOutput).not.toContain('Projects\\KQode');
+    expect(openOutput).toContain('/clear');
+    expect(openOutput).toContain('/exit');
+    expect(openOutput).toContain('/help');
+    expect(openOutput.split('\n').at(-1)).toContain('/ commands | @ mention | ? help');
+  });
+
+  it('keeps cwd, composer, status hints, and model label visible at the minimum 60x15', async () => {
+    const { lastFrame, stdin } = renderHomeScreen({ columns: 60, rows: 15 });
 
     const output = lastFrame() ?? '';
 
     expect(output).toContain('~');
     expect(output.split('\n')).toContain('>');
     expect(output).not.toContain('Ask KQode...');
-    expect(output).toContain('/');
-    expect(output).toContain('@');
-    expect(output).toContain('?');
-    expect(output).not.toContain('GPT-5.5');
+    expect(output).toContain('GPT-5.5');
     const outputRows = output.split('\n');
-    expect(outputRows).toHaveLength(12);
-    expect(outputRows.at(-1)).toContain('/ | @ | ?');
+    expect(outputRows).toHaveLength(15);
+    expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
 
-    stdin.write('a long prompt that wraps across several visible composer rows');
+    const typed = 'a long prompt that wraps across several visible composer rows';
+    stdin.write(typed);
     await flushInput();
 
     const wrappedOutput = lastFrame() ?? '';
-    expect(wrappedOutput).toContain('a long prompt that wraps across severa');
-    expect(wrappedOutput).toContain('l visible composer rows');
     const wrappedRows = wrappedOutput.split('\n');
-    expect(wrappedRows).toHaveLength(12);
-    expect(wrappedRows.at(-4)).toContain('> a long prompt');
-    expect(wrappedRows.at(-3)).toContain('l visible composer rows');
+    // The composer soft-wraps across rows; rejoining the rows and dropping the
+    // one prompt prefix plus the 2-space padding/indent runs (continuations are
+    // indented under `> `) must reproduce the full typed prompt.
+    const composerFlattened = wrappedRows
+      .map((row) => row.replace(/\s+$/, ''))
+      .join('')
+      .replace(/ {2,}/g, '')
+      .replace('> ', '');
+
+    expect(wrappedOutput).not.toContain('...');
+    expect(composerFlattened).toContain(typed);
+    expect(wrappedRows).toHaveLength(15);
     expect(wrappedRows.at(-2)).toContain('▀');
-    expect(wrappedRows.at(-1)).toContain('/ | @ | ?');
+    expect(wrappedRows.at(-1)).toContain('/ commands | @ mention | ? help');
   });
 
   it('soft-wraps long prompts instead of truncating them with an ellipsis', async () => {
     const longPrompt = 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const { lastFrame, stdin } = renderHomeScreen({ bodyEntries: [], columns: 24, rows: 12 });
+    const { lastFrame, stdin } = renderHomeScreen({ bodyEntries: [], columns: 60, rows: 15 });
 
     stdin.write(longPrompt);
     await flushInput();
 
     const output = lastFrame() ?? '';
     const outputRows = output.split('\n');
+    const composerFlattened = outputRows
+      .map((row) => row.replace(/\s+$/, ''))
+      .join('')
+      .replace(/ {2,}/g, '')
+      .replace('> ', '');
 
     expect(output).not.toContain('...');
-    expect(outputRows.at(-5)).toContain('> abcdefghijklmnopqrstuv');
-    expect(outputRows.at(-4)).toContain('wxyz0123456789ABCDEFGH');
-    expect(outputRows.at(-3)).toContain('IJKLMNOPQRSTUVWXYZ');
+    expect(composerFlattened).toContain(longPrompt);
     expect(outputRows.at(-2)).toContain('▀');
-    expect(outputRows.at(-1)).toContain('/ | @ | ?');
+    expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
   });
 
   it('adds submitted prompts to the body when Enter is pressed', async () => {
-    const { lastFrame, stdin } = renderHomeScreen({ columns: 80, rows: 12 });
+    const { lastFrame, stdin } = renderHomeScreen({ columns: 80, rows: 15 });
 
     stdin.write('show this in the body');
     await flushInput();
@@ -314,7 +345,7 @@ describe('HomeScreen', () => {
   });
 
   it('keeps submitted multiline prompts on separate indented body rows', async () => {
-    const { lastFrame, stdin } = renderHomeScreen({ columns: 80, rows: 14 });
+    const { lastFrame, stdin } = renderHomeScreen({ columns: 80, rows: 15 });
 
     stdin.write('1');
     await flushInput();
@@ -334,10 +365,10 @@ describe('HomeScreen', () => {
 
   it('scrolls body output with PageUp and PageDown while keeping the status bar pinned', async () => {
     const entries = Array.from({ length: 10 }, (_, index) => ({
-      kind: 'info' as const,
+      kind: 'assistant' as const,
       text: `entry ${index + 1}`
     }));
-    const { lastFrame, stdin } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 12 });
+    const { lastFrame, stdin } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 15 });
 
     expect(lastFrame() ?? '').toContain('entry 10');
 
@@ -377,10 +408,10 @@ describe('HomeScreen', () => {
 
   it('scrolls body output with mouse wheel events', async () => {
     const entries = Array.from({ length: 10 }, (_, index) => ({
-      kind: 'info' as const,
+      kind: 'assistant' as const,
       text: `entry ${index + 1}`
     }));
-    const { lastFrame, stdin } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 12 });
+    const { lastFrame, stdin } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 15 });
 
     stdin.write('\u001B[<64;1;1M');
     await flushInput();
@@ -396,8 +427,8 @@ describe('HomeScreen', () => {
     expect(bottomOutput).toContain('entry 10');
   });
 
-  it('fits over-limit validation feedback inside the 40x12 row budget', async () => {
-    const { lastFrame, stdin } = renderHomeScreen({ columns: 40, rows: 12 });
+  it('fits over-limit validation feedback inside the 60x15 row budget', async () => {
+    const { lastFrame, stdin } = renderHomeScreen({ columns: 60, rows: 15 });
 
     stdin.write('a'.repeat(PROMPT_MAX_BYTES + 1));
     await flushInput();
@@ -409,7 +440,7 @@ describe('HomeScreen', () => {
     expect(errorOutput).toContain('ERROR: Prompt is 65537 bytes; maximum is');
     expect(errorOutput).toContain('65536 bytes.');
     const errorRows = errorOutput.split('\n');
-    expect(errorRows).toHaveLength(12);
-    expect(errorRows.at(-1)).toContain('/ | @ | ?');
+    expect(errorRows).toHaveLength(15);
+    expect(errorRows.at(-1)).toContain('/ commands | @ mention | ? help');
   });
 });
