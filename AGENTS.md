@@ -40,8 +40,11 @@ For the nested TUI package, prefer Cargo-facing xtask commands instead of runnin
 cargo xtask tui-install
 cargo xtask tui-typecheck
 cargo xtask tui-test
-cargo xtask tui-dev
+cargo xtask tui-dev    # run the TUI from TypeScript source against a workspace fixture
+cargo xtask tui-prod   # package the standalone kqode binary and run it from the workspace
 ```
+
+`tui-dev` and `tui-prod` both run against a workspace fixture; seed one first with `cargo xtask fixture-prepare-react-simple` (or `fixture-prepare-react-complex`) to skip the interactive fixture prompt.
 
 For the Docusaurus blog/docs site under `blog/`, prefer Cargo-facing xtask commands instead of running package-manager commands directly:
 
@@ -68,7 +71,7 @@ Keep xtask command modules as thin wrappers around reusable implementation modul
 
 ## Architecture
 
-KQode is planned as a Rust-first coding-agent harness with TypeScript Ink as the committed TUI. The checked-in implementation is still at the project-foundation stage, so treat the `docs/` specs as the product direction while keeping changes aligned with the current code shape.
+KQode is planned as a Rust-first coding-agent harness with TypeScript Ink as the committed TUI. The checked-in implementation is still at the project-foundation stage, so treat the `docs/` specs as the product direction while keeping changes aligned with the current code shape. The current working slice is a first end-to-end round trip: the Ink TUI in `tui/` spawns the Rust `kqode` binary in its stdio JSON-RPC backend mode (built on `lsp-server`), which emits a one-shot `kqode.backend.ready` notification and then answers `kqode.message.submit`. The agent loop, provider layer, tools, VFS, sandbox, policy engine, and session store described below are still `docs/` specs, not code yet.
 
 Rust owns the core runtime: agent loop, provider abstraction, tool registry, VFS/patch application, sandbox-lite process execution, policy engine, session store, replay engine, eval runner, MCP core, and headless CLI. TypeScript owns rich surfaces: Ink TUI, protocol client, plugin authoring helpers, IDE/ACP adapters, and future web or desktop companions. Python is only for benchmark/eval adapters where the ecosystem makes it cheaper.
 
@@ -88,7 +91,7 @@ Rust kqode daemon / CLI
 
 The Rust core must run headless without the TUI. Daemon mode is planned later and should not be required for early milestones.
 
-The planned Rust crate boundaries are `kqode-core`, `kqode-cli`, `kqode-protocol`, `kqode-provider`, `kqode-tools`, `kqode-vfs`, `kqode-sandbox`, `kqode-policy`, `kqode-session`, `kqode-mcp`, and `kqode-eval`. Keep these boundaries in mind before adding modules to the starter crate.
+The planned Rust crate boundaries are `kqode-core`, `kqode-cli`, `kqode-protocol`, `kqode-provider`, `kqode-tools`, `kqode-vfs`, `kqode-sandbox`, `kqode-policy`, `kqode-session`, `kqode-mcp`, and `kqode-eval`. Today the Rust side is still a single root crate (`kqode`, with modules such as `backend` and `protocol` under `src/`) plus the `xtask` helper crate, so these are targets to grow into rather than existing crates. Keep these boundaries in mind before adding modules to the starter crate.
 
 ## Constants and enums
 
