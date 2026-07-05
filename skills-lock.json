@@ -1,17 +1,35 @@
 {
   "version": 1,
   "skills": {
+    "blog-audit": {
+      "source": "agricidaniel/claude-blog",
+      "sourceType": "github",
+      "skillPath": "skills/blog-audit/SKILL.md",
+      "computedHash": "2080a428f56e3255ed9d73c3e6daf65ea67a41e5cf190c51d25b24769091fb9c"
+    },
     "chinese-writing": {
       "source": "miantiao-me/aigc-weekly",
       "sourceType": "github",
       "skillPath": "agent/.opencode/skills/chinese-writing/SKILL.md",
       "computedHash": "ee49c347183f228a01fc951c7ca81324b1662712945186b955a307fe6f2f624c"
     },
+    "humanize-chinese": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/humanize-chinese/SKILL.md",
+      "computedHash": "3f2b21a2eed72b10860706793cb6308be95fa154bb9297f3a2e0534d87bf65f6"
+    },
     "humanizer-zh": {
       "source": "op7418/humanizer-zh",
       "sourceType": "github",
       "skillPath": "SKILL.md",
       "computedHash": "dede9681d9fea5caed2fb9d88656af3024c9ec0136fc833415ffc6e16d762429"
+    },
+    "personal-chinese-writing-style": {
+      "source": "sugarforever/01coder-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/personal-chinese-writing-style/SKILL.md",
+      "computedHash": "21fa79201235c3753acdf45bff53b68b5e4c26ae5e172c400841ee619c9ad236"
     }
   }
 }

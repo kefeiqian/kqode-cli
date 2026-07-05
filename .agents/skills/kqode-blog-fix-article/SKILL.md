@@ -1,6 +1,6 @@
 ---
 name: kqode-blog-fix-article
-description: Fix and polish one existing KQode Docusaurus blog article. Moves loose pasted screenshots (including repo-root Obsidian `![[...]]` embeds and any image not yet under blog/docs/images) into the article's image folder with meaningful names, adds immutable pinned-commit GitHub links for every referenced project source/config file, strips trailing next-article content previews, applies a caller-provided list of edits, runs a Chinese de-AI/humanize pass (humanizer-zh + chinese-writing skills) over the prose, then restarts the local blog dev server so the change is live. Use when asked to fix up, polish, clean, or update an existing blog doc, move/insert/replace its pasted images and convert wikilinks, add commit permalinks to files it mentions, verify quoted code values, or apply a batch of specific corrections to one article.
+description: Fix and polish one existing KQode Docusaurus blog article. Moves loose pasted screenshots (including repo-root Obsidian `![[...]]` embeds and any image not yet under blog/docs/images) into the article's image folder with meaningful names, adds immutable pinned-commit GitHub links for every referenced project source/config file, strips trailing next-article content previews, applies a caller-provided list of edits, runs a Chinese de-AI/humanize pass (humanizer-zh, chinese-writing, humanize-chinese, personal-chinese-writing-style — applied in a fixed precedence order) over the prose, then restarts the local blog dev server so the change is live. When no specific article is given, runs a full-site blog-audit instead. Use when asked to fix up, polish, clean, or update an existing blog doc, move/insert/replace its pasted images and convert wikilinks, add commit permalinks to files it mentions, verify quoted code values, apply a batch of specific corrections to one article, or audit the whole blog.
 ---
 
 # KQode Blog Fix Article
@@ -11,10 +11,10 @@ Read `blog/AGENTS.md` first. All `kqode-blog-new-article` rules (ordering, front
 
 ## Inputs
 
-1. **Doc path** — one Markdown file under `blog/docs/`.
+1. **Doc path** — one Markdown file under `blog/docs/`. **Optional:** if the caller does not name a specific article, do not fix a single doc — instead invoke the `blog-audit` skill for a full-site health assessment (quality scores, orphan pages, topic cannibalization, stale content) and return its prioritized action queue. Switch to single-article fixes only once the caller points at one.
 2. **User requests** — a freeform list of specific edits to make (the skill parameter). Treat each item as a task and complete all of them.
 
-If the doc path is missing, ask. Do not touch other articles.
+When a doc path is given, do not touch other articles.
 
 ## Five standing jobs (always do these, even if unlisted)
 
@@ -22,7 +22,7 @@ If the doc path is missing, ask. Do not touch other articles.
 2. **Link every referenced project source/config file** by its path (never a bare basename), pinned to the commit.
 3. **Remove next-article content previews** — trailing "下一篇看…/下一篇讲…" teasers that advertise the next article's topics.
 4. **Apply every item in the user requests** parameter.
-5. **Reduce AI flavor** — after the content edits, run the `humanizer-zh` and `chinese-writing` skills over the Chinese prose to strip AI-writing tells.
+5. **Reduce AI flavor** — after the content edits, run the four Chinese-writing skills (`chinese-writing`, `humanizer-zh`, `humanize-chinese`, `personal-chinese-writing-style`) over the Chinese prose, applied in the fixed precedence order in workflow step 8, to strip AI-writing tells and tighten the voice.
 
 ## Workflow
 
@@ -56,11 +56,20 @@ If the doc path is missing, ask. Do not touch other articles.
 
 7. **Apply the user requests.** Complete each requested edit. Before writing any concrete value quoted from code (a constant, default, enum, path), read it at the pinned commit (`git show <sha>:<path>`) and use the real value — do not trust the prose that is already there.
 
-8. **De-AI / humanize the Chinese prose.** After the content edits land, invoke the `humanizer-zh` skill (去除 AI 写作痕迹) and the `chinese-writing` skill (去 AI 味六原则), and apply their guidance as in-place edits to this doc's prose — not as a separate rewritten copy or score report. Guardrails:
+8. **De-AI / humanize the Chinese prose.** After the content edits land, run the four Chinese-writing skills over this doc's prose and apply their guidance as **in-place edits** — not a separate rewritten copy or a score report. Apply them in this fixed **precedence order** (higher wins on any conflict); resolve routine stylistic disagreements silently, do not stop to ask about them:
+
+   0. **Project rules always win.** `blog/AGENTS.md` + the `kqode-blog-*` rules override every skill: full-width Chinese punctuation including `——` and `……`, spaces around English words / acronyms / product names / inline code adjacent to CJK, valid MDX, immutable pinned-commit permalinks, verified quoted values, no next-article teasers, no duplicate body `# H1`.
+   1. **`chinese-writing`** — house baseline: structure, 去 AI 味六原则, and punctuation (aligned with rule 0).
+   2. **`humanizer-zh`** — remove AI-writing tells (维基百科 “AI 写作特征”).
+   3. **`humanize-chinese`** — extra de-AI / AIGC-signal reduction. **Keep its platform style-conversion modes (`zhihu`/`xiaohongshu`/`wechat`/`weibo`/`literary`) and academic-hedging moves OFF** — this is a neutral technical dev blog; apply a target-platform voice only if the caller explicitly asks.
+   4. **`personal-chinese-writing-style`** — final voice/tone polish (delete trust-me lines, avoid business clichés, keep endings light, no duplicate H1). **Override its punctuation rules** where they conflict with rule 0: keep full-width `——` (not ` - `), `……` (not `......`), and Chinese quotes — the blog's established typography wins.
+
+   Guardrails (apply to every pass):
    - Rewrite only Chinese prose (paragraph text, list-item text, headings). **Never touch** fenced code blocks, inline code, shell commands, file paths, GitHub permalinks or their visible path text, frontmatter, image links / alt structure, or any exact value quoted from the pinned commit.
-   - Do not invent facts or soften a verified technical claim; humanizing changes voice, not content.
+   - Humanizing changes voice, not content: do not invent facts, drop a citation, or soften a verified technical claim.
    - Reduce mechanical over-bolding but keep sparse, intentional **加粗** of key terms.
-   - Keep Chinese typography (spaces around English words, acronyms, product names, and inline code adjacent to CJK) and keep the doc MDX-valid; re-check inline-marker balance in the grammar-lint step below.
+   - Keep the doc MDX-valid; re-check inline-marker balance in the grammar-lint step below.
+   - **Only prompt the caller for a *material* conflict the precedence order cannot settle** — e.g. a rewrite that would change meaning or drop a verified fact, or a requested target register that clashes with the blog's technical voice. Resolve everything else silently by precedence.
 
 9. **Grammar-lint the Markdown — the build will NOT catch this.** Unbalanced inline markers are *valid* MDX: they compile clean but render literally (an unclosed `**` prints `**可交互的主界面` instead of bolding it; an unclosed `` ` `` swallows the rest of the line as code). After every edit, verify inline markup is balanced. A quick per-line heuristic for the most common offender (odd number of `**`):
 
@@ -93,7 +102,9 @@ If the doc path is missing, ask. Do not touch other articles.
 - Every referenced repo file is a pinned-commit permalink whose **visible text is a path, not a bare basename** (e.g. `theme/themeConfig.ts`, not `themeConfig.ts`); the `href` uses the full repo-relative path. This holds in headings, tables, and inline prose alike.
 - Image folder names are stable English kebab-case topic slugs with no numeric prefix or Chinese; file names are meaningful English kebab-case.
 - Never invent code. Quote and describe only what exists at the pinned commit; verify constants/paths with `git show`/`git cat-file` before writing them.
-- Humanizing changes voice, not facts: the `humanizer-zh`/`chinese-writing` pass rewrites only Chinese prose and must leave code, commands, file paths, permalinks (and their visible path text), frontmatter, image links, and verified quoted values untouched.
+- Humanizing changes voice, not facts: the four-skill Chinese pass (`chinese-writing`, `humanizer-zh`, `humanize-chinese`, `personal-chinese-writing-style`) rewrites only Chinese prose and must leave code, commands, file paths, permalinks (and their visible path text), frontmatter, image links, and verified quoted values untouched.
+- Resolve conflicts between the four Chinese-writing skills by the fixed precedence in workflow step 8 (project rules > `chinese-writing` > `humanizer-zh` > `humanize-chinese` > `personal-chinese-writing-style`); apply silently and prompt the caller only for a material meaning/voice conflict the order cannot settle. Keep the blog's full-width Chinese punctuation (`——`, `……`, Chinese quotes) even when `personal-chinese-writing-style` asks for ` - `/`......`/straight quotes, and keep `humanize-chinese` platform/academic style modes off unless explicitly requested.
+- With no doc path, this skill runs `blog-audit` (full-site health) instead of editing a single article; switch to single-article fixes only once the caller names one.
 - Keep the doc valid MDX: no bare `{...}` **or bare `<` before a digit/space** in prose (both parse as JS/JSX and fail the build — wrap in inline code, e.g. `` `<10` ``, or escape `<` as `&lt;`); wrap inline code containing a backtick in double backticks; no blank lines inside tables or frontmatter; single blank lines between blocks.
 - Balance every inline marker. Unclosed `**`/`*`/`_`/`` ` `` is valid MDX that compiles but renders literally, so `blog-build` will NOT flag it — re-check balance after each edit (see workflow step 9).
 - Chinese typography: spaces on both sides of English words, acronyms, product names, and inline code adjacent to CJK — in titles, headings, prose, alt text, and table cells.
