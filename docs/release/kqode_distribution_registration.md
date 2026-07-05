@@ -320,12 +320,12 @@ by `.github/workflows/winget-publish.yml` (the `vedantmgoyal9/winget-releaser`
 action), which reads the release's `kqode-windows-x64.zip`, regenerates the
 manifests, and opens a pull request to
 [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs). The package
-identifier is **`KQode.KQode`** with **`Moniker: kqode`**, so users install with:
+identifier is **`KefeiQian.KQode`** with **`Moniker: kqode`**, so users install with:
 
 ```bash
 winget install kqode          # matches the moniker
 # exact id:
-winget install KQode.KQode
+winget install KefeiQian.KQode
 ```
 
 winget ships the **x64** zip only; Windows on ARM runs it via emulation (the same
@@ -350,7 +350,7 @@ error.
    `cargo binstall komac`, or download from its releases):
 
    ```bash
-   komac new KQode.KQode \
+   komac new KefeiQian.KQode \
      --urls https://github.com/kefeiqian/kqode-cli/releases/download/vX.Y.Z/kqode-windows-x64.zip \
      --version X.Y.Z --submit
    ```
@@ -362,8 +362,8 @@ error.
    resulting manifests should match:
 
    ```yaml
-   # KQode.KQode.installer.yaml
-   PackageIdentifier: KQode.KQode
+   # KefeiQian.KQode.installer.yaml
+   PackageIdentifier: KefeiQian.KQode
    PackageVersion: X.Y.Z
    InstallerType: zip
    NestedInstallerType: portable
@@ -379,11 +379,11 @@ error.
    ```
 
    ```yaml
-   # KQode.KQode.locale.en-US.yaml
-   PackageIdentifier: KQode.KQode
+   # KefeiQian.KQode.locale.en-US.yaml
+   PackageIdentifier: KefeiQian.KQode
    PackageVersion: X.Y.Z
    PackageLocale: en-US
-   Publisher: KQode
+   Publisher: KefeiQian
    PackageName: KQode
    License: MIT OR Apache-2.0
    ShortDescription: Rust-core coding-agent harness with a TypeScript Ink terminal UI.
@@ -393,8 +393,8 @@ error.
    ```
 
    ```yaml
-   # KQode.KQode.yaml
-   PackageIdentifier: KQode.KQode
+   # KefeiQian.KQode.yaml
+   PackageIdentifier: KefeiQian.KQode
    PackageVersion: X.Y.Z
    DefaultLocale: en-US
    ManifestType: version
@@ -410,6 +410,23 @@ the version from the released commit, and calls `winget-releaser` with
 from your fork. Re-run a tag by hand from **Actions → Publish winget → Run
 workflow** (also the path for a Release published by hand in the UI). Because
 komac opens a real PR each run, avoid triggering it twice for the same version.
+
+```bash
+gh secret set WINGET_TOKEN --repo kefeiqian/kqode-cli   # paste a fresh <=7-day classic PAT
+gh workflow run "Publish winget" --repo kefeiqian/kqode-cli -f tag=vX.Y.Z
+```
+
+The workflow calls `winget-releaser` with `identifier: KefeiQian.KQode`, the tag, and
+`installers-regex: kqode-windows-x64\.zip$` to open the PR from your fork. Each
+run opens a real PR, so don't dispatch the same version twice.
+
+Equivalent local alternative (no CI, no stored secret) — run from your machine
+with a fresh token via `komac token add`:
+
+```bash
+komac update KefeiQian.KQode --version X.Y.Z \
+  --urls https://github.com/kefeiqian/kqode-cli/releases/download/vX.Y.Z/kqode-windows-x64.zip --submit
+```
 
 ## Verifying provenance
 

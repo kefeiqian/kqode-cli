@@ -20,11 +20,10 @@
 #     dispatch below instead.
 #   - workflow_dispatch: manual (re-)publish for a given tag.
 #
-# One-time setup (see docs/release/kqode_distribution_registration.md):
-#   - Fork microsoft/winget-pkgs under `kefeiqian` (PRs are opened from it).
-#   - Add a repo secret WINGET_TOKEN: a CLASSIC PAT with `public_repo` scope
-#     (fine-grained PATs are not supported by the action).
-#   - Submit the first KQode.KQode version by hand (bootstrap).
+# winget-releaser UPDATES an existing package, so the first KefeiQian.KQode version
+# must be submitted once by hand (bootstrap). Running komac / wingetcreate locally
+# with a fresh token is an equally valid alternative to this workflow. See
+# docs/release/kqode_distribution_registration.md.
 name: Publish winget
 
 on:
@@ -99,7 +98,7 @@ jobs:
       - name: Publish to winget
         uses: vedantmgoyal9/winget-releaser@v2
         with:
-          identifier: KQode.KQode
+          identifier: KefeiQian.KQode
           version: ${{ steps.rel.outputs.version }}
           release-tag: ${{ steps.rel.outputs.tag }}
           installers-regex: 'kqode-windows-x64\.zip$'
