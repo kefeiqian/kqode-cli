@@ -4,19 +4,18 @@ import { BodyEntryKind } from '@constants/bodyEntry.ts';
 import { sanitizeDisplayText } from '@libs/text/sanitizeDisplayText.ts';
 import { unknownCommandMessage } from '@libs/commands/unknownCommand.ts';
 import { backendClientAtom } from '@state/global/index.ts';
-import { bodyScrollOffsetRowsAtom, submittedPromptEntriesAtom } from '@state/ui/index.ts';
+import { bodyScrollOffsetRowsAtom } from '@state/ui/index.ts';
+import { promptQueueAtom, streamingTextByIdAtom } from '@state/promptQueue/store.ts';
 import {
   BACKEND_UNAVAILABLE_MESSAGE,
   backendErrorMessage,
-  outcomeToResult,
-  queueToBodyEntries
+  outcomeToResult
 } from '@libs/promptQueue/promptQueue.ts';
 import type { BackendResult, QueueItem } from '@libs/promptQueue/promptQueue.ts';
 
-let nextQueueItemId = 0;
+export { promptQueueAtom, streamingTextByIdAtom };
 
-/** Ordered record of submitted prompts and their backend outcomes. */
-export const promptQueueAtom = atom<QueueItem[]>([]);
+let nextQueueItemId = 0;
 
 const drainingAtom = atom(false);
 
@@ -38,15 +37,14 @@ export const enqueuePromptAtom = atom(null, async (get, set, rawText: string) =>
 
   set(promptQueueAtom, (queue) => [...queue, item]);
   set(bodyScrollOffsetRowsAtom, 0);
-  syncBodyEntries(get, set);
   await drainQueue(get, set);
 });
 
 /** Clears all transcript entries (prompts and results) and resets scroll. */
-export const clearTranscriptAtom = atom(null, (get, set) => {
+export const clearTranscriptAtom = atom(null, (_get, set) => {
   set(promptQueueAtom, []);
+  set(streamingTextByIdAtom, new Map());
   set(bodyScrollOffsetRowsAtom, 0);
-  syncBodyEntries(get, set);
 });
 
 /**
@@ -55,7 +53,7 @@ export const clearTranscriptAtom = atom(null, (get, set) => {
  * the unmatched command. The item is pre-settled so the backend queue never
  * sends it, mirroring how a real prompt and its result appear in the body.
  */
-export const appendUnknownCommandAtom = atom(null, (get, set, rawText: string) => {
+export const appendUnknownCommandAtom = atom(null, (_get, set, rawText: string) => {
   const item: QueueItem = {
     id: nextQueueItemId++,
     text: rawText,
@@ -65,7 +63,6 @@ export const appendUnknownCommandAtom = atom(null, (get, set, rawText: string) =
 
   set(promptQueueAtom, (queue) => [...queue, item]);
   set(bodyScrollOffsetRowsAtom, 0);
-  syncBodyEntries(get, set);
 });
 
 async function drainQueue(get: Getter, set: Setter): Promise<void> {
@@ -78,7 +75,7 @@ async function drainQueue(get: Getter, set: Setter): Promise<void> {
     let active = findActive(get);
     while (active !== undefined) {
       const result = await streamActive(get, set, active.id, active.text);
-      settleActive(get, set, active.id, result);
+      settleActive(set, active.id, result);
       active = findActive(get);
     }
   } finally {
@@ -91,9 +88,9 @@ async function drainQueue(get: Getter, set: Setter): Promise<void> {
  * active item, and resolves the terminal transcript result.
  *
  * The assistant marker appears immediately (empty streaming text), then each
- * `onDelta` appends and re-syncs the body; the view sticks to the bottom so new
- * output stays visible. Provider errors and the no-key path settle as themed
- * body entries rather than throwing.
+ * `onDelta` appends to the live streaming text; the derived body sticks to the
+ * bottom so new output stays visible. Provider errors and the no-key path settle
+ * as themed body entries rather than throwing.
  */
 async function streamActive(
   get: Getter,
@@ -106,14 +103,14 @@ async function streamActive(
     return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(BACKEND_UNAVAILABLE_MESSAGE) };
   }
 
-  updateStreamingText(get, set, id, () => '');
+  updateStreamingText(set, id, () => '');
 
   try {
     const outcome = await backendClient.submitStreaming(
       { text },
       {
         onDelta: (delta) => {
-          updateStreamingText(get, set, id, (current) => current + delta);
+          updateStreamingText(set, id, (current) => current + delta);
           set(bodyScrollOffsetRowsAtom, 0);
         }
       }
@@ -124,22 +121,27 @@ async function streamActive(
   }
 }
 
-/** Applies `update` to the active item's streamed text and re-syncs body rows. */
+/**
+ * Appends to the active item's live streaming text in O(1).
+ *
+ * The text lives in `streamingTextByIdAtom` (at most one entry) rather than in
+ * the queue array, so a token delta rewrites only that single map entry instead
+ * of cloning the whole queue. `submittedPromptEntriesAtom` derives its body rows
+ * from this map, so there is no manual re-sync.
+ */
 function updateStreamingText(
-  get: Getter,
   set: Setter,
   id: number,
   update: (current: string) => string
 ): void {
-  set(promptQueueAtom, (queue) =>
-    queue.map((item) =>
-      item.id === id ? { ...item, streamingText: update(item.streamingText ?? '') } : item
-    )
-  );
-  syncBodyEntries(get, set);
+  set(streamingTextByIdAtom, (previous) => {
+    const next = new Map(previous);
+    next.set(id, update(previous.get(id) ?? ''));
+    return next;
+  });
 }
 
-function settleActive(get: Getter, set: Setter, id: number, result: BackendResult): void {
+function settleActive(set: Setter, id: number, result: BackendResult): void {
   set(promptQueueAtom, (queue) => {
     let promoted = false;
     return queue.map((item) => {
@@ -153,13 +155,21 @@ function settleActive(get: Getter, set: Setter, id: number, result: BackendResul
       return item;
     });
   });
-  syncBodyEntries(get, set);
+  discardStreamingText(set, id);
+}
+
+/** Drops a settled item's streaming buffer so the map holds at most one entry. */
+function discardStreamingText(set: Setter, id: number): void {
+  set(streamingTextByIdAtom, (previous) => {
+    if (!previous.has(id)) {
+      return previous;
+    }
+    const next = new Map(previous);
+    next.delete(id);
+    return next;
+  });
 }
 
 function findActive(get: Getter): QueueItem | undefined {
   return get(promptQueueAtom).find((item) => item.state === 'active');
-}
-
-function syncBodyEntries(get: Getter, set: Setter): void {
-  set(submittedPromptEntriesAtom, queueToBodyEntries(get(promptQueueAtom)));
 }

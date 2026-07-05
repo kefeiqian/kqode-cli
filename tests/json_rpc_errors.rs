@@ -29,6 +29,9 @@ fn response_frame(id: i64) -> Vec<u8> {
 fn backend_output_without_closing_stdin(input: &[u8]) -> Output {
     let mut child = Command::new(env!("CARGO_BIN_EXE_kqode"))
         .arg(BACKEND_MODE_ARG)
+        // Keep the test-spawned backend from writing under the real
+        // `~/.kqode/logs` (the dev build defaults debug logging on).
+        .env("KQODE_DEBUG", "0")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

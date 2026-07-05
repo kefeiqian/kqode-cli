@@ -1,5 +1,3 @@
-import type { MessageSubmitParams, MessageSubmitResult } from '@contracts/backend/messages.ts';
-
 /**
  * Consumer-facing backend seam shared by the `@state` and `@backend` layers.
  *
@@ -33,13 +31,32 @@ export class BackendClientError extends Error {
   }
 }
 
+/** Params the TUI submits; the client generates the wire `turnId` internally. */
+export type StreamSubmitParams = {
+  text: string;
+};
+
+/** Callbacks invoked while a streamed turn is in flight. */
+export type StreamCallbacks = {
+  /** Called for each chunk of assistant text as it streams in. */
+  onDelta: (delta: string) => void;
+};
+
+/** Terminal outcome of a streamed turn (transport failures reject instead). */
+export type StreamOutcome =
+  | { kind: 'completed'; text: string; finishReason: string | null }
+  | { kind: 'error'; errorKind: string; message: string }
+  | { kind: 'needsConfiguration' };
+
 /**
- * Narrow backend seam the TUI uses for the first-slice ACK protocol.
+ * Narrow backend seam the TUI uses for streaming chat turns.
  *
- * `submitMessage` resolves with the backend ACK result or rejects with a
- * {@link BackendClientError}; display components depend only on this interface
- * so process and protocol mechanics stay out of the render tree.
+ * `submitStreaming` streams assistant text through `callbacks.onDelta` and
+ * resolves with a {@link StreamOutcome} when the turn ends (completed, provider
+ * error, or needs-configuration). It rejects with a {@link BackendClientError}
+ * only for transport/timeout failures; display components depend only on this
+ * interface so process and protocol mechanics stay out of the render tree.
  */
 export type BackendClient = {
-  submitMessage(params: MessageSubmitParams): Promise<MessageSubmitResult>;
+  submitStreaming(params: StreamSubmitParams, callbacks: StreamCallbacks): Promise<StreamOutcome>;
 };

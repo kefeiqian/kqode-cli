@@ -1,3 +1,5 @@
+import { KQODE_DEBUG_ENV_VAR, KQODE_LOG_DIR_ENV_VAR } from '@constants/backend.ts';
+
 /**
  * Builds a hardened environment for source-mode Cargo build and backend launch.
  *
@@ -22,6 +24,13 @@ const UNIX_ALLOWLIST = ['PATH', 'HOME', 'TMPDIR', 'TERM', 'COLORTERM', 'LANG', '
 
 const CARGO_ALLOWLIST = ['CARGO_HOME', 'RUSTUP_HOME', 'RUSTUP_TOOLCHAIN'];
 
+// Non-secret KQode runtime toggles that must reach the spawned backend: the
+// debug-logging switch and its optional log-directory override. Passing these
+// through (rather than a provider key like KIMI_API_KEY, which stays out of the
+// allowlist and is read from `.env`) is safe and lets `--debug` / `KQODE_DEBUG`
+// enable backend logging in packaged builds.
+const KQODE_RUNTIME_ALLOWLIST = [KQODE_DEBUG_ENV_VAR, KQODE_LOG_DIR_ENV_VAR];
+
 export type HardenedEnvOptions = {
   includeCargo?: boolean;
   platform?: NodeJS.Platform;
@@ -35,7 +44,11 @@ export function buildHardenedEnv({
 }: HardenedEnvOptions = {}): NodeJS.ProcessEnv {
   const baseAllowlist = platform === 'win32' ? WINDOWS_ALLOWLIST : UNIX_ALLOWLIST;
   const allowed = new Set(
-    [...baseAllowlist, ...(includeCargo ? CARGO_ALLOWLIST : [])].map((name) => name.toUpperCase())
+    [
+      ...baseAllowlist,
+      ...KQODE_RUNTIME_ALLOWLIST,
+      ...(includeCargo ? CARGO_ALLOWLIST : [])
+    ].map((name) => name.toUpperCase())
   );
 
   const hardened: NodeJS.ProcessEnv = {};

@@ -46,3 +46,35 @@ describe('resolveBodyRows hard line breaks', () => {
     expect(texts.every((line) => line.length <= WIDE_COLUMNS)).toBe(true);
   });
 });
+
+describe('resolveBodyRows memoization', () => {
+  it('returns the same row objects for an unchanged entry and width', () => {
+    const entry = { kind: BodyEntryKind.Assistant, text: 'stable text' };
+
+    const first = resolveBodyRows([entry], WIDE_COLUMNS, TALL_ROWS);
+    const second = resolveBodyRows([entry], WIDE_COLUMNS, TALL_ROWS);
+
+    expect(second[0]).toBe(first[0]);
+    expect(second).toEqual(first);
+  });
+
+  it('recomputes fresh rows when the column width changes', () => {
+    const entry = { kind: BodyEntryKind.Assistant, text: 'stable text' };
+
+    const wide = resolveBodyRows([entry], WIDE_COLUMNS, TALL_ROWS);
+    const narrow = resolveBodyRows([entry], 20, TALL_ROWS);
+
+    expect(narrow[0]).not.toBe(wide[0]);
+  });
+
+  it('does not reuse rows across distinct entry objects with equal content', () => {
+    const a = { kind: BodyEntryKind.Assistant, text: 'same' };
+    const b = { kind: BodyEntryKind.Assistant, text: 'same' };
+
+    const rowsA = resolveBodyRows([a], WIDE_COLUMNS, TALL_ROWS);
+    const rowsB = resolveBodyRows([b], WIDE_COLUMNS, TALL_ROWS);
+
+    expect(rowsB[0]).not.toBe(rowsA[0]);
+    expect(rowsB).toEqual(rowsA);
+  });
+});

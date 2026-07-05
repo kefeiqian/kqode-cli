@@ -6,6 +6,7 @@ import { App } from '@/App.tsx';
 import { buildKqodeMeta } from '@/cli/meta.ts';
 import { createAppRuntime } from '@/bootstrap.ts';
 import { finishSession } from '@components/AppExitSummary/finishSession.ts';
+import { KQODE_DEBUG_ENV_VAR } from '@constants/backend.ts';
 
 /** Inputs for the root CLI command; `loadPackagedAsset` is supplied only in packaged mode. */
 export type RunKqodeCliOptions = {
@@ -41,11 +42,28 @@ async function launchTui({ entryUrl, loadPackagedAsset }: RunKqodeCliOptions): P
  * citty answers `--help` / `-h` and `--version` / `-v` from the metadata. Extend
  * the CLI by adding global flags under `args` and subcommands under
  * `subCommands`.
+ *
+ * `--debug` turns on backend request/response logging to `~/.kqode/logs/` by
+ * setting {@link KQODE_DEBUG_ENV_VAR} for the spawned backend (which is
+ * allowlisted through the hardened child env). Logging is already on by default
+ * in dev builds; the flag is the opt-in for packaged builds.
  */
 export function createKqodeCommand(options: RunKqodeCliOptions) {
   return defineCommand({
     meta: buildKqodeMeta({ entryUrl: options.entryUrl }),
-    run: () => launchTui(options)
+    args: {
+      debug: {
+        type: 'boolean',
+        description: 'Log LLM request/response transcripts to ~/.kqode/logs/',
+        default: false
+      }
+    },
+    run: ({ args }) => {
+      if (args.debug) {
+        process.env[KQODE_DEBUG_ENV_VAR] = '1';
+      }
+      return launchTui(options);
+    }
   });
 }
 
