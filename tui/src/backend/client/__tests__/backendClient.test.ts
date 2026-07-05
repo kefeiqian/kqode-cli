@@ -68,7 +68,7 @@ function makeFakeBackend(
   configure(server);
   server.listen();
   if (signalReady) {
-    void server.sendNotification(backendReadyNotification);
+    void server.sendNotification(backendReadyNotification, { sessionId: 'test-session' });
   }
   openServers.push(server);
 

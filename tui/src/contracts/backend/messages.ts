@@ -35,6 +35,14 @@ export const GIT_STATUS_METHOD = 'kqode.git.status';
 export const BACKEND_READY_METHOD = 'kqode.backend.ready';
 
 /**
+ * Payload for {@link BACKEND_READY_METHOD}: the backend-minted session id for
+ * this spawn. Must match `BackendReadyParams` in `src/protocol.rs`.
+ */
+export type BackendReadyParams = {
+  sessionId: string;
+};
+
+/**
  * Server→client notification carrying one chunk of streamed assistant text.
  * Must match `TOKEN_DELTA_METHOD` in `src/protocol.rs`.
  */

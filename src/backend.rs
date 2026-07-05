@@ -7,9 +7,9 @@ use crate::config::KimiConfig;
 use crate::debug_log;
 use crate::git;
 use crate::protocol::{
-    BACKEND_READY_METHOD, GitStatusResult, JSON_RPC_INVALID_PARAMS, JSON_RPC_METHOD_NOT_FOUND,
-    MessageSubmitParams, MessageSubmitResult, RpcMethod, SUBMIT_STATUS_NEEDS_CONFIGURATION,
-    SUBMIT_STATUS_STREAMING,
+    BACKEND_READY_METHOD, BackendReadyParams, GitStatusResult, JSON_RPC_INVALID_PARAMS,
+    JSON_RPC_METHOD_NOT_FOUND, MessageSubmitParams, MessageSubmitResult, RpcMethod,
+    SUBMIT_STATUS_NEEDS_CONFIGURATION, SUBMIT_STATUS_STREAMING,
 };
 
 #[derive(Debug)]
@@ -51,7 +51,7 @@ pub fn run_stdio() -> Result<(), BackendError> {
     // `None` when debug logging is disabled.
     let _log_guard = debug_log::init(&session_id);
     let (connection, io_threads) = Connection::stdio();
-    announce_ready(&connection)?;
+    announce_ready(&connection, &session_id)?;
     match run_loop(connection) {
         Ok(()) => io_threads.join().map_err(|error| {
             BackendError::Transport(format!("JSON-RPC transport failed: {error}"))
@@ -60,22 +60,25 @@ pub fn run_stdio() -> Result<(), BackendError> {
     }
 }
 
-/// Emits the one-shot backend-ready notification over `connection`.
+/// Emits the one-shot backend-ready notification over `connection`, carrying the
+/// session id minted for this spawn.
 ///
 /// Sending this before the request loop lets a client observe readiness the
-/// moment the backend can speak JSON-RPC. The notification carries no params;
-/// `lsp-server` omits a null `params` field on the wire.
+/// moment the backend can speak JSON-RPC; the `sessionId` lets the client scope
+/// its own per-session log to the same session.
 ///
 /// # Errors
 ///
 /// Returns a [`BackendError::Transport`] when the notification cannot be queued
 /// on the transport (for example, the writer thread has already stopped).
-fn announce_ready(connection: &Connection) -> Result<(), BackendError> {
+fn announce_ready(connection: &Connection, session_id: &str) -> Result<(), BackendError> {
     connection
         .sender
         .send(Message::Notification(Notification::new(
             BACKEND_READY_METHOD.to_owned(),
-            (),
+            BackendReadyParams {
+                session_id: session_id.to_owned(),
+            },
         )))
         .map_err(|error| {
             BackendError::Transport(format!("failed to send backend ready signal: {error}"))

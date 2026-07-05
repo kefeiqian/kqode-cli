@@ -1,4 +1,4 @@
-import { NotificationType, NotificationType0, RequestType, RequestType0 } from 'vscode-jsonrpc';
+import { NotificationType, RequestType, RequestType0 } from 'vscode-jsonrpc';
 import {
   BACKEND_READY_METHOD,
   GIT_STATUS_METHOD,
@@ -8,6 +8,7 @@ import {
   TURN_ERROR_METHOD
 } from '@contracts/backend/index.ts';
 import type {
+  BackendReadyParams,
   GitStatusResult,
   MessageSubmitParams,
   MessageSubmitResult,
@@ -39,12 +40,15 @@ export const gitStatusRequest = new RequestType0<GitStatusResult, void>(GIT_STAT
 /**
  * Typed descriptor for the backend's one-shot readiness notification.
  *
- * The backend sends this parameterless notification the moment it can serve
- * JSON-RPC; the client resolves startup on it (see `waitForBackendReady`). The
- * method name comes from the same dependency-free `@contracts` seam so the Rust
- * and TypeScript sides stay in lockstep.
+ * The backend sends this the moment it can serve JSON-RPC, carrying the session
+ * id it minted for this spawn; the client resolves startup on it (see
+ * `waitForBackendReady`). The method name and params shape come from the
+ * dependency-free `@contracts` seam so the Rust and TypeScript sides stay in
+ * lockstep.
  */
-export const backendReadyNotification = new NotificationType0(BACKEND_READY_METHOD);
+export const backendReadyNotification = new NotificationType<BackendReadyParams>(
+  BACKEND_READY_METHOD
+);
 
 /** Streamed assistant-text chunk for an in-flight turn. */
 export const tokenDeltaNotification = new NotificationType<TokenDeltaParams>(TOKEN_DELTA_METHOD);

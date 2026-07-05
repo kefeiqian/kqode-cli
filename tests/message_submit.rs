@@ -26,6 +26,13 @@ fn backend_announces_ready_before_handling_requests() {
         "ready is a notification, not a response: {}",
         frames[0]
     );
+    assert!(
+        frames[0]["params"]["sessionId"]
+            .as_str()
+            .is_some_and(|id| !id.is_empty()),
+        "ready notification must carry a non-empty sessionId: {}",
+        frames[0]
+    );
 }
 
 #[test]

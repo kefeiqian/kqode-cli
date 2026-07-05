@@ -85,6 +85,17 @@ pub struct MessageSubmitResult {
     pub status: &'static str,
 }
 
+/// Payload for [`BACKEND_READY_METHOD`].
+///
+/// Carries the backend-minted session id so the client can scope its own
+/// per-session log to the same session. Kept in lockstep with the TypeScript
+/// `BackendReadyParams`.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackendReadyParams {
+    pub session_id: String,
+}
+
 /// Payload for [`TOKEN_DELTA_METHOD`].
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
