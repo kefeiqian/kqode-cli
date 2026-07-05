@@ -6,6 +6,8 @@ import { unknownCommandMessage } from '@libs/commands/unknownCommand.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { bodyScrollOffsetRowsAtom } from '@state/ui/index.ts';
 import { promptQueueAtom, streamingTextByIdAtom } from '@state/promptQueue/store.ts';
+import { createDeltaCoalescer } from '@libs/promptQueue/streamCoalescer.ts';
+import { STREAM_RENDER_FLUSH_MS } from '@constants/backend.ts';
 import {
   BACKEND_UNAVAILABLE_MESSAGE,
   backendErrorMessage,
@@ -87,10 +89,13 @@ async function drainQueue(get: Getter, set: Setter): Promise<void> {
  * Streams one prompt to the backend, rendering assistant deltas live into the
  * active item, and resolves the terminal transcript result.
  *
- * The assistant marker appears immediately (empty streaming text), then each
- * `onDelta` appends to the live streaming text; the derived body sticks to the
- * bottom so new output stays visible. Provider errors and the no-key path settle
- * as themed body entries rather than throwing.
+ * The assistant marker appears immediately (empty streaming text), then token
+ * deltas are coalesced (see `createDeltaCoalescer`) and flushed at most ~15fps
+ * into the live streaming text; the derived body sticks to the bottom so new
+ * output stays visible. The final result is rendered by `settleActive`, so the
+ * coalescer's trailing sub-frame buffer is safely discarded on completion.
+ * Provider errors and the no-key path settle as themed body entries rather than
+ * throwing.
  */
 async function streamActive(
   get: Getter,
@@ -105,19 +110,21 @@ async function streamActive(
 
   updateStreamingText(set, id, () => '');
 
+  const coalescer = createDeltaCoalescer((batch) => {
+    updateStreamingText(set, id, (current) => current + batch);
+    set(bodyScrollOffsetRowsAtom, 0);
+  }, STREAM_RENDER_FLUSH_MS);
+
   try {
     const outcome = await backendClient.submitStreaming(
       { text },
-      {
-        onDelta: (delta) => {
-          updateStreamingText(set, id, (current) => current + delta);
-          set(bodyScrollOffsetRowsAtom, 0);
-        }
-      }
+      { onDelta: (delta) => coalescer.push(delta) }
     );
     return outcomeToResult(outcome);
   } catch (error) {
     return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(backendErrorMessage(error)) };
+  } finally {
+    coalescer.cancel();
   }
 }
 

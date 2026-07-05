@@ -25,12 +25,12 @@ export function formatVisiblePromptView(
 }
 
 export function countVisibleComposerRows(
-  visibleText: string,
+  visibleRowCount: number,
   hasValidationError: boolean,
   hasBackgroundPadding: boolean
 ): number {
   return (
-    visibleText.split('\n').length +
+    visibleRowCount +
     (hasValidationError ? 1 : 0) +
     (hasBackgroundPadding ? COMPOSER_BACKGROUND_PADDING_ROWS : 0)
   );

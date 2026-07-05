@@ -32,3 +32,12 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 
 /** Captured Cargo stderr is capped so a noisy build cannot exhaust memory. */
 export const BUILD_STDERR_CAP_BYTES = 16 * 1024;
+
+/**
+ * Trailing-edge flush ceiling for streamed assistant tokens: the transcript
+ * re-renders at most once per this many ms (~15fps) rather than once per token.
+ * Windows with no new tokens emit nothing, so the effective rate floats down to
+ * the token arrival rate — a max-fps cap, not a forced cadence. See
+ * `createDeltaCoalescer`.
+ */
+export const STREAM_RENDER_FLUSH_MS = 66;

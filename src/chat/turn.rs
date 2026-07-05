@@ -74,7 +74,10 @@ async fn stream_turn<E: Fn(Notification)>(
         messages: vec![system_message(&model), ChatMessage::user(user_text)],
         model,
     };
-    debug_log::log_request(&request.model, &request.messages);
+    let record_transcript = debug_log::transcript_enabled();
+    if record_transcript {
+        debug_log::log_request(&request.model, &request.messages);
+    }
 
     let stream = match provider.stream(request).await {
         Ok(stream) => stream,
@@ -95,7 +98,9 @@ async fn stream_turn<E: Fn(Notification)>(
             }
             Ok(None) => break,
             Ok(Some(Ok(StreamEvent::Delta(text)))) => {
-                response_text.push_str(&text);
+                if record_transcript {
+                    response_text.push_str(&text);
+                }
                 emit(token_delta(turn_id, text));
             }
             Ok(Some(Ok(StreamEvent::Done {
@@ -109,7 +114,9 @@ async fn stream_turn<E: Fn(Notification)>(
         }
     }
 
-    debug_log::log_response(&response_text, finish_reason.as_deref());
+    if record_transcript {
+        debug_log::log_response(&response_text, finish_reason.as_deref());
+    }
     emit(turn_end(turn_id, finish_reason));
 }
 

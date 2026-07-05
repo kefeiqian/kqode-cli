@@ -1,30 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  countWrappedPromptRows,
   resolveClickResult,
   resolveComposerWindow,
   resolveScrollIntoViewOffset,
-  resolveVerticalCursorIndex,
-  wrapPromptText
+  resolveVerticalCursorIndex
 } from '@libs/composer/composerWindow.ts';
-
-describe('wrapPromptText', () => {
-  it('wraps a long logical line every `columns` characters', () => {
-    expect(wrapPromptText('abcdefghij', 4).map((row) => row.text)).toEqual(['abcd', 'efgh', 'ij']);
-  });
-
-  it('keeps authored newlines as separate rows', () => {
-    expect(wrapPromptText('a\nbb', 10).map((row) => row.text)).toEqual(['a', 'bb']);
-  });
-
-  it('returns a single empty row for empty text', () => {
-    expect(wrapPromptText('', 10)).toEqual([{ text: '', start: 0, end: 0 }]);
-  });
-
-  it('counts wrapped rows', () => {
-    expect(countWrappedPromptRows('abcdefghij', 4)).toBe(3);
-  });
-});
 
 describe('resolveComposerWindow', () => {
   // 6 wrapped rows at columns=4: '0000','1111','2222','3333','4444','5555'

@@ -1,11 +1,6 @@
 import { clamp } from '@libs/math/clamp.ts';
-
-/** One wrapped visual row of the prompt, with its source index range. */
-export type WrappedPromptRow = {
-  text: string;
-  start: number;
-  end: number;
-};
+import { wrapPromptText } from '@libs/composer/wrapPromptText.ts';
+import type { WrappedPromptRow } from '@libs/composer/wrapPromptText.ts';
 
 export type ComposerWindowParams = {
   text: string;
@@ -31,55 +26,6 @@ export type ComposerWindow = {
   /** Most-positive offset — scrolls to the first wrapped row. */
   maxOffset: number;
 };
-
-/**
- * Splits `text` into visual rows: authored newlines start new rows, and each
- * logical line is chunked every `columns` characters. An empty prompt yields a
- * single empty row. Pass the prompt's input width (terminal columns minus the
- * prompt prefix) so wrapping matches what the composer renders.
- */
-export function wrapPromptText(text: string, columns: number): WrappedPromptRow[] {
-  const safeColumns = Math.max(1, columns);
-  if (text.length === 0) {
-    return [{ text: '', start: 0, end: 0 }];
-  }
-
-  const rows: WrappedPromptRow[] = [];
-  let lineStart = 0;
-
-  while (lineStart <= text.length) {
-    const newlineIndex = text.indexOf('\n', lineStart);
-    const lineEnd = newlineIndex < 0 ? text.length : newlineIndex;
-    const rawLine = text.slice(lineStart, lineEnd);
-    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
-
-    if (line.length === 0) {
-      rows.push({ text: '', start: lineStart, end: lineStart });
-    } else {
-      for (let offset = 0; offset < line.length; offset += safeColumns) {
-        const endOffset = Math.min(offset + safeColumns, line.length);
-        rows.push({
-          text: line.slice(offset, endOffset),
-          start: lineStart + offset,
-          end: lineStart + endOffset
-        });
-      }
-    }
-
-    if (newlineIndex < 0) {
-      break;
-    }
-
-    lineStart = newlineIndex + 1;
-  }
-
-  return rows;
-}
-
-/** Number of visual rows `text` wraps into at `columns` width. */
-export function countWrappedPromptRows(text: string, columns: number): number {
-  return wrapPromptText(text, columns).length;
-}
 
 /**
  * Resolves the visible window of a (possibly scrolled) multi-line prompt.

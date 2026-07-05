@@ -96,9 +96,10 @@ export function PromptComposer({
     offset: scrollOffsetRows
   });
   const visibleText = composerWindow.text;
+  const visibleTextRows = visibleText.split('\n');
   const shouldRenderBackground = true;
   const visibleRows = countVisibleComposerRows(
-    visibleText,
+    visibleTextRows.length,
     state.validationError !== null,
     shouldRenderBackground
   );
@@ -142,7 +143,7 @@ export function PromptComposer({
         columns={resolvedColumns}
         shouldRenderBackground={shouldRenderBackground}
         validationError={state.validationError}
-        visibleTextRows={visibleText.split('\n')}
+        visibleTextRows={visibleTextRows}
       />
     </Box>
   );

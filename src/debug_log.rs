@@ -129,6 +129,17 @@ pub fn log_error(error_kind: &str, message: &str) {
     );
 }
 
+/// Whether transcript logging is currently recording.
+///
+/// Returns `true` only when an installed subscriber is interested in transcript
+/// events, so hot paths can skip building debug-only payloads (the full response
+/// buffer and request serialization) when logging is off — the packaged/prod
+/// default.
+#[must_use]
+pub fn transcript_enabled() -> bool {
+    tracing::enabled!(target: TRANSCRIPT_TARGET, tracing::Level::INFO)
+}
+
 /// Whether debug logging should run for this process.
 ///
 /// A non-empty `KQODE_DEBUG` wins (`1`/`true`/`on`/`yes` enable, anything else
