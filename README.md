@@ -140,7 +140,9 @@ assets — no channel builds from source:
 - Direct download of `kqode-<os>-<arch>.tar.gz` / `.zip` plus checksums.
 - npm: `npm install -g @kqode/kqode-cli` downloads and verifies the matching
   release archive on install.
-- Homebrew and winget manifests that point at the Release asset URLs.
+- Homebrew: `brew install kefeiqian/kqode/kqode` (or `brew tap kefeiqian/kqode`
+  then `brew install kqode`).
+- winget: `winget install kqode`.
 
 Maintainer commands:
 

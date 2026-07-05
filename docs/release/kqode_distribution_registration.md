@@ -19,13 +19,17 @@ In scope:
 - Publishing the `@kqode/kqode-cli` npm launcher and its five per-platform
   packages via Trusted Publishing (automated by
   `.github/workflows/npm-publish.yml`).
-- Manually registering the Homebrew and winget packages that point at the GitHub
-  Release asset URLs.
+- Publishing the Homebrew tap formula and the winget package automatically on
+  release (automated by `.github/workflows/homebrew-publish.yml` and
+  `.github/workflows/winget-publish.yml`).
 
 Deferred (not covered here, intentionally out of scope for this slice):
 
-- Homebrew tap submission and winget submission from CI.
-- Code signing, notarization, and auto-update.
+- The one-time bootstrap each package manager needs before automation takes over:
+  creating the Homebrew tap repo and submitting winget's first manifest by hand
+  (both documented below as one-time setup).
+- Homebrew-core submission (the tap is automated; core has a notability bar).
+- apt/Debian packaging, code signing, notarization, and auto-update.
 
 ## Artifacts
 
@@ -98,9 +102,10 @@ git tag v0.2.0 && git push origin v0.2.0
 ```
 
 The tag drives `release.yml` (which builds the archives + GitHub Release); when it
-finishes, `npm-publish.yml` runs automatically (its `workflow_run` trigger) and
-publishes npm. Keeping `Cargo.toml` equal to the tag ensures `kqode --version`
-matches the published release and npm version.
+finishes, `npm-publish.yml`, `homebrew-publish.yml`, and `winget-publish.yml` each
+run automatically (their `workflow_run` triggers) and publish npm, the Homebrew
+tap formula, and the winget package. Keeping `Cargo.toml` equal to the tag ensures
+`kqode --version` matches every published channel.
 
 ## 1. GitHub Release direct download
 
@@ -254,57 +259,157 @@ for d in dist-packages/*/; do (cd "$d" && npm publish --access public); done
 
 ## 3. Homebrew
 
-Homebrew consumes the POSIX (`darwin`/`linux`) `.tar.gz` release assets. Create a
-formula in your tap that points at the GitHub Release URLs and pins the
-published `sha256` values (from `checksums.txt`):
+Homebrew installs from a **tap** you control — the GitHub repo
+`kefeiqian/homebrew-kqode` (Homebrew maps the tap name `kefeiqian/kqode` to a repo
+named `homebrew-kqode`). The formula points at the POSIX (`darwin`/`linux`)
+`.tar.gz` release assets and pins each `sha256` from the release's
+`checksums.txt`. `.github/workflows/homebrew-publish.yml` regenerates and pushes
+the formula on every release, so the tap always tracks the latest version.
 
-```ruby
-class Kqode < Formula
-  desc "Rust-core coding-agent harness with a TypeScript Ink terminal UI"
-  homepage "https://github.com/kefeiqian/kqode-cli"
-  version "0.1.0"
+Users install with:
 
-  on_macos do
-    on_arm do
-      url "https://github.com/kefeiqian/kqode-cli/releases/download/v0.1.0/kqode-darwin-arm64.tar.gz"
-      sha256 "<sha256 from checksums.txt>"
-    end
-    # Intel macOS (darwin-x64) is not distributed; only Apple Silicon is built.
-  end
-
-  def install
-    bin.install "kqode"
-  end
-end
+```bash
+brew install kefeiqian/kqode/kqode        # self-tapping one-liner
+# or tap once, then use the bare name:
+brew tap kefeiqian/kqode && brew install kqode
+brew upgrade kqode
 ```
 
-Register by creating a tap repo (`homebrew-<tap>`), committing the formula under
-`Formula/`, and instructing users to
-`brew install <owner>/<tap>/kqode`.
+A truly bare `brew install kqode` with no tap requires acceptance into
+**homebrew-core**, which has a notability bar and discourages prebuilt-binary
+formulae — deferred until KQode is established. The tap gives a bare
+`brew install kqode` after the one-time `brew tap`.
+
+The formula covers macOS arm64, Linux x64, and Linux arm64. Intel macOS is not
+built (Apple Silicon only) and Windows is served by winget, so neither appears in
+the formula.
+
+### One-time setup
+
+1. Create a **public** GitHub repo named **`homebrew-kqode`** under `kefeiqian`,
+   initialized with a README (or any initial commit) so it has a default branch —
+   `actions/checkout` cannot check out a repo with zero commits. The first release
+   then commits `Formula/kqode.rb`; you do not need to add the formula by hand.
+2. Add a repository secret **`HOMEBREW_TAP_TOKEN`** to `kqode-cli` (Settings →
+   Secrets and variables → Actions) that can push to the tap: a fine-grained PAT
+   scoped to `homebrew-kqode` with **Contents: read and write**, or a classic PAT
+   with `repo`. `GITHUB_TOKEN` cannot push to another repo, so this token is
+   required.
+
+### Automated publishing
+
+`homebrew-publish.yml` runs after `release.yml` completes (its `workflow_run`
+trigger, the same model as npm), downloads the tag's `checksums.txt`, runs
+`packaging/homebrew/generate-formula.cjs` to render `Formula/kqode.rb` with the
+pinned checksums, and pushes it to the tap using `HOMEBREW_TAP_TOKEN`. Re-run a
+tag by hand from **Actions → Publish Homebrew → Run workflow** (also the path for
+a Release published by hand in the UI).
+
+Render the formula locally (e.g. to seed the tap the first time):
+
+```bash
+gh release download vX.Y.Z --pattern checksums.txt --dir staging
+node packaging/homebrew/generate-formula.cjs \
+  --checksums staging/checksums.txt --version X.Y.Z --out kqode.rb
+```
 
 ## 4. winget
 
-winget consumes the Windows `.zip` release assets. Author a manifest set
-(version, installer, locale) for submission to
-[microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs). The installer
-manifest points at the GitHub Release URL and pins the published `SHA256`:
+winget consumes the Windows `.zip` release asset. Ongoing releases are automated
+by `.github/workflows/winget-publish.yml` (the `vedantmgoyal9/winget-releaser`
+action), which reads the release's `kqode-windows-x64.zip`, regenerates the
+manifests, and opens a pull request to
+[microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs). The package
+identifier is **`KQode.KQode`** with **`Moniker: kqode`**, so users install with:
 
-```yaml
-# KQode.KQode.installer.yaml (excerpt)
-PackageIdentifier: KQode.KQode
-PackageVersion: 0.1.0
-Installers:
-  - Architecture: x64
-    InstallerType: zip
-    InstallerUrl: https://github.com/kefeiqian/kqode-cli/releases/download/v0.1.0/kqode-windows-x64.zip
-    InstallerSha256: <SHA256 from checksums.txt>
-    NestedInstallerType: portable
-    NestedInstallerFiles:
-      - RelativeFilePath: kqode.exe
+```bash
+winget install kqode          # matches the moniker
+# exact id:
+winget install KQode.KQode
 ```
 
-Submit via a pull request to `microsoft/winget-pkgs`. Users then install with
-`winget install KQode.KQode`.
+winget ships the **x64** zip only; Windows on ARM runs it via emulation (the same
+stance as the npm channel), so no arm64 winget installer is needed.
+
+winget-releaser **updates an existing package** — it copies the previous
+version's manifests and bumps the version/URL/hash — so the very first version
+must be submitted once by hand to create the package. Every version after that is
+automatic; runs before the bootstrap fail with a clear "package does not exist"
+error.
+
+### One-time setup
+
+1. **Fork** `microsoft/winget-pkgs` under `kefeiqian` (winget-releaser opens its
+   PRs from this fork; override with the action's `fork-user` input if it lives
+   elsewhere).
+2. Add a repository secret **`WINGET_TOKEN`** to `kqode-cli`: a **classic** PAT
+   with **`public_repo`** scope. Fine-grained PATs are not supported by the
+   action.
+3. **Bootstrap the first submission** for an existing release `vX.Y.Z` with
+   [komac](https://github.com/russellbanks/Komac) (install via
+   `cargo binstall komac`, or download from its releases):
+
+   ```bash
+   komac new KQode.KQode \
+     --urls https://github.com/kefeiqian/kqode-cli/releases/download/vX.Y.Z/kqode-windows-x64.zip \
+     --version X.Y.Z --submit
+   ```
+
+   komac downloads the zip, computes the SHA-256, and (because it is a zip)
+   prompts for the nested installer. Set **NestedInstallerType: portable**,
+   relative path **`kqode.exe`**, command alias **`kqode`**, and the metadata
+   below (especially **Moniker: `kqode`**), then let it submit the PR. The
+   resulting manifests should match:
+
+   ```yaml
+   # KQode.KQode.installer.yaml
+   PackageIdentifier: KQode.KQode
+   PackageVersion: X.Y.Z
+   InstallerType: zip
+   NestedInstallerType: portable
+   NestedInstallerFiles:
+     - RelativeFilePath: kqode.exe
+       PortableCommandAlias: kqode
+   Installers:
+     - Architecture: x64
+       InstallerUrl: https://github.com/kefeiqian/kqode-cli/releases/download/vX.Y.Z/kqode-windows-x64.zip
+       InstallerSha256: <SHA256 from checksums.txt>
+   ManifestType: installer
+   ManifestVersion: 1.6.0
+   ```
+
+   ```yaml
+   # KQode.KQode.locale.en-US.yaml
+   PackageIdentifier: KQode.KQode
+   PackageVersion: X.Y.Z
+   PackageLocale: en-US
+   Publisher: KQode
+   PackageName: KQode
+   License: MIT OR Apache-2.0
+   ShortDescription: Rust-core coding-agent harness with a TypeScript Ink terminal UI.
+   Moniker: kqode
+   ManifestType: defaultLocale
+   ManifestVersion: 1.6.0
+   ```
+
+   ```yaml
+   # KQode.KQode.yaml
+   PackageIdentifier: KQode.KQode
+   PackageVersion: X.Y.Z
+   DefaultLocale: en-US
+   ManifestType: version
+   ManifestVersion: 1.6.0
+   ```
+
+### Automated publishing
+
+`winget-publish.yml` runs after `release.yml` completes (`workflow_run`), resolves
+the version from the released commit, and calls `winget-releaser` with
+`identifier: KQode.KQode`, the release tag, and
+`installers-regex: kqode-windows-x64\.zip$`, using `WINGET_TOKEN` to open the PR
+from your fork. Re-run a tag by hand from **Actions → Publish winget → Run
+workflow** (also the path for a Release published by hand in the UI). Because
+komac opens a real PR each run, avoid triggering it twice for the same version.
 
 ## Verifying provenance
 

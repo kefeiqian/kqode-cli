@@ -1,0 +1,137 @@
+# Regenerates the KQode Homebrew formula and pushes it to the tap repository
+# (kefeiqian/homebrew-kqode) so `brew install kqode` always resolves the latest
+# release. Every install channel ships the SAME GitHub Release binaries; this
+# formula just points Homebrew at the POSIX `.tar.gz` assets and pins their
+# `sha256` from that release's `checksums.txt`.
+#
+# How it runs (mirrors npm-publish.yml so a pushed version tag reaches every
+# channel with no manual step):
+#   - workflow_run: fires automatically when the "Release" workflow finishes. On
+#     a successful tag-push release it publishes the just-released version. By
+#     "completed", release.yml has already uploaded the tag's archives +
+#     checksums, so the download below is safe.
+#   - workflow_dispatch: manual (re-)publish for a given tag, and the path to use
+#     for a Release published by hand in the UI (a GITHUB_TOKEN-created release
+#     does not re-fire events).
+#
+# One-time setup (see docs/release/kqode_distribution_registration.md):
+#   - Create the public tap repo `homebrew-kqode` under `kefeiqian`.
+#   - Add a repo secret HOMEBREW_TAP_TOKEN: a token that can push to that tap
+#     (fine-grained PAT scoped to homebrew-kqode with Contents: read and write,
+#     or a classic PAT with `repo`). GITHUB_TOKEN cannot push to another repo.
+name: Publish Homebrew
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish, e.g. v0.1.0"
+        required: true
+        type: string
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homebrew-publish-${{ inputs.tag || github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    # For workflow_run, only publish after a SUCCESSFUL tag-push release.
+    # release.yml only pushes on `v*` tags, so event == 'push' implies a version
+    # tag; workflow_dispatch always proceeds.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    permissions:
+      contents: read # checkout + gh release download (this repo)
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Check out the code that carries the generator: the released commit for
+          # workflow_run (its head_sha), else the workflow's own ref (e.g. main) for
+          # dispatch. The input tag is used ONLY to download that release's assets
+          # (below), so bootstrapping a tag cut before this generator existed still
+          # works.
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Ensure tap token is configured
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "$HOMEBREW_TAP_TOKEN" ]; then
+            echo "::error::HOMEBREW_TAP_TOKEN secret is not set. See docs/release/kqode_distribution_registration.md (Homebrew)."
+            exit 1
+          fi
+
+      - name: Resolve version
+        id: rel
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "workflow_run" ]; then
+            version="$(node -p "require('./packaging/npm/kqode/package.json').version")"
+          else
+            [ -n "$INPUT_TAG" ] || { echo "::error::no release tag provided"; exit 1; }
+            version="${INPUT_TAG#v}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Resolved Homebrew version: $version"
+
+      - name: Download the release checksums
+        env:
+          VERSION: ${{ steps.rel.outputs.version }}
+        run: |
+          set -euo pipefail
+          rm -rf staging && mkdir -p staging
+          gh release download "v$VERSION" --pattern checksums.txt --dir staging --clobber
+          echo "checksums.txt:"; cat staging/checksums.txt
+
+      - name: Render the formula
+        env:
+          VERSION: ${{ steps.rel.outputs.version }}
+        run: |
+          set -euo pipefail
+          node packaging/homebrew/generate-formula.cjs \
+            --checksums staging/checksums.txt --version "$VERSION" --out kqode.rb
+          echo "----- Formula/kqode.rb -----"; cat kqode.rb
+
+      - name: Check out the tap repository
+        uses: actions/checkout@v4
+        with:
+          repository: kefeiqian/homebrew-kqode
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Commit and push the formula
+        env:
+          VERSION: ${{ steps.rel.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p tap/Formula
+          cp kqode.rb tap/Formula/kqode.rb
+          cd tap
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "Formula already up to date for v$VERSION; nothing to push."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/kqode.rb
+          git commit -m "kqode $VERSION"
+          git push
+          echo "Pushed Formula/kqode.rb for kqode $VERSION to the tap."
