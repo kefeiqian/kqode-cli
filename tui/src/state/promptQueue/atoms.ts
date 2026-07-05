@@ -6,6 +6,7 @@ import { unknownCommandMessage } from '@libs/commands/unknownCommand.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { bodyScrollOffsetRowsAtom } from '@state/ui/index.ts';
 import { promptQueueAtom, streamingTextByIdAtom } from '@state/promptQueue/store.ts';
+import { refreshGitStatusAtom } from '@state/ui/index.ts';
 import { createDeltaCoalescer } from '@libs/promptQueue/streamCoalescer.ts';
 import { STREAM_RENDER_FLUSH_MS } from '@constants/backend.ts';
 import {
@@ -78,6 +79,9 @@ async function drainQueue(get: Getter, set: Setter): Promise<void> {
     while (active !== undefined) {
       const result = await streamActive(get, set, active.id, active.text);
       settleActive(set, active.id, result);
+      // A completed turn may have changed the working tree; refresh the git label
+      // (fire-and-forget so it never delays draining the next queued prompt).
+      void set(refreshGitStatusAtom);
       active = findActive(get);
     }
   } finally {

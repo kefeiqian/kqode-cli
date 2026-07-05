@@ -59,4 +59,11 @@ export type StreamOutcome =
  */
 export type BackendClient = {
   submitStreaming(params: StreamSubmitParams, callbacks: StreamCallbacks): Promise<StreamOutcome>;
+  /**
+   * Fetches the workspace git status label (e.g. `⎇ main*`), or `null` when the
+   * workspace is not a git repository or `git` could not be queried. Rejects
+   * with a {@link BackendClientError} on transport/timeout failure. The backend
+   * formats the label; the TUI renders it verbatim.
+   */
+  gitStatus(): Promise<string | null>;
 };

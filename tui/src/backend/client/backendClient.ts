@@ -189,6 +189,20 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
         throw error;
       }
     },
+    async gitStatus(): Promise<string | null> {
+      if (disposed) {
+        throw disposedError();
+      }
+      const active = await ensureSession();
+      try {
+        return await active.client.gitStatus();
+      } catch (error) {
+        if (isFatalBackendError(error)) {
+          markDead();
+        }
+        throw error;
+      }
+    },
     dispose() {
       disposed = true;
       if (state === BackendLifecycleState.Dead) {

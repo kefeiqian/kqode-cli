@@ -9,6 +9,7 @@ import type {
   StreamSubmitParams
 } from '@contracts/backend/index.ts';
 import {
+  gitStatusRequest,
   messageSubmitRequest,
   tokenDeltaNotification,
   turnEndNotification,
@@ -107,6 +108,17 @@ export function createMessageConnectionClient(
           (error: unknown) => finish(() => reject(toBackendClientError(error)))
         );
       });
+    },
+    async gitStatus(): Promise<string | null> {
+      try {
+        const result = await withRequestTimeout(
+          connection.sendRequest(gitStatusRequest),
+          requestTimeoutMs
+        );
+        return result.label;
+      } catch (error) {
+        throw toBackendClientError(error);
+      }
     }
   };
 }

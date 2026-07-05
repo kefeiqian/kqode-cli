@@ -11,6 +11,7 @@ import type { RuntimeBackendClient } from '@backend/runtime/backendRuntime.ts';
 function fakeClient(overrides: Partial<RuntimeBackendClient> = {}): RuntimeBackendClient {
   return {
     submitStreaming: vi.fn(),
+    gitStatus: vi.fn().mockResolvedValue(null),
     ensureStarted: vi.fn().mockResolvedValue(undefined),
     dispose: vi.fn(),
     ...overrides

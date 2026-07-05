@@ -41,13 +41,24 @@ pub const JSON_RPC_INVALID_PARAMS: i32 = -32602;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RpcMethod {
     MessageSubmit,
+    GitStatus,
 }
 
 impl RpcMethod {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::MessageSubmit => "kqode.message.submit",
+            Self::GitStatus => "kqode.git.status",
         }
+    }
+
+    /// Resolves a wire method name to its [`RpcMethod`], or `None` when the
+    /// backend does not implement it (yielding a method-not-found response).
+    #[must_use]
+    pub fn from_method(method: &str) -> Option<Self> {
+        [Self::MessageSubmit, Self::GitStatus]
+            .into_iter()
+            .find(|candidate| candidate.as_str() == method)
     }
 }
 
@@ -97,4 +108,14 @@ pub struct TurnErrorParams {
     pub turn_id: String,
     pub error_kind: String,
     pub message: String,
+}
+
+/// Result for `kqode.git.status`: the formatted working-tree label, or `null`
+/// when the workspace is not a git repository (or `git` could not be queried).
+/// The backend owns parsing and formatting; the client renders `label` verbatim.
+/// Kept in lockstep with the TypeScript `GitStatusResult`.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitStatusResult {
+    pub label: Option<String>,
 }

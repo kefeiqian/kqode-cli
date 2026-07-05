@@ -1,13 +1,15 @@
-use std::{error::Error, fmt};
+use std::{error::Error, fmt, thread};
 
 use lsp_server::{Connection, Message, Notification, Request, Response};
 
 use crate::chat::spawn_streaming_turn;
 use crate::config::KimiConfig;
 use crate::debug_log;
+use crate::git;
 use crate::protocol::{
-    BACKEND_READY_METHOD, JSON_RPC_INVALID_PARAMS, JSON_RPC_METHOD_NOT_FOUND, MessageSubmitParams,
-    MessageSubmitResult, RpcMethod, SUBMIT_STATUS_NEEDS_CONFIGURATION, SUBMIT_STATUS_STREAMING,
+    BACKEND_READY_METHOD, GitStatusResult, JSON_RPC_INVALID_PARAMS, JSON_RPC_METHOD_NOT_FOUND,
+    MessageSubmitParams, MessageSubmitResult, RpcMethod, SUBMIT_STATUS_NEEDS_CONFIGURATION,
+    SUBMIT_STATUS_STREAMING,
 };
 
 #[derive(Debug)]
@@ -32,6 +34,11 @@ impl Error for BackendError {}
 /// [`BACKEND_READY_METHOD`] notification as soon as the stdio transport is
 /// established and before any request is handled, so clients bound startup on
 /// real JSON-RPC readiness rather than the OS process-spawn event.
+///
+/// After the receive loop ends (stdin closed), [`io_threads.join`] blocks until
+/// every `connection.sender` clone is dropped. Deferred handlers (streaming
+/// turns and [`spawn_git_status`]) hold such clones, so an in-flight response is
+/// flushed to stdout before the process exits rather than being cut off.
 ///
 /// # Errors
 ///
@@ -78,15 +85,9 @@ fn run_loop(connection: Connection) -> Result<(), BackendError> {
     while let Ok(message) = connection.receiver.recv() {
         match message {
             Message::Request(request) => {
-                let response = handle_request(request, &connection);
-                connection
-                    .sender
-                    .send(Message::Response(response))
-                    .map_err(|error| {
-                        BackendError::Transport(format!(
-                            "failed to write JSON-RPC response: {error}"
-                        ))
-                    })?;
+                if let Some(response) = handle_request(request, &connection) {
+                    send_response(&connection, response)?;
+                }
             }
             Message::Notification(_) => {}
             Message::Response(_) => {
@@ -100,22 +101,46 @@ fn run_loop(connection: Connection) -> Result<(), BackendError> {
     Ok(())
 }
 
-/// Handles one JSON-RPC request.
+/// Writes one response over the transport, mapping a closed writer to a
+/// [`BackendError::Transport`].
+fn send_response(connection: &Connection, response: Response) -> Result<(), BackendError> {
+    connection
+        .sender
+        .send(Message::Response(response))
+        .map_err(|error| {
+            BackendError::Transport(format!("failed to write JSON-RPC response: {error}"))
+        })
+}
+
+/// Dispatches one JSON-RPC request.
 ///
-/// `kqode.message.submit` returns an immediate streaming ack: when a Kimi key is
-/// configured it spawns a streaming turn (whose tokens arrive as notifications
-/// through a clone of `connection.sender`) and returns
-/// [`SUBMIT_STATUS_STREAMING`]; otherwise it returns
-/// [`SUBMIT_STATUS_NEEDS_CONFIGURATION`] without contacting the provider.
-fn handle_request(request: Request, connection: &Connection) -> Response {
-    if request.method != RpcMethod::MessageSubmit.as_str() {
-        return Response::new_err(
+/// Returns `Some(response)` to answer synchronously, or `None` when the handler
+/// owns its response and will send it later. `kqode.message.submit` answers
+/// immediately with a streaming ack (and spawns the turn); `kqode.git.status`
+/// runs on a spawned thread and sends its response deferred, so a slow `git`
+/// never stalls the receive loop.
+fn handle_request(request: Request, connection: &Connection) -> Option<Response> {
+    match RpcMethod::from_method(&request.method) {
+        Some(RpcMethod::MessageSubmit) => Some(handle_message_submit(request, connection)),
+        Some(RpcMethod::GitStatus) => {
+            spawn_git_status(request, connection);
+            None
+        }
+        None => Some(Response::new_err(
             request.id,
             JSON_RPC_METHOD_NOT_FOUND,
             format!("unsupported method `{}`", request.method),
-        );
+        )),
     }
+}
 
+/// Handles `kqode.message.submit`.
+///
+/// When a Kimi key is configured it spawns a streaming turn (whose tokens arrive
+/// as notifications through a clone of `connection.sender`) and returns
+/// [`SUBMIT_STATUS_STREAMING`]; otherwise it returns
+/// [`SUBMIT_STATUS_NEEDS_CONFIGURATION`] without contacting the provider.
+fn handle_message_submit(request: Request, connection: &Connection) -> Response {
     let params = match serde_json::from_value::<MessageSubmitParams>(request.params) {
         Ok(params) => params,
         Err(error) => {
@@ -152,4 +177,25 @@ fn handle_request(request: Request, connection: &Connection) -> Response {
             )
         }
     }
+}
+
+/// Spawns a detached thread that computes the workspace git label and sends the
+/// deferred response for `request`.
+///
+/// Running `git` off the receive loop keeps a slow or hung call from stalling
+/// other requests; the thread's `sender` clone also keeps the transport alive
+/// until the response is flushed, so the answer is not lost if stdin closes
+/// first (see the shutdown note in [`run_stdio`]).
+fn spawn_git_status(request: Request, connection: &Connection) {
+    let id = request.id;
+    let sender = connection.sender.clone();
+    thread::spawn(move || {
+        let response = Response::new_ok(
+            id,
+            GitStatusResult {
+                label: git::status_label(),
+            },
+        );
+        let _ = sender.send(Message::Response(response));
+    });
 }

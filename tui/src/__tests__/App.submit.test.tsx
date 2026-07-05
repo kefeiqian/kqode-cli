@@ -18,13 +18,22 @@ import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
 const workspaceCwd = path.join(os.homedir(), 'Projects', 'dummy-react-app');
 
-function renderApp(backendClient: BackendClient, columns = 80, rows = 40) {
+function renderApp(backendClient: Partial<BackendClient>, columns = 80, rows = 40) {
   const store = createStore();
   store.set(productVersionAtom, '0.1.0');
   store.set(workspaceCwdAtom, workspaceCwd);
   store.set(columnsTestOverrideAtom, columns);
   store.set(rowsTestOverrideAtom, rows);
-  store.set(backendClientAtom, backendClient);
+  // Fill the full seam so the after-turn git refresh has a gitStatus to call;
+  // streaming tests only supply submitStreaming.
+  const client: BackendClient = {
+    gitStatus: async () => null,
+    submitStreaming: async () => {
+      throw new Error('submitStreaming not provided');
+    },
+    ...backendClient
+  };
+  store.set(backendClientAtom, client);
   return { store, ...renderWithJotai(<App />, store) };
 }
 

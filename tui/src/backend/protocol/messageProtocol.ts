@@ -1,12 +1,14 @@
-import { NotificationType, NotificationType0, RequestType } from 'vscode-jsonrpc';
+import { NotificationType, NotificationType0, RequestType, RequestType0 } from 'vscode-jsonrpc';
 import {
   BACKEND_READY_METHOD,
+  GIT_STATUS_METHOD,
   MESSAGE_SUBMIT_METHOD,
   TOKEN_DELTA_METHOD,
   TURN_END_METHOD,
   TURN_ERROR_METHOD
 } from '@contracts/backend/index.ts';
 import type {
+  GitStatusResult,
   MessageSubmitParams,
   MessageSubmitResult,
   TokenDeltaParams,
@@ -24,6 +26,15 @@ import type {
 export const messageSubmitRequest = new RequestType<MessageSubmitParams, MessageSubmitResult, void>(
   MESSAGE_SUBMIT_METHOD
 );
+
+/**
+ * Typed descriptor for the parameterless `kqode.git.status` request.
+ *
+ * The backend queries `git` in its own workspace cwd, so the request carries no
+ * params; it resolves with the formatted label (or `null`). The method name and
+ * result shape come from the dependency-free `@contracts` seam.
+ */
+export const gitStatusRequest = new RequestType0<GitStatusResult, void>(GIT_STATUS_METHOD);
 
 /**
  * Typed descriptor for the backend's one-shot readiness notification.

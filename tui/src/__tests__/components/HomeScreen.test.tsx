@@ -11,7 +11,7 @@ import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import {
   bodyEntriesAtom,
   columnsTestOverrideAtom,
-  gitStatusLabelTestOverrideAtom,
+  gitStatusLabelAtom,
   rowsTestOverrideAtom
 } from '@state/ui/index.ts';
 import { productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
@@ -47,7 +47,7 @@ function renderHomeScreen({
   store.set(productVersionAtom, productVersion);
   store.set(workspaceCwdAtom, screenWorkspaceCwd);
   if (gitStatusLabel !== undefined) {
-    store.set(gitStatusLabelTestOverrideAtom, gitStatusLabel);
+    store.set(gitStatusLabelAtom, gitStatusLabel);
   }
   if (columns !== undefined) {
     store.set(columnsTestOverrideAtom, columns);

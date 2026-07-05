@@ -15,6 +15,15 @@
 export const MESSAGE_SUBMIT_METHOD = 'kqode.message.submit';
 
 /**
+ * KQode-owned JSON-RPC method returning the workspace git status label.
+ *
+ * Must match `RpcMethod::GitStatus` (via `RpcMethod::as_str`) in
+ * `src/protocol.rs`. The backend runs `git` in the workspace and formats the
+ * label; the TUI renders the returned string verbatim.
+ */
+export const GIT_STATUS_METHOD = 'kqode.git.status';
+
+/**
  * JSON-RPC notification the backend emits exactly once, as soon as it is
  * listening and speaking JSON-RPC and before it handles any request.
  *
@@ -89,4 +98,14 @@ export type TurnErrorParams = {
   turnId: string;
   errorKind: string;
   message: string;
+};
+
+/**
+ * Result for `kqode.git.status`: the formatted working-tree label (e.g.
+ * `⎇ main*`), or `null` when the workspace is not a git repository or `git`
+ * could not be queried. The Rust backend owns parsing and formatting
+ * (`GitStatusResult` in `src/protocol.rs`); keep the two shapes in lockstep.
+ */
+export type GitStatusResult = {
+  label: string | null;
 };

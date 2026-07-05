@@ -13,6 +13,7 @@ import {
   SUBMIT_STATUS_STREAMING
 } from '@contracts/backend/index.ts';
 import {
+  gitStatusRequest,
   messageSubmitRequest,
   tokenDeltaNotification,
   turnEndNotification,
@@ -156,5 +157,37 @@ describe('message protocol client', () => {
 
     await expect(submit).rejects.toBeInstanceOf(BackendClientError);
     await expect(submit).rejects.toMatchObject({ kind: BackendErrorKind.Protocol });
+  });
+});
+
+describe('git status request', () => {
+  it('resolves the formatted label the backend returns', async () => {
+    const { client, server } = pairedConnections();
+    server.onRequest(gitStatusRequest, () => ({ label: '⎇ main*' }));
+
+    const label = await createMessageConnectionClient(client).gitStatus();
+
+    expect(label).toBe('⎇ main*');
+  });
+
+  it('resolves null when the workspace is not a git repository', async () => {
+    const { client, server } = pairedConnections();
+    server.onRequest(gitStatusRequest, () => ({ label: null }));
+
+    const label = await createMessageConnectionClient(client).gitStatus();
+
+    expect(label).toBeNull();
+  });
+
+  it('surfaces a JSON-RPC error as a typed protocol client error', async () => {
+    const { client, server } = pairedConnections();
+    server.onRequest(gitStatusRequest, () => {
+      throw new ResponseError(ErrorCodes.InternalError, 'git failed');
+    });
+
+    const status = createMessageConnectionClient(client).gitStatus();
+
+    await expect(status).rejects.toBeInstanceOf(BackendClientError);
+    await expect(status).rejects.toMatchObject({ kind: BackendErrorKind.Protocol });
   });
 });
