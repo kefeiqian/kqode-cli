@@ -19,9 +19,11 @@ In scope:
 - Publishing the `@kqode/kqode-cli` npm launcher and its five per-platform
   packages via Trusted Publishing (automated by
   `.github/workflows/npm-publish.yml`).
-- Publishing the Homebrew tap formula and the winget package automatically on
-  release (automated by `.github/workflows/homebrew-publish.yml` and
-  `.github/workflows/winget-publish.yml`).
+- Publishing the Homebrew tap formula automatically on release (automated by
+  `.github/workflows/homebrew-publish.yml`).
+- Publishing the winget package via a manual, on-demand workflow
+  (`.github/workflows/winget-publish.yml`, `workflow_dispatch`) — see the winget
+  section for why it cannot be fully automated.
 
 Deferred (not covered here, intentionally out of scope for this slice):
 
@@ -102,10 +104,11 @@ git tag v0.2.0 && git push origin v0.2.0
 ```
 
 The tag drives `release.yml` (which builds the archives + GitHub Release); when it
-finishes, `npm-publish.yml`, `homebrew-publish.yml`, and `winget-publish.yml` each
-run automatically (their `workflow_run` triggers) and publish npm, the Homebrew
-tap formula, and the winget package. Keeping `Cargo.toml` equal to the tag ensures
-`kqode --version` matches every published channel.
+finishes, `npm-publish.yml` and `homebrew-publish.yml` each run automatically
+(their `workflow_run` triggers) and publish npm and the Homebrew tap formula.
+winget is **not** auto-published (see its section) — dispatch it manually after
+the release to ship that version to winget. Keeping `Cargo.toml` equal to the tag
+ensures `kqode --version` matches every published channel.
 
 ## 1. GitHub Release direct download
 
@@ -315,10 +318,10 @@ node packaging/homebrew/generate-formula.cjs \
 
 ## 4. winget
 
-winget consumes the Windows `.zip` release asset. Ongoing releases are automated
-by `.github/workflows/winget-publish.yml` (the `vedantmgoyal9/winget-releaser`
-action), which reads the release's `kqode-windows-x64.zip`, regenerates the
-manifests, and opens a pull request to
+winget consumes the Windows `.zip` release asset. Releases are published by a
+**manual** workflow, `.github/workflows/winget-publish.yml` (`workflow_dispatch`),
+which runs the `vedantmgoyal9/winget-releaser` action to read the release's
+`kqode-windows-x64.zip`, regenerate the manifests, and open a pull request to
 [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs). The package
 identifier is **`KefeiQian.KQode`** with **`Moniker: kqode`**, so users install with:
 
@@ -331,20 +334,30 @@ winget install KefeiQian.KQode
 winget ships the **x64** zip only; Windows on ARM runs it via emulation (the same
 stance as the npm channel), so no arm64 winget installer is needed.
 
-winget-releaser **updates an existing package** — it copies the previous
-version's manifests and bumps the version/URL/hash — so the very first version
-must be submitted once by hand to create the package. Every version after that is
-automatic; runs before the bootstrap fail with a clear "package does not exist"
-error.
+**Why manual, not auto-published:** opening the cross-fork PR to
+`microsoft/winget-pkgs` requires a **classic** PAT with `public_repo` —
+fine-grained PATs and GitHub App tokens cannot create that PR (an App would have
+to be installed on `microsoft/winget-pkgs`, which only Microsoft can do).
+Microsoft's "Open Source" enterprise then rejects classic PATs whose lifetime
+exceeds **8 days**, so a long-lived `WINGET_TOKEN` secret would expire within a
+week. The workflow is therefore `workflow_dispatch`-only and you supply a fresh
+short-lived token per run (below); running `komac`/`wingetcreate` locally per
+release is an equally valid alternative.
+
+winget-releaser also **updates an existing package** (it copies the previous
+version's manifests and bumps the version/URL/hash), so the very first version
+must be submitted once by hand to create the package; runs before that bootstrap
+fail with a clear "package does not exist" error.
 
 ### One-time setup
 
 1. **Fork** `microsoft/winget-pkgs` under `kefeiqian` (winget-releaser opens its
    PRs from this fork; override with the action's `fork-user` input if it lives
    elsewhere).
-2. Add a repository secret **`WINGET_TOKEN`** to `kqode-cli`: a **classic** PAT
-   with **`public_repo`** scope. Fine-grained PATs are not supported by the
-   action.
+2. Prepare a **classic** PAT with **`public_repo`** scope and an expiry of
+   **≤ 7 days** (Microsoft's enterprise rejects classic PATs living longer than 8
+   days). Fine-grained PATs cannot open the PR, so classic is required. You set
+   this as the `WINGET_TOKEN` secret right before each run (see Publishing).
 3. **Bootstrap the first submission** for an existing release `vX.Y.Z` with
    [komac](https://github.com/russellbanks/Komac) (install via
    `cargo binstall komac`, or download from its releases):
@@ -401,15 +414,13 @@ error.
    ManifestVersion: 1.6.0
    ```
 
-### Automated publishing
+### Publishing (manual, per release)
 
-`winget-publish.yml` runs after `release.yml` completes (`workflow_run`), resolves
-the version from the released commit, and calls `winget-releaser` with
-`identifier: KQode.KQode`, the release tag, and
-`installers-regex: kqode-windows-x64\.zip$`, using `WINGET_TOKEN` to open the PR
-from your fork. Re-run a tag by hand from **Actions → Publish winget → Run
-workflow** (also the path for a Release published by hand in the UI). Because
-komac opens a real PR each run, avoid triggering it twice for the same version.
+Because the token can only live 8 days, `winget-publish.yml` is
+`workflow_dispatch`-only and reads the `WINGET_TOKEN` secret (not a workflow
+input — a dispatch input value is recorded in the run and would leak the token).
+For each release you want on winget, refresh the secret with a fresh ≤ 7-day
+classic PAT, then dispatch:
 
 ```bash
 gh secret set WINGET_TOKEN --repo kefeiqian/kqode-cli   # paste a fresh <=7-day classic PAT
