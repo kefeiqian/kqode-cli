@@ -2,7 +2,7 @@
 //!
 //! When enabled, [`init`] installs a global subscriber whose `TranscriptLayer`
 //! appends the exact request sent to the LLM and the response received back to a
-//! daily-rotating JSONL file under `~/.kqode/logs/`. The emit helpers
+//! per-session JSONL file at `~/.kqode/logs/<session>/backend.jsonl`. The emit helpers
 //! ([`log_request`]/[`log_response`]/[`log_error`]) are plain `tracing` events,
 //! so they are cheap no-ops when logging is disabled (no subscriber installed).
 //!
@@ -11,6 +11,7 @@
 //! of the logged payload (only the system/user messages and the model id are).
 
 mod layer;
+mod session;
 
 use std::env;
 use std::io::Write;
@@ -47,9 +48,6 @@ const KQODE_HOME_DIRNAME: &str = ".kqode";
 /// Subdirectory under the KQode home holding runtime logs.
 const LOGS_DIRNAME: &str = "logs";
 
-/// Base filename for the daily-rotating log (rotation appends the date).
-const LOG_FILE_PREFIX: &str = "kqode.log";
-
 // Field names on transcript spans/events (snake_case for `tracing`; the layer
 // maps them to the camelCase on-disk JSON keys).
 pub(crate) const FIELD_TURN_ID: &str = "turn_id";
@@ -66,18 +64,32 @@ const KIND_REQUEST: &str = "request";
 const KIND_RESPONSE: &str = "response";
 const KIND_ERROR: &str = "error";
 
-/// Installs the global transcript subscriber when logging is enabled.
+/// Installs the global transcript subscriber when logging is enabled, writing to
+/// `<logs>/<session_id>/backend.jsonl` and a sibling `session.json` manifest.
 ///
 /// Returns the [`WorkerGuard`] for the non-blocking writer, which the caller
 /// must hold for the process lifetime so buffered lines flush on exit. Returns
-/// `None` when logging is disabled or a global subscriber is already set.
+/// `None` when logging is disabled, the session directory cannot be created, or
+/// a global subscriber is already set. Old session directories are pruned
+/// best-effort on startup.
 #[must_use]
-pub fn init() -> Option<WorkerGuard> {
+pub fn init(session_id: &str) -> Option<WorkerGuard> {
     if !logging_enabled() {
         return None;
     }
-    let dir = resolve_log_dir()?;
-    let appender = MkdirWriter::new(dir.clone(), rolling::daily(&dir, LOG_FILE_PREFIX));
+    let logs_root = resolve_log_dir()?;
+    let session_dir = logs_root.join(session_id);
+    // Create the session dir eagerly so the manifest and appender have a home.
+    // Tests run with `KQODE_DEBUG=0`, so this never touches the real logs root.
+    if std::fs::create_dir_all(&session_dir).is_err() {
+        return None;
+    }
+    session::write_manifest(&session_dir, session_id);
+
+    let appender = MkdirWriter::new(
+        session_dir.clone(),
+        rolling::never(&session_dir, session::BACKEND_LOG_FILENAME),
+    );
     let (writer, guard) = tracing_appender::non_blocking(appender);
 
     let filter =
@@ -86,9 +98,21 @@ pub fn init() -> Option<WorkerGuard> {
         .with(filter)
         .with(TranscriptLayer::new(writer));
 
-    tracing::subscriber::set_global_default(subscriber)
+    let installed = tracing::subscriber::set_global_default(subscriber)
         .ok()
-        .map(|()| guard)
+        .map(|()| guard);
+    // Best-effort retention: keep the most recent sessions (this one included).
+    session::prune_old_sessions(&logs_root);
+    installed
+}
+
+/// Mints a session id for this backend spawn (see the `session` module).
+///
+/// Exposed so the caller can announce the id on the readiness notification
+/// regardless of whether logging is enabled.
+#[must_use]
+pub fn new_session_id() -> String {
+    session::generate_session_id()
 }
 
 /// Builds the turn span that stamps `turn_id` onto every transcript event

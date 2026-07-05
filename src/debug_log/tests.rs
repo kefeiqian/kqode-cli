@@ -133,3 +133,48 @@ fn empty_finish_reason_is_omitted() {
     assert_eq!(lines[0]["event"], "response");
     assert!(lines[0].get("finishReason").is_none());
 }
+
+#[test]
+fn session_id_is_nonempty_and_path_safe() {
+    let id = super::session::generate_session_id();
+    assert!(!id.is_empty());
+    assert!(
+        id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'),
+        "session id {id:?} must be filesystem-safe"
+    );
+}
+
+#[test]
+fn manifest_records_session_metadata() {
+    let dir = env::temp_dir().join(format!("kqode-session-{}-{}", epoch_millis(), std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    super::session::write_manifest(&dir, "sess-123");
+    let raw = std::fs::read_to_string(dir.join("session.json")).unwrap();
+    let _ = std::fs::remove_dir_all(&dir);
+
+    let manifest: Value = serde_json::from_str(&raw).unwrap();
+    assert_eq!(manifest["sessionId"], "sess-123");
+    assert!(
+        manifest["kqodeVersion"]
+            .as_str()
+            .is_some_and(|value| !value.is_empty())
+    );
+    assert!(manifest["os"].as_str().is_some());
+    assert!(manifest["startedAtMs"].is_number());
+}
+
+#[test]
+fn prune_keeps_only_the_retention_window() {
+    let root = env::temp_dir().join(format!("kqode-prune-{}-{}", epoch_millis(), std::process::id()));
+    std::fs::create_dir_all(&root).unwrap();
+    let total = super::session::SESSION_RETENTION + 5;
+    for index in 0..total {
+        std::fs::create_dir_all(root.join(format!("s{index:03}"))).unwrap();
+    }
+
+    super::session::prune_old_sessions(&root);
+    let remaining = std::fs::read_dir(&root).unwrap().count();
+    let _ = std::fs::remove_dir_all(&root);
+
+    assert_eq!(remaining, super::session::SESSION_RETENTION);
+}
