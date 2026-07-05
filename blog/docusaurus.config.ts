@@ -22,6 +22,26 @@ const config: Config = {
   },
   trailingSlash: false,
 
+  future: {
+    // Enable Docusaurus Faster (Rspack + SWC + Lightning CSS) for a much faster
+    // dev server and warm restarts, without opting into `future.v4`. We keep
+    // `ssgWorkerThreads` off because it is the only Faster flag that requires a
+    // v4 flag (removeLegacyPostBuildHeadAttribute), and it only speeds up the
+    // build-time SSG step — not the dev server. Leaving v4 off also keeps
+    // `useCssCascadeLayers` disabled, so the custom Tailwind/theme CSS cascade
+    // is unaffected.
+    faster: {
+      swcJsLoader: true,
+      swcJsMinimizer: true,
+      swcHtmlMinimizer: true,
+      lightningCssMinimizer: true,
+      mdxCrossCompilerCache: true,
+      rspackBundler: true,
+      rspackPersistentCache: true,
+      ssgWorkerThreads: false,
+    },
+  },
+
   stylesheets: [
     {
       href: 'https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/katex.min.css',
@@ -47,7 +67,10 @@ const config: Config = {
     },
   },
 
-  plugins: ['./src/plugins/tailwind-config.cjs'],
+  plugins: [
+    './src/plugins/tailwind-config.cjs',
+    './src/plugins/dev-watch-poll.cjs',
+  ],
 
   presets: [
     [

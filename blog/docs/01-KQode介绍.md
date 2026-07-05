@@ -19,7 +19,7 @@ KQode 是一个基于 Rust 的 Coding Agent，作为学习及研究 Agent Runtim
 
 ## 参考的 Coding Agent 列表
 
-本项目参考了各大目前开源/闭源的 Coding Agent，包括并不限于 Copilot CLI, Claude Code, Codex, Gemini CLI, OpenCode, Kimi Code 等，在此对贡献以上项目的工程师们表示深深的敬意与感谢。
+本项目参考了目前各大开源/闭源的 Coding Agent，包括但不限于 Copilot CLI、Claude Code、Codex、Gemini CLI、OpenCode、Kimi Code 等，在此向贡献这些项目的工程师们致以敬意与感谢。
 
 | 名称 | 主页 | GitHub |
 |---|---|---|

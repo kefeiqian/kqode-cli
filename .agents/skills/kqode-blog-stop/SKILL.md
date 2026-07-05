@@ -5,7 +5,9 @@ description: "Stop the locally running KQode Docusaurus blog dev server or produ
 
 # KQode Blog Stop
 
-Stop the long-lived Docusaurus server started by the `kqode-blog-serve` skill (or a bare `cargo xtask blog-serve` / `blog-serve-en` / `blog-preview`). All of those bind `http://127.0.0.1:3000`, so stopping is a matter of finding the single process that owns port 3000 and terminating it — **by PID, never by process name**. This environment runs many unrelated `node` and `xtask` processes, so name-based killing would take down other work.
+Stop the long-lived Docusaurus server started by the `kqode-blog-serve` skill (or a bare `cargo xtask blog-dev` / `blog-serve` / `blog-serve-en` / `blog-preview`). All of those bind `http://127.0.0.1:3000`, so stopping is a matter of finding the single process that owns port 3000 and terminating it — **by PID, never by process name**. This environment runs many unrelated `node` and `xtask` processes, so name-based killing would take down other work.
+
+If the server was started via **`blog-dev`**, an extra Node *wrapper* process supervises Docusaurus and normally respawns it on file changes — but it is written to **self-terminate when its port-3000 child is killed** (it never respawns on an external stop or crash). So killing the port-3000 owner (below) also stops the wrapper. The wrapper also records its own PID in a `kqode-blog-dev.pid` file in the OS temp dir (the exact path is printed in its startup log as `pidfile …`), which you can read and stop directly (by literal `-Id`) if it ever lingers.
 
 ## Workflow
 
@@ -26,7 +28,7 @@ If nothing is listening, report that there is nothing to stop — do not kill an
 
 ### 2. Prefer stopping the background process this session started
 
-If the current session started the server, the `kqode-blog-serve` skill launched it as a **detached background shell** (typically shellId `blog-serve`). Stopping that shell cleanly tears down the whole `xtask.ps1` → `xtask` → `node` process tree:
+If the current session started the server, the `kqode-blog-serve` skill launched it as a **detached background shell** (typically shellId `blog-dev` or `blog-serve`). Stopping that shell cleanly tears down the whole `xtask.ps1` → `xtask` → `bun` → `node` (dev wrapper and Docusaurus) process tree:
 
 - Use the agent's `stop_powershell` tool with that shellId, or `Stop-Process -Id <PID>` on the tracked launcher PID.
 
@@ -95,5 +97,6 @@ State that port 3000 is now free. If the goal was to switch locale or preview mo
 - Identify the target by **port ownership** (`Get-NetTCPConnection -LocalPort 3000` / `lsof -ti tcp:3000`), not by guessing or by process name.
 - If nothing is listening on 3000, report there is nothing to stop rather than killing anything.
 - Prefer tearing down via the session's background shell (`stop_powershell`) when `kqode-blog-serve` started it, so the launcher and `xtask` parent are cleaned up along with `node`.
+- A `blog-dev` server includes a Node wrapper that supervises Docusaurus; it self-terminates when its port-3000 child is killed and never respawns on an external stop, so the port-based kill above is sufficient. If the wrapper ever lingers, also stop the PID recorded in the `kqode-blog-dev.pid` file in the OS temp dir (path printed in the wrapper's startup log) by literal `-Id`.
 - After stopping, **verify** port 3000 no longer has a listener before reporting success.
 - To switch locale/preview mode, stop here first, then use `kqode-blog-serve` to start the desired server (only one can bind `127.0.0.1:3000` at a time).

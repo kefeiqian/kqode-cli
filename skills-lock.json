@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "chinese-writing": {
+      "source": "miantiao-me/aigc-weekly",
+      "sourceType": "github",
+      "skillPath": "agent/.opencode/skills/chinese-writing/SKILL.md",
+      "computedHash": "ee49c347183f228a01fc951c7ca81324b1662712945186b955a307fe6f2f624c"
+    },
+    "humanizer-zh": {
+      "source": "op7418/humanizer-zh",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "dede9681d9fea5caed2fb9d88656af3024c9ec0136fc833415ffc6e16d762429"
+    }
+  }
+}

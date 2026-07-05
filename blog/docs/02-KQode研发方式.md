@@ -37,7 +37,7 @@ KQode 的研发会重度使用 [compound-engineering-plugin](https://github.com/
 
 在真正写代码之前，我们会先用 `ce-brainstorm` 把模糊想法整理成需求，再用 `ce-plan` 把需求整理成可以执行、可以评审、可以验证的方案。
 
-整个方案由许细项组成，每一条都会被review，确认范围、边界、风险和验收方式都没有问题之后，才开始进入实现阶段。比如第一个 Ink TUI 首页功能对应的方案文档是 `docs/plans/2026-06-25-003-feat-first-ink-tui-homepage-plan.md`，里面把需求、范围边界、技术约束、上下文研究、测试策略和任务拆分都整理成了可勾选的 item。
+整个方案由许多细项组成，每一条都会被 review，确认范围、边界、风险和验收方式都没有问题之后，才开始进入实现阶段。比如第一个 Ink TUI 首页功能对应的方案文档是 [`docs/plans/2026-06-25-003-feat-first-ink-tui-homepage-plan.md`](https://github.com/kefeiqian/KQode/blob/ad9670d1978ae2c6e738ea76bc52b58149463dbd/docs/plans/2026-06-25-003-feat-first-ink-tui-homepage-plan.md)，里面把需求、范围边界、技术约束、上下文研究、测试策略和任务拆分都整理成了可勾选的 item。
 
 这种做法很适合 KQode 这类项目：一方面我们确实在用 Coding Agent 加速开发；另一方面，我们不希望 Agent 直接从一句模糊指令直接跳到代码实现。先 brainstorm、再 plan、逐条 review，能让人类把控产品方向和架构边界，也能让 Agent 在明确上下文里完成更稳定的实现。
 

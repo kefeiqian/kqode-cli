@@ -1,6 +1,6 @@
 ---
 name: kqode-blog-fix-article
-description: Fix and polish one existing KQode Docusaurus blog article. Moves loose pasted screenshots (including repo-root Obsidian `![[...]]` embeds and any image not yet under blog/docs/images) into the article's image folder with meaningful names, adds immutable pinned-commit GitHub links for every referenced project source/config file, strips trailing next-article content previews, and applies a caller-provided list of edits, then restarts the local blog dev server so the change is live. Use when asked to fix up, polish, clean, or update an existing blog doc, move/insert/replace its pasted images and convert wikilinks, add commit permalinks to files it mentions, verify quoted code values, or apply a batch of specific corrections to one article.
+description: Fix and polish one existing KQode Docusaurus blog article. Moves loose pasted screenshots (including repo-root Obsidian `![[...]]` embeds and any image not yet under blog/docs/images) into the article's image folder with meaningful names, adds immutable pinned-commit GitHub links for every referenced project source/config file, strips trailing next-article content previews, applies a caller-provided list of edits, runs a Chinese de-AI/humanize pass (humanizer-zh + chinese-writing skills) over the prose, then restarts the local blog dev server so the change is live. Use when asked to fix up, polish, clean, or update an existing blog doc, move/insert/replace its pasted images and convert wikilinks, add commit permalinks to files it mentions, verify quoted code values, or apply a batch of specific corrections to one article.
 ---
 
 # KQode Blog Fix Article
@@ -16,12 +16,13 @@ Read `blog/AGENTS.md` first. All `kqode-blog-new-article` rules (ordering, front
 
 If the doc path is missing, ask. Do not touch other articles.
 
-## Four standing jobs (always do these, even if unlisted)
+## Five standing jobs (always do these, even if unlisted)
 
 1. **Move out-of-folder images into the article's image folder** and fix their links.
 2. **Link every referenced project source/config file** by its path (never a bare basename), pinned to the commit.
 3. **Remove next-article content previews** — trailing "下一篇看…/下一篇讲…" teasers that advertise the next article's topics.
 4. **Apply every item in the user requests** parameter.
+5. **Reduce AI flavor** — after the content edits, run the `humanizer-zh` and `chinese-writing` skills over the Chinese prose to strip AI-writing tells.
 
 ## Workflow
 
@@ -55,7 +56,13 @@ If the doc path is missing, ask. Do not touch other articles.
 
 7. **Apply the user requests.** Complete each requested edit. Before writing any concrete value quoted from code (a constant, default, enum, path), read it at the pinned commit (`git show <sha>:<path>`) and use the real value — do not trust the prose that is already there.
 
-8. **Grammar-lint the Markdown — the build will NOT catch this.** Unbalanced inline markers are *valid* MDX: they compile clean but render literally (an unclosed `**` prints `**可交互的主界面` instead of bolding it; an unclosed `` ` `` swallows the rest of the line as code). After every edit, verify inline markup is balanced. A quick per-line heuristic for the most common offender (odd number of `**`):
+8. **De-AI / humanize the Chinese prose.** After the content edits land, invoke the `humanizer-zh` skill (去除 AI 写作痕迹) and the `chinese-writing` skill (去 AI 味六原则), and apply their guidance as in-place edits to this doc's prose — not as a separate rewritten copy or score report. Guardrails:
+   - Rewrite only Chinese prose (paragraph text, list-item text, headings). **Never touch** fenced code blocks, inline code, shell commands, file paths, GitHub permalinks or their visible path text, frontmatter, image links / alt structure, or any exact value quoted from the pinned commit.
+   - Do not invent facts or soften a verified technical claim; humanizing changes voice, not content.
+   - Reduce mechanical over-bolding but keep sparse, intentional **加粗** of key terms.
+   - Keep Chinese typography (spaces around English words, acronyms, product names, and inline code adjacent to CJK) and keep the doc MDX-valid; re-check inline-marker balance in the grammar-lint step below.
+
+9. **Grammar-lint the Markdown — the build will NOT catch this.** Unbalanced inline markers are *valid* MDX: they compile clean but render literally (an unclosed `**` prints `**可交互的主界面` instead of bolding it; an unclosed `` ` `` swallows the rest of the line as code). After every edit, verify inline markup is balanced. A quick per-line heuristic for the most common offender (odd number of `**`):
 
    ```powershell
    $n=0; Get-Content -LiteralPath <doc> -Encoding UTF8 | ForEach-Object { $n++
@@ -64,7 +71,7 @@ If the doc path is missing, ask. Do not touch other articles.
 
    Also eyeball: unclosed inline code `` ` ``, unbalanced `*italic*` / `_italic_`, and stray `]`/`)` from half-finished `[text](url)` links. Emphasis must hug non-space text (`**词**`, not `** 词 **`), and a marker opened on one line does not close on the next.
 
-9. **Build to validate:** prefer the parallel-safe launcher, because a `blog-serve`/`blog-preview` may already hold `xtask.exe`:
+10. **Build to validate:** prefer the parallel-safe launcher, because a `blog-serve`/`blog-preview` may already hold `xtask.exe`:
 
    ```powershell
    ./scripts/xtask.ps1 blog-build     # Windows
@@ -73,11 +80,11 @@ If the doc path is missing, ask. Do not touch other articles.
 
    `onBrokenLinks: 'throw'` means every internal `.md`/category link must resolve; missing local images only warn.
 
-10. **Restart the dev server.** After the build passes, restart the local blog dev server via the `kqode-blog-serve` skill so the running preview picks up new or renamed docs, images, and config (hot reload misses those). If none is running, start one; either way confirm it comes up on `http://127.0.0.1:3000` and the fixed page loads.
+11. **Refresh the dev server.** The recommended dev server is `blog-dev` (via the `kqode-blog-serve` skill), which **auto-restarts** on the new/renamed docs, images, and config this skill produces — so if it is already running, just wait a moment (watch for its `[blog-dev] restarting — …` line) and confirm the fixed page loads on `http://127.0.0.1:3000/kqode-cli/`. If nothing is running, start `blog-dev`. Only force a manual restart if a plain `blog-serve` (no auto-restart wrapper) is running, since it misses new/renamed docs, images, and config.
 
-11. **Clean up** superseded/leftover loose pastes only after confirming the doc uses the kept images. Deleting a loose paste is destructive — do it only when the user asked to, or after they confirm.
+12. **Clean up** superseded/leftover loose pastes only after confirming the doc uses the kept images. Deleting a loose paste is destructive — do it only when the user asked to, or after they confirm.
 
-12. This pass is Chinese-only. Sync `blog/i18n/en` separately with `kqode-blog-translate-en` if requested.
+13. This pass is Chinese-only. Sync `blog/i18n/en` separately with `kqode-blog-translate-en` if requested.
 
 ## Rules
 
@@ -86,9 +93,10 @@ If the doc path is missing, ask. Do not touch other articles.
 - Every referenced repo file is a pinned-commit permalink whose **visible text is a path, not a bare basename** (e.g. `theme/themeConfig.ts`, not `themeConfig.ts`); the `href` uses the full repo-relative path. This holds in headings, tables, and inline prose alike.
 - Image folder names are stable English kebab-case topic slugs with no numeric prefix or Chinese; file names are meaningful English kebab-case.
 - Never invent code. Quote and describe only what exists at the pinned commit; verify constants/paths with `git show`/`git cat-file` before writing them.
+- Humanizing changes voice, not facts: the `humanizer-zh`/`chinese-writing` pass rewrites only Chinese prose and must leave code, commands, file paths, permalinks (and their visible path text), frontmatter, image links, and verified quoted values untouched.
 - Keep the doc valid MDX: no bare `{...}` **or bare `<` before a digit/space** in prose (both parse as JS/JSX and fail the build — wrap in inline code, e.g. `` `<10` ``, or escape `<` as `&lt;`); wrap inline code containing a backtick in double backticks; no blank lines inside tables or frontmatter; single blank lines between blocks.
-- Balance every inline marker. Unclosed `**`/`*`/`_`/`` ` `` is valid MDX that compiles but renders literally, so `blog-build` will NOT flag it — re-check balance after each edit (see workflow step 8).
+- Balance every inline marker. Unclosed `**`/`*`/`_`/`` ` `` is valid MDX that compiles but renders literally, so `blog-build` will NOT flag it — re-check balance after each edit (see workflow step 9).
 - Chinese typography: spaces on both sides of English words, acronyms, product names, and inline code adjacent to CJK — in titles, headings, prose, alt text, and table cells.
 - Do not preview the next article's content. Strip trailing "下一篇看…/下一篇讲…" teasers such as "下一篇看工作目录行和 Git 状态解析。"; each article stands alone. Keep in-scope deferral pointers that say where a specific topic is covered (e.g. "…放到第 9 篇讲。").
 - Keep files focused (~≤200 lines); this includes the helper script.
-- After a successful build, restart the dev server via the `kqode-blog-serve` skill so the running preview reflects new/renamed docs, images, or config; confirm the fixed page loads on `http://127.0.0.1:3000`.
+- After a successful build, make sure the dev server reflects new/renamed docs, images, or config: the `blog-dev` auto-restart server (via `kqode-blog-serve`) picks these up automatically; only a plain `blog-serve` needs a manual restart. Confirm the fixed page loads on `http://127.0.0.1:3000/kqode-cli/`.

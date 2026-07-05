@@ -1,6 +1,6 @@
 ---
 sidebar_position: 2
-title: 2. TUI主题与背景块组件
+title: 2. TUI 主题与背景块组件
 ---
 
 这一篇讲两个最底层、被几乎所有 UI 模块引用的东西：集中式的主题颜色 Scheme [`theme/themeConfig.ts`](https://github.com/kefeiqian/KQode/blob/dd15b678392eacc2ffcee88884eba18ae52c1236/tui/src/theme/themeConfig.ts)，以及给消息块做“半行留白”背景的 [`components/BackgroundBlock.tsx`](https://github.com/kefeiqian/KQode/blob/dd15b678392eacc2ffcee88884eba18ae52c1236/tui/src/components/BackgroundBlock.tsx) 组件。
@@ -48,7 +48,7 @@ export const githubDarkTheme = {
 
 终端屏幕本质是一张**字符网格**（character grid），可以想象成 Excel：每个格子（cell）只放一个字符，各带一个前景色（画字符用）和一个背景色（格子底色）。这里有个关键限制：**背景色只能“整格”填充**，没有“半格背景”。
 
-给用户消息刷背景时，若只给“文字那一行”设背景色，气泡就只有一行高、上下紧贴相邻内容，很局促。想让它像张舒展的卡片、上下有半行的内边距（padding），纯背景色最少也得加**一整行**实色——又太重、太抢眼。“半行”这种更轻的留白只靠背景色做不到，于是有了下面的半块字符方案。
+给用户消息刷背景时，若只给“文字那一行”设背景色，气泡就只有一行高、上下紧贴相邻内容，很局促。想让它像张舒展的卡片、上下有半行的内边距（padding），纯背景色最少也得加**一整行**实色，又太重、太抢眼。“半行”这种更轻的留白只靠背景色做不到，于是有了下面的半块字符方案。
 
 `BackgroundBlock` 用 `▄`/`▀` 两个 Unicode 半块字符做出这“半行留白”，手法借鉴自 Gemini CLI 的 [`HalfLinePaddedBox`](https://github.com/google-gemini/gemini-cli/blob/2e12c3400992f77d33e04d0c2870d961b92a3f9c/packages/cli/src/ui/components/shared/HalfLinePaddedBox.tsx)（直译“半行内边距盒子”）：
 
@@ -97,7 +97,7 @@ export function BackgroundBlock({ backgroundColor, children, mode = 'auto', widt
 
 ![开启半块（KQode 默认）时的消息气泡：每条消息上下各多出半行留白，气泡更高、更透气，像一张张舒展的卡片，与相邻内容明显分开](../../images/background-block/message-bubble-half-block-padding.png)
 
-对比很明显：朴素单行（上图）挤成一团；半块版（下图）每条消息都有了“半行”的上下呼吸感——这就是我们愿意为它多写几行渲染代码的原因。
+对比很明显：朴素单行（上图）挤成一团；半块版（下图）每条消息都有了“半行”的上下呼吸感，这也是我们愿意为它多写几行渲染代码的原因。
 
 ### 半块字符是怎么“只涂半格”的
 
@@ -133,6 +133,6 @@ export function shouldRenderBackgroundBlock({ colorDepth, isNoColor, isScreenRea
 
 - **[`NO_COLOR`](https://crates.io/crates/no_color) 环境变量**：这是一条被众多命令行工具采纳的社区约定（见官网 no-color.org）——只要这个变量存在（无论取值是什么），程序就应关闭彩色输出。
 - **屏幕阅读器开启时**：屏幕阅读器（screen reader）是给视障用户用的辅助技术，会把界面内容逐字念成语音或转成盲文；Ink 用 `useIsScreenReaderEnabled()` 探测它是否开启。满屏的半块字符 `▄▀` 对读屏软件是纯噪音，关掉背景反而更可读。
-- **色深要够（24 位真彩色）**：终端色深——必须支持 **24 位真彩色**（truecolor，`colorDepth >= 24`）才开背景。所谓 24 位，是指 RGB 三个通道各占 8 位、合计 2^24 ≈ 1670 万种颜色，能精确还原 `#141b22` 这类十六进制色值；而只有 256 色或 16 色的终端，会把块色**量化**到自带调色板里最接近的一项，`#141b22` 可能被近似成另一个很难看的颜色——那不如不刷。
+- **色深要够（24 位真彩色）**：终端必须支持 **24 位真彩色**（truecolor，`colorDepth >= 24`）才开背景。所谓 24 位，是指 RGB 三个通道各占 8 位、合计 2^24 ≈ 1670 万种颜色，能精确还原 `#141b22` 这类十六进制色值；而只有 256 色或 16 色的终端，会把块色**量化**到自带调色板里最接近的一项，`#141b22` 可能被近似成另一个很难看的颜色，那不如不刷。
 
-而且注意我们设计的时候，**所有“语义”都不仅仅是靠背景色承载的**。用户消息 vs assistant 消息靠 `❯`/`•` 前缀区分，错误靠 `ERROR:` 文本区分。就算背景整个关掉，界面依然可读。
+而且注意我们设计的时候，**所有“语义”都不只靠背景色承载**。用户消息 vs assistant 消息靠 `❯`/`•` 前缀区分，错误靠 `ERROR:` 文本区分。就算背景整个关掉，界面依然可读。

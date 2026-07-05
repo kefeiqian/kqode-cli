@@ -3,7 +3,7 @@ sidebar_position: 1
 title: 1. 创建 Rust 项目
 ---
 
-从这篇开始我们正式开始研发我们的 Coding Agent。这一篇先配置 RustRover IDE，并创建一个最小可运行的 Rust 项目，后面再在这个项目上逐步扩展 Agent Runtime 和 Harness。
+从这篇开始，我们正式进入 Coding Agent 的研发。这一篇先配置 RustRover IDE，创建一个最小可运行的 Rust 项目，后面再在它上面逐步扩展 Agent Runtime 和 Harness。
 
 创建 Rust 项目有两种常见方式：
 

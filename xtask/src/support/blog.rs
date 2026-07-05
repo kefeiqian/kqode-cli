@@ -41,6 +41,21 @@ pub fn serve(repo_root: &Path) -> Result<(), String> {
     bun::run_in(&paths::blog_root(repo_root), &["run", "serve"])
 }
 
+/// Starts the Docusaurus blog dev server with auto-restart on structural changes.
+///
+/// Runs the `dev` script (a Node wrapper around `docusaurus start`) that
+/// hot-reloads content edits but automatically restarts the server when files
+/// Docusaurus only reads at startup change (new/renamed/deleted docs and images,
+/// `_category_.json`, `docusaurus.config.ts`, `sidebars.ts`, plugins).
+///
+/// # Errors
+///
+/// Returns an error when dependencies cannot be installed or the dev server fails.
+pub fn dev(repo_root: &Path) -> Result<(), String> {
+    ensure_dependencies(repo_root)?;
+    bun::run_in(&paths::blog_root(repo_root), &["run", "dev"])
+}
+
 /// Starts the English Docusaurus blog dev server with hot reload.
 ///
 /// # Errors

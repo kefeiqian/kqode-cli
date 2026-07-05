@@ -1,11 +1,11 @@
 ---
 sidebar_position: 4
-title: 4. 正文转录区BodyPane
+title: 4. 正文转录区 BodyPane
 ---
 
 正文区是主界面最“像聊天记录”的部分。它把一串**类型化的 item** 编译成一行行可渲染文本，处理换行、消息块背景、滚动窗口和滚动条。逻辑分在两个文件：纯函数 [`components/bodyRows.ts`](https://github.com/kefeiqian/KQode/blob/dd15b678392eacc2ffcee88884eba18ae52c1236/tui/src/components/bodyRows.ts) 负责“item → 行”，组件 [`components/BodyPane.tsx`](https://github.com/kefeiqian/KQode/blob/dd15b678392eacc2ffcee88884eba18ae52c1236/tui/src/components/BodyPane.tsx) 负责“行 → 屏幕”。
 
-## 正文内容type定义：BodyEntry
+## 正文内容 type 定义：BodyEntry
 
 ```ts
 export type BodyEntry = {
@@ -15,11 +15,11 @@ export type BodyEntry = {
 };
 ```
 
-我们首先来定义BodyEntry，目前有三个属性， id, kind 和 text； 后续我们会有更多的类别。
+我们首先来定义 BodyEntry，目前有三个属性：id、kind 和 text；后续会再加入更多类别。
 
-## 把每个BodyEntry打包成行组件BodyRow：resolveBodyRows
+## 把每个 BodyEntry 打包成行组件 BodyRow：resolveBodyRows
 
-`resolveBodyRows` 把BodyEntry列表编译成 `BodyRow[]`. 有一个点需要注意就是当 item 太多需要增加滚动条的时候，我们需要特殊处理一下：
+`resolveBodyRows` 把 BodyEntry 列表编译成 `BodyRow[]`。这里有一点要注意：当 item 太多、需要显示滚动条的时候，得做点特殊处理：
 
 ![KQode 主界面正文区溢出时的截图：绿色的 Rust backend ACK - received 信息行与带 ❯ 前缀、灰色消息块背景的用户 prompt 行交替排列，内容超出可见高度，右侧边缘出现滚动条（红框标出），正文因此让出最右一列](../../images/body-pane/body-overflow-scrollbar.png)
 

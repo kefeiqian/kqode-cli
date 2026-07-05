@@ -209,7 +209,7 @@ expect(output).toContain('Preview mode: local Rust backend only.');
 
 Coding Agent 的 TUI 不应该只在自己的 `tui/` package 目录里运行。真实使用时，KQode 面对的是用户当前打开的项目目录，所以 `workspaceCwd` 从一开始就要按“被操作的项目”来理解。
 
-为了验证这个语义，U1 里加入了一个很小的 dummy React 项目：[`tests/fixtures/dummy-react-app/`](https://github.com/kefeiqian/KQode/tree/99949b9fe7698a1f0b87acda232281cbaeb4d81d/tests/fixtures/dummy-react-app)。它的 [`package.json`](https://github.com/kefeiqian/KQode/blob/99949b9fe7698a1f0b87acda232281cbaeb4d81d/tests/fixtures/dummy-react-app/package.json) 看起来像一个普通 Vite React app：
+为了验证这个语义，U1 里加入了一个很小的 dummy React 项目：[`tests/fixtures/dummy-react-app/`](https://github.com/kefeiqian/KQode/tree/99949b9fe7698a1f0b87acda232281cbaeb4d81d/tests/fixtures/dummy-react-app)。它的 [`dummy-react-app/package.json`](https://github.com/kefeiqian/KQode/blob/99949b9fe7698a1f0b87acda232281cbaeb4d81d/tests/fixtures/dummy-react-app/package.json) 看起来像一个普通 Vite React app：
 
 ```json
 {

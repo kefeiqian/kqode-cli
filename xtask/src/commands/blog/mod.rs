@@ -1,6 +1,7 @@
 use crate::commands::CommandSpec;
 
 pub mod build;
+pub mod dev;
 pub mod install;
 pub mod preview;
 pub mod serve;
@@ -37,10 +38,16 @@ pub const SERVE_EN: CommandSpec = CommandSpec {
     run: serve_en::run,
 };
 
+pub const DEV: CommandSpec = CommandSpec {
+    name: "blog-dev",
+    description: "Run the Docusaurus blog dev server with auto-restart on structural changes",
+    run: dev::run,
+};
+
 pub const PREVIEW: CommandSpec = CommandSpec {
     name: "blog-preview",
     description: "Serve the production Docusaurus blog build locally",
     run: preview::run,
 };
 
-pub const COMMANDS: &[CommandSpec] = &[INSTALL, BUILD, TYPECHECK, SERVE, SERVE_EN, PREVIEW];
+pub const COMMANDS: &[CommandSpec] = &[INSTALL, BUILD, TYPECHECK, SERVE, SERVE_EN, DEV, PREVIEW];
