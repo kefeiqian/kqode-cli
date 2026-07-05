@@ -1,6 +1,7 @@
 import { atom } from 'jotai';
 import { clamp } from '@libs/math/clamp.ts';
 import { overLimitMessage, PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
+import { resolveVerticalCursorIndex } from '@libs/composer/composerWindow.ts';
 
 export type ComposerState = {
   text: string;
@@ -24,6 +25,24 @@ export const initialComposerState: ComposerState = {
 };
 
 export const composerStateAtom = atom<ComposerState>(initialComposerState);
+
+/**
+ * Signed rows the composer view is scrolled away from its cursor-follow baseline
+ * (+ up / - down). Text/cursor mutations below do NOT reset it; the composer
+ * dispatches `scrollComposerCursorIntoViewAtom` on cursor changes to keep the
+ * caret visible with minimal scrolling, so typing after a click preserves the
+ * current view instead of snapping to the bottom. `clearComposerAtom` resets it
+ * since the text (and any scroll) is gone.
+ */
+export const composerScrollOffsetRowsAtom = atom(0);
+
+/**
+ * True while the user is actively scrolling (wheel / page keys). The composer
+ * hides its caret while this holds and re-shows it once scrolling settles, so
+ * the terminal cursor's blink is not reset on every scrolled frame. Driven by
+ * `useCaretScrollSuppression`.
+ */
+export const caretSuppressedWhileScrollingAtom = atom(false);
 
 export const insertComposerTextAtom = atom(
   null,
@@ -97,7 +116,39 @@ export const moveComposerCursorForwardAtom = atom(null, (_get, set) => {
   });
 });
 
+export const moveComposerCursorUpAtom = atom(null, (_get, set, { columns }: { columns: number }) => {
+  set(composerStateAtom, (state) => {
+    const target = resolveVerticalCursorIndex(state.text, columns, state.cursorIndex, 'up');
+    return target === null ? state : { ...state, cursorIndex: target };
+  });
+});
+
+export const moveComposerCursorDownAtom = atom(null, (_get, set, { columns }: { columns: number }) => {
+  set(composerStateAtom, (state) => {
+    const target = resolveVerticalCursorIndex(state.text, columns, state.cursorIndex, 'down');
+    return target === null ? state : { ...state, cursorIndex: target };
+  });
+});
+
+/**
+ * Places the caret at `index` while setting the scroll `offset` explicitly. The
+ * click path passes the offset that keeps the visible window fixed (see
+ * `resolveClickResult`), so clicking to reposition the caret does not scroll the
+ * composer.
+ */
+export const setComposerCursorWithOffsetAtom = atom(
+  null,
+  (_get, set, { index, offset }: { index: number; offset: number }) => {
+    set(composerScrollOffsetRowsAtom, offset);
+    set(composerStateAtom, (state) => ({
+      ...state,
+      cursorIndex: clampCursorIndex(state.text, index)
+    }));
+  }
+);
+
 export const clearComposerAtom = atom(null, (_get, set) => {
+  set(composerScrollOffsetRowsAtom, 0);
   set(composerStateAtom, (state) => {
     if (state.text.length === 0 && state.validationError === null) {
       return state;
@@ -107,6 +158,9 @@ export const clearComposerAtom = atom(null, (_get, set) => {
   });
 });
 
+// Intentionally does NOT reset composerScrollOffsetRowsAtom: its only caller
+// re-sets an already-set over-limit message (a guarded no-op). A future caller
+// that sets/clears the error from a non-insert path while scrolled should reset.
 export const setComposerValidationErrorAtom = atom(null, (_get, set, message: string | null) => {
   set(composerStateAtom, (state) => {
     if (state.validationError === message) {

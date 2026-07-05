@@ -17,6 +17,14 @@ name = "kqode"
 path = "main.rs"
 
 [dependencies]
+dotenvy = "0.15.7"
+eventsource-stream = "0.2.3"
+futures-util = "0.3.32"
 lsp-server = "0.7"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tokio = { version = "1.52.3", default-features = false, features = ["rt", "net", "time"] }
+tracing = "0.1.44"
+tracing-appender = "0.2.5"
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["std", "registry", "env-filter", "fmt"] }

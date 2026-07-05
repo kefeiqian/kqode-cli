@@ -48,4 +48,20 @@ describe('buildHardenedEnv', () => {
     expect(env.USERPROFILE).toBe('C:\\Users\\dev');
     expect(env.AZURE_CLIENT_SECRET).toBeUndefined();
   });
+
+  it('passes through non-secret KQode runtime toggles for the backend', () => {
+    const env = buildHardenedEnv({
+      platform: 'linux',
+      source: {
+        PATH: '/usr/bin',
+        KQODE_DEBUG: '1',
+        KQODE_LOG_DIR: '/tmp/kqode-logs',
+        GITHUB_TOKEN: 'should-be-dropped'
+      }
+    });
+
+    expect(env.KQODE_DEBUG).toBe('1');
+    expect(env.KQODE_LOG_DIR).toBe('/tmp/kqode-logs');
+    expect(env.GITHUB_TOKEN).toBeUndefined();
+  });
 });

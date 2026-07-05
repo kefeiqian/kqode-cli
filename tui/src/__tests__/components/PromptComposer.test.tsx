@@ -10,8 +10,9 @@ import { commandMenuDismissedAtom, highlightedCommandAtom } from '@state/ui/comm
 import { armedActionAtom } from '@state/ui/index.ts';
 import { ArmedAction } from '@constants/ui.ts';
 import { helpVisibleAtom } from '@state/ui/help/index.ts';
-import { composerStateAtom } from '@state/ui/composer/index.ts';
-import { submittedPromptEntriesAtom } from '@state/ui/index.ts';
+import { composerScrollOffsetRowsAtom, composerStateAtom } from '@state/ui/composer/index.ts';
+import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/dimensions.ts';
+import { scrollComposerByRowsAtom, submittedPromptEntriesAtom } from '@state/ui/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
@@ -65,6 +66,33 @@ describe('PromptComposer', () => {
     await flushInput();
 
     expect(onSubmit).toHaveBeenCalledWith('first\nsecond');
+  });
+
+  it('scrolls the caret back into view after a backslash-Enter edit that keeps the cursor index', async () => {
+    const store = createStore();
+    store.set(columnsTestOverrideAtom, 60);
+    store.set(rowsTestOverrideAtom, 24);
+    // A long prompt (overflows the composer cap) ending in a backslash, caret at end.
+    const text = `${Array.from({ length: 20 }, (_, index) => `line ${index}`).join('\n')}\\`;
+    store.set(composerStateAtom, { text, cursorIndex: text.length, validationError: null });
+
+    const { stdin } = renderWithJotai(<PromptComposer />, store);
+    await flushInput();
+
+    // Peek toward the top so the caret (at the end) is scrolled off-window.
+    store.set(scrollComposerByRowsAtom, 999);
+    await flushInput();
+    expect(store.get(composerScrollOffsetRowsAtom)).toBeGreaterThan(0);
+
+    // Bare Enter on the trailing `\` deletes it and inserts a newline in one
+    // keypress: the text changes but the net cursor index does not. The caret
+    // must still snap back into view (regression guard for the effect keying on
+    // text as well as cursor index).
+    stdin.write('\r');
+    await flushInput();
+
+    expect(store.get(composerStateAtom).text).toBe(`${text.slice(0, -1)}\n`);
+    expect(store.get(composerScrollOffsetRowsAtom)).toBe(0);
   });
 
   it('uses backslash followed by Enter as a newline fallback without submitting', async () => {
@@ -378,5 +406,60 @@ describe('PromptComposer', () => {
     expect(store.get(armedActionAtom)).toBeNull();
     expect(store.get(composerStateAtom).text).toBe('hellox');
     expect(lastFrame() ?? '').toContain('hellox');
+  });
+
+  it('renders the cursor-follow bottom window of an overflowing prompt at offset 0', () => {
+    const store = createStore();
+    store.set(composerStateAtom, {
+      text: '1111\n2222\n3333\n4444\n5555',
+      cursorIndex: 24,
+      validationError: null
+    });
+
+    const { lastFrame } = renderWithJotai(
+      <PromptComposer columns={40} maxVisibleLines={3} />,
+      store
+    );
+    const frame = lastFrame() ?? '';
+
+    expect(frame).toContain('5555');
+    expect(frame).not.toContain('1111');
+  });
+
+  it('scrolls the composer view to earlier rows when a scroll offset is set', () => {
+    const store = createStore();
+    store.set(composerStateAtom, {
+      text: '1111\n2222\n3333\n4444\n5555',
+      cursorIndex: 24,
+      validationError: null
+    });
+    store.set(composerScrollOffsetRowsAtom, 2);
+
+    const { lastFrame } = renderWithJotai(
+      <PromptComposer columns={40} maxVisibleLines={3} />,
+      store
+    );
+    const frame = lastFrame() ?? '';
+
+    expect(frame).toContain('1111');
+    expect(frame).not.toContain('5555');
+  });
+
+  it('moves the cursor between visual lines with the Up and Down arrows', async () => {
+    const store = createStore();
+    const { stdin } = renderWithJotai(<PromptComposer />, store);
+    store.set(composerStateAtom, {
+      text: 'aaa\nbbb\nccc',
+      cursorIndex: 11,
+      validationError: null
+    });
+
+    stdin.write('\u001B[A'); // Up
+    await flushInput();
+    expect(store.get(composerStateAtom).cursorIndex).toBe(7);
+
+    stdin.write('\u001B[B'); // Down
+    await flushInput();
+    expect(store.get(composerStateAtom).cursorIndex).toBe(11);
   });
 });

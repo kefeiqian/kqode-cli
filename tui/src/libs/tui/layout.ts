@@ -1,3 +1,8 @@
+import {
+  COMPOSER_BACKGROUND_PADDING_ROWS,
+  COMPOSER_MAX_HEIGHT_DIVISOR
+} from '@constants/ui.ts';
+
 /**
  * Rows occupied by the always-visible home-screen header (product name +
  * version). The app only renders at or above `MIN_COLUMNS`, so the header no
@@ -8,7 +13,6 @@ export const HEADER_ROWS = 1;
 export const DEFAULT_COMPOSER_ROWS = 3;
 export const BODY_CWD_GAP_ROWS = 1;
 
-const COMPOSER_BACKGROUND_PADDING_ROWS = 2;
 const COMPOSER_ERROR_RESERVE_ROWS = 1;
 
 /**
@@ -36,9 +40,19 @@ export function resolveHomeScreenLayout(
   // Fixed rows exclude the composer because it grows with wrapping/validation;
   // reserving one possible error row keeps the body from collapsing below 1 row.
   const fixedRows = headerRows + BODY_CWD_GAP_ROWS + resolvedCwdRows + statusRows;
+  // Cap the composer's visible text rows so the whole box (text + background
+  // padding + reserved error row) never exceeds `rows / COMPOSER_MAX_HEIGHT_DIVISOR`
+  // (half the terminal), keeping the transcript visible. The `min` with the
+  // body-preserving budget only ever shrinks the composer, so the total can
+  // never over-subscribe the canvas.
   const maxComposerVisibleRows = Math.max(
     1,
-    rows - fixedRows - COMPOSER_BACKGROUND_PADDING_ROWS - composerErrorReserveRows - minBodyRows
+    Math.min(
+      rows - fixedRows - COMPOSER_BACKGROUND_PADDING_ROWS - composerErrorReserveRows - minBodyRows,
+      Math.floor(rows / COMPOSER_MAX_HEIGHT_DIVISOR) -
+        COMPOSER_BACKGROUND_PADDING_ROWS -
+        composerErrorReserveRows
+    )
   );
   // The command menu (when open) renders above the composer; its rows come out
   // of the body budget so the composer and status stay pinned to the bottom and

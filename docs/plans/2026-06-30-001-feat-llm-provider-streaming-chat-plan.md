@@ -80,7 +80,7 @@ Traced from the origin requirements doc. This plan satisfies all 18 origin requi
 ### Relevant Code and Patterns
 - `src/backend.rs` — synchronous `lsp-server` stdio loop; currently matches only `Message::Request` and returns a `Response`. Streaming requires cloning `connection.sender` and emitting `Message::Notification`.
 - `src/protocol.rs` — `RpcMethod` enum, method-name constants, and typed params/results with `serde(deny_unknown_fields)`/`camelCase`. New methods/notifications follow this constant + typed-struct pattern (AGENTS.md: no hard-coded protocol names).
-- `src/session_store.rs`, `src/session_protocol.rs` (introduced by this plan's U9/U10) — `rusqlite` bundled SQLite under `~/.kqcode/`; tables `sessions`, `session_messages`, `session_context`, `repo_memory`; methods `kqode.session.start/list/resume` and `kqode.message.submit(sessionId, text)`. U9/U10 create the base store; the streaming units then extend the schema, add a versioned migration path, and add append-only session-log writes ahead of SQLite indexing.
+- `src/session_store.rs`, `src/session_protocol.rs` (introduced by this plan's U9/U10) — `rusqlite` bundled SQLite under `~/.kqode/`; tables `sessions`, `session_messages`, `session_context`, `repo_memory`; methods `kqode.session.start/list/resume` and `kqode.message.submit(sessionId, text)`. U9/U10 create the base store; the streaming units then extend the schema, add a versioned migration path, and add append-only session-log writes ahead of SQLite indexing.
 - `tui/src/libs/backend/` — `vscode-jsonrpc` client (`backendClient.ts`, `processBackendClient.ts`, `messageProtocol.ts`, `sessionProtocol.ts`). New `modelProtocol.ts` and notification wiring attach here.
 - `tui/src/components/` — `HomeScreen`, `BodyPane`, `StatusBar` (static `GPT-5.5` affordance), `PromptComposer` from the homepage slice; `ResumeSessionList` and the `/resume` command pattern are added by this plan's U10 and mirrored for `/model`.
 - `tui/src/state/` — Jotai atoms (`homeScreenAtoms.ts`, `composerAtoms.ts`). Shared model/transcript state uses Jotai; isolated input editing stays component-local (per project convention).
@@ -592,7 +592,7 @@ Two phases: **Phase A** builds the Rust core (U1–U6) plus the SQLite session s
 
 ### U9. Add the SQLite session store and session JSON-RPC methods
 
-**Goal:** Add a Rust-owned local SQLite session store under `~/.kqcode/` and expose narrow JSON-RPC methods for starting, recording, listing, and resuming sessions.
+**Goal:** Add a Rust-owned local SQLite session store under `~/.kqode/` and expose narrow JSON-RPC methods for starting, recording, listing, and resuming sessions.
 
 **Requirements:** R17
 
@@ -601,7 +601,7 @@ Two phases: **Phase A** builds the Rust core (U1–U6) plus the SQLite session s
 **Approach:**
 - Add SQLite storage under the Rust backend, not under display components or TUI-only state.
 - Use `rusqlite` with bundled SQLite (or an equivalent self-contained SQLite strategy) so packaged backends do not require system SQLite, pkg-config, vcpkg, or platform-specific runtime libraries.
-- Place the SQLite database under `~/.kqcode/` by default, with a test-only override so integration tests do not write to the real user profile.
+- Place the SQLite database under `~/.kqode/` by default, with a test-only override so integration tests do not write to the real user profile.
 - Create a small schema with `sessions`, `session_messages`, `session_context`, and `repo_memory` tables. Include stable ids, canonical absolute `workspace_cwd`, git root/repo key when detected, relative workspace subpath from the git root, `created_at`, `updated_at`, title/last-prompt metadata, message order, role/kind, status, text/content JSON, context fragments, and repo-memory kind/source fields.
 - Keep writes explicit and ordered: start session, record each user prompt when it is sent to the backend, record the completed assistant response/error, and update session `updated_at`/last prompt. Do not persist frontend-only queued prompts or validation-only errors in this slice.
 - Record repo memory only through an explicit session API/event with structured content. It must not infer broad semantic memory from arbitrary prompt text, and automatic repo-memory injection into the model context is deferred to a later memory-focused slice.
@@ -616,7 +616,7 @@ Two phases: **Phase A** builds the Rust core (U1–U6) plus the SQLite session s
 
 **Test scenarios:**
 - Happy path: starting the backend creates a SQLite database and a session row for the current `workspaceCwd`.
-- Happy path: the SQLite database is created under a test-overridden KQode home path and the production default resolves under `~/.kqcode/`.
+- Happy path: the SQLite database is created under a test-overridden KQode home path and the production default resolves under `~/.kqode/`.
 - Happy path: packaged backend smoke tests confirm SQLite open/read/write works on each supported target without system SQLite dependencies.
 - Happy path: starting a session inside a git repo stores git root/repo identity plus the relative workspace subpath and returns explicitly stored repo-memory rows for that repo.
 - Happy path: submitting a prompt records the user message and the matching assistant response with exact text and stable order.
@@ -745,9 +745,9 @@ Two phases: **Phase A** builds the Rust core (U1–U6) plus the SQLite session s
 ---
 
 ## Documentation / Operational Notes
-- Note the new `~/.kqcode/` `provider_credentials` table and the keychain entry (service `kqode`) in operational docs; document the env-var fallback for headless use and the `.cn`/`.ai` base-URL choice.
+- Note the new `~/.kqode/` `provider_credentials` table and the keychain entry (service `kqode`) in operational docs; document the env-var fallback for headless use and the `.cn`/`.ai` base-URL choice.
 - Document the new append-only session log, SQLite `user_version` migration path, the key-state surface (`configured`, `ephemeral env`, `unrecoverable stored`), and the explicit reconfigure flow after a lost keychain item.
-- Record that real prompts/model output are now stored under `~/.kqcode/`; transcript deletion/retention/redaction is a deferred privacy/compliance concern, not an accidental omission.
+- Record that real prompts/model output are now stored under `~/.kqode/`; transcript deletion/retention/redaction is a deferred privacy/compliance concern, not an accidental omission.
 - Validation: Rust via `cargo test --workspace`, `cargo fmt --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`; TUI via `cargo xtask tui-typecheck` and `cargo xtask tui-test`. No live Kimi calls in the suite.
 - A blog article documenting the provider/streaming/compaction design fits the `blog/docs/` series but is out of scope for this plan.
 

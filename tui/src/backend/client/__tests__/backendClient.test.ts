@@ -1,4 +1,6 @@
 import { PassThrough } from 'node:stream';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -10,8 +12,13 @@ import {
 } from 'vscode-jsonrpc/node';
 import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.ts';
 import { type LaunchedBackend } from '@backend/process/backendProcess.ts';
-import { ACK_MESSAGE } from '@contracts/backend/index.ts';
-import { messageSubmitRequest, backendReadyNotification } from '@backend/protocol/messageProtocol.ts';
+import { SUBMIT_STATUS_STREAMING } from '@contracts/backend/index.ts';
+import {
+  messageSubmitRequest,
+  backendReadyNotification,
+  tokenDeltaNotification,
+  turnEndNotification
+} from '@backend/protocol/messageProtocol.ts';
 import type { MessageSubmitResult } from '@contracts/backend/index.ts';
 import {
   BackendLifecycleState,
@@ -30,8 +37,18 @@ type FakeBackend = {
 
 let openServers: MessageConnection[] = [];
 
+// A fake backend that streams the submitted text back as one delta then ends
+// the turn, so `submitStreaming` resolves `completed` with that exact text.
 function ack(server: MessageConnection): void {
-  server.onRequest(messageSubmitRequest, ({ text }) => ({ message: ACK_MESSAGE, receivedText: text }));
+  server.onRequest(messageSubmitRequest, ({ text, turnId }) => {
+    queueMicrotask(async () => {
+      if (text.length > 0) {
+        await server.sendNotification(tokenDeltaNotification, { turnId, delta: text });
+      }
+      await server.sendNotification(turnEndNotification, { turnId, finishReason: 'stop' });
+    });
+    return { turnId, status: SUBMIT_STATUS_STREAMING };
+  });
 }
 
 function makeFakeBackend(
@@ -95,8 +112,8 @@ describe('createBackendClient (fake backend)', () => {
     expect(client.getState()).toBe(BackendLifecycleState.Ready);
     expect(launch).toHaveBeenCalledTimes(1);
 
-    const result = await client.submitMessage({ text: 'hello' });
-    expect(result).toEqual({ message: ACK_MESSAGE, receivedText: 'hello' });
+    const result = await client.submitStreaming({ text: 'hello' }, { onDelta: () => {} });
+    expect(result).toEqual({ kind: 'completed', text: 'hello', finishReason: 'stop' });
     expect(launch).toHaveBeenCalledTimes(1);
     client.dispose();
   });
@@ -106,9 +123,9 @@ describe('createBackendClient (fake backend)', () => {
     const client = createBackendClient({ launch: async () => fake.launched });
 
     expect(client.getState()).toBe(BackendLifecycleState.Idle);
-    const result = await client.submitMessage({ text: 'hello' });
+    const result = await client.submitStreaming({ text: 'hello' }, { onDelta: () => {} });
 
-    expect(result).toEqual({ message: ACK_MESSAGE, receivedText: 'hello' });
+    expect(result).toEqual({ kind: 'completed', text: 'hello', finishReason: 'stop' });
     expect(client.getState()).toBe(BackendLifecycleState.Ready);
     client.dispose();
   });
@@ -137,13 +154,17 @@ describe('createBackendClient (fake backend)', () => {
     const launch = vi.fn(async () => fake.launched);
     const client = createBackendClient({ launch });
 
-    await expect(client.submitMessage({ text: 'x' })).rejects.toMatchObject({
+    await expect(
+      client.submitStreaming({ text: 'x' }, { onDelta: () => {} })
+    ).rejects.toMatchObject({
       kind: BackendErrorKind.Protocol
     });
     expect(client.getState()).toBe(BackendLifecycleState.Ready);
     expect(fake.disposed()).toBe(false);
 
-    await expect(client.submitMessage({ text: 'y' })).rejects.toMatchObject({
+    await expect(
+      client.submitStreaming({ text: 'y' }, { onDelta: () => {} })
+    ).rejects.toMatchObject({
       kind: BackendErrorKind.Protocol
     });
     expect(launch).toHaveBeenCalledTimes(1);
@@ -159,14 +180,16 @@ describe('createBackendClient (fake backend)', () => {
     const launch = vi.fn(async () => backends.shift()?.launched as LaunchedBackend);
     const client = createBackendClient({ launch, requestTimeoutMs: 100 });
 
-    await expect(client.submitMessage({ text: 'first' })).rejects.toMatchObject({
+    await expect(
+      client.submitStreaming({ text: 'first' }, { onDelta: () => {} })
+    ).rejects.toMatchObject({
       kind: BackendErrorKind.Timeout
     });
     expect(client.getState()).toBe(BackendLifecycleState.Dead);
     expect(hung.disposed()).toBe(true);
 
-    const result = await client.submitMessage({ text: 'second' });
-    expect(result.receivedText).toBe('second');
+    const result = await client.submitStreaming({ text: 'second' }, { onDelta: () => {} });
+    expect(result).toEqual({ kind: 'completed', text: 'second', finishReason: 'stop' });
     expect(client.getState()).toBe(BackendLifecycleState.Ready);
     expect(launch).toHaveBeenCalledTimes(2);
     client.dispose();
@@ -176,7 +199,7 @@ describe('createBackendClient (fake backend)', () => {
     const fake = makeFakeBackend(ack);
     const client = createBackendClient({ launch: async () => fake.launched });
 
-    await client.submitMessage({ text: 'alive' });
+    await client.submitStreaming({ text: 'alive' }, { onDelta: () => {} });
     expect(client.getState()).toBe(BackendLifecycleState.Ready);
 
     fake.emitExit();
@@ -194,7 +217,9 @@ describe('createBackendClient (fake backend)', () => {
 
     client.dispose();
 
-    await expect(client.submitMessage({ text: 'after dispose' })).rejects.toMatchObject({
+    await expect(
+      client.submitStreaming({ text: 'after dispose' }, { onDelta: () => {} })
+    ).rejects.toMatchObject({
       kind: BackendErrorKind.Launch
     });
     // The disposed client is terminal: no fresh backend is launched.
@@ -213,7 +238,7 @@ describe('createBackendClient (fake backend)', () => {
     );
     const client = createBackendClient({ launch });
 
-    const submit = client.submitMessage({ text: 'race' });
+    const submit = client.submitStreaming({ text: 'race' }, { onDelta: () => {} });
     client.dispose();
     resolveLaunch?.(fake.launched);
 
@@ -225,15 +250,25 @@ describe('createBackendClient (fake backend)', () => {
 
 describe('createSourceBackendClient (integration)', () => {
   it(
-    'starts the Rust backend, submits, and receives the ACK with exact receivedText',
+    'builds and launches the Rust backend, routing to configuration without a key',
     async () => {
-      const client = createSourceBackendClient({ repoRoot, workspaceCwd: repoRoot });
+      // Run in a temp workspace whose ancestry has no `.env`, so the backend
+      // finds no KIMI_API_KEY and deterministically returns needsConfiguration —
+      // regardless of a developer's real `.env` at the repo root.
+      const workspaceCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-src-client-'));
+      const client = createSourceBackendClient({ repoRoot, workspaceCwd });
       try {
-        const result = await client.submitMessage({ text: '  café\n☕  ' });
-        expect(result.message).toBe(ACK_MESSAGE);
-        expect(result.receivedText).toBe('  café\n☕  ');
+        const outcome = await client.submitStreaming({ text: 'hello' }, { onDelta: () => {} });
+        expect(outcome).toEqual({ kind: 'needsConfiguration' });
       } finally {
         client.dispose();
+        // Best-effort: on Windows the just-killed backend may still hold the cwd
+        // handle briefly; the OS reclaims the temp dir regardless.
+        try {
+          fs.rmSync(workspaceCwd, { recursive: true, force: true });
+        } catch {
+          /* temp cleanup is best-effort */
+        }
       }
     },
     INTEGRATION_TIMEOUT_MS

@@ -8,6 +8,7 @@ import { bodyScrollOffsetRowsAtom, submittedPromptEntriesAtom } from '@state/ui/
 import {
   BACKEND_UNAVAILABLE_MESSAGE,
   backendErrorMessage,
+  outcomeToResult,
   queueToBodyEntries
 } from '@libs/promptQueue/promptQueue.ts';
 import type { BackendResult, QueueItem } from '@libs/promptQueue/promptQueue.ts';
@@ -76,7 +77,7 @@ async function drainQueue(get: Getter, set: Setter): Promise<void> {
   try {
     let active = findActive(get);
     while (active !== undefined) {
-      const result = await runBackendRequest(get, active.text);
+      const result = await streamActive(get, set, active.id, active.text);
       settleActive(get, set, active.id, result);
       active = findActive(get);
     }
@@ -85,21 +86,57 @@ async function drainQueue(get: Getter, set: Setter): Promise<void> {
   }
 }
 
-async function runBackendRequest(get: Getter, text: string): Promise<BackendResult> {
+/**
+ * Streams one prompt to the backend, rendering assistant deltas live into the
+ * active item, and resolves the terminal transcript result.
+ *
+ * The assistant marker appears immediately (empty streaming text), then each
+ * `onDelta` appends and re-syncs the body; the view sticks to the bottom so new
+ * output stays visible. Provider errors and the no-key path settle as themed
+ * body entries rather than throwing.
+ */
+async function streamActive(
+  get: Getter,
+  set: Setter,
+  id: number,
+  text: string
+): Promise<BackendResult> {
   const backendClient = get(backendClientAtom);
   if (backendClient === undefined) {
     return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(BACKEND_UNAVAILABLE_MESSAGE) };
   }
 
+  updateStreamingText(get, set, id, () => '');
+
   try {
-    const ack = await backendClient.submitMessage({ text });
-    return {
-      kind: BodyEntryKind.Success,
-      text: sanitizeDisplayText(`Rust backend ACK - received: ${ack.receivedText}`)
-    };
+    const outcome = await backendClient.submitStreaming(
+      { text },
+      {
+        onDelta: (delta) => {
+          updateStreamingText(get, set, id, (current) => current + delta);
+          set(bodyScrollOffsetRowsAtom, 0);
+        }
+      }
+    );
+    return outcomeToResult(outcome);
   } catch (error) {
     return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(backendErrorMessage(error)) };
   }
+}
+
+/** Applies `update` to the active item's streamed text and re-syncs body rows. */
+function updateStreamingText(
+  get: Getter,
+  set: Setter,
+  id: number,
+  update: (current: string) => string
+): void {
+  set(promptQueueAtom, (queue) =>
+    queue.map((item) =>
+      item.id === id ? { ...item, streamingText: update(item.streamingText ?? '') } : item
+    )
+  );
+  syncBodyEntries(get, set);
 }
 
 function settleActive(get: Getter, set: Setter, id: number, result: BackendResult): void {

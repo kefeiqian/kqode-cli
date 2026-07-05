@@ -8,8 +8,16 @@ import {
 import { ErrorCodes, type MessageConnection, ResponseError } from 'vscode-jsonrpc';
 import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.ts';
 import { createMessageConnectionClient } from '@backend/client/messageConnectionClient.ts';
-import { ACK_MESSAGE } from '@contracts/backend/index.ts';
-import { messageSubmitRequest } from '@backend/protocol/messageProtocol.ts';
+import {
+  SUBMIT_STATUS_NEEDS_CONFIGURATION,
+  SUBMIT_STATUS_STREAMING
+} from '@contracts/backend/index.ts';
+import {
+  messageSubmitRequest,
+  tokenDeltaNotification,
+  turnEndNotification,
+  turnErrorNotification
+} from '@backend/protocol/messageProtocol.ts';
 
 type PairedConnections = {
   client: MessageConnection;
@@ -45,11 +53,16 @@ function pairedConnections(): PairedConnections {
   return pair;
 }
 
-function ackingServer(server: MessageConnection): void {
-  server.onRequest(messageSubmitRequest, ({ text }) => ({
-    message: ACK_MESSAGE,
-    receivedText: text
-  }));
+function streamingServer(server: MessageConnection, deltas: readonly string[]): void {
+  server.onRequest(messageSubmitRequest, ({ turnId }) => {
+    queueMicrotask(async () => {
+      for (const delta of deltas) {
+        await server.sendNotification(tokenDeltaNotification, { turnId, delta });
+      }
+      await server.sendNotification(turnEndNotification, { turnId, finishReason: 'stop' });
+    });
+    return { turnId, status: SUBMIT_STATUS_STREAMING };
+  });
 }
 
 afterEach(() => {
@@ -60,26 +73,74 @@ afterEach(() => {
 });
 
 describe('message protocol client', () => {
-  it('sends kqode.message.submit and receives an ACK success response', async () => {
+  it('streams token deltas and resolves completed with the concatenated text', async () => {
     const { client, server } = pairedConnections();
-    ackingServer(server);
+    streamingServer(server, ['Hello', ', ', 'world']);
 
-    const result = await createMessageConnectionClient(client).submitMessage({
-      text: 'hello from tui'
-    });
+    const deltas: string[] = [];
+    const outcome = await createMessageConnectionClient(client).submitStreaming(
+      { text: 'hello from tui' },
+      { onDelta: (delta) => deltas.push(delta) }
+    );
 
-    expect(result.message).toBe(ACK_MESSAGE);
-    expect(result.receivedText).toBe('hello from tui');
+    expect(deltas).toEqual(['Hello', ', ', 'world']);
+    expect(outcome).toEqual({ kind: 'completed', text: 'Hello, world', finishReason: 'stop' });
   });
 
-  it('preserves Unicode, surrounding spaces, and newlines in receivedText', async () => {
+  it('preserves Unicode and whitespace across streamed deltas', async () => {
     const { client, server } = pairedConnections();
-    ackingServer(server);
+    streamingServer(server, ['  café\n', '☕ 日本語  ']);
 
-    const text = '  café\n☕ 日本語  ';
-    const result = await createMessageConnectionClient(client).submitMessage({ text });
+    const outcome = await createMessageConnectionClient(client).submitStreaming(
+      { text: 'unicode' },
+      { onDelta: () => {} }
+    );
 
-    expect(result.receivedText).toBe(text);
+    expect(outcome).toEqual({
+      kind: 'completed',
+      text: '  café\n☕ 日本語  ',
+      finishReason: 'stop'
+    });
+  });
+
+  it('resolves an error outcome when the backend emits kqode/turnError', async () => {
+    const { client, server } = pairedConnections();
+    server.onRequest(messageSubmitRequest, ({ turnId }) => {
+      queueMicrotask(() => {
+        void server.sendNotification(turnErrorNotification, {
+          turnId,
+          errorKind: 'auth',
+          message: 'Kimi rejected the API key'
+        });
+      });
+      return { turnId, status: SUBMIT_STATUS_STREAMING };
+    });
+
+    const outcome = await createMessageConnectionClient(client).submitStreaming(
+      { text: 'boom' },
+      { onDelta: () => {} }
+    );
+
+    expect(outcome).toEqual({
+      kind: 'error',
+      errorKind: 'auth',
+      message: 'Kimi rejected the API key'
+    });
+  });
+
+  it('resolves a needs-configuration outcome when the ack reports no key', async () => {
+    const { client, server } = pairedConnections();
+    server.onRequest(messageSubmitRequest, ({ turnId }) => ({
+      turnId,
+      status: SUBMIT_STATUS_NEEDS_CONFIGURATION
+    }));
+
+    const outcome = await createMessageConnectionClient(client).submitStreaming(
+      { text: 'no key' },
+      { onDelta: () => {} }
+    );
+
+    expect(outcome).toEqual({ kind: 'needsConfiguration' });
   });
 
   it('surfaces JSON-RPC method errors as typed protocol client errors', async () => {
@@ -88,7 +149,10 @@ describe('message protocol client', () => {
       throw new ResponseError(ErrorCodes.InvalidParams, 'invalid message submit params');
     });
 
-    const submit = createMessageConnectionClient(client).submitMessage({ text: 'boom' });
+    const submit = createMessageConnectionClient(client).submitStreaming(
+      { text: 'boom' },
+      { onDelta: () => {} }
+    );
 
     await expect(submit).rejects.toBeInstanceOf(BackendClientError);
     await expect(submit).rejects.toMatchObject({ kind: BackendErrorKind.Protocol });

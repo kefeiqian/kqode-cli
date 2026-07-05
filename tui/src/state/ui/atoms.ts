@@ -1,6 +1,7 @@
 import { atom } from 'jotai';
 import { countBodyRows, DEFAULT_BODY_ENTRIES } from '@libs/tui/bodyRows.ts';
-import type { BodyEntry } from '@libs/tui/bodyRows.ts';
+import { queueToBodyEntries } from '@libs/promptQueue/promptQueue.ts';
+import { promptQueueAtom, streamingTextByIdAtom } from '@state/promptQueue/store.ts';
 import { countCwdRows } from '@libs/tui/cwdLine.ts';
 import {
   BODY_CWD_GAP_ROWS,
@@ -14,10 +15,19 @@ import { bodyEntriesAtom } from '@state/ui/body.ts';
 import { columnsAtom, rowsAtom } from '@state/ui/dimensions.ts';
 import { gitStatusLabelAtom } from '@state/ui/gitStatus.ts';
 import { commandMenuDesiredRowsAtom, commandMenuOpenAtom } from '@state/ui/commands/index.ts';
+import { PROMPT_PREFIX } from '@constants/ui.ts';
+import {
+  resolveComposerWindow,
+  resolveScrollIntoViewOffset
+} from '@libs/composer/composerWindow.ts';
+import { composerScrollOffsetRowsAtom, composerStateAtom } from '@state/ui/composer/index.ts';
 
 export const bodyScrollOffsetRowsAtom = atom(0);
 export const composerRowsAtom = atom(DEFAULT_COMPOSER_ROWS);
-export const submittedPromptEntriesAtom = atom<BodyEntry[]>([]);
+/** Transcript body rows derived from the prompt queue and live streaming text. */
+export const submittedPromptEntriesAtom = atom((get) =>
+  queueToBodyEntries(get(promptQueueAtom), get(streamingTextByIdAtom))
+);
 
 /**
  * Rows the cwd line occupies in the layout. It collapses to `0` while the command
@@ -117,5 +127,56 @@ export const scrollBodyByRowsAtom = atom(null, (get, set, deltaRows: number) => 
   const maxBodyScrollOffsetRows = get(maxBodyScrollOffsetRowsAtom);
   set(bodyScrollOffsetRowsAtom, (current) =>
     clamp(current + deltaRows, 0, maxBodyScrollOffsetRows)
+  );
+});
+
+/**
+ * The composer's current visible window, derived from the live composer text,
+ * the shared input width (`columns − PROMPT_PREFIX.length`, matching the render),
+ * the layout's visible-line cap, and the scroll offset. Its `canScroll` and
+ * `minOffset`/`maxOffset` drive the wheel router and the scroll clamp.
+ */
+const composerWindowAtom = atom((get) => {
+  const inputColumns = Math.max(1, get(columnsAtom) - PROMPT_PREFIX.length);
+  const { text, cursorIndex } = get(composerStateAtom);
+  return resolveComposerWindow({
+    text,
+    columns: inputColumns,
+    maxVisibleLines: get(layoutAtom).composerVisibleRows,
+    cursorIndex,
+    offset: get(composerScrollOffsetRowsAtom)
+  });
+});
+
+/** Whether the composer overflows its cap — drives wheel fall-through to the body. */
+export const composerCanScrollAtom = atom((get) => get(composerWindowAtom).canScroll);
+
+export const scrollComposerByRowsAtom = atom(null, (get, set, deltaRows: number) => {
+  const { minOffset, maxOffset } = get(composerWindowAtom);
+  set(composerScrollOffsetRowsAtom, (current) =>
+    clamp(current + deltaRows, minOffset, maxOffset)
+  );
+});
+
+/**
+ * Adjusts the composer scroll offset so the caret stays visible after a text
+ * edit or cursor move, without snapping the view to the bottom: a no-op while
+ * the caret is already within the scrolled window, otherwise a minimal scroll to
+ * the nearest edge. The composer dispatches this whenever the cursor index
+ * changes (never on wheel scroll, which does not move the cursor), so typing
+ * after a click keeps the current view.
+ */
+export const scrollComposerCursorIntoViewAtom = atom(null, (get, set) => {
+  const inputColumns = Math.max(1, get(columnsAtom) - PROMPT_PREFIX.length);
+  const { text, cursorIndex } = get(composerStateAtom);
+  set(
+    composerScrollOffsetRowsAtom,
+    resolveScrollIntoViewOffset({
+      text,
+      columns: inputColumns,
+      maxVisibleLines: get(layoutAtom).composerVisibleRows,
+      cursorIndex,
+      offset: get(composerScrollOffsetRowsAtom)
+    })
   );
 });
