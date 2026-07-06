@@ -7,11 +7,11 @@ use lsp_server::{Connection, Message, Notification, Request, Response};
 use crate::conversation::{Command, ConversationEvent, Coordinator, SettledKind, TurnResult};
 use crate::debug_log;
 use crate::protocol::{
-    ActivatedParams, BACKEND_READY_METHOD, BackendReadyParams, ClearKeyParams, EnqueuedParams,
-    JSON_RPC_INVALID_PARAMS, JSON_RPC_METHOD_NOT_FOUND, RpcMethod, SelectionSetParams,
-    SettledParams, TOKEN_DELTA_METHOD, TURN_ACTIVATED_METHOD, TURN_END_METHOD,
-    TURN_ENQUEUED_METHOD, TURN_ERROR_METHOD, TURN_SETTLED_METHOD, TokenDeltaParams,
-    TurnCancelParams, TurnCancelResult, TurnEndParams, TurnErrorParams,
+    ActivatedParams, BACKEND_READY_METHOD, BackendReadyParams, ClearKeyParams,
+    ConversationClearResult, EnqueuedParams, JSON_RPC_INVALID_PARAMS, JSON_RPC_METHOD_NOT_FOUND,
+    RpcMethod, SelectionSetParams, SettledParams, TOKEN_DELTA_METHOD, TURN_ACTIVATED_METHOD,
+    TURN_END_METHOD, TURN_ENQUEUED_METHOD, TURN_ERROR_METHOD, TURN_SETTLED_METHOD,
+    TokenDeltaParams, TurnCancelParams, TurnCancelResult, TurnEndParams, TurnErrorParams,
 };
 use crate::store::Store;
 
@@ -143,11 +143,7 @@ fn handle_request(
         Some(RpcMethod::MessageSubmit) => {
             Some(message::handle_message_submit(request, coordinator, store))
         }
-        Some(RpcMethod::ConversationClear) => Some(Response::new_err(
-            request.id,
-            JSON_RPC_METHOD_NOT_FOUND,
-            format!("unsupported method `{}`", request.method),
-        )),
+        Some(RpcMethod::ConversationClear) => Some(handle_conversation_clear(request, coordinator)),
         Some(RpcMethod::TurnCancel) => Some(handle_turn_cancel(request, coordinator)),
         Some(RpcMethod::GitStatus) => {
             git_status::spawn_git_status(request, connection);
@@ -175,6 +171,13 @@ fn handle_request(
             format!("unsupported method `{}`", request.method),
         )),
     }
+}
+
+fn handle_conversation_clear(request: Request, coordinator: &Sender<Command>) -> Response {
+    // Clear takes no meaningful params; abandon the active turn, drop pending,
+    // and empty the transcript history on the single owner.
+    let _ = coordinator.send(Command::Clear);
+    Response::new_ok(request.id, ConversationClearResult { ok: true })
 }
 
 fn handle_turn_cancel(request: Request, coordinator: &Sender<Command>) -> Response {

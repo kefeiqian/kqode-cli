@@ -163,3 +163,46 @@ fn cancel_overrides_a_racing_completion_and_suppresses_late_delta() {
     expect_settled(&events, "A", SettledKind::Cancelled);
     handle.shutdown_and_join();
 }
+
+#[test]
+fn clear_drops_pending_and_abandons_active() {
+    let (handle, events, started) = harness();
+    let sender = handle.sender();
+    enqueue(&sender, "A");
+    expect_enqueued(&events, "A", TurnState::Active);
+    let a = started.recv_timeout(WAIT).unwrap();
+    enqueue(&sender, "B");
+    expect_enqueued(&events, "B", TurnState::Pending);
+    // A awaits cancel; clear abandons it and drops pending B.
+    a.actions.send(Action::AwaitCancel).unwrap();
+    sender.send(Command::Clear).unwrap();
+    expect_settled(&events, "A", SettledKind::Cancelled);
+    // B was dropped by clear: it never activates or starts a runner.
+    assert!(started.recv_timeout(Duration::from_millis(200)).is_err());
+    // A fresh submit starts active immediately (transcript history is gone).
+    enqueue(&sender, "C");
+    expect_enqueued(&events, "C", TurnState::Active);
+    let c = started.recv_timeout(WAIT).unwrap();
+    c.actions.send(Action::Complete("c")).unwrap();
+    expect_settled(&events, "C", SettledKind::Completed);
+    handle.shutdown_and_join();
+}
+
+#[test]
+fn clear_empties_settled_history_and_starts_fresh() {
+    let (handle, events, started) = harness();
+    let sender = handle.sender();
+    enqueue(&sender, "A");
+    expect_enqueued(&events, "A", TurnState::Active);
+    let a = started.recv_timeout(WAIT).unwrap();
+    a.actions.send(Action::Complete("done")).unwrap();
+    expect_settled(&events, "A", SettledKind::Completed);
+    // Clear with only a settled turn: nothing to abandon, history emptied.
+    sender.send(Command::Clear).unwrap();
+    enqueue(&sender, "B");
+    expect_enqueued(&events, "B", TurnState::Active);
+    let b = started.recv_timeout(WAIT).unwrap();
+    b.actions.send(Action::Complete("b")).unwrap();
+    expect_settled(&events, "B", SettledKind::Completed);
+    handle.shutdown_and_join();
+}

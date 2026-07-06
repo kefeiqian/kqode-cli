@@ -189,6 +189,7 @@ impl LoopState {
         }
         self.configs.clear();
         self.transcript.drop_pending();
+        self.transcript.drop_settled();
     }
 
     fn shutdown(&mut self) {

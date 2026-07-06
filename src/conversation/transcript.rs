@@ -160,6 +160,13 @@ impl Transcript {
         self.turns.retain(|turn| turn.state != TurnState::Pending);
     }
 
+    /// Removes settled turns, keeping any pending/active turns. Used by `/clear`
+    /// to empty the transcript history while leaving an abandoning active turn
+    /// in place until it settles (so its runner thread is still joined).
+    pub fn drop_settled(&mut self) {
+        self.turns.retain(|turn| turn.state != TurnState::Settled);
+    }
+
     #[must_use]
     pub fn turns(&self) -> &[TranscriptTurn] {
         &self.turns
