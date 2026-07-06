@@ -3,6 +3,7 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { useLayoutEffect } from 'react';
 import { HelpScreen } from '@components/HelpScreen/index.tsx';
 import { HomeScreen } from '@components/HomeScreen/index.tsx';
+import { LoginSurface } from '@components/LoginSurface/index.tsx';
 import { TerminalTooSmall } from '@components/TerminalTooSmall.tsx';
 import { useGlobalKeys } from '@/useGlobalKeys.ts';
 import {
@@ -29,7 +30,7 @@ export function App() {
   const setArmedAction = useSetAtom(armedActionAtom);
 
   useInput((_input, key) => {
-    if (key.escape && activeSurface !== Surface.Home) {
+    if (key.escape && activeSurface !== Surface.Home && activeSurface !== Surface.Login) {
       setArmedAction(null);
       closeActiveSurface();
     }
@@ -50,7 +51,7 @@ export function App() {
     case Surface.Help:
       return <HelpScreen />;
     case Surface.Login:
-      return <PendingSurface title="/login" />;
+      return <LoginSurface />;
     case Surface.Model:
       return <PendingSurface title="/model" />;
   }
