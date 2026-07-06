@@ -6,6 +6,7 @@ import type { BackendClientHandle } from '@backend/client/backendClient.ts';
 import { createSessionLogger } from '@backend/log/sessionLogger.ts';
 import { startBackendRuntime } from '@backend/runtime/backendRuntime.ts';
 import { resolveRepoRoot, resolveWorkspaceCwd } from '@libs/path/runtimePaths.ts';
+import { systemClipboard } from '@libs/clipboard/systemClipboard.ts';
 import { PRODUCT_NAME } from '@constants/product.ts';
 import { resolveProductVersion } from '@libs/product/productMetadata.ts';
 import { setTerminalWindowTitle, resetTerminalWindowTitle } from '@libs/terminal/windowTitle.ts';
@@ -24,7 +25,8 @@ import {
   repoRootAtom,
   sessionGitBaselineAtom,
   sessionStartedAtAtom,
-  workspaceCwdAtom
+  workspaceCwdAtom,
+  clipboardClientAtom
 } from '@state/global/index.ts';
 import { newTurnIdAtom } from '@state/promptQueue/atoms.ts';
 import { theme } from '@theme/themeConfig.ts';
@@ -70,6 +72,7 @@ export async function createAppRuntime({
 }: CreateAppRuntimeOptions): Promise<AppRuntime> {
   const store = createStore();
   store.set(newTurnIdAtom, { newTurnId: randomUUID });
+  store.set(clipboardClientAtom, systemClipboard);
   // The composition root owns the TUI session logger for the whole backend
   // lifetime; it buffers until the backend announces its session id on ready.
   const logger = createSessionLogger();

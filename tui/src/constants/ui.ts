@@ -77,6 +77,15 @@ export const PRESS_AGAIN_TO_EXIT_HINT = 'ctrl+c again to exit';
 /** Default left-aligned status-bar hints shown when no transient hint is active. */
 export const DEFAULT_STATUS_HINTS = '/ commands | @ mention | ? help';
 
+/** Milliseconds before a transient status-bar hint clears itself. */
+export const TRANSIENT_STATUS_HINT_MS = 1_500;
+
+/** Generic clipboard success hint used by copy/paste follow-up units. */
+export const CLIPBOARD_ACTION_SUCCEEDED_HINT = 'clipboard updated';
+
+/** Generic clipboard failure hint used by copy/paste follow-up units. */
+export const CLIPBOARD_ACTION_FAILED_HINT = 'clipboard unavailable';
+
 // --- Status-bar loading spinner ---
 
 /** Milliseconds between animated dots in the status-bar loading hint. */
