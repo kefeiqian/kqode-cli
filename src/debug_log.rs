@@ -42,9 +42,6 @@ pub(crate) const TRANSCRIPT_TARGET: &str = "kqode::transcript";
 /// Default `EnvFilter` directive when `RUST_LOG` is unset: transcript on, rest off.
 const DEFAULT_FILTER: &str = "kqode::transcript=info";
 
-/// Per-user KQode home directory name. Mirrors the TUI's `KQODE_HOME_DIRNAME`.
-const KQODE_HOME_DIRNAME: &str = ".kqode";
-
 /// Subdirectory under the KQode home holding runtime logs.
 const LOGS_DIRNAME: &str = "logs";
 
@@ -190,15 +187,7 @@ fn resolve_log_dir() -> Option<PathBuf> {
     {
         return Some(PathBuf::from(dir));
     }
-    Some(home_dir()?.join(KQODE_HOME_DIRNAME).join(LOGS_DIRNAME))
-}
-
-/// Best-effort home directory from `USERPROFILE` (Windows) or `HOME` (Unix).
-fn home_dir() -> Option<PathBuf> {
-    env::var_os("USERPROFILE")
-        .or_else(|| env::var_os("HOME"))
-        .map(PathBuf::from)
-        .filter(|path| !path.as_os_str().is_empty())
+    Some(crate::paths::kqode_home()?.join(LOGS_DIRNAME))
 }
 
 fn epoch_millis() -> u64 {

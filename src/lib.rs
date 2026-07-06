@@ -4,5 +4,6 @@ pub mod chat;
 pub mod config;
 pub mod debug_log;
 pub mod git;
+pub mod paths;
 pub mod protocol;
 pub mod provider;
