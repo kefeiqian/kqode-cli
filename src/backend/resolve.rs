@@ -11,8 +11,8 @@ use crate::store::Store;
 /// An explicit active selection is authoritative: if its key or custom endpoint
 /// cannot be resolved, the submit needs configuration and does not switch to
 /// another provider. When no active selection exists, the effective default is
-/// the first registry provider with a resolvable key and a registry default
-/// model.
+/// the first registry provider with a resolvable key and a resolvable default
+/// model (a preset's compiled default, or the Custom provider's `.env` model).
 #[must_use]
 pub(crate) fn resolve_submit_config(store: Option<&Store>) -> Option<KimiConfig> {
     let (provider, model) = match active_choice(store) {
@@ -37,9 +37,9 @@ fn active_choice(store: Option<&Store>) -> Option<(ProviderId, String)> {
 
 fn effective_default() -> Option<(ProviderId, String)> {
     registry::PROVIDERS.iter().find_map(|descriptor| {
-        let model = descriptor.default_model?;
+        let model = registry::effective_default_model(descriptor.id)?;
         secrets::resolve_key(descriptor.id)?;
-        Some((descriptor.id, model.to_owned()))
+        Some((descriptor.id, model))
     })
 }
 
@@ -48,7 +48,11 @@ fn resolve_base_url(store: Option<&Store>, provider: ProviderId) -> Option<Strin
         ProviderEndpoint::Fixed { base_url } => Some(base_url.to_owned()),
         ProviderEndpoint::Custom => store
             .and_then(|store| store.provider_settings(ProviderId::Custom).ok().flatten())
-            .map(|settings| settings.base_url),
+            .map(|settings| settings.base_url)
+            .or_else(|| {
+                crate::config::custom_env_base_url()
+                    .and_then(|url| registry::validate_base_url(&url).ok())
+            }),
     }
 }
 

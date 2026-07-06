@@ -27,7 +27,7 @@ struct IsolatedState {
 impl IsolatedState {
     fn new(guard: MutexGuard<'static, ()>) -> Self {
         let state = Self {
-            previous_env: env::var_os(KIMI_API_KEY_VAR),
+            previous_env: env::var_os(CUSTOM_API_KEY_VAR),
             _guard: guard,
         };
         state.clear();
@@ -38,7 +38,7 @@ impl IsolatedState {
         clear_key(ProviderId::Kimi).unwrap();
         clear_key(ProviderId::Custom).unwrap();
         unsafe {
-            env::remove_var(KIMI_API_KEY_VAR);
+            env::remove_var(CUSTOM_API_KEY_VAR);
         }
     }
 }
@@ -48,9 +48,9 @@ impl Drop for IsolatedState {
         self.clear();
         unsafe {
             if let Some(value) = &self.previous_env {
-                env::set_var(KIMI_API_KEY_VAR, value);
+                env::set_var(CUSTOM_API_KEY_VAR, value);
             } else {
-                env::remove_var(KIMI_API_KEY_VAR);
+                env::remove_var(CUSTOM_API_KEY_VAR);
             }
         }
     }
@@ -72,16 +72,16 @@ fn set_then_get_returns_the_same_key() {
 fn resolver_prefers_keychain_over_env() {
     with_isolated_state(|| {
         unsafe {
-            env::set_var(KIMI_API_KEY_VAR, "sk-env-fallback");
+            env::set_var(CUSTOM_API_KEY_VAR, "sk-env-fallback");
         }
-        set_key(ProviderId::Kimi, &ApiKey::new("sk-keychain".to_owned())).unwrap();
+        set_key(ProviderId::Custom, &ApiKey::new("sk-keychain".to_owned())).unwrap();
 
         assert_eq!(
-            KeychainKeyResolver.key_source(ProviderId::Kimi),
+            KeychainKeyResolver.key_source(ProviderId::Custom),
             KeySource::Keychain
         );
         assert_eq!(
-            resolve_key(ProviderId::Kimi).unwrap().expose(),
+            resolve_key(ProviderId::Custom).unwrap().expose(),
             "sk-keychain"
         );
     });
@@ -106,36 +106,36 @@ fn clear_removes_only_the_selected_provider_key() {
 #[test]
 fn clear_does_not_touch_env_fallback() {
     with_isolated_state(|| {
-        set_key(ProviderId::Kimi, &ApiKey::new("sk-keychain".to_owned())).unwrap();
+        set_key(ProviderId::Custom, &ApiKey::new("sk-keychain".to_owned())).unwrap();
         unsafe {
-            env::set_var(KIMI_API_KEY_VAR, "sk-env-after-clear");
+            env::set_var(CUSTOM_API_KEY_VAR, "sk-env-after-clear");
         }
 
-        clear_key(ProviderId::Kimi).unwrap();
+        clear_key(ProviderId::Custom).unwrap();
 
         assert_eq!(
-            KeychainKeyResolver.key_source(ProviderId::Kimi),
+            KeychainKeyResolver.key_source(ProviderId::Custom),
             KeySource::Env
         );
         assert_eq!(
-            resolve_key(ProviderId::Kimi).unwrap().expose(),
+            resolve_key(ProviderId::Custom).unwrap().expose(),
             "sk-env-after-clear"
         );
     });
 }
 
 #[test]
-fn custom_has_no_env_fallback() {
+fn kimi_has_no_env_fallback() {
     with_isolated_state(|| {
         unsafe {
-            env::set_var(KIMI_API_KEY_VAR, "sk-env-only");
+            env::set_var(CUSTOM_API_KEY_VAR, "sk-env-only");
         }
 
         assert_eq!(
-            KeychainKeyResolver.key_source(ProviderId::Custom),
+            KeychainKeyResolver.key_source(ProviderId::Kimi),
             KeySource::None
         );
-        assert!(resolve_key(ProviderId::Custom).is_none());
+        assert!(resolve_key(ProviderId::Kimi).is_none());
     });
 }
 

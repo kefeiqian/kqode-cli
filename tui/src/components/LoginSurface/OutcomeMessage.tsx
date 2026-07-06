@@ -39,7 +39,7 @@ const OUTCOME_MESSAGES: Record<SetKeyOutcome, { color: string; text: string }> =
   },
   [SET_KEY_OUTCOME_STORE_FAILED]: {
     color: theme.colors.errorRed,
-    text: 'Keychain write failed — set `KIMI_API_KEY` in `.env`, then retry.'
+    text: 'Keychain write failed — set `CUSTOM_API_KEY` in `.env`, then retry.'
   }
 };
 

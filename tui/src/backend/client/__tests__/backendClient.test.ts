@@ -450,7 +450,7 @@ describe('createSourceBackendClient (integration)', () => {
     'builds and launches the Rust backend, routing to configuration without a key',
     async () => {
       // Run in a temp workspace whose ancestry has no `.env`, so the backend
-      // finds no KIMI_API_KEY and deterministically returns needsConfiguration —
+      // finds no CUSTOM_API_KEY and deterministically returns needsConfiguration —
       // regardless of a developer's real `.env` at the repo root.
       const workspaceCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-src-client-'));
       const client = createSourceBackendClient({ repoRoot, workspaceCwd });

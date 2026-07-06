@@ -1,4 +1,4 @@
-use crate::config::KIMI_API_KEY_VAR;
+use crate::config::CUSTOM_API_KEY_VAR;
 use crate::protocol::{
     ActiveSelectionResult, CREDENTIAL_SOURCE_ENV, CREDENTIAL_SOURCE_KEYCHAIN, ClearKeyParams,
     ClearKeyResult, PROVIDER_STATUS_CONNECTED, PROVIDER_STATUS_NOT_CONFIGURED, ProviderListResult,
@@ -20,13 +20,18 @@ pub(crate) fn provider_list(store: Option<&Store>) -> ProviderListResult {
         .map(|descriptor| {
             let settings = provider_settings(store, descriptor.id);
             let source = key_source(descriptor.id, settings.as_ref(), store.is_some());
-            let status = registry::derive_status(descriptor.id, &move |provider| {
+            let raw_status = registry::derive_status(descriptor.id, &move |provider| {
                 if provider == descriptor.id {
                     source
                 } else {
                     key_source(provider, None, store.is_some())
                 }
             });
+            let base_url = settings
+                .as_ref()
+                .map(|settings| settings.base_url.clone())
+                .or_else(|| fallback_base_url(descriptor.endpoint));
+            let status = gate_status_on_base_url(descriptor.id, raw_status, base_url.as_deref());
             let (status, credential_source) = status_fields(status);
             ProviderStatusInfo {
                 provider_id: descriptor.id.as_str().to_owned(),
@@ -34,13 +39,8 @@ pub(crate) fn provider_list(store: Option<&Store>) -> ProviderListResult {
                     .as_ref()
                     .and_then(|settings| settings.label.clone())
                     .unwrap_or_else(|| descriptor.label.to_owned()),
-                base_url: settings
-                    .as_ref()
-                    .map(|settings| settings.base_url.clone())
-                    .or_else(|| descriptor_base_url(descriptor.endpoint)),
-                default_model: registry::provider_descriptor(descriptor.id)
-                    .default_model
-                    .map(str::to_owned),
+                base_url,
+                default_model: registry::effective_default_model(descriptor.id),
                 status,
                 credential_source,
             }
@@ -118,24 +118,44 @@ fn key_source(
     if settings.is_some_and(|settings| settings.key_present) {
         return KeySource::Keychain;
     }
-    if !persistence_available
-        && provider == ProviderId::Kimi
-        && matches!(crate::secrets::get_key(provider), Ok(Some(_)))
-    {
+    if !persistence_available && matches!(crate::secrets::get_key(provider), Ok(Some(_))) {
         return KeySource::Keychain;
     }
-    if provider == ProviderId::Kimi
-        && std::env::var(KIMI_API_KEY_VAR).is_ok_and(|value| !value.trim().is_empty())
+    if provider == ProviderId::Custom
+        && std::env::var(CUSTOM_API_KEY_VAR).is_ok_and(|value| !value.trim().is_empty())
     {
         return KeySource::Env;
     }
     KeySource::None
 }
 
-fn descriptor_base_url(endpoint: ProviderEndpoint) -> Option<String> {
+/// Base URL to show when no stored provider settings exist: a preset's fixed
+/// endpoint, or the Custom provider's validated `.env` base URL.
+fn fallback_base_url(endpoint: ProviderEndpoint) -> Option<String> {
     match endpoint {
         ProviderEndpoint::Fixed { base_url } => Some(base_url.to_owned()),
-        ProviderEndpoint::Custom => None,
+        ProviderEndpoint::Custom => crate::config::custom_env_base_url()
+            .and_then(|url| registry::validate_base_url(&url).ok()),
+    }
+}
+
+/// Downgrades a Custom provider's connected status to not-configured when no
+/// base URL resolves.
+///
+/// The Custom endpoint is user-supplied, so a credential without a resolvable
+/// (store or validated `.env`) base URL is unusable — the submit path already
+/// yields needs-configuration in that case. Gating the status here keeps the
+/// selection surfaces from advertising a provider that cannot serve a turn.
+/// Preset providers have a fixed compiled endpoint and are never gated.
+fn gate_status_on_base_url(
+    provider: ProviderId,
+    status: ProviderStatus,
+    base_url: Option<&str>,
+) -> ProviderStatus {
+    if provider == ProviderId::Custom && base_url.is_none() {
+        ProviderStatus::NotConfigured
+    } else {
+        status
     }
 }
 

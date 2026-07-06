@@ -95,7 +95,7 @@ function PersistenceDegradedMessage({ providerId }: { providerId: string | null 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={theme.colors.warning} paddingX={1}>
       <Text color={theme.colors.warning}>
-        Settings won&apos;t persist (storage unavailable); set `KIMI_API_KEY` in `.env` to persist across restarts.
+        Settings won&apos;t persist (storage unavailable); set `CUSTOM_API_KEY` in `.env` to persist across restarts.
       </Text>
       {providerId === PROVIDER_ID_CUSTOM ? (
         <Text color={theme.colors.warning}>Custom can&apos;t be saved in this mode because its base URL needs storage.</Text>

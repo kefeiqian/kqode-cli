@@ -1,29 +1,31 @@
-//! Runtime configuration for the Kimi provider, sourced from environment
-//! variables (populated from a `.env` file at backend startup).
+//! Runtime provider configuration sourced from environment variables
+//! (populated from a `.env` file at backend startup).
 //!
-//! Only the API key is required; the model and base URL fall back to documented
-//! defaults so a minimal `.env` needs a single line. The key is read at use time
-//! and never logged.
+//! The `.env` file configures the user-supplied **Custom** provider: an
+//! OpenAI-compatible endpoint that is not one of the compiled presets. The
+//! built-in Kimi preset is configured through `/login` (OS keychain) only and
+//! never reads the environment. Values are read at use time and never logged.
 
 use std::env;
 
-/// Environment variable holding the Kimi/Moonshot API key.
-pub const KIMI_API_KEY_VAR: &str = "KIMI_API_KEY";
+/// Environment variable holding the Custom provider API key.
+pub const CUSTOM_API_KEY_VAR: &str = "CUSTOM_API_KEY";
 
-/// Environment variable overriding the Kimi model id.
-pub const KIMI_MODEL_VAR: &str = "KIMI_MODEL";
+/// Environment variable holding the Custom provider model id.
+pub const CUSTOM_MODEL_VAR: &str = "CUSTOM_MODEL";
 
-/// Environment variable overriding the Kimi API base URL.
-pub const KIMI_BASE_URL_VAR: &str = "KIMI_BASE_URL";
+/// Environment variable holding the Custom provider base URL.
+pub const CUSTOM_BASE_URL_VAR: &str = "CUSTOM_BASE_URL";
 
-/// Default model: newer, coding-optimized, 256k context.
+/// Default model for the Kimi preset: coding-optimized, 256k context.
 pub const DEFAULT_KIMI_MODEL: &str = "kimi-k2.7-code";
 
-/// Default base URL (Moonshot China / CNY billing). International keys use
+/// Kimi preset base URL (Moonshot China / CNY billing). Fixed and never
+/// overridable from the environment. International keys use
 /// `https://api.moonshot.ai/v1`.
 pub const DEFAULT_KIMI_BASE_URL: &str = "https://api.moonshot.cn/v1";
 
-/// Resolved provider configuration for a single Kimi-compatible turn.
+/// Resolved provider configuration for a single OpenAI-compatible turn.
 ///
 /// Historically this was read from environment variables only; submit-time
 /// resolution now also reuses it as the carrier for active provider selections,
@@ -50,26 +52,23 @@ impl std::fmt::Debug for KimiConfig {
     }
 }
 
-impl KimiConfig {
-    /// Reads the Kimi configuration from the process environment.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ConfigError::MissingApiKey`] when [`KIMI_API_KEY_VAR`] is unset
-    /// or blank, so the backend can route the user to configuration instead of
-    /// issuing an unauthenticated provider call.
-    pub fn from_env() -> Result<Self, ConfigError> {
-        let api_key = non_empty_var(KIMI_API_KEY_VAR).ok_or(ConfigError::MissingApiKey)?;
-        let model = non_empty_var(KIMI_MODEL_VAR).unwrap_or_else(|| DEFAULT_KIMI_MODEL.to_owned());
-        let base_url =
-            non_empty_var(KIMI_BASE_URL_VAR).unwrap_or_else(|| DEFAULT_KIMI_BASE_URL.to_owned());
+/// Reads the Custom provider model id from the environment, if set.
+///
+/// Returns `None` when [`CUSTOM_MODEL_VAR`] is unset or whitespace-only, so a
+/// placeholder `CUSTOM_MODEL=` line in `.env` counts as "not set".
+#[must_use]
+pub fn custom_env_model() -> Option<String> {
+    non_empty_var(CUSTOM_MODEL_VAR)
+}
 
-        Ok(Self {
-            api_key,
-            model,
-            base_url: base_url.trim_end_matches('/').to_owned(),
-        })
-    }
+/// Reads the raw Custom provider base URL from the environment, if set.
+///
+/// The value is returned unnormalized; callers validate and normalize it
+/// through the provider registry before use. Returns `None` when
+/// [`CUSTOM_BASE_URL_VAR`] is unset or whitespace-only.
+#[must_use]
+pub fn custom_env_base_url() -> Option<String> {
+    non_empty_var(CUSTOM_BASE_URL_VAR)
 }
 
 /// Reads an environment variable, treating unset and whitespace-only values the
@@ -80,28 +79,6 @@ fn non_empty_var(name: &str) -> Option<String> {
         _ => None,
     }
 }
-
-/// Reasons the Kimi configuration cannot be resolved.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ConfigError {
-    /// No usable API key is present in the environment.
-    MissingApiKey,
-}
-
-impl std::fmt::Display for ConfigError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::MissingApiKey => {
-                write!(
-                    formatter,
-                    "{KIMI_API_KEY_VAR} is not set; configure it in .env"
-                )
-            }
-        }
-    }
-}
-
-impl std::error::Error for ConfigError {}
 
 #[cfg(test)]
 mod tests;

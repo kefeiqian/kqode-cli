@@ -35,7 +35,7 @@ export function useLoginBackend(baseUrl: string, label: string) {
 
   const refreshProviders = useCallback(async () => {
     if (client === undefined) {
-      setRequestError('Backend unavailable — set `KIMI_API_KEY` in `.env` and restart if needed.');
+      setRequestError('Backend unavailable — set `CUSTOM_API_KEY` in `.env` and restart if needed.');
       return;
     }
 
@@ -46,7 +46,7 @@ export function useLoginBackend(baseUrl: string, label: string) {
       setSelectedIndex((current) => Math.min(current, Math.max(0, result.providers.length - 1)));
       setRequestError(null);
     } catch {
-      setRequestError('Could not read providers — if keychain is unavailable, set `KIMI_API_KEY` in `.env`.');
+      setRequestError('Could not read providers — if keychain is unavailable, set `CUSTOM_API_KEY` in `.env`.');
     }
   }, [client, setPersistenceAvailable, setProviders, setRequestError, setSelectedIndex]);
 
@@ -71,7 +71,7 @@ export function useLoginBackend(baseUrl: string, label: string) {
           closeActiveSurface();
         }
       } catch {
-        setRequestError('Login failed — if keychain is unavailable, set `KIMI_API_KEY` in `.env`.');
+        setRequestError('Login failed — if keychain is unavailable, set `CUSTOM_API_KEY` in `.env`.');
       } finally {
         setInFlight(false);
       }

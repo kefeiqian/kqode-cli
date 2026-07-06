@@ -9,7 +9,7 @@ use std::{env, fmt};
 
 use secrecy::{ExposeSecret, SecretString};
 
-use crate::config::KIMI_API_KEY_VAR;
+use crate::config::CUSTOM_API_KEY_VAR;
 use crate::provider::ProviderId;
 use crate::provider::registry::{KeyResolver, KeySource};
 
@@ -125,7 +125,7 @@ pub fn clear_key(provider: ProviderId) -> Result<(), KeychainError> {
 /// Resolves a provider API key, preferring keychain over `.env`.
 ///
 /// Resolution is intentionally uncached so clear/set operations take effect on
-/// the next call. Keychain failures fall through to the Kimi-only `.env`
+/// the next call. Keychain failures fall through to the Custom-only `.env`
 /// fallback instead of hiding a working environment key.
 #[must_use]
 pub fn resolve_key(provider: ProviderId) -> Option<ApiKey> {
@@ -153,8 +153,8 @@ impl KeyResolver for KeychainKeyResolver {
 
 fn env_key(provider: ProviderId) -> Option<ApiKey> {
     match provider {
-        ProviderId::Kimi => non_empty_env(KIMI_API_KEY_VAR).map(ApiKey::new),
-        ProviderId::Custom => None,
+        ProviderId::Custom => non_empty_env(CUSTOM_API_KEY_VAR).map(ApiKey::new),
+        ProviderId::Kimi => None,
     }
 }
 

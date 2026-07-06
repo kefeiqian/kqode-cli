@@ -12,7 +12,7 @@ pub fn backend_output(input: &[u8]) -> Output {
         // Force the no-key path so integration tests are deterministic and never
         // issue a live provider call, even when a developer's `.env` has a real
         // key (dotenvy does not override an already-set variable).
-        .env("KIMI_API_KEY", "")
+        .env("CUSTOM_API_KEY", "")
         // Disable debug logging so the test-spawned backend never writes under
         // the real `~/.kqode/logs` (the dev build defaults it on).
         .env("KQODE_DEBUG", "0")

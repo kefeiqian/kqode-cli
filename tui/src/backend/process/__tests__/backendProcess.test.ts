@@ -107,7 +107,7 @@ describe('launchSourceBackend (integration)', () => {
     'builds and launches the backend and returns a well-formed ack',
     async () => {
       // A temp workspace with no `.env` in its ancestry makes the backend find
-      // no KIMI_API_KEY; submit still returns an accepted-only ack.
+      // no CUSTOM_API_KEY; submit still returns an accepted-only ack.
       const workspaceCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-launch-'));
       const backend = await launchSourceBackend({ repoRoot, workspaceCwd });
       try {

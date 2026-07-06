@@ -1,4 +1,5 @@
 use super::*;
+use crate::config::{CUSTOM_BASE_URL_VAR, CUSTOM_MODEL_VAR};
 use crate::paths::KQODE_DB_PATH_VAR;
 use crate::test_env;
 use std::env;
@@ -6,7 +7,9 @@ use std::sync::MutexGuard;
 
 struct EnvGuard {
     db_path: Option<std::ffi::OsString>,
-    kimi_key: Option<std::ffi::OsString>,
+    custom_key: Option<std::ffi::OsString>,
+    custom_model: Option<std::ffi::OsString>,
+    custom_base_url: Option<std::ffi::OsString>,
     _lock: MutexGuard<'static, ()>,
 }
 
@@ -14,12 +17,16 @@ impl EnvGuard {
     fn new(db_path: &std::path::Path, lock: MutexGuard<'static, ()>) -> Self {
         let guard = Self {
             db_path: env::var_os(KQODE_DB_PATH_VAR),
-            kimi_key: env::var_os(KIMI_API_KEY_VAR),
+            custom_key: env::var_os(CUSTOM_API_KEY_VAR),
+            custom_model: env::var_os(CUSTOM_MODEL_VAR),
+            custom_base_url: env::var_os(CUSTOM_BASE_URL_VAR),
             _lock: lock,
         };
         unsafe {
             env::set_var(KQODE_DB_PATH_VAR, db_path);
-            env::remove_var(KIMI_API_KEY_VAR);
+            env::remove_var(CUSTOM_API_KEY_VAR);
+            env::remove_var(CUSTOM_MODEL_VAR);
+            env::remove_var(CUSTOM_BASE_URL_VAR);
         }
         guard
     }
@@ -28,7 +35,9 @@ impl EnvGuard {
 impl Drop for EnvGuard {
     fn drop(&mut self) {
         restore_env(KQODE_DB_PATH_VAR, self.db_path.as_ref());
-        restore_env(KIMI_API_KEY_VAR, self.kimi_key.as_ref());
+        restore_env(CUSTOM_API_KEY_VAR, self.custom_key.as_ref());
+        restore_env(CUSTOM_MODEL_VAR, self.custom_model.as_ref());
+        restore_env(CUSTOM_BASE_URL_VAR, self.custom_base_url.as_ref());
     }
 }
 
@@ -145,4 +154,55 @@ fn provider_list_uses_cached_key_present_bit_for_keychain_status() {
         .unwrap();
     assert_eq!(kimi.status, PROVIDER_STATUS_CONNECTED);
     assert_eq!(kimi.credential_source, Some(CREDENTIAL_SOURCE_KEYCHAIN));
+}
+
+#[test]
+fn provider_list_reports_custom_connected_via_env_with_default_model() {
+    let (_dir, store, _env) = bootstrap();
+    unsafe {
+        env::set_var(CUSTOM_API_KEY_VAR, "sk-env-custom");
+        env::set_var(CUSTOM_MODEL_VAR, "env-model");
+        env::set_var(CUSTOM_BASE_URL_VAR, "https://models.example/v1");
+    }
+
+    let result = provider_list(Some(&store));
+
+    let custom = result
+        .providers
+        .iter()
+        .find(|row| row.provider_id == "custom")
+        .unwrap();
+    assert_eq!(custom.status, PROVIDER_STATUS_CONNECTED);
+    assert_eq!(custom.credential_source, Some(CREDENTIAL_SOURCE_ENV));
+    assert_eq!(custom.default_model.as_deref(), Some("env-model"));
+    assert_eq!(
+        custom.base_url.as_deref(),
+        Some("https://models.example/v1")
+    );
+
+    let kimi = result
+        .providers
+        .iter()
+        .find(|row| row.provider_id == "kimi")
+        .unwrap();
+    assert_eq!(kimi.status, PROVIDER_STATUS_NOT_CONFIGURED);
+}
+
+#[test]
+fn provider_list_marks_custom_not_configured_without_a_base_url() {
+    let (_dir, store, _env) = bootstrap();
+    unsafe {
+        env::set_var(CUSTOM_API_KEY_VAR, "sk-env-custom");
+        env::set_var(CUSTOM_MODEL_VAR, "env-model");
+    }
+
+    let result = provider_list(Some(&store));
+
+    let custom = result
+        .providers
+        .iter()
+        .find(|row| row.provider_id == "custom")
+        .unwrap();
+    assert_eq!(custom.status, PROVIDER_STATUS_NOT_CONFIGURED);
+    assert_eq!(custom.credential_source, None);
 }

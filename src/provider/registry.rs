@@ -55,6 +55,24 @@ pub fn provider_descriptor(provider: ProviderId) -> &'static ProviderDescriptor 
     }
 }
 
+/// The default model for a provider, including the Custom provider's `.env`
+/// override.
+///
+/// Presets return their compiled default model. The Custom provider has no
+/// compiled default and instead falls back to the `.env` `CUSTOM_MODEL` value
+/// when one is configured, so the effective-default and status surfaces can
+/// treat an env-configured Custom provider like any other selectable model.
+#[must_use]
+pub fn effective_default_model(provider: ProviderId) -> Option<String> {
+    if let Some(model) = provider_descriptor(provider).default_model {
+        return Some(model.to_owned());
+    }
+    match provider {
+        ProviderId::Custom => crate::config::custom_env_model(),
+        ProviderId::Kimi => None,
+    }
+}
+
 /// User-supplied Custom provider settings.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CustomProviderConfig {

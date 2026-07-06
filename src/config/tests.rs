@@ -8,58 +8,53 @@ fn env_guard() -> MutexGuard<'static, ()> {
 }
 
 fn clear() {
-    for var in [KIMI_API_KEY_VAR, KIMI_MODEL_VAR, KIMI_BASE_URL_VAR] {
+    for var in [CUSTOM_API_KEY_VAR, CUSTOM_MODEL_VAR, CUSTOM_BASE_URL_VAR] {
         unsafe { env::remove_var(var) };
     }
 }
 
 #[test]
-fn missing_key_is_an_error() {
+fn custom_env_model_is_none_when_unset() {
     let _guard = env_guard();
     clear();
+    assert_eq!(custom_env_model(), None);
+}
+
+#[test]
+fn custom_env_model_reads_and_trims_the_value() {
+    let _guard = env_guard();
+    clear();
+    unsafe { env::set_var(CUSTOM_MODEL_VAR, "  my-model  ") };
+    assert_eq!(custom_env_model().as_deref(), Some("my-model"));
+    clear();
+}
+
+#[test]
+fn custom_env_model_treats_blank_as_unset() {
+    let _guard = env_guard();
+    clear();
+    unsafe { env::set_var(CUSTOM_MODEL_VAR, "   ") };
+    assert_eq!(custom_env_model(), None);
+    clear();
+}
+
+#[test]
+fn custom_env_base_url_reads_and_trims_the_value() {
+    let _guard = env_guard();
+    clear();
+    unsafe { env::set_var(CUSTOM_BASE_URL_VAR, "  https://models.example/v1  ") };
     assert_eq!(
-        KimiConfig::from_env().unwrap_err(),
-        ConfigError::MissingApiKey
-    );
-}
-
-#[test]
-fn blank_key_counts_as_missing() {
-    let _guard = env_guard();
-    clear();
-    unsafe { env::set_var(KIMI_API_KEY_VAR, "   ") };
-    assert_eq!(
-        KimiConfig::from_env().unwrap_err(),
-        ConfigError::MissingApiKey
+        custom_env_base_url().as_deref(),
+        Some("https://models.example/v1")
     );
     clear();
 }
 
 #[test]
-fn defaults_apply_when_only_key_is_set() {
+fn custom_env_base_url_is_none_when_unset() {
     let _guard = env_guard();
     clear();
-    unsafe { env::set_var(KIMI_API_KEY_VAR, "secret-token") };
-    let config = KimiConfig::from_env().unwrap();
-    assert_eq!(config.api_key, "secret-token");
-    assert_eq!(config.model, DEFAULT_KIMI_MODEL);
-    assert_eq!(config.base_url, DEFAULT_KIMI_BASE_URL);
-    clear();
-}
-
-#[test]
-fn overrides_and_trailing_slash_trim_apply() {
-    let _guard = env_guard();
-    clear();
-    unsafe {
-        env::set_var(KIMI_API_KEY_VAR, "secret-token");
-        env::set_var(KIMI_MODEL_VAR, "kimi-k2.6");
-        env::set_var(KIMI_BASE_URL_VAR, "https://api.moonshot.ai/v1/");
-    }
-    let config = KimiConfig::from_env().unwrap();
-    assert_eq!(config.model, "kimi-k2.6");
-    assert_eq!(config.base_url, "https://api.moonshot.ai/v1");
-    clear();
+    assert_eq!(custom_env_base_url(), None);
 }
 
 #[test]

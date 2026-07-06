@@ -120,7 +120,7 @@ describe('LoginSurface', () => {
     const { lastFrame } = renderLogin(fakeClient({ persistenceAvailable: false }));
     const frame = await waitForFrame(lastFrame, "Settings won't persist");
 
-    expect(frame).toContain('set `KIMI_API_KEY` in `.env`');
+    expect(frame).toContain('set `CUSTOM_API_KEY` in `.env`');
   });
 
   it("warns that Custom can't be saved when persistence is degraded", async () => {

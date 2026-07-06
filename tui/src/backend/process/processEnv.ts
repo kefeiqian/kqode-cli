@@ -26,7 +26,7 @@ const CARGO_ALLOWLIST = ['CARGO_HOME', 'RUSTUP_HOME', 'RUSTUP_TOOLCHAIN'];
 
 // Non-secret KQode runtime toggles that must reach the spawned backend: the
 // debug-logging switch and its optional log-directory override. Passing these
-// through (rather than a provider key like KIMI_API_KEY, which stays out of the
+// through (rather than a provider key like CUSTOM_API_KEY, which stays out of the
 // allowlist and is read from `.env`) is safe and lets `--debug` / `KQODE_DEBUG`
 // enable backend logging in packaged builds.
 const KQODE_RUNTIME_ALLOWLIST = [KQODE_DEBUG_ENV_VAR, KQODE_LOG_DIR_ENV_VAR];
