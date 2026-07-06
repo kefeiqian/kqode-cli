@@ -23,7 +23,11 @@ pub const DEFAULT_KIMI_MODEL: &str = "kimi-k2.7-code";
 /// `https://api.moonshot.ai/v1`.
 pub const DEFAULT_KIMI_BASE_URL: &str = "https://api.moonshot.cn/v1";
 
-/// Resolved Kimi provider configuration for a single turn.
+/// Resolved provider configuration for a single Kimi-compatible turn.
+///
+/// Historically this was read from environment variables only; submit-time
+/// resolution now also reuses it as the carrier for active provider selections,
+/// keychain credentials, and custom or preset base URLs.
 #[derive(Clone)]
 pub struct KimiConfig {
     /// Bearer token used to authenticate with Kimi. Never logged or traced.

@@ -1,11 +1,11 @@
 use super::*;
+use crate::test_env;
 use std::ffi::OsString;
-use std::sync::{Mutex, MutexGuard, OnceLock};
+use std::sync::MutexGuard;
 
 // USERPROFILE / HOME / KQODE_DB_PATH are process-global; serialize env-touching tests.
 fn env_guard() -> MutexGuard<'static, ()> {
-    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-    LOCK.get_or_init(|| Mutex::new(())).lock().unwrap()
+    test_env::lock()
 }
 
 /// Saves and restores the home-related env vars so a test never leaks state

@@ -1,9 +1,9 @@
 use super::*;
 use crate::provider::registry::KeySource;
+use crate::test_env;
 use std::env;
-use std::sync::{Mutex, MutexGuard, Once};
+use std::sync::{MutexGuard, Once};
 
-static GLOBAL_STATE: Mutex<()> = Mutex::new(());
 static KEYRING_MOCK: Once = Once::new();
 
 fn setup_mock() {
@@ -13,9 +13,7 @@ fn setup_mock() {
 }
 
 fn with_isolated_state(test: impl FnOnce()) {
-    let _guard = GLOBAL_STATE
-        .lock()
-        .unwrap_or_else(|poison| poison.into_inner());
+    let _guard = test_env::lock();
     setup_mock();
     let _state = IsolatedState::new(_guard);
     test();

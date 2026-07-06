@@ -11,7 +11,11 @@ import {
 } from '@components/PromptComposer/promptTextView.ts';
 import { usePromptComposerInput } from '@components/PromptComposer/usePromptComposerInput.ts';
 import { DEFAULT_COMPOSER_VISIBLE_LINES } from '@constants/ui.ts';
-import { clearTranscriptAtom, enqueuePromptAtom } from '@state/promptQueue/index.ts';
+import {
+  clearTranscriptAtom,
+  enqueuePromptAtom,
+  restoreComposerDraftAtom
+} from '@state/promptQueue/index.ts';
 import { openHelpAtom } from '@state/ui/help/index.ts';
 import { openLoginSurfaceAtom, openModelSurfaceAtom } from '@state/ui/surface/index.ts';
 import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
@@ -58,7 +62,11 @@ export function PromptComposer({
   const atomInputLocked = useAtomValue(inputLockedAtom);
   const atomLayout = useAtomValue(layoutAtom);
   const atomComposerTop = useAtomValue(composerTopAtom);
+  const restoreDraft = useAtomValue(restoreComposerDraftAtom);
   const enqueuePrompt = useSetAtom(enqueuePromptAtom);
+  const setRestoreDraft = useSetAtom(restoreComposerDraftAtom);
+  const setComposerState = useSetAtom(composerStateAtom);
+  const setComposerScrollOffsetRows = useSetAtom(composerScrollOffsetRowsAtom);
   const setComposerRows = useSetAtom(composerRowsAtom);
   const scrollCursorIntoView = useSetAtom(scrollComposerCursorIntoViewAtom);
   const { exit } = useApp();
@@ -81,6 +89,19 @@ export function PromptComposer({
     () => ({ exit, clearTranscript, showHelp: openHelp, openLogin, openModel }),
     [exit, clearTranscript, openHelp, openLogin, openModel]
   );
+
+  useEffect(() => {
+    if (restoreDraft.length === 0) {
+      return;
+    }
+    setComposerState({
+      text: restoreDraft,
+      cursorIndex: restoreDraft.length,
+      validationError: null
+    });
+    setComposerScrollOffsetRows(0);
+    setRestoreDraft('');
+  }, [restoreDraft, setComposerScrollOffsetRows, setComposerState, setRestoreDraft]);
 
   usePromptComposerInput({
     isActive: resolvedIsActive,

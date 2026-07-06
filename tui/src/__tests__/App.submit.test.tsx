@@ -10,9 +10,14 @@ import type {
   StreamOutcome,
   StreamSubmitParams
 } from '@contracts/backend/index.ts';
-import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/index.ts';
+import {
+  activeSurfaceAtom,
+  columnsTestOverrideAtom,
+  rowsTestOverrideAtom,
+  Surface
+} from '@state/ui/index.ts';
 import { backendClientAtom, productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
-import { promptQueueAtom } from '@state/promptQueue/index.ts';
+import { promptQueueAtom, restoreComposerDraftAtom } from '@state/promptQueue/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
@@ -197,7 +202,7 @@ describe('App submit and streaming output', () => {
     expect(store.get(promptQueueAtom).some((item) => item.state === 'active')).toBe(false);
   });
 
-  it('renders a themed provider error when the streamed turn fails', async () => {
+  it('renders auth errors and reroutes to login with the prompt restored', async () => {
     const submitStreaming = vi.fn(
       async (): Promise<StreamOutcome> => ({
         kind: 'error',
@@ -205,25 +210,31 @@ describe('App submit and streaming output', () => {
         message: 'Kimi rejected the API key'
       })
     );
-    const { lastFrame, stdin } = renderApp({ submitStreaming });
+    const { stdin, store } = renderApp({ submitStreaming });
 
     await submit(stdin, 'needs a good key');
 
-    const frame = await waitForFrame(lastFrame, (output) =>
-      output.includes('Kimi rejected the API key')
+    await waitForFrame(
+      () => `${store.get(activeSurfaceAtom)}:${store.get(restoreComposerDraftAtom)}`,
+      (state) => state === `${Surface.Login}:needs a good key`
     );
-    expect(frame).toContain('❯ needs a good key');
-    expect(frame).toContain('ERROR:');
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Login);
+    expect(store.get(restoreComposerDraftAtom)).toBe('needs a good key');
+    expect(store.get(promptQueueAtom).at(-1)?.result?.text).toContain('Kimi rejected the API key');
   });
 
-  it('routes to configuration guidance when no key is set', async () => {
+  it('routes to login and restores the prompt when no key is set', async () => {
     const submitStreaming = vi.fn(
       async (): Promise<StreamOutcome> => ({ kind: 'needsConfiguration' })
     );
-    const { lastFrame, stdin } = renderApp({ submitStreaming });
+    const { stdin, store } = renderApp({ submitStreaming });
 
     await submit(stdin, 'hello');
 
-    await waitForFrame(lastFrame, (output) => output.includes('No Kimi API key configured.'));
+    await waitForFrame(
+      () => `${store.get(activeSurfaceAtom)}:${store.get(restoreComposerDraftAtom)}`,
+      (state) => state === `${Surface.Login}:hello`
+    );
+    expect(store.get(promptQueueAtom)).toEqual([]);
   });
 });

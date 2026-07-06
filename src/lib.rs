@@ -10,3 +10,6 @@ pub mod protocol;
 pub mod provider;
 pub mod secrets;
 pub mod store;
+
+#[cfg(test)]
+pub(crate) mod test_env;

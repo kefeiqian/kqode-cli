@@ -5,7 +5,7 @@ import {
   PromptComposer,
   resolveComposerCursorPosition
 } from '@components/PromptComposer/index.tsx';
-import { enqueuePromptAtom } from '@state/promptQueue/index.ts';
+import { enqueuePromptAtom, restoreComposerDraftAtom } from '@state/promptQueue/index.ts';
 import { commandMenuDismissedAtom, highlightedCommandAtom } from '@state/ui/commands/index.ts';
 import { armedActionAtom } from '@state/ui/index.ts';
 import { ArmedAction } from '@constants/ui.ts';
@@ -164,6 +164,21 @@ describe('PromptComposer', () => {
 
     expect(onSubmit).toHaveBeenCalledWith('  hello  ');
     expect(lastFrame() ?? '').not.toContain('Ask KQode...');
+  });
+
+  it('restores a pending draft at the end of the composer and clears the restore seam', async () => {
+    const store = createStore();
+    store.set(restoreComposerDraftAtom, 'retry this prompt');
+
+    renderWithJotai(<PromptComposer columns={40} />, store);
+    await flushInput();
+
+    expect(store.get(composerStateAtom)).toMatchObject({
+      text: 'retry this prompt',
+      cursorIndex: 'retry this prompt'.length,
+      validationError: null
+    });
+    expect(store.get(restoreComposerDraftAtom)).toBe('');
   });
 
   it('blocks empty or whitespace-only submits', async () => {

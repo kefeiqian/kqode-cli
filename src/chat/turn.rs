@@ -29,6 +29,10 @@ const NEXT_CHUNK_TIMEOUT: Duration = Duration::from_secs(120);
 /// `kqode/tokenDelta` notifications followed by a terminal `kqode/turnEnd` (or a
 /// single `kqode/turnError`), all tagged with `turn_id`.
 ///
+/// `config` carries the already resolved provider key, model, and base URL for
+/// this turn; submit-time resolution may source it from active selection,
+/// keychain, or environment fallback.
+///
 /// The turn is instrumented with a debug-log span carrying `turn_id`; when debug
 /// logging is enabled the assembled request and the response/error are recorded.
 pub fn spawn_streaming_turn<E>(turn_id: String, user_text: String, config: KimiConfig, emit: E)

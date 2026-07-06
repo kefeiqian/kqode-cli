@@ -1,10 +1,10 @@
 use super::*;
-use std::sync::{Mutex, MutexGuard, OnceLock};
+use crate::test_env;
+use std::sync::MutexGuard;
 
 // Environment mutation is process-global; serialize env-touching tests.
 fn env_guard() -> MutexGuard<'static, ()> {
-    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-    LOCK.get_or_init(|| Mutex::new(())).lock().unwrap()
+    test_env::lock()
 }
 
 fn clear() {

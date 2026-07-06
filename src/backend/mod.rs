@@ -13,6 +13,7 @@ mod git_status;
 mod login;
 mod message;
 mod providers;
+mod resolve;
 
 #[derive(Debug)]
 pub enum BackendError {
@@ -125,7 +126,9 @@ fn handle_request(
     store: Option<&Store>,
 ) -> Option<Response> {
     match RpcMethod::from_method(&request.method) {
-        Some(RpcMethod::MessageSubmit) => Some(message::handle_message_submit(request, connection)),
+        Some(RpcMethod::MessageSubmit) => {
+            Some(message::handle_message_submit(request, connection, store))
+        }
         Some(RpcMethod::GitStatus) => {
             git_status::spawn_git_status(request, connection);
             None

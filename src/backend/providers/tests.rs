@@ -1,9 +1,8 @@
 use super::*;
 use crate::paths::KQODE_DB_PATH_VAR;
+use crate::test_env;
 use std::env;
-use std::sync::{Mutex, MutexGuard};
-
-static ENV_MUTEX: Mutex<()> = Mutex::new(());
+use std::sync::MutexGuard;
 
 struct EnvGuard {
     db_path: Option<std::ffi::OsString>,
@@ -44,9 +43,7 @@ fn restore_env(name: &str, value: Option<&std::ffi::OsString>) {
 }
 
 fn bootstrap() -> (tempfile::TempDir, Store, EnvGuard) {
-    let lock = ENV_MUTEX
-        .lock()
-        .unwrap_or_else(|poison| poison.into_inner());
+    let lock = test_env::lock();
     let dir = tempfile::tempdir().expect("temp dir");
     let guard = EnvGuard::new(&dir.path().join("kqode.db"), lock);
     let store = Store::open_or_bootstrap().expect("bootstrap");

@@ -17,10 +17,6 @@ export type BackendResult = {
 /** Shown when a prompt is submitted with no backend client wired into the seam. */
 export const BACKEND_UNAVAILABLE_MESSAGE = 'Rust backend unavailable';
 
-/** Shown when the active provider has no usable API key (see .env `KIMI_API_KEY`). */
-export const NEEDS_CONFIGURATION_MESSAGE =
-  'No Kimi API key configured. Set KIMI_API_KEY in .env and restart KQode.';
-
 export type QueueItem = {
   id: number;
   text: string;
@@ -96,12 +92,9 @@ function buildItemEntries(item: QueueItem, streamingText: string | undefined): B
 }
 
 /** Maps a streamed turn's terminal {@link StreamOutcome} to a transcript result. */
-export function outcomeToResult(outcome: StreamOutcome): BackendResult {
+export function outcomeToResult(outcome: Exclude<StreamOutcome, { kind: 'needsConfiguration' }>): BackendResult {
   if (outcome.kind === 'completed') {
     return { kind: BodyEntryKind.Assistant, text: sanitizeDisplayText(outcome.text) };
-  }
-  if (outcome.kind === 'needsConfiguration') {
-    return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(NEEDS_CONFIGURATION_MESSAGE) };
   }
   return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(outcome.message) };
 }

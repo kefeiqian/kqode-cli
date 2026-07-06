@@ -7,6 +7,7 @@ import { backendClientAtom } from '@state/global/index.ts';
 import { bodyScrollOffsetRowsAtom } from '@state/ui/index.ts';
 import { promptQueueAtom, streamingTextByIdAtom } from '@state/promptQueue/store.ts';
 import { refreshGitStatusAtom } from '@state/ui/index.ts';
+import { openLoginSurfaceAtom } from '@state/ui/surface/index.ts';
 import { createDeltaCoalescer } from '@libs/promptQueue/streamCoalescer.ts';
 import { STREAM_RENDER_FLUSH_MS } from '@constants/backend.ts';
 import {
@@ -18,18 +19,20 @@ import type { BackendResult, QueueItem } from '@libs/promptQueue/promptQueue.ts'
 
 export { promptQueueAtom, streamingTextByIdAtom };
 
+const AUTH_ERROR_KIND = 'auth';
+
 let nextQueueItemId = 0;
 
 const drainingAtom = atom(false);
 
-/**
- * Appends a submitted prompt and drains the backend queue one request at a time.
- *
- * The prompt is shown immediately: the first item is active with no marker and
- * later items render `(pending)` until they become active. Raw text is sent to
- * the backend while only sanitized text reaches the body, and validation/queue
- * state stays in memory for this slice.
- */
+export const restoreComposerDraftAtom = atom('');
+
+type StreamActiveResult =
+  | { kind: 'settled'; result: BackendResult }
+  | { kind: 'needsConfiguration' }
+  | { kind: 'authError'; result: BackendResult };
+
+/** Appends a submitted prompt and drains the backend queue one request at a time. */
 export const enqueuePromptAtom = atom(null, async (get, set, rawText: string) => {
   const hasActive = get(promptQueueAtom).some((item) => item.state === 'active');
   const item: QueueItem = {
@@ -50,12 +53,6 @@ export const clearTranscriptAtom = atom(null, (_get, set) => {
   set(bodyScrollOffsetRowsAtom, 0);
 });
 
-/**
- * Records an unknown `/command` submission in the transcript instead of the
- * composer: the raw text renders as a prompt entry and a red error entry names
- * the unmatched command. The item is pre-settled so the backend queue never
- * sends it, mirroring how a real prompt and its result appear in the body.
- */
 export const appendUnknownCommandAtom = atom(null, (_get, set, rawText: string) => {
   const item: QueueItem = {
     id: nextQueueItemId++,
@@ -78,7 +75,16 @@ async function drainQueue(get: Getter, set: Setter): Promise<void> {
     let active = findActive(get);
     while (active !== undefined) {
       const result = await streamActive(get, set, active.id, active.text);
-      settleActive(set, active.id, result);
+      if (result.kind === 'needsConfiguration') {
+        rerouteToLogin(set, active.id, active.text, false);
+        return;
+      }
+      if (result.kind === 'authError') {
+        settleActive(set, active.id, result.result);
+        rerouteToLogin(set, active.id, active.text, true);
+        return;
+      }
+      settleActive(set, active.id, result.result);
       // A completed turn may have changed the working tree; refresh the git label
       // (fire-and-forget so it never delays draining the next queued prompt).
       void set(refreshGitStatusAtom);
@@ -89,27 +95,18 @@ async function drainQueue(get: Getter, set: Setter): Promise<void> {
   }
 }
 
-/**
- * Streams one prompt to the backend, rendering assistant deltas live into the
- * active item, and resolves the terminal transcript result.
- *
- * The assistant marker appears immediately (empty streaming text), then token
- * deltas are coalesced (see `createDeltaCoalescer`) and flushed at most ~15fps
- * into the live streaming text; the derived body sticks to the bottom so new
- * output stays visible. The final result is rendered by `settleActive`, so the
- * coalescer's trailing sub-frame buffer is safely discarded on completion.
- * Provider errors and the no-key path settle as themed body entries rather than
- * throwing.
- */
 async function streamActive(
   get: Getter,
   set: Setter,
   id: number,
   text: string
-): Promise<BackendResult> {
+): Promise<StreamActiveResult> {
   const backendClient = get(backendClientAtom);
   if (backendClient === undefined) {
-    return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(BACKEND_UNAVAILABLE_MESSAGE) };
+    return {
+      kind: 'settled',
+      result: { kind: BodyEntryKind.Error, text: sanitizeDisplayText(BACKEND_UNAVAILABLE_MESSAGE) }
+    };
   }
 
   updateStreamingText(set, id, () => '');
@@ -124,22 +121,23 @@ async function streamActive(
       { text },
       { onDelta: (delta) => coalescer.push(delta) }
     );
-    return outcomeToResult(outcome);
+    if (outcome.kind === 'needsConfiguration') {
+      return { kind: 'needsConfiguration' };
+    }
+    const result = outcomeToResult(outcome);
+    return outcome.kind === 'error' && outcome.errorKind === AUTH_ERROR_KIND
+      ? { kind: 'authError', result }
+      : { kind: 'settled', result };
   } catch (error) {
-    return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(backendErrorMessage(error)) };
+    return {
+      kind: 'settled',
+      result: { kind: BodyEntryKind.Error, text: sanitizeDisplayText(backendErrorMessage(error)) }
+    };
   } finally {
     coalescer.cancel();
   }
 }
 
-/**
- * Appends to the active item's live streaming text in O(1).
- *
- * The text lives in `streamingTextByIdAtom` (at most one entry) rather than in
- * the queue array, so a token delta rewrites only that single map entry instead
- * of cloning the whole queue. `submittedPromptEntriesAtom` derives its body rows
- * from this map, so there is no manual re-sync.
- */
 function updateStreamingText(
   set: Setter,
   id: number,
@@ -167,6 +165,20 @@ function settleActive(set: Setter, id: number, result: BackendResult): void {
     });
   });
   discardStreamingText(set, id);
+}
+
+function rerouteToLogin(
+  set: Setter,
+  activeId: number,
+  draft: string,
+  keepSettledActive: boolean
+): void {
+  set(promptQueueAtom, (queue) =>
+    queue.filter((item) => item.state === 'settled' || (keepSettledActive && item.id === activeId))
+  );
+  set(streamingTextByIdAtom, new Map());
+  set(restoreComposerDraftAtom, draft);
+  set(openLoginSurfaceAtom);
 }
 
 /** Drops a settled item's streaming buffer so the map holds at most one entry. */
