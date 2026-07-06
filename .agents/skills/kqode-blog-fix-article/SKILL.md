@@ -1,6 +1,6 @@
 ---
 name: kqode-blog-fix-article
-description: Fix and polish one existing KQode Docusaurus blog article. Moves loose pasted screenshots (including repo-root Obsidian `![[...]]` embeds and any image not yet under blog/docs/images) into the article's image folder with meaningful names, adds immutable pinned-commit GitHub links for every referenced project source/config file, strips trailing next-article content previews, applies a caller-provided list of edits, runs a Chinese de-AI/humanize pass (humanizer-zh, chinese-writing, humanize-chinese, personal-chinese-writing-style — applied in a fixed precedence order) over the prose, then restarts the local blog dev server so the change is live. When no specific article is given, runs a full-site blog-audit instead. Use when asked to fix up, polish, clean, or update an existing blog doc, move/insert/replace its pasted images and convert wikilinks, add commit permalinks to files it mentions, verify quoted code values, apply a batch of specific corrections to one article, or audit the whole blog.
+description: Fix and polish one existing KQode Docusaurus blog article. Moves loose pasted screenshots (including repo-root Obsidian `![[...]]` embeds and any image not yet under blog/docs/images) into the article's image folder with meaningful names, adds immutable pinned-commit GitHub links for referenced source/config files, strips trailing next-article content previews, expands English acronyms to their full name with an intro link (Wikipedia/Google) on first blog-wide use, applies a caller-provided list of edits, runs a Chinese de-AI/humanize pass (humanizer-zh, chinese-writing, humanize-chinese, personal-chinese-writing-style, in fixed precedence order) over the prose, then restarts the local blog dev server. When no specific article is given, runs a full-site blog-audit instead. Use when asked to fix up, polish, clean, or update an existing blog doc, fix its pasted images or wikilinks, add commit permalinks, verify quoted code values, apply a batch of corrections, or audit the whole blog.
 ---
 
 # KQode Blog Fix Article
@@ -16,13 +16,14 @@ Read `blog/AGENTS.md` first. All `kqode-blog-new-article` rules (ordering, front
 
 When a doc path is given, do not touch other articles.
 
-## Five standing jobs (always do these, even if unlisted)
+## Six standing jobs (always do these, even if unlisted)
 
 1. **Move out-of-folder images into the article's image folder** and fix their links.
 2. **Link every referenced project source/config file** by its path (never a bare basename), pinned to the commit.
 3. **Remove next-article content previews** — trailing "下一篇看…/下一篇讲…" teasers that advertise the next article's topics.
 4. **Apply every item in the user requests** parameter.
 5. **Reduce AI flavor** — after the content edits, run the four Chinese-writing skills (`chinese-writing`, `humanizer-zh`, `humanize-chinese`, `personal-chinese-writing-style`) over the Chinese prose, applied in the fixed precedence order in workflow step 8, to strip AI-writing tells and tighten the voice.
+6. **Expand English acronyms on first blog-wide use** — the first time an acronym appears in the blog's reading order, add its full English name **and an intro link (Wikipedia or a Google search) on that full name** so readers can jump to a definition; later occurrences and later articles keep the short form (see Rules for the format).
 
 ## Workflow
 
@@ -108,6 +109,7 @@ When a doc path is given, do not touch other articles.
 - Keep the doc valid MDX: no bare `{...}` **or bare `<` before a digit/space** in prose (both parse as JS/JSX and fail the build — wrap in inline code, e.g. `` `<10` ``, or escape `<` as `&lt;`); wrap inline code containing a backtick in double backticks; no blank lines inside tables or frontmatter; single blank lines between blocks.
 - Balance every inline marker. Unclosed `**`/`*`/`_`/`` ` `` is valid MDX that compiles but renders literally, so `blog-build` will NOT flag it — re-check balance after each edit (see workflow step 9).
 - Chinese typography: spaces on both sides of English words, acronyms, product names, and inline code adjacent to CJK — in titles, headings, prose, alt text, and table cells.
+- Expand English acronyms on their **first blog-wide use**: before expanding one in the current doc, grep the whole `blog/docs` tree and use the blog's reading order (numeric filename prefixes + `_category_.json` positions, i.e. the sidebar order) — expand only if no earlier-ordered doc already uses that acronym in prose, otherwise keep the short form. On that first occurrence add the verified full English name in full-width parens **and wrap that full name in an intro link** so readers can jump to a definition: a Chinese term becomes `中文术语（[Full English Name](intro-url), ACRONYM）` (e.g. `基本多文种平面（[Basic Multilingual Plane](https://en.wikipedia.org/wiki/Plane_%28Unicode%29), BMP）`), and a standalone acronym becomes `ACRONYM（[Full English Name](intro-url)）`. Prefer a canonical `intro-url` — a specific Wikipedia article, or the term's official spec/docs for a protocol/tool — that you have verified exists; fall back to a Google search link `https://www.google.com/search?q=<url-encoded full name>` when there is no clean canonical page. Percent-encode parentheses in the URL (`(`→`%28`, `)`→`%29`, common in Wikipedia disambiguation links like `Plane_%28Unicode%29`) so the Markdown link does not break. Never expand acronyms inside code, inline code, file paths, or permalinks; recurring uses in the same doc stay short; verify the full name rather than guessing; the Glossary appendix (附录 A：术语表) stays the blog-wide reference for later articles.
 - Do not preview the next article's content. Strip trailing "下一篇看…/下一篇讲…" teasers such as "下一篇看工作目录行和 Git 状态解析。"; each article stands alone. Keep in-scope deferral pointers that say where a specific topic is covered (e.g. "…放到第 9 篇讲。").
 - Keep files focused (~≤200 lines); this includes the helper script.
 - After a successful build, make sure the dev server reflects new/renamed docs, images, or config: the `blog-dev` auto-restart server (via `kqode-blog-serve`) picks these up automatically; only a plain `blog-serve` needs a manual restart. Confirm the fixed page loads on `http://127.0.0.1:3000/kqode-cli/`.
