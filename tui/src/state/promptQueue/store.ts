@@ -6,6 +6,14 @@ import type { TranscriptReducerState } from '@libs/promptQueue/transcriptReducer
 /** Ordered record of submitted prompts and their backend outcomes. */
 export const promptQueueAtom = atom<QueueItem[]>([]);
 
+/** Active backend turn id, or `null` when no active mirror item has one. */
+export const activeTurnIdAtom = atom((get) => {
+  const activeItem = get(promptQueueAtom).find(
+    (item) => item.state === 'active' && item.turnId !== undefined
+  );
+  return activeItem?.turnId ?? null;
+});
+
 /** Client-only rows that are composed with, but never stored in, the mirror. */
 export const clientOnlyRowsAtom = atom<ClientOnlyRow[]>([]);
 

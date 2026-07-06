@@ -1,6 +1,7 @@
 import { useInput } from 'ink';
 import { useStore } from 'jotai';
 import { handleCursorMove } from '@components/PromptComposer/input/handleCursorMove.ts';
+import { handleEscCancelTurn } from '@components/PromptComposer/input/handleEscCancelTurn.ts';
 import { handleEscArmedClear } from '@components/PromptComposer/input/handleEscArmedClear.ts';
 import { handleHistoryRecall } from '@components/PromptComposer/input/handleHistoryRecall.ts';
 import { handleNewline } from '@components/PromptComposer/input/handleNewline.ts';
@@ -28,12 +29,14 @@ type PromptComposerInputOptions = {
  * Priority-ordered branches of the composer's single `useInput`. The dispatcher
  * runs them in order and stops at the first that reports it handled the key, so
  * the order is behavior: newline (incl. modified Enter) precedes the open menu,
- * which precedes Esc-clear, cursor moves, bare-Enter submit, and text editing.
+ * which precedes active-turn Esc-cancel, Esc-clear, cursor moves, bare-Enter
+ * submit, and text editing.
  * Adding a key is a new handler plus one entry here — not more lines in the hook.
  */
 const COMPOSER_KEY_HANDLERS: readonly ComposerKeyHandler[] = [
   handleNewline,
   handleMenuKey,
+  handleEscCancelTurn,
   handleEscArmedClear,
   handleHistoryRecall,
   handleCursorMove,

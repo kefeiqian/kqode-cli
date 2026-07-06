@@ -19,12 +19,14 @@ import {
   nextQueueItemIdAtom,
   nextSubmissionSequenceAtom,
   promptQueueAtom,
+  activeTurnIdAtom,
   settledTurnIdsAtom,
   streamingTextByIdAtom,
   transcriptReducerStateAtom,
   turnGenerationByIdAtom
 } from '@state/promptQueue/store.ts';
 export {
+  activeTurnIdAtom,
   clientOnlyRowsAtom,
   conversationGenerationAtom,
   nextClientOnlyRowIdAtom,
