@@ -1,7 +1,7 @@
 ---
 title: "feat: Provider /login, /model Selection, and a Real Status Bar"
 type: feat
-status: active
+status: completed
 date: 2026-07-05
 deepened: 2026-07-05
 origin: docs/brainstorms/2026-07-05-provider-login-and-model-selection-requirements.md

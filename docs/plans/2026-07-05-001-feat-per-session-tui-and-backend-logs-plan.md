@@ -1,7 +1,7 @@
 ---
 title: "feat: Per-Session TUI and Backend Debug Logs"
 type: feat
-status: active
+status: completed
 date: 2026-07-05
 origin: docs/brainstorms/2026-07-05-per-session-tui-and-backend-debug-logs-requirements.md
 ---
