@@ -1,23 +1,21 @@
-import { Box, Text, useInput, useWindowSize } from 'ink';
+import { useInput, useWindowSize } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useLayoutEffect } from 'react';
 import { HelpScreen } from '@components/HelpScreen/index.tsx';
 import { HomeScreen } from '@components/HomeScreen/index.tsx';
 import { LoginSurface } from '@components/LoginSurface/index.tsx';
+import { ModelSurface } from '@components/ModelSurface/index.tsx';
 import { TerminalTooSmall } from '@components/TerminalTooSmall.tsx';
 import { useGlobalKeys } from '@/useGlobalKeys.ts';
 import {
   activeSurfaceAtom,
   armedActionAtom,
   closeActiveSurfaceAtom,
-  columnsAtom,
-  rowsAtom,
   Surface,
   terminalTooSmallAtom,
   windowColumnsAtom,
   windowRowsAtom
 } from '@state/ui/index.ts';
-import { theme } from '@theme/themeConfig.ts';
 
 export function App() {
   useGlobalKeys();
@@ -53,23 +51,6 @@ export function App() {
     case Surface.Login:
       return <LoginSurface />;
     case Surface.Model:
-      return <PendingSurface title="/model" />;
+      return <ModelSurface />;
   }
-}
-
-function PendingSurface({ title }: { title: string }) {
-  const columns = useAtomValue(columnsAtom);
-  const rows = useAtomValue(rowsAtom);
-
-  return (
-    <Box
-      flexDirection="column"
-      width={columns}
-      height={rows}
-      backgroundColor={theme.colors.bodyBackground}
-    >
-      <Text color={theme.colors.accentBlue}>{title}</Text>
-      <Text color={theme.colors.muted}>Surface implementation follows in the next unit. Esc returns home.</Text>
-    </Box>
-  );
 }
