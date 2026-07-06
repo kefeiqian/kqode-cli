@@ -1,7 +1,9 @@
-use lsp_server::{Connection, Message, Notification, Request, Response};
+use std::sync::mpsc::Sender;
+
+use lsp_server::{Request, Response};
 
 use super::resolve::resolve_submit_config;
-use crate::chat::spawn_streaming_turn;
+use crate::conversation::Command;
 use crate::protocol::{
     JSON_RPC_INVALID_PARAMS, MessageSubmitParams, MessageSubmitResult,
     SUBMIT_STATUS_NEEDS_CONFIGURATION, SUBMIT_STATUS_STREAMING,
@@ -15,7 +17,7 @@ use crate::store::Store;
 /// `needsConfiguration`.
 pub(super) fn handle_message_submit(
     request: Request,
-    connection: &Connection,
+    coordinator: &Sender<Command>,
     store: Option<&Store>,
 ) -> Response {
     let params = match serde_json::from_value::<MessageSubmitParams>(request.params) {
@@ -29,27 +31,16 @@ pub(super) fn handle_message_submit(
         }
     };
     let MessageSubmitParams { text, turn_id } = params;
-    match resolve_submit_config(store) {
-        None => Response::new_ok(
-            request.id,
-            MessageSubmitResult {
-                turn_id,
-                status: SUBMIT_STATUS_NEEDS_CONFIGURATION,
-            },
-        ),
-        Some(config) => {
-            let sender = connection.sender.clone();
-            let emit = move |notification: Notification| {
-                let _ = sender.send(Message::Notification(notification));
-            };
-            spawn_streaming_turn(turn_id.clone(), text, config, emit);
-            Response::new_ok(
-                request.id,
-                MessageSubmitResult {
-                    turn_id,
-                    status: SUBMIT_STATUS_STREAMING,
-                },
-            )
-        }
-    }
+    let config = resolve_submit_config(store);
+    let status = if config.is_some() {
+        SUBMIT_STATUS_STREAMING
+    } else {
+        SUBMIT_STATUS_NEEDS_CONFIGURATION
+    };
+    let _ = coordinator.send(Command::Enqueue {
+        turn_id: turn_id.clone(),
+        prompt: text,
+        config,
+    });
+    Response::new_ok(request.id, MessageSubmitResult { turn_id, status })
 }

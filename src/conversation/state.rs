@@ -1,0 +1,204 @@
+use std::collections::HashMap;
+use std::panic::{self, AssertUnwindSafe};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Sender;
+use std::thread::{self, JoinHandle};
+
+use crate::chat::CancellationToken;
+use crate::config::KimiConfig;
+
+use super::transcript::{Transcript, TurnResult, TurnState};
+use super::{Command, ConversationEvent, TurnJob};
+
+const NEEDS_CONFIGURATION_MESSAGE: &str = "Configure a provider before sending messages.";
+const PANIC_ERROR_KIND: &str = "panic";
+
+pub(super) type EventSink = Arc<dyn Fn(ConversationEvent) + Send + Sync + 'static>;
+pub(super) type TurnRunner = Arc<dyn Fn(TurnJob) + Send + Sync + 'static>;
+
+pub(super) struct LoopState {
+    transcript: Transcript,
+    configs: HashMap<String, Option<KimiConfig>>,
+    active_cancel: Option<CancellationToken>,
+    /// The active turn id awaiting cancellation, if any. While set, deltas from
+    /// that turn are suppressed and its settle is forced to `cancelled`, so a
+    /// chunk/completion that races the cancel can never win over the cancel.
+    cancelling: Option<String>,
+    active_thread: Option<JoinHandle<()>>,
+    command_tx: Sender<Command>,
+    event_sink: EventSink,
+    turn_runner: TurnRunner,
+    shutting_down: bool,
+    shutdown_requested: Arc<AtomicBool>,
+}
+
+impl LoopState {
+    pub(super) fn new(
+        command_tx: Sender<Command>,
+        event_sink: EventSink,
+        turn_runner: TurnRunner,
+        shutdown_requested: Arc<AtomicBool>,
+    ) -> Self {
+        Self {
+            transcript: Transcript::default(),
+            configs: HashMap::new(),
+            active_cancel: None,
+            cancelling: None,
+            active_thread: None,
+            command_tx,
+            event_sink,
+            turn_runner,
+            shutting_down: false,
+            shutdown_requested,
+        }
+    }
+
+    pub(super) fn handle(&mut self, command: Command) -> bool {
+        match command {
+            Command::Enqueue {
+                turn_id,
+                prompt,
+                config,
+            } => self.enqueue(turn_id, prompt, config),
+            Command::Delta { turn_id, text } => self.emit_current_delta(turn_id, text),
+            Command::Settle { turn_id, result } => self.settle(turn_id, result),
+            Command::Cancel { turn_id }
+                if self.transcript.active_id() == Some(turn_id.as_str()) =>
+            {
+                self.cancelling = Some(turn_id);
+                if let Some(cancel) = &self.active_cancel {
+                    cancel.cancel();
+                }
+            }
+            Command::Clear => self.clear(),
+            Command::Shutdown => self.shutdown(),
+            Command::Cancel { .. } => {}
+        }
+        self.is_shutting_down() && !self.transcript.has_active()
+    }
+
+    fn enqueue(&mut self, turn_id: String, prompt: String, config: Option<KimiConfig>) {
+        if self.is_shutting_down() {
+            return;
+        }
+        let state = if self.transcript.has_active() {
+            TurnState::Pending
+        } else {
+            TurnState::Active
+        };
+        let seq = self.transcript.push(turn_id.clone(), prompt, state);
+        self.configs.insert(turn_id.clone(), config);
+        (self.event_sink)(ConversationEvent::Enqueued {
+            turn_id: turn_id.clone(),
+            seq,
+            state,
+        });
+        if state == TurnState::Active {
+            self.start_active(turn_id);
+        }
+    }
+
+    fn emit_current_delta(&self, turn_id: String, text: String) {
+        if self.transcript.active_id() == Some(turn_id.as_str())
+            && self.cancelling.as_deref() != Some(turn_id.as_str())
+        {
+            (self.event_sink)(ConversationEvent::Delta { turn_id, text });
+        }
+    }
+
+    fn settle(&mut self, turn_id: String, result: TurnResult) {
+        // A turn awaiting cancellation always settles `cancelled`, so a chunk or
+        // completion that raced the cancel signal cannot settle it otherwise.
+        let result = if self.cancelling.as_deref() == Some(turn_id.as_str()) {
+            TurnResult::cancelled()
+        } else {
+            result
+        };
+        if !self.transcript.settle_active(&turn_id, result.clone()) {
+            return;
+        }
+        if self.cancelling.as_deref() == Some(turn_id.as_str()) {
+            self.cancelling = None;
+        }
+        self.active_cancel = None;
+        if let Some(thread) = self.active_thread.take() {
+            let _ = thread.join();
+        }
+        (self.event_sink)(ConversationEvent::Settled { turn_id, result });
+        if self.is_shutting_down() {
+            return;
+        }
+        if let Some(next_turn_id) = self.transcript.activate_next_pending() {
+            (self.event_sink)(ConversationEvent::Activated {
+                turn_id: next_turn_id.clone(),
+            });
+            self.start_active(next_turn_id);
+        }
+    }
+
+    fn start_active(&mut self, turn_id: String) {
+        let Some(config) = self.configs.remove(&turn_id).flatten() else {
+            self.settle(
+                turn_id,
+                TurnResult::needs_configuration(NEEDS_CONFIGURATION_MESSAGE),
+            );
+            return;
+        };
+        let cancel = CancellationToken::new();
+        self.active_cancel = Some(cancel.clone());
+        let command_tx = self.command_tx.clone();
+        let runner = Arc::clone(&self.turn_runner);
+        let prompt = self.active_prompt(&turn_id);
+        self.active_thread = Some(thread::spawn(move || {
+            let panic_result = panic::catch_unwind(AssertUnwindSafe(|| {
+                runner(TurnJob {
+                    turn_id: turn_id.clone(),
+                    prompt,
+                    config,
+                    cancel,
+                    command_tx: command_tx.clone(),
+                });
+            }));
+            if panic_result.is_err() {
+                let _ = command_tx.send(Command::Settle {
+                    turn_id,
+                    result: TurnResult::error(PANIC_ERROR_KIND, "turn runner panicked"),
+                });
+            }
+        }));
+    }
+
+    fn active_prompt(&self, turn_id: &str) -> String {
+        self.transcript
+            .turns()
+            .iter()
+            .find(|turn| turn.turn_id == turn_id)
+            .map(|turn| turn.prompt.clone())
+            .unwrap_or_default()
+    }
+
+    fn clear(&mut self) {
+        // Force the active turn (if any) to settle `cancelled` and suppress its
+        // remaining events, matching the abandon-active semantics.
+        if let Some(active) = self.transcript.active_id() {
+            self.cancelling = Some(active.to_owned());
+        }
+        if let Some(cancel) = &self.active_cancel {
+            cancel.cancel();
+        }
+        self.configs.clear();
+        self.transcript.drop_pending();
+    }
+
+    fn shutdown(&mut self) {
+        self.shutting_down = true;
+        self.shutdown_requested.store(true, Ordering::SeqCst);
+        self.configs.clear();
+        self.transcript.drop_pending();
+    }
+
+    fn is_shutting_down(&self) -> bool {
+        self.shutting_down || self.shutdown_requested.load(Ordering::SeqCst)
+    }
+}

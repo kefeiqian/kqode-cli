@@ -52,9 +52,9 @@ impl ProviderError {
 impl fmt::Display for ProviderError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Auth => formatter.write_str(
-                "the provider rejected the API key (authentication failed)",
-            ),
+            Self::Auth => {
+                formatter.write_str("the provider rejected the API key (authentication failed)")
+            }
             Self::RateLimit => {
                 formatter.write_str("the provider rate limit was reached; try again shortly")
             }

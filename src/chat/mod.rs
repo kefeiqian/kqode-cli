@@ -3,5 +3,7 @@
 
 pub mod system_prompt;
 pub mod turn;
+pub mod types;
 
-pub use turn::spawn_streaming_turn;
+pub use turn::{run_streaming_turn, spawn_streaming_turn};
+pub use types::{CancellationToken, TurnStreamEvent};

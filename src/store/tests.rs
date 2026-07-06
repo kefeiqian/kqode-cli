@@ -28,7 +28,10 @@ fn fresh_path_bootstraps_to_latest_with_all_tables() {
     let (_dir, path) = temp_db();
     let store = Store::open_or_bootstrap_at(path).expect("bootstrap");
     let conn = store.connect().expect("connect");
-    assert_eq!(migrations::user_version(&conn).unwrap(), LATEST_USER_VERSION);
+    assert_eq!(
+        migrations::user_version(&conn).unwrap(),
+        LATEST_USER_VERSION
+    );
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
 }
 
@@ -38,7 +41,10 @@ fn reopening_a_migrated_db_is_idempotent() {
     Store::open_or_bootstrap_at(path.clone()).expect("first bootstrap");
     let store = Store::open_or_bootstrap_at(path).expect("second bootstrap is a no-op");
     let conn = store.connect().unwrap();
-    assert_eq!(migrations::user_version(&conn).unwrap(), LATEST_USER_VERSION);
+    assert_eq!(
+        migrations::user_version(&conn).unwrap(),
+        LATEST_USER_VERSION
+    );
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
 }
 
@@ -53,7 +59,10 @@ fn a_version_zero_db_migrates_forward() {
     }
     let store = Store::open_or_bootstrap_at(path).expect("bootstrap");
     let conn = store.connect().unwrap();
-    assert_eq!(migrations::user_version(&conn).unwrap(), LATEST_USER_VERSION);
+    assert_eq!(
+        migrations::user_version(&conn).unwrap(),
+        LATEST_USER_VERSION
+    );
 }
 
 #[test]
@@ -65,7 +74,11 @@ fn a_failed_step_rolls_back_and_a_later_open_recovers() {
         let bad = "CREATE TABLE rollback_probe (id INTEGER); CREATE TABLE;";
         let result = migrations::apply_step(&mut conn, 1, bad);
         assert!(matches!(result, Err(StoreError::Migrate(_))));
-        assert_eq!(migrations::user_version(&conn).unwrap(), 0, "version untouched");
+        assert_eq!(
+            migrations::user_version(&conn).unwrap(),
+            0,
+            "version untouched"
+        );
         assert!(
             !table_names(&conn).contains(&"rollback_probe".to_owned()),
             "partial table must be rolled back"
@@ -74,7 +87,10 @@ fn a_failed_step_rolls_back_and_a_later_open_recovers() {
     // A subsequent open recovers cleanly to the full schema.
     let store = Store::open_or_bootstrap_at(path).expect("recovers");
     let conn = store.connect().unwrap();
-    assert_eq!(migrations::user_version(&conn).unwrap(), LATEST_USER_VERSION);
+    assert_eq!(
+        migrations::user_version(&conn).unwrap(),
+        LATEST_USER_VERSION
+    );
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
 }
 
@@ -92,8 +108,14 @@ fn concurrent_bootstraps_on_one_fresh_path_all_succeed() {
         // version re-check; the losers must not hit "table already exists".
         handle.join().unwrap().expect("every racer ends healthy");
     }
-    let conn = Store::open_or_bootstrap_at(path).unwrap().connect().unwrap();
-    assert_eq!(migrations::user_version(&conn).unwrap(), LATEST_USER_VERSION);
+    let conn = Store::open_or_bootstrap_at(path)
+        .unwrap()
+        .connect()
+        .unwrap();
+    assert_eq!(
+        migrations::user_version(&conn).unwrap(),
+        LATEST_USER_VERSION
+    );
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
 }
 
@@ -188,7 +210,9 @@ fn set_active_selection_is_last_writer_wins_on_the_singleton_row() {
     store.set_active_selection(&latest).unwrap();
     let conn = store.connect().unwrap();
     let rows: i64 = conn
-        .query_row("SELECT count(*) FROM active_selection", [], |row| row.get(0))
+        .query_row("SELECT count(*) FROM active_selection", [], |row| {
+            row.get(0)
+        })
         .unwrap();
     assert_eq!(rows, 1, "singleton row is never duplicated");
     assert_eq!(store.active_selection().unwrap(), Some(latest));
@@ -211,10 +235,15 @@ fn upsert_provider_settings_updates_without_duplicating() {
 
     let conn = store.connect().unwrap();
     let rows: i64 = conn
-        .query_row("SELECT count(*) FROM provider_settings", [], |row| row.get(0))
+        .query_row("SELECT count(*) FROM provider_settings", [], |row| {
+            row.get(0)
+        })
         .unwrap();
     assert_eq!(rows, 1, "upsert updates in place, never duplicates");
-    assert_eq!(store.provider_settings(ProviderId::Kimi).unwrap(), Some(settings));
+    assert_eq!(
+        store.provider_settings(ProviderId::Kimi).unwrap(),
+        Some(settings)
+    );
 }
 
 #[test]
@@ -278,6 +307,9 @@ fn no_key_or_secret_column_exists_in_the_schema() {
             || column.contains("secret")
             || column.contains("token")
             || column.ends_with("_key");
-        assert!(!secretish, "column {column:?} looks like it stores a secret");
+        assert!(
+            !secretish,
+            "column {column:?} looks like it stores a secret"
+        );
     }
 }

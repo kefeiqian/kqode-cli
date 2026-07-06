@@ -78,6 +78,7 @@ pub fn parse_stdout_frames(stdout: &[u8]) -> Vec<Value> {
 /// Every backend run now emits a one-shot [`BACKEND_READY_METHOD`] notification
 /// before it handles requests, so response-oriented tests skip that first frame
 /// while still asserting it was announced correctly.
+#[allow(dead_code)]
 pub fn response_frames(stdout: &[u8]) -> Vec<Value> {
     let mut frames = parse_stdout_frames(stdout);
     assert!(

@@ -1,11 +1,17 @@
 use std::{error::Error, fmt};
 
+use std::sync::mpsc::Sender;
+
 use lsp_server::{Connection, Message, Notification, Request, Response};
 
+use crate::conversation::{Command, ConversationEvent, Coordinator, SettledKind, TurnResult};
 use crate::debug_log;
 use crate::protocol::{
-    BackendReadyParams, ClearKeyParams, RpcMethod, SelectionSetParams, BACKEND_READY_METHOD,
-    JSON_RPC_INVALID_PARAMS, JSON_RPC_METHOD_NOT_FOUND,
+    ActivatedParams, BACKEND_READY_METHOD, BackendReadyParams, ClearKeyParams, EnqueuedParams,
+    JSON_RPC_INVALID_PARAMS, JSON_RPC_METHOD_NOT_FOUND, RpcMethod, SelectionSetParams,
+    SettledParams, TOKEN_DELTA_METHOD, TURN_ACTIVATED_METHOD, TURN_END_METHOD,
+    TURN_ENQUEUED_METHOD, TURN_ERROR_METHOD, TURN_SETTLED_METHOD, TokenDeltaParams,
+    TurnCancelParams, TurnCancelResult, TurnEndParams, TurnErrorParams,
 };
 use crate::store::Store;
 
@@ -56,7 +62,10 @@ pub fn run_stdio() -> Result<(), BackendError> {
     let store = Store::open_or_bootstrap().ok();
     let (connection, io_threads) = Connection::stdio();
     announce_ready(&connection, &session_id)?;
-    match run_loop(connection, store.as_ref()) {
+    let coordinator = Coordinator::start(json_rpc_event_sink(&connection));
+    let loop_result = run_loop(connection, store.as_ref(), coordinator.sender());
+    coordinator.shutdown_and_join();
+    match loop_result {
         Ok(()) => io_threads.join().map_err(|error| {
             BackendError::Transport(format!("JSON-RPC transport failed: {error}"))
         }),
@@ -89,11 +98,15 @@ fn announce_ready(connection: &Connection, session_id: &str) -> Result<(), Backe
         })
 }
 
-fn run_loop(connection: Connection, store: Option<&Store>) -> Result<(), BackendError> {
+fn run_loop(
+    connection: Connection,
+    store: Option<&Store>,
+    coordinator: Sender<Command>,
+) -> Result<(), BackendError> {
     while let Ok(message) = connection.receiver.recv() {
         match message {
             Message::Request(request) => {
-                if let Some(response) = handle_request(request, &connection, store) {
+                if let Some(response) = handle_request(request, &connection, store, &coordinator) {
                     send_response(&connection, response)?;
                 }
             }
@@ -124,16 +137,18 @@ fn handle_request(
     request: Request,
     connection: &Connection,
     store: Option<&Store>,
+    coordinator: &Sender<Command>,
 ) -> Option<Response> {
     match RpcMethod::from_method(&request.method) {
         Some(RpcMethod::MessageSubmit) => {
-            Some(message::handle_message_submit(request, connection, store))
+            Some(message::handle_message_submit(request, coordinator, store))
         }
-        Some(RpcMethod::ConversationClear | RpcMethod::TurnCancel) => Some(Response::new_err(
+        Some(RpcMethod::ConversationClear) => Some(Response::new_err(
             request.id,
             JSON_RPC_METHOD_NOT_FOUND,
             format!("unsupported method `{}`", request.method),
         )),
+        Some(RpcMethod::TurnCancel) => Some(handle_turn_cancel(request, coordinator)),
         Some(RpcMethod::GitStatus) => {
             git_status::spawn_git_status(request, connection);
             None
@@ -160,6 +175,110 @@ fn handle_request(
             format!("unsupported method `{}`", request.method),
         )),
     }
+}
+
+fn handle_turn_cancel(request: Request, coordinator: &Sender<Command>) -> Response {
+    let params = match serde_json::from_value::<TurnCancelParams>(request.params) {
+        Ok(params) => params,
+        Err(error) => {
+            return Response::new_err(
+                request.id,
+                JSON_RPC_INVALID_PARAMS,
+                format!("invalid turn cancel params: {error}"),
+            );
+        }
+    };
+    let _ = coordinator.send(Command::Cancel {
+        turn_id: params.turn_id,
+    });
+    Response::new_ok(request.id, TurnCancelResult { ok: true })
+}
+
+fn json_rpc_event_sink(
+    connection: &Connection,
+) -> impl Fn(ConversationEvent) + Send + Sync + 'static {
+    let sender = connection.sender.clone();
+    move |event| {
+        for notification in notifications_for_event(event) {
+            let _ = sender.send(Message::Notification(notification));
+        }
+    }
+}
+
+fn notifications_for_event(event: ConversationEvent) -> Vec<Notification> {
+    match event {
+        ConversationEvent::Enqueued {
+            turn_id,
+            seq,
+            state,
+        } => vec![Notification::new(
+            TURN_ENQUEUED_METHOD.to_owned(),
+            EnqueuedParams {
+                turn_id,
+                seq,
+                state: state
+                    .as_queue_state()
+                    .expect("enqueued state is queue-visible"),
+            },
+        )],
+        ConversationEvent::Activated { turn_id } => vec![Notification::new(
+            TURN_ACTIVATED_METHOD.to_owned(),
+            ActivatedParams { turn_id },
+        )],
+        ConversationEvent::Delta { turn_id, text } => vec![Notification::new(
+            TOKEN_DELTA_METHOD.to_owned(),
+            TokenDeltaParams {
+                turn_id,
+                delta: text,
+            },
+        )],
+        ConversationEvent::Settled { turn_id, result } => {
+            let mut notifications = vec![Notification::new(
+                TURN_SETTLED_METHOD.to_owned(),
+                SettledParams {
+                    turn_id: turn_id.clone(),
+                    result: protocol_turn_result(&result),
+                },
+            )];
+            notifications.push(legacy_settle_notification(turn_id, result));
+            notifications
+        }
+    }
+}
+
+fn protocol_turn_result(result: &TurnResult) -> crate::protocol::TurnResult {
+    crate::protocol::TurnResult {
+        kind: match result.kind {
+            SettledKind::Completed => crate::protocol::SETTLED_KIND_COMPLETED,
+            SettledKind::NeedsConfiguration => crate::protocol::SETTLED_KIND_NEEDS_CONFIGURATION,
+            SettledKind::Error => crate::protocol::SETTLED_KIND_ERROR,
+            SettledKind::Cancelled => crate::protocol::SETTLED_KIND_CANCELLED,
+        },
+        text: result.text.clone(),
+        finish_reason: result.finish_reason.clone(),
+        error_kind: result.error_kind.clone(),
+        message: result.message.clone(),
+    }
+}
+
+fn legacy_settle_notification(turn_id: String, result: TurnResult) -> Notification {
+    if result.kind == SettledKind::Completed {
+        return Notification::new(
+            TURN_END_METHOD.to_owned(),
+            TurnEndParams {
+                turn_id,
+                finish_reason: result.finish_reason,
+            },
+        );
+    }
+    Notification::new(
+        TURN_ERROR_METHOD.to_owned(),
+        TurnErrorParams {
+            turn_id,
+            error_kind: result.error_kind.unwrap_or_else(|| "error".to_owned()),
+            message: result.message.unwrap_or_else(|| "turn failed".to_owned()),
+        },
+    )
 }
 
 fn handle_selection_set(request: Request, store: Option<&Store>) -> Response {
@@ -198,6 +317,7 @@ mod tests {
     #[test]
     fn set_key_rejects_bad_custom_url_immediately_without_worker() {
         let (backend, client) = Connection::memory();
+        let (coordinator, _receiver) = std::sync::mpsc::channel();
         let request = Request {
             id: RequestId::from(1),
             method: crate::protocol::PROVIDER_SET_KEY_METHOD.to_owned(),
@@ -209,7 +329,8 @@ mod tests {
             }),
         };
 
-        let response = handle_request(request, &backend, None).expect("immediate error");
+        let response =
+            handle_request(request, &backend, None, &coordinator).expect("immediate error");
 
         assert_eq!(response.error.unwrap().code, JSON_RPC_INVALID_PARAMS);
         assert!(

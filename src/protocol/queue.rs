@@ -85,7 +85,7 @@ impl<'de> Deserialize<'de> for EnqueuedParams {
             other => {
                 return Err(serde::de::Error::custom(format!(
                     "unknown turn state `{other}`"
-                )))
+                )));
             }
         };
         Ok(Self {
@@ -120,7 +120,7 @@ impl<'de> Deserialize<'de> for TurnResult {
             other => {
                 return Err(serde::de::Error::custom(format!(
                     "unknown settled kind `{other}`"
-                )))
+                )));
             }
         };
         Ok(Self {

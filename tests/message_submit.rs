@@ -1,7 +1,10 @@
 #[path = "common/rpc.rs"]
 mod rpc;
 
-use kqode::protocol::{BACKEND_READY_METHOD, RpcMethod, SUBMIT_STATUS_NEEDS_CONFIGURATION};
+use kqode::protocol::{
+    BACKEND_READY_METHOD, RpcMethod, SUBMIT_STATUS_NEEDS_CONFIGURATION, TURN_ENQUEUED_METHOD,
+    TURN_ERROR_METHOD, TURN_SETTLED_METHOD,
+};
 use serde_json::json;
 
 use rpc::{backend_output, parse_stdout_frames, request_frame, response_frames};
@@ -48,19 +51,32 @@ fn message_submit_without_key_returns_needs_configuration() {
     assert!(output.status.success(), "{output:?}");
 
     let all_frames = parse_stdout_frames(&output.stdout);
-    assert_eq!(
-        all_frames.len(),
-        2,
-        "expected only the ready notification and one ack response: {all_frames:?}"
+    assert!(
+        all_frames
+            .iter()
+            .any(|frame| frame["method"] == TURN_ENQUEUED_METHOD),
+        "expected an enqueue notification: {all_frames:?}"
+    );
+    assert!(
+        all_frames
+            .iter()
+            .any(|frame| frame["method"] == TURN_SETTLED_METHOD),
+        "expected a settled notification: {all_frames:?}"
+    );
+    assert!(
+        all_frames
+            .iter()
+            .any(|frame| frame["method"] == TURN_ERROR_METHOD),
+        "expected a legacy terminal notification: {all_frames:?}"
     );
 
     let frames = response_frames(&output.stdout);
-    assert_eq!(frames[0]["id"], 1);
+    let response = frames.iter().find(|frame| frame["id"] == 1).unwrap();
     assert_eq!(
-        frames[0]["result"]["status"],
+        response["result"]["status"],
         SUBMIT_STATUS_NEEDS_CONFIGURATION
     );
-    assert_eq!(frames[0]["result"]["turnId"], "turn-1");
+    assert_eq!(response["result"]["turnId"], "turn-1");
 }
 
 #[test]
@@ -83,16 +99,13 @@ fn message_submit_echoes_the_client_turn_id_for_each_submit() {
 
     assert!(output.status.success(), "{output:?}");
     let frames = response_frames(&output.stdout);
-    assert_eq!(frames[0]["id"], 1);
-    assert_eq!(frames[0]["result"]["turnId"], "turn-a");
+    let first = frames.iter().find(|frame| frame["id"] == 1).unwrap();
+    let second = frames.iter().find(|frame| frame["id"] == 2).unwrap();
+    assert_eq!(first["result"]["turnId"], "turn-a");
+    assert_eq!(first["result"]["status"], SUBMIT_STATUS_NEEDS_CONFIGURATION);
+    assert_eq!(second["result"]["turnId"], "turn-b");
     assert_eq!(
-        frames[0]["result"]["status"],
-        SUBMIT_STATUS_NEEDS_CONFIGURATION
-    );
-    assert_eq!(frames[1]["id"], 2);
-    assert_eq!(frames[1]["result"]["turnId"], "turn-b");
-    assert_eq!(
-        frames[1]["result"]["status"],
+        second["result"]["status"],
         SUBMIT_STATUS_NEEDS_CONFIGURATION
     );
 }
