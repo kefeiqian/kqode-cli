@@ -10,6 +10,7 @@ import {
   formatVisiblePrompt
 } from '@components/PromptComposer/promptTextView.ts';
 import { usePromptComposerInput } from '@components/PromptComposer/usePromptComposerInput.ts';
+import { usePasteInput } from '@components/PromptComposer/usePasteInput.ts';
 import { DEFAULT_COMPOSER_VISIBLE_LINES } from '@constants/ui.ts';
 import {
   clearTranscriptAtom,
@@ -124,6 +125,7 @@ export function PromptComposer({
     state,
     commandActions
   });
+  usePasteInput({ maxBytes });
 
   const inputColumns = Math.max(1, resolvedColumns - PROMPT_PREFIX.length);
   const composerWindow = resolveComposerWindow({

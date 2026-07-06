@@ -22,6 +22,7 @@ const SGR_MOUSE_INPUT_PATTERN =
 const WHEEL_BUTTON_OFFSET = 64;
 const WHEEL_BUTTON_COUNT = 4;
 const LEFT_BUTTON_CODE = 0;
+export const RIGHT_BUTTON_CODE = 2;
 
 export function isMouseInput(input: string): boolean {
   return SGR_MOUSE_INPUT_PATTERN.test(input);
@@ -71,6 +72,26 @@ export function parseMouseClickEvent(input: string): MouseClickEvent | null {
   }
 
   if (Number.parseInt(match.groups.buttonCode, 10) !== LEFT_BUTTON_CODE) {
+    return null;
+  }
+
+  return {
+    row: Number.parseInt(match.groups.row, 10),
+    column: Number.parseInt(match.groups.column, 10)
+  };
+}
+
+/**
+ * Parses a right-button press (button 2, `M`) into its 1-based row/column, or
+ * `null` for release, wheel, left-click, or non-mouse input.
+ */
+export function parseMouseRightClickEvent(input: string): MouseClickEvent | null {
+  const match = SGR_MOUSE_INPUT_PATTERN.exec(input);
+  if (match?.groups === undefined || match.groups.eventType !== 'M') {
+    return null;
+  }
+
+  if (Number.parseInt(match.groups.buttonCode, 10) !== RIGHT_BUTTON_CODE) {
     return null;
   }
 

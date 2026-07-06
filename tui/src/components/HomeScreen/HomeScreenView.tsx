@@ -13,6 +13,7 @@ import {
   parseMouseClickEvent,
   parseMouseWheelEvent
 } from '@libs/terminal/mouse.ts';
+import { handleRightClickPaste } from '@components/HomeScreen/rightClickPaste.ts';
 import { resolveWheelTarget } from '@components/HomeScreen/wheelRouting.ts';
 import { useCaretScrollSuppression } from '@components/HomeScreen/useCaretScrollSuppression.ts';
 import { resolveClickResult } from '@libs/composer/composerWindow.ts';
@@ -103,6 +104,10 @@ export function HomeScreenView() {
       if (result !== null) {
         store.set(setComposerCursorWithOffsetAtom, result);
       }
+      return;
+    }
+
+    if (handleRightClickPaste(input, store)) {
       return;
     }
 

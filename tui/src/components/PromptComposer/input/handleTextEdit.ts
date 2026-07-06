@@ -26,6 +26,10 @@ export const handleTextEdit: ComposerKeyHandler = (context) => {
     return true;
   }
 
+  if (key.ctrl === true || key.meta === true) {
+    return false;
+  }
+
   const printable = printableInput(input);
   if (printable.length > 0) {
     store.set(insertComposerTextAtom, { maxBytes, text: printable });

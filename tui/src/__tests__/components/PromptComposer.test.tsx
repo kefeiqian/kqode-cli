@@ -116,6 +116,24 @@ describe('PromptComposer', () => {
     expect(onSubmit).toHaveBeenCalledWith('first\nsecond');
   });
 
+  it('inserts bracketed multi-line paste without submitting and preserves over-limit validation', async () => {
+    const onSubmit = vi.fn();
+    const { lastFrame, stdin } = renderWithJotai(
+      <PromptComposer columns={40} maxBytes={6} onSubmit={onSubmit} />
+    );
+
+    stdin.write('\u001B[200~one\r\ntwo\u001B[201~');
+    await flushInput();
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(lastFrame() ?? '').toContain('> one\n  two');
+    expect(lastFrame() ?? '').toContain('ERROR: Prompt is 7 bytes; maximum is 6 bytes.');
+    stdin.write('\r');
+    await flushInput();
+
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it('submits a trailing backslash instead of inserting a newline when the cursor is at the start', async () => {
     const onSubmit = vi.fn();
     const { stdin } = renderWithJotai(<PromptComposer columns={40} onSubmit={onSubmit} />);

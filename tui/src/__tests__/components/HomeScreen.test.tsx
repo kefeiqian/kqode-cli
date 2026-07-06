@@ -2,20 +2,23 @@ import os from 'node:os';
 import path from 'node:path';
 import { render } from 'ink-testing-library';
 import { createStore } from 'jotai';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { App } from '@/App.tsx';
 import { BodyPane } from '@components/BodyPane.tsx';
 import { formatDisplayCwd } from '@libs/tui/cwdLine.ts';
 import type { BodyEntry } from '@libs/tui/bodyRows.ts';
 import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import { NOT_CONFIGURED_MODEL_LABEL } from '@libs/model/index.ts';
+import { PASTE_FAILED_HINT } from '@constants/ui.ts';
 import {
   bodyEntriesAtom,
   columnsTestOverrideAtom,
   gitStatusLabelAtom,
   rowsTestOverrideAtom
 } from '@state/ui/index.ts';
-import { productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
+import { clipboardClientAtom, productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
+import { composerStateAtom } from '@state/ui/composer/index.ts';
+import { transientStatusHintAtom } from '@state/ui/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 import { theme } from '@theme/themeConfig.ts';
@@ -59,7 +62,7 @@ function renderHomeScreen({
   if (bodyEntries !== undefined) {
     store.set(bodyEntriesAtom, bodyEntries);
   }
-  return renderWithJotai(<App />, store);
+  return { ...renderWithJotai(<App />, store), store };
 }
 
 describe('HomeScreen', () => {
@@ -437,6 +440,42 @@ describe('HomeScreen', () => {
 
     const bottomOutput = lastFrame() ?? '';
     expect(bottomOutput).toContain('entry 10');
+  });
+
+  it('pastes clipboard text into the composer on right-click', async () => {
+    const { lastFrame, stdin, store } = renderHomeScreen({ columns: 80, rows: 15 });
+    store.set(clipboardClientAtom, {
+      readText: vi.fn().mockResolvedValue('right\r\npaste'),
+      writeText: vi.fn()
+    });
+
+    stdin.write('\u001B[<2;5;13M');
+    await flushInput();
+
+    expect(store.get(composerStateAtom).text).toBe('right\npaste');
+    expect(lastFrame() ?? '').toContain('> right');
+  });
+
+  it('shows a paste-failed hint when right-click clipboard read is unavailable', async () => {
+    const { stdin, store } = renderHomeScreen({ columns: 80, rows: 15 });
+    store.set(clipboardClientAtom, { readText: vi.fn().mockResolvedValue(null), writeText: vi.fn() });
+
+    stdin.write('\u001B[<2;5;13M');
+    await flushInput();
+
+    expect(store.get(composerStateAtom).text).toBe('');
+    expect(store.get(transientStatusHintAtom)?.text).toBe(PASTE_FAILED_HINT);
+  });
+
+  it('silently ignores an empty clipboard on right-click paste', async () => {
+    const { stdin, store } = renderHomeScreen({ columns: 80, rows: 15 });
+    store.set(clipboardClientAtom, { readText: vi.fn().mockResolvedValue(''), writeText: vi.fn() });
+
+    stdin.write('\u001B[<2;5;13M');
+    await flushInput();
+
+    expect(store.get(composerStateAtom).text).toBe('');
+    expect(store.get(transientStatusHintAtom)).toBeUndefined();
   });
 
   it('fits over-limit validation feedback inside the 60x15 row budget', async () => {

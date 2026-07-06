@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isMouseInput,
   parseMouseClickEvent,
+  parseMouseRightClickEvent,
   parseMouseWheelEvent,
   parseMouseWheelInput
 } from '@libs/terminal/mouse.ts';
@@ -9,6 +10,18 @@ import {
 describe('parseMouseWheelEvent', () => {
   it('parses wheel-up with its 1-based pointer row', () => {
     expect(parseMouseWheelEvent('\u001B[<64;1;1M')).toEqual({ direction: 'up', row: 1 });
+  });
+
+  describe('parseMouseRightClickEvent', () => {
+    it('parses a right-button press into its 1-based row/column', () => {
+      expect(parseMouseRightClickEvent('\u001B[<2;5;3M')).toEqual({ row: 3, column: 5 });
+    });
+
+    it('ignores wheel, left-button, and release events', () => {
+      expect(parseMouseRightClickEvent('\u001B[<64;1;1M')).toBeNull();
+      expect(parseMouseRightClickEvent('\u001B[<0;5;3M')).toBeNull();
+      expect(parseMouseRightClickEvent('\u001B[<2;5;3m')).toBeNull();
+    });
   });
 
   it('parses wheel-down with the row from the third SGR field', () => {

@@ -86,6 +86,24 @@ export const CLIPBOARD_ACTION_SUCCEEDED_HINT = 'clipboard updated';
 /** Generic clipboard failure hint used by copy/paste follow-up units. */
 export const CLIPBOARD_ACTION_FAILED_HINT = 'clipboard unavailable';
 
+/** Composer key that triggers a system-clipboard paste read. */
+export const PASTE_INPUT_KEY = 'v';
+
+/** Transient hint shown when clipboard paste cannot read text. */
+export const PASTE_FAILED_HINT = 'paste failed';
+
+/** Composer key that copies the last assistant response. */
+export const COPY_LAST_RESPONSE_KEY = 'o';
+
+/** Transient hint shown after the last assistant response is copied. */
+export const COPY_LAST_RESPONSE_SUCCEEDED_HINT = 'copied';
+
+/** Transient hint shown when copying the last assistant response fails. */
+export const COPY_LAST_RESPONSE_FAILED_HINT = 'copy failed';
+
+/** Transient hint shown when no assistant response can be copied. */
+export const COPY_LAST_RESPONSE_NOTHING_HINT = 'nothing to copy';
+
 // --- Status-bar loading spinner ---
 
 /** Milliseconds between animated dots in the status-bar loading hint. */
