@@ -3,9 +3,11 @@
 //! modules (currently only [`kimi`]).
 
 pub mod error;
+pub mod id;
 pub mod kimi;
 
 pub use error::ProviderError;
+pub use id::ProviderId;
 pub use kimi::KimiProvider;
 
 use serde::Serialize;

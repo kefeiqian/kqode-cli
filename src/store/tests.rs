@@ -1,4 +1,5 @@
 use super::*;
+use crate::provider::ProviderId;
 use rusqlite::Connection;
 use std::thread;
 
@@ -14,12 +15,10 @@ fn table_names(conn: &Connection) -> Vec<String> {
     let mut stmt = conn
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
         .unwrap();
-    let names = stmt
-        .query_map([], |row| row.get::<_, String>(0))
+    stmt.query_map([], |row| row.get::<_, String>(0))
         .unwrap()
         .map(Result::unwrap)
-        .collect();
-    names
+        .collect()
 }
 
 const EXPECTED_TABLES: [&str; 4] = ["active_selection", "provider_settings", "sessions", "turns"];
@@ -138,4 +137,147 @@ fn an_uncreatable_parent_dir_surfaces_create_dir_error() {
     let path = blocker.join("nested").join("kqode.db");
     let result = Store::open_or_bootstrap_at(path);
     assert!(matches!(result, Err(StoreError::CreateDir(_))));
+}
+
+fn bootstrap() -> (tempfile::TempDir, Store) {
+    let (dir, path) = temp_db();
+    let store = Store::open_or_bootstrap_at(path).expect("bootstrap");
+    (dir, store)
+}
+
+fn column_names(conn: &Connection, table: &str) -> Vec<String> {
+    let mut stmt = conn
+        .prepare(&format!("PRAGMA table_info({table})"))
+        .unwrap();
+    stmt.query_map([], |row| row.get::<_, String>(1))
+        .unwrap()
+        .map(Result::unwrap)
+        .collect()
+}
+
+#[test]
+fn set_then_get_active_selection_round_trips() {
+    let (_dir, store) = bootstrap();
+    let selection = ActiveSelection {
+        provider: ProviderId::Kimi,
+        model_id: "kimi-k2.7-code".to_owned(),
+    };
+    store.set_active_selection(&selection).unwrap();
+    assert_eq!(store.active_selection().unwrap(), Some(selection));
+}
+
+#[test]
+fn active_selection_is_none_when_unset() {
+    let (_dir, store) = bootstrap();
+    assert_eq!(store.active_selection().unwrap(), None);
+}
+
+#[test]
+fn set_active_selection_is_last_writer_wins_on_the_singleton_row() {
+    let (_dir, store) = bootstrap();
+    store
+        .set_active_selection(&ActiveSelection {
+            provider: ProviderId::Kimi,
+            model_id: "kimi-k2.7-code".to_owned(),
+        })
+        .unwrap();
+    let latest = ActiveSelection {
+        provider: ProviderId::Custom,
+        model_id: "gpt-4o-mini".to_owned(),
+    };
+    store.set_active_selection(&latest).unwrap();
+    let conn = store.connect().unwrap();
+    let rows: i64 = conn
+        .query_row("SELECT count(*) FROM active_selection", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(rows, 1, "singleton row is never duplicated");
+    assert_eq!(store.active_selection().unwrap(), Some(latest));
+}
+
+#[test]
+fn upsert_provider_settings_updates_without_duplicating() {
+    let (_dir, store) = bootstrap();
+    let mut settings = ProviderSettings {
+        provider: ProviderId::Kimi,
+        base_url: "https://api.moonshot.cn/v1".to_owned(),
+        label: None,
+        key_present: false,
+        last_connected_at: None,
+    };
+    store.upsert_provider_settings(&settings).unwrap();
+    settings.base_url = "https://api.moonshot.ai/v1".to_owned();
+    settings.label = Some("Kimi".to_owned());
+    store.upsert_provider_settings(&settings).unwrap();
+
+    let conn = store.connect().unwrap();
+    let rows: i64 = conn
+        .query_row("SELECT count(*) FROM provider_settings", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(rows, 1, "upsert updates in place, never duplicates");
+    assert_eq!(store.provider_settings(ProviderId::Kimi).unwrap(), Some(settings));
+}
+
+#[test]
+fn set_key_present_flips_only_the_flag() {
+    let (_dir, store) = bootstrap();
+    let settings = ProviderSettings {
+        provider: ProviderId::Kimi,
+        base_url: "https://api.moonshot.cn/v1".to_owned(),
+        label: None,
+        key_present: false,
+        last_connected_at: None,
+    };
+    store.upsert_provider_settings(&settings).unwrap();
+    store.set_key_present(ProviderId::Kimi, true).unwrap();
+    let stored = store.provider_settings(ProviderId::Kimi).unwrap().unwrap();
+    assert!(stored.key_present);
+    assert_eq!(stored.base_url, settings.base_url, "base url is untouched");
+}
+
+#[test]
+fn provider_settings_is_none_for_an_absent_provider() {
+    let (_dir, store) = bootstrap();
+    assert_eq!(store.provider_settings(ProviderId::Custom).unwrap(), None);
+}
+
+#[test]
+fn active_selection_survives_reopening_the_db() {
+    // Covers AE7: the selection persists across process/connection lifetimes.
+    let (_dir, path) = temp_db();
+    let selection = ActiveSelection {
+        provider: ProviderId::Custom,
+        model_id: "llama-3.1-70b".to_owned(),
+    };
+    Store::open_or_bootstrap_at(path.clone())
+        .unwrap()
+        .set_active_selection(&selection)
+        .unwrap();
+    let reopened = Store::open_or_bootstrap_at(path).unwrap();
+    assert_eq!(reopened.active_selection().unwrap(), Some(selection));
+}
+
+#[test]
+fn no_key_or_secret_column_exists_in_the_schema() {
+    let (_dir, store) = bootstrap();
+    let conn = store.connect().unwrap();
+    let columns = column_names(&conn, "provider_settings");
+    assert_eq!(
+        columns,
+        [
+            "provider_id",
+            "base_url",
+            "label",
+            "key_present",
+            "last_connected_at",
+            "created_at",
+            "updated_at",
+        ]
+    );
+    for column in &columns {
+        let secretish = matches!(column.as_str(), "secret" | "token" | "api_key" | "key_hash")
+            || column.contains("secret")
+            || column.contains("token")
+            || column.ends_with("_key");
+        assert!(!secretish, "column {column:?} looks like it stores a secret");
+    }
 }
