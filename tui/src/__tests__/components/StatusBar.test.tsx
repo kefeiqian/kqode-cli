@@ -12,8 +12,13 @@ import {
   formatModelLabel
 } from '@libs/model/index.ts';
 import { backendClientAtom } from '@state/global/index.ts';
-import { armedActionAtom, columnsTestOverrideAtom } from '@state/ui/index.ts';
-import { ArmedAction } from '@constants/ui.ts';
+import {
+  armedActionAtom,
+  columnsTestOverrideAtom,
+  copyModeActiveAtom,
+  setTransientStatusHintAtom
+} from '@state/ui/index.ts';
+import { ArmedAction, COPY_MODE_HINT } from '@constants/ui.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
 const makeStore = (): ReturnType<typeof createStore> => {
@@ -42,6 +47,19 @@ describe('StatusBar', () => {
 
     const { lastFrame } = renderWithJotai(<StatusBar />, store);
     expect(lastFrame() ?? '').toContain('ctrl+c again to exit');
+  });
+
+  it('shows the Copy Mode banner ahead of transient hints without adding a row', () => {
+    const store = makeStore();
+    store.set(copyModeActiveAtom, true);
+    store.set(setTransientStatusHintAtom, { text: 'copied' });
+
+    const { lastFrame } = renderWithJotai(<StatusBar />, store);
+    const output = lastFrame() ?? '';
+
+    expect(output).toContain(COPY_MODE_HINT);
+    expect(output).not.toContain('copied');
+    expect(output.split('\n')).toHaveLength(1);
   });
 
   it('shows the active provider and model when the provider is connected', async () => {

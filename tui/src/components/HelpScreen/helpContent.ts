@@ -25,6 +25,7 @@ const KEYBINDING_SECTIONS: readonly HelpSection[] = [
     title: 'GLOBAL',
     entries: [
       { keys: '/', description: 'Open the command menu' },
+      { keys: 'alt+r', description: 'Toggle Copy Mode for terminal-native selection' },
       { keys: 'ctrl+c ×2', description: 'Exit KQode' },
       { keys: 'esc', description: 'Clear the prompt · close the command menu' }
     ]
@@ -36,8 +37,13 @@ const KEYBINDING_SECTIONS: readonly HelpSection[] = [
       { keys: 'shift+enter', description: 'Insert a newline' },
       { keys: '\\ then enter', description: 'Insert a newline' },
       { keys: '← / →', description: 'Move the cursor' },
-      { keys: 'backspace', description: 'Delete the previous character' }
+      { keys: 'backspace', description: 'Delete the previous character' },
+      { keys: 'ctrl+v / alt+v / right-click', description: 'Paste from the system clipboard' }
     ]
+  },
+  {
+    title: 'CLIPBOARD',
+    entries: [{ keys: 'ctrl+o', description: 'Copy the last assistant response' }]
   },
   {
     title: 'COMMAND MENU',

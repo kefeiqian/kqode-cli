@@ -22,7 +22,20 @@ describe('helpContent', () => {
     const titles = buildHelpSections().map((section) => section.title);
 
     expect(titles[0]).toBe('COMMANDS');
-    expect(titles).toEqual(['COMMANDS', 'GLOBAL', 'INPUT', 'COMMAND MENU', 'SCROLL']);
+    expect(titles).toEqual(['COMMANDS', 'GLOBAL', 'INPUT', 'CLIPBOARD', 'COMMAND MENU', 'SCROLL']);
+  });
+
+  it('documents copy, paste, and Copy Mode shortcuts', () => {
+    const joined = flattenHelpLines(buildHelpSections())
+      .map((line) => line.text)
+      .join('\n');
+
+    expect(joined).toContain('alt+r');
+    expect(joined).toContain('Copy Mode');
+    expect(joined).toContain('ctrl+o');
+    expect(joined).toContain('Copy the last assistant response');
+    expect(joined).toContain('ctrl+v / alt+v / right-click');
+    expect(joined).toContain('Paste from the system clipboard');
   });
 
   it('flattens sections into title, entry, and blank-separator lines', () => {

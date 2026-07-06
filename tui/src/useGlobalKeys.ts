@@ -1,7 +1,7 @@
 import { useApp, useInput } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { ArmedAction } from '@constants/ui.ts';
-import { armedActionAtom } from '@state/ui/index.ts';
+import { ArmedAction, COPY_MODE_INPUT_KEY } from '@constants/ui.ts';
+import { armedActionAtom, copyModeActiveAtom } from '@state/ui/index.ts';
 
 /**
  * Global key handling that stays active in every state — the home screen, the
@@ -19,9 +19,30 @@ export function useGlobalKeys(): void {
   const { exit } = useApp();
   const armedAction = useAtomValue(armedActionAtom);
   const setArmedAction = useSetAtom(armedActionAtom);
+  const copyModeActive = useAtomValue(copyModeActiveAtom);
+  const setCopyModeActive = useSetAtom(copyModeActiveAtom);
 
   useInput((input, key) => {
     const isCtrlC = key.ctrl === true && input === 'c';
+    const isCopyModeToggle = key.meta === true && input === COPY_MODE_INPUT_KEY;
+
+    if (copyModeActive) {
+      if (key.pageUp === true || key.pageDown === true || key.end === true) {
+        return;
+      }
+      setCopyModeActive(false);
+      setArmedAction(null);
+      return;
+    }
+
+    if (isCopyModeToggle) {
+      setCopyModeActive(true);
+      if (armedAction === ArmedAction.Exit) {
+        setArmedAction(null);
+      }
+      return;
+    }
+
     if (!isCtrlC) {
       // A pending two-step exit clears on any other key, in every screen (the
       // composer dispatcher only runs on the home screen). Esc and the

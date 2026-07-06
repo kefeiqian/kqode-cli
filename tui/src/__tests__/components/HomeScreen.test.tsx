@@ -9,10 +9,15 @@ import { formatDisplayCwd } from '@libs/tui/cwdLine.ts';
 import type { BodyEntry } from '@libs/tui/bodyRows.ts';
 import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import { NOT_CONFIGURED_MODEL_LABEL } from '@libs/model/index.ts';
-import { PASTE_FAILED_HINT } from '@constants/ui.ts';
+import { COPY_MODE_HINT, PASTE_FAILED_HINT } from '@constants/ui.ts';
+import {
+  DISABLE_SGR_MOUSE_TRACKING,
+  ENABLE_SGR_MOUSE_TRACKING
+} from '@libs/terminal/mouse.ts';
 import {
   bodyEntriesAtom,
   columnsTestOverrideAtom,
+  copyModeActiveAtom,
   gitStatusLabelAtom,
   rowsTestOverrideAtom
 } from '@state/ui/index.ts';
@@ -419,6 +424,70 @@ describe('HomeScreen', () => {
     const bottomOutput = lastFrame() ?? '';
     expect(bottomOutput).toContain('entry 10');
     expect(bottomOutput).not.toContain('... newer output hidden ...');
+  });
+
+  it('toggles Copy Mode with Alt+R and keeps scroll keys active', async () => {
+    const entries = Array.from({ length: 10 }, (_, index) => ({
+      kind: 'assistant' as const,
+      text: `entry ${index + 1}`
+    }));
+    const { lastFrame, stdin, stdout, store } = renderHomeScreen({
+      bodyEntries: entries,
+      columns: 100,
+      rows: 15
+    });
+    const write = vi.spyOn(stdout, 'write');
+    Object.defineProperty(stdout, 'isTTY', { configurable: true, value: true });
+    await flushInput();
+    write.mockClear();
+
+    stdin.write('\u001Br');
+    await flushInput();
+
+    expect(store.get(copyModeActiveAtom)).toBe(true);
+    expect(write.mock.calls.some(([chunk]) => chunk === DISABLE_SGR_MOUSE_TRACKING)).toBe(true);
+    expect(store.get(composerStateAtom).text).toBe('');
+
+    stdin.write('\u001B[5~');
+    await flushInput();
+
+    expect(store.get(copyModeActiveAtom)).toBe(true);
+    expect(lastFrame() ?? '').toContain('entry 6');
+    expect(lastFrame() ?? '').toContain(COPY_MODE_HINT);
+
+    stdin.write('\u001B[6~');
+    await flushInput();
+    expect(store.get(copyModeActiveAtom)).toBe(true);
+    expect(lastFrame() ?? '').toContain('entry 10');
+
+    stdin.write('\u001B[F');
+    await flushInput();
+    expect(store.get(copyModeActiveAtom)).toBe(true);
+    expect(lastFrame() ?? '').toContain('entry 10');
+
+    write.mockClear();
+    stdin.write('\u001Br');
+    await flushInput();
+
+    expect(store.get(copyModeActiveAtom)).toBe(false);
+    expect(write.mock.calls.some(([chunk]) => chunk === ENABLE_SGR_MOUSE_TRACKING)).toBe(true);
+  });
+
+  it('exits Copy Mode on printable keys without inserting into the composer', async () => {
+    const { lastFrame, stdin, store } = renderHomeScreen({ columns: 100, rows: 15 });
+    await flushInput();
+
+    stdin.write('\u001Br');
+    await flushInput();
+    expect(store.get(copyModeActiveAtom)).toBe(true);
+    expect(lastFrame() ?? '').toContain(COPY_MODE_HINT);
+
+    stdin.write('z');
+    await flushInput();
+
+    expect(store.get(copyModeActiveAtom)).toBe(false);
+    expect(store.get(composerStateAtom).text).toBe('');
+    expect(lastFrame() ?? '').not.toContain(COPY_MODE_HINT);
   });
 
   it('scrolls body output with mouse wheel events', async () => {

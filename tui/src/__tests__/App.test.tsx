@@ -6,6 +6,7 @@ import { App } from '@/App.tsx';
 import {
   armedActionAtom,
   columnsTestOverrideAtom,
+  copyModeActiveAtom,
   FULLSCREEN_GUARD_ROWS,
   rowsTestOverrideAtom
 } from '@state/ui/index.ts';
@@ -150,6 +151,25 @@ describe('App', () => {
     stdin.write('\u0003');
     await flushInput();
     expect(store.get(armedActionAtom)).toBeNull();
+  });
+
+  it('lets Ctrl+C exit Copy Mode before arming the app exit', async () => {
+    const { store, stdin } = renderApp({ columns: 100, rows: 20 });
+    await flushInput();
+
+    stdin.write('\u001Br');
+    await flushInput();
+    expect(store.get(copyModeActiveAtom)).toBe(true);
+
+    stdin.write('\u0003');
+    await flushInput();
+
+    expect(store.get(copyModeActiveAtom)).toBe(false);
+    expect(store.get(armedActionAtom)).toBeNull();
+
+    stdin.write('\u0003');
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBe(ArmedAction.Exit);
   });
 
   it('disarms a pending Ctrl+C exit on another key outside the home screen', async () => {

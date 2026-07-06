@@ -26,7 +26,7 @@ import {
   scrollBodyByRowsAtom,
   scrollComposerByRowsAtom
 } from '@state/ui/index.ts';
-import { columnsAtom, rowsAtom } from '@state/ui/index.ts';
+import { columnsAtom, copyModeActiveAtom, rowsAtom } from '@state/ui/index.ts';
 import { commandMenuOpenAtom } from '@state/ui/commands/index.ts';
 import {
   composerScrollOffsetRowsAtom,
@@ -47,6 +47,7 @@ export function HomeScreenView() {
   const layout = useAtomValue(layoutAtom);
   const composerTop = useAtomValue(composerTopAtom);
   const composerCanScroll = useAtomValue(composerCanScrollAtom);
+  const copyModeActive = useAtomValue(copyModeActiveAtom);
   const scrollBodyByRows = useSetAtom(scrollBodyByRowsAtom);
   const scrollComposerByRows = useSetAtom(scrollComposerByRowsAtom);
   const notifyScroll = useCaretScrollSuppression();
@@ -57,13 +58,17 @@ export function HomeScreenView() {
       return;
     }
 
-    stdout.write(ENABLE_SGR_MOUSE_TRACKING);
+    stdout.write(copyModeActive ? DISABLE_SGR_MOUSE_TRACKING : ENABLE_SGR_MOUSE_TRACKING);
     return () => {
       stdout.write(DISABLE_SGR_MOUSE_TRACKING);
     };
-  }, [stdout]);
+  }, [copyModeActive, stdout]);
 
   useInput((input, key) => {
+    if (copyModeActive && !key.pageUp && !key.pageDown && !key.end) {
+      return;
+    }
+
     const wheel = parseMouseWheelEvent(input);
     if (wheel !== null) {
       notifyScroll();

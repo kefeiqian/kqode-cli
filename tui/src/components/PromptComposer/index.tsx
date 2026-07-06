@@ -29,7 +29,7 @@ import {
   composerStateAtom
 } from '@state/ui/composer/index.ts';
 import { composerRowsAtom, composerTopAtom, layoutAtom, scrollComposerCursorIntoViewAtom } from '@state/ui/index.ts';
-import { columnsAtom, inputLockedAtom } from '@state/ui/index.ts';
+import { columnsAtom, copyModeActiveAtom, inputLockedAtom } from '@state/ui/index.ts';
 
 type PromptComposerProps = {
   columns?: number;
@@ -63,6 +63,7 @@ export function PromptComposer({
   const caretSuppressed = useAtomValue(caretSuppressedWhileScrollingAtom);
   const atomColumns = useAtomValue(columnsAtom);
   const atomInputLocked = useAtomValue(inputLockedAtom);
+  const copyModeActive = useAtomValue(copyModeActiveAtom);
   const atomLayout = useAtomValue(layoutAtom);
   const atomComposerTop = useAtomValue(composerTopAtom);
   const restoreDraft = useAtomValue(restoreComposerDraftAtom);
@@ -90,7 +91,7 @@ export function PromptComposer({
             submissionSequence === undefined ? prompt : { text: prompt, submissionSequence }
           )
       : (prompt: string) => onSubmit(prompt);
-  const resolvedIsActive = isActive ?? !atomInputLocked;
+  const resolvedIsActive = isActive ?? (!atomInputLocked && !copyModeActive);
   const resolvedMaxVisibleLines = maxVisibleLines ?? atomLayout.composerVisibleRows ?? DEFAULT_COMPOSER_VISIBLE_LINES;
   const resolvedCursorTop = cursorTop ?? atomComposerTop;
   const resolvedVisibleRowsChange = onVisibleRowsChange ?? setComposerRows;

@@ -6,13 +6,15 @@ import {
   activeSurfaceAtom,
   armedActionAtom,
   columnsAtom,
+  copyModeActiveAtom,
   setTransientStatusHintAtom,
-  statusHintAtom,
+  startupStatusHintAtom,
   Surface,
   transientStatusHintAtom
 } from '@state/ui/index.ts';
 import {
   ArmedAction,
+  COPY_MODE_HINT,
   DEFAULT_STATUS_HINTS,
   LOADING_FRAME_COUNT,
   LOADING_FRAME_INTERVAL_MS,
@@ -25,13 +27,15 @@ import { theme } from '@theme/themeConfig.ts';
 export function StatusBar() {
   const columns = useAtomValue(columnsAtom);
   const modelLabel = useAtomValue(activeModelLabelAtom);
-  const statusHint = useAtomValue(statusHintAtom);
+  const startupStatusHint = useAtomValue(startupStatusHintAtom);
   const transientStatusHint = useAtomValue(transientStatusHintAtom);
+  const copyModeActive = useAtomValue(copyModeActiveAtom);
   const armedAction = useAtomValue(armedActionAtom);
   useActiveModelRefresh();
   useTransientStatusHintClear(transientStatusHint);
-  const loadingFrame = useLoadingFrame(statusHint?.kind === 'loading');
-  const baseHints = statusHint === undefined ? DEFAULT_STATUS_HINTS : statusHint.text;
+  const loadingFrame = useLoadingFrame(startupStatusHint?.kind === 'loading');
+  const persistentStatusHint = startupStatusHint ?? (copyModeActive ? { text: COPY_MODE_HINT } : undefined);
+  const baseHints = persistentStatusHint?.text ?? transientStatusHint?.text ?? DEFAULT_STATUS_HINTS;
   const armedHint =
     armedAction === ArmedAction.ClearInput
       ? PRESS_AGAIN_TO_CLEAR_HINT
@@ -40,7 +44,7 @@ export function StatusBar() {
         : undefined;
   const leftHints =
     armedHint ??
-    (statusHint?.kind === 'loading' ? `${baseHints}${'.'.repeat(loadingFrame)}` : baseHints);
+    (persistentStatusHint?.kind === 'loading' ? `${baseHints}${'.'.repeat(loadingFrame)}` : baseHints);
   const renderedModelLabel = truncateStatusModelLabel(modelLabel, columns, leftHints.length);
 
   return (
@@ -49,7 +53,9 @@ export function StatusBar() {
     // the last column — Windows Terminal renders it fine, so the model label is
     // allowed to reach the edge. Restore paddingRight={1} if a terminal clips it.
     <Box width={columns}>
-      <Text color={theme.colors.muted}>{leftHints}</Text>
+      <Text color={theme.colors.muted} wrap="truncate">
+        {leftHints}
+      </Text>
       <Box flexGrow={1} justifyContent="flex-end">
         <Text color={theme.colors.accentGreen} wrap="truncate">
           {renderedModelLabel}
