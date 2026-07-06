@@ -10,7 +10,7 @@ import {
   spawnBackend,
   type LaunchedBackend
 } from '@backend/process/backendProcess.ts';
-import { MESSAGE_SUBMIT_METHOD, SUBMIT_STATUS_NEEDS_CONFIGURATION } from '@contracts/backend/index.ts';
+import { MESSAGE_SUBMIT_METHOD } from '@contracts/backend/index.ts';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..');
 const INTEGRATION_TIMEOUT_MS = 180_000;
@@ -22,7 +22,7 @@ function frameRequest(payload: unknown): Buffer {
 
 function readResponseFrame(
   stream: Readable
-): Promise<{ result: { turnId: string; status: string } }> {
+): Promise<{ result: { turnId: string } }> {
   return new Promise((resolve, reject) => {
     let buffer = Buffer.alloc(0);
     const cleanup = () => {
@@ -67,7 +67,7 @@ function readResponseFrame(
 async function submitThroughLauncher(
   backend: LaunchedBackend,
   text: string
-): Promise<{ turnId: string; status: string }> {
+): Promise<{ turnId: string }> {
   const response = readResponseFrame(backend.stdout);
   backend.stdin.write(
     frameRequest({
@@ -107,13 +107,13 @@ describe('launchSourceBackend (integration)', () => {
     'builds and launches the backend and returns a well-formed ack',
     async () => {
       // A temp workspace with no `.env` in its ancestry makes the backend find
-      // no KIMI_API_KEY, so it deterministically returns needsConfiguration.
+      // no KIMI_API_KEY; submit still returns an accepted-only ack.
       const workspaceCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-launch-'));
       const backend = await launchSourceBackend({ repoRoot, workspaceCwd });
       try {
         const result = await submitThroughLauncher(backend, 'hi from a temp workspace');
         expect(result.turnId).toBe('turn-1');
-        expect(result.status).toBe(SUBMIT_STATUS_NEEDS_CONFIGURATION);
+        expect('status' in result).toBe(false);
       } finally {
         backend.dispose();
         safeRemove(workspaceCwd);
@@ -130,7 +130,7 @@ describe('launchSourceBackend (integration)', () => {
       try {
         const result = await submitThroughLauncher(backend, 'café ☕');
         expect(result.turnId).toBe('turn-1');
-        expect(result.status).toBe(SUBMIT_STATUS_NEEDS_CONFIGURATION);
+        expect('status' in result).toBe(false);
       } finally {
         backend.dispose();
         safeRemove(workspaceCwd);

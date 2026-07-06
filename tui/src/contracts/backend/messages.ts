@@ -54,18 +54,6 @@ export type BackendReadyParams = {
  */
 export const TOKEN_DELTA_METHOD = 'kqode/tokenDelta';
 
-/**
- * Server→client notification marking the natural end of a streamed turn.
- * Must match `TURN_END_METHOD` in `src/protocol.rs`.
- */
-export const TURN_END_METHOD = 'kqode/turnEnd';
-
-/**
- * Server→client notification for a turn that ended with a provider error.
- * Must match `TURN_ERROR_METHOD` in `src/protocol.rs`.
- */
-export const TURN_ERROR_METHOD = 'kqode/turnError';
-
 /** Must match `TURN_ENQUEUED_METHOD` in `src/protocol.rs`. */
 export const TURN_ENQUEUED_METHOD = 'kqode/turnEnqueued';
 
@@ -103,12 +91,6 @@ export type SettledKind =
   | typeof SETTLED_KIND_ERROR
   | typeof SETTLED_KIND_CANCELLED;
 
-/** `status` value when a submit is accepted and streaming has begun. */
-export const SUBMIT_STATUS_STREAMING = 'streaming';
-
-/** `status` value when a submit cannot run because no API key is configured. */
-export const SUBMIT_STATUS_NEEDS_CONFIGURATION = 'needsConfiguration';
-
 /**
  * Params for `kqode.message.submit`.
  *
@@ -124,12 +106,12 @@ export type MessageSubmitParams = {
 };
 
 /**
- * Result for `kqode.message.submit`: an immediate streaming ack. `status` is one
- * of {@link SUBMIT_STATUS_STREAMING} or {@link SUBMIT_STATUS_NEEDS_CONFIGURATION}.
+ * Result for `kqode.message.submit`: an immediate accepted ack. Terminal
+ * outcomes, including missing provider configuration, arrive via
+ * `kqode/turnSettled`.
  */
 export type MessageSubmitResult = {
   turnId: string;
-  status: string;
 };
 
 /** Must match `ConversationClearParams` in `src/protocol.rs`. */
@@ -154,19 +136,6 @@ export type TurnCancelResult = {
 export type TokenDeltaParams = {
   turnId: string;
   delta: string;
-};
-
-/** Payload for {@link TURN_END_METHOD}. */
-export type TurnEndParams = {
-  turnId: string;
-  finishReason: string | null;
-};
-
-/** Payload for {@link TURN_ERROR_METHOD}. */
-export type TurnErrorParams = {
-  turnId: string;
-  errorKind: string;
-  message: string;
 };
 
 /** Payload for {@link TURN_ENQUEUED_METHOD}. Must match `EnqueuedParams` in `src/protocol.rs`. */

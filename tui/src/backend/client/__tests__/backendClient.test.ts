@@ -19,8 +19,7 @@ import {
   SET_KEY_OUTCOME_CONNECTED,
   SET_KEY_OUTCOME_UNREACHABLE,
   SETTLED_KIND_CANCELLED,
-  SETTLED_KIND_COMPLETED,
-  SUBMIT_STATUS_STREAMING
+  SETTLED_KIND_COMPLETED
 } from '@contracts/backend/index.ts';
 import {
   messageSubmitRequest,
@@ -65,7 +64,7 @@ function ack(server: MessageConnection): void {
         result: { kind: SETTLED_KIND_COMPLETED, text, finishReason: 'stop', errorKind: null, message: null }
       });
     });
-    return { turnId, status: SUBMIT_STATUS_STREAMING };
+    return { turnId };
   });
 }
 
@@ -219,7 +218,7 @@ describe('createBackendClient (fake backend)', () => {
 
   it('synthesizes a terminal event for in-flight turns on fatal close', async () => {
     const fake = makeFakeBackend((server) => {
-      server.onRequest(messageSubmitRequest, ({ turnId }) => ({ turnId, status: SUBMIT_STATUS_STREAMING }));
+      server.onRequest(messageSubmitRequest, ({ turnId }) => ({ turnId }));
     });
     const client = createBackendClient({ launch: async () => fake.launched });
     const events: TranscriptEvent[] = [];

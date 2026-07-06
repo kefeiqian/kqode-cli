@@ -24,20 +24,6 @@ pub const BACKEND_READY_METHOD: &str = "kqode.backend.ready";
 /// Mirrored in `tui/src/contracts/backend/messages.ts`.
 pub const TOKEN_DELTA_METHOD: &str = "kqode/tokenDelta";
 
-/// Server→client notification marking the natural end of a streamed turn.
-/// Mirrored in `tui/src/contracts/backend/messages.ts`.
-pub const TURN_END_METHOD: &str = "kqode/turnEnd";
-
-/// Server→client notification for a turn that ended with a provider/network
-/// error. Mirrored in `tui/src/contracts/backend/messages.ts`.
-pub const TURN_ERROR_METHOD: &str = "kqode/turnError";
-
-/// `status` value when a submit is accepted and streaming has begun.
-pub const SUBMIT_STATUS_STREAMING: &str = "streaming";
-
-/// `status` value when a submit cannot run because no API key is configured.
-pub const SUBMIT_STATUS_NEEDS_CONFIGURATION: &str = "needsConfiguration";
-
 /// JSON-RPC code for method lookup failures.
 pub const JSON_RPC_METHOD_NOT_FOUND: i32 = -32601;
 
@@ -108,15 +94,14 @@ pub struct MessageSubmitParams {
     pub turn_id: String,
 }
 
-/// Result for `kqode.message.submit`: an immediate streaming ack.
+/// Result for `kqode.message.submit`: an immediate accepted ack.
 ///
-/// `status` is one of [`SUBMIT_STATUS_STREAMING`] or
-/// [`SUBMIT_STATUS_NEEDS_CONFIGURATION`]; `turnId` echoes the client's id.
+/// `turnId` echoes the client's id. Terminal outcomes, including missing
+/// provider configuration, are delivered through `kqode/turnSettled`.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MessageSubmitResult {
     pub turn_id: String,
-    pub status: &'static str,
 }
 
 /// Payload for [`BACKEND_READY_METHOD`].
@@ -136,23 +121,6 @@ pub struct BackendReadyParams {
 pub struct TokenDeltaParams {
     pub turn_id: String,
     pub delta: String,
-}
-
-/// Payload for [`TURN_END_METHOD`].
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TurnEndParams {
-    pub turn_id: String,
-    pub finish_reason: Option<String>,
-}
-
-/// Payload for [`TURN_ERROR_METHOD`].
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TurnErrorParams {
-    pub turn_id: String,
-    pub error_kind: String,
-    pub message: String,
 }
 
 /// Result for `kqode.git.status`: the formatted working-tree label, or `null`

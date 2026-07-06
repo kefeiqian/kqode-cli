@@ -10,8 +10,8 @@ use crate::protocol::{
     ActivatedParams, BACKEND_READY_METHOD, BackendReadyParams, ClearKeyParams,
     ConversationClearResult, EnqueuedParams, JSON_RPC_INVALID_PARAMS, JSON_RPC_METHOD_NOT_FOUND,
     RpcMethod, SelectionSetParams, SettledParams, TOKEN_DELTA_METHOD, TURN_ACTIVATED_METHOD,
-    TURN_END_METHOD, TURN_ENQUEUED_METHOD, TURN_ERROR_METHOD, TURN_SETTLED_METHOD,
-    TokenDeltaParams, TurnCancelParams, TurnCancelResult, TurnEndParams, TurnErrorParams,
+    TURN_ENQUEUED_METHOD, TURN_SETTLED_METHOD, TokenDeltaParams, TurnCancelParams,
+    TurnCancelResult,
 };
 use crate::store::Store;
 
@@ -235,17 +235,13 @@ fn notifications_for_event(event: ConversationEvent) -> Vec<Notification> {
                 delta: text,
             },
         )],
-        ConversationEvent::Settled { turn_id, result } => {
-            let mut notifications = vec![Notification::new(
-                TURN_SETTLED_METHOD.to_owned(),
-                SettledParams {
-                    turn_id: turn_id.clone(),
-                    result: protocol_turn_result(&result),
-                },
-            )];
-            notifications.push(legacy_settle_notification(turn_id, result));
-            notifications
-        }
+        ConversationEvent::Settled { turn_id, result } => vec![Notification::new(
+            TURN_SETTLED_METHOD.to_owned(),
+            SettledParams {
+                turn_id,
+                result: protocol_turn_result(&result),
+            },
+        )],
     }
 }
 
@@ -262,26 +258,6 @@ fn protocol_turn_result(result: &TurnResult) -> crate::protocol::TurnResult {
         error_kind: result.error_kind.clone(),
         message: result.message.clone(),
     }
-}
-
-fn legacy_settle_notification(turn_id: String, result: TurnResult) -> Notification {
-    if result.kind == SettledKind::Completed {
-        return Notification::new(
-            TURN_END_METHOD.to_owned(),
-            TurnEndParams {
-                turn_id,
-                finish_reason: result.finish_reason,
-            },
-        );
-    }
-    Notification::new(
-        TURN_ERROR_METHOD.to_owned(),
-        TurnErrorParams {
-            turn_id,
-            error_kind: result.error_kind.unwrap_or_else(|| "error".to_owned()),
-            message: result.message.unwrap_or_else(|| "turn failed".to_owned()),
-        },
-    )
 }
 
 fn handle_selection_set(request: Request, store: Option<&Store>) -> Response {

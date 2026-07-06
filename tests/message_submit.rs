@@ -2,8 +2,8 @@
 mod rpc;
 
 use kqode::protocol::{
-    BACKEND_READY_METHOD, RpcMethod, SUBMIT_STATUS_NEEDS_CONFIGURATION, TURN_ENQUEUED_METHOD,
-    TURN_ERROR_METHOD, TURN_SETTLED_METHOD,
+    BACKEND_READY_METHOD, RpcMethod, SETTLED_KIND_NEEDS_CONFIGURATION, TURN_ENQUEUED_METHOD,
+    TURN_SETTLED_METHOD,
 };
 use serde_json::json;
 
@@ -39,9 +39,9 @@ fn backend_announces_ready_before_handling_requests() {
 }
 
 #[test]
-fn message_submit_without_key_returns_needs_configuration() {
-    // With no API key (forced by the harness), submit must return an immediate
-    // ack routing the user to configuration and must not stream any tokens.
+fn message_submit_without_key_settles_needs_configuration() {
+    // With no API key (forced by the harness), submit must still be accepted.
+    // The coordinator then settles the turn to configuration-required.
     let output = backend_output(&request_frame(
         1,
         RpcMethod::MessageSubmit.as_str(),
@@ -66,17 +66,18 @@ fn message_submit_without_key_returns_needs_configuration() {
     assert!(
         all_frames
             .iter()
-            .any(|frame| frame["method"] == TURN_ERROR_METHOD),
-        "expected a legacy terminal notification: {all_frames:?}"
+            .any(|frame| frame["method"] == TURN_SETTLED_METHOD
+                && frame["params"]["result"]["kind"] == SETTLED_KIND_NEEDS_CONFIGURATION),
+        "expected a needs-configuration settlement: {all_frames:?}"
     );
 
     let frames = response_frames(&output.stdout);
     let response = frames.iter().find(|frame| frame["id"] == 1).unwrap();
-    assert_eq!(
-        response["result"]["status"],
-        SUBMIT_STATUS_NEEDS_CONFIGURATION
-    );
     assert_eq!(response["result"]["turnId"], "turn-1");
+    assert!(
+        response["result"].get("status").is_none(),
+        "submit ack no longer carries status: {response:?}"
+    );
 }
 
 #[test]
@@ -102,10 +103,7 @@ fn message_submit_echoes_the_client_turn_id_for_each_submit() {
     let first = frames.iter().find(|frame| frame["id"] == 1).unwrap();
     let second = frames.iter().find(|frame| frame["id"] == 2).unwrap();
     assert_eq!(first["result"]["turnId"], "turn-a");
-    assert_eq!(first["result"]["status"], SUBMIT_STATUS_NEEDS_CONFIGURATION);
+    assert!(first["result"].get("status").is_none());
     assert_eq!(second["result"]["turnId"], "turn-b");
-    assert_eq!(
-        second["result"]["status"],
-        SUBMIT_STATUS_NEEDS_CONFIGURATION
-    );
+    assert!(second["result"].get("status").is_none());
 }

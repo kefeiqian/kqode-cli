@@ -8,8 +8,6 @@ import {
   TURN_ACTIVATED_METHOD,
   TURN_CANCEL_METHOD,
   TURN_ENQUEUED_METHOD,
-  TURN_END_METHOD,
-  TURN_ERROR_METHOD,
   TURN_SETTLED_METHOD
 } from '@contracts/backend/index.ts';
 import type {
@@ -23,9 +21,7 @@ import type {
   SettledParams,
   TokenDeltaParams,
   TurnCancelParams,
-  TurnCancelResult,
-  TurnEndParams,
-  TurnErrorParams
+  TurnCancelResult
 } from '@contracts/backend/index.ts';
 
 /**
@@ -84,9 +80,3 @@ export const turnActivatedNotification = new NotificationType<ActivatedParams>(
 
 /** Unified terminal result notification for a turn. */
 export const turnSettledNotification = new NotificationType<SettledParams>(TURN_SETTLED_METHOD);
-
-/** Terminal "turn finished" notification carrying the finish reason. */
-export const turnEndNotification = new NotificationType<TurnEndParams>(TURN_END_METHOD);
-
-/** Terminal "turn failed" notification carrying a sanitized provider error. */
-export const turnErrorNotification = new NotificationType<TurnErrorParams>(TURN_ERROR_METHOD);

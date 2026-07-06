@@ -1,5 +1,5 @@
 //! Typed provider failures, classified so the backend can emit themed,
-//! non-fatal `kqode/turnError` notifications.
+//! non-fatal settled error notifications.
 //!
 //! Error messages are sanitized: they never include the bearer token, auth
 //! headers, or a full request dump.

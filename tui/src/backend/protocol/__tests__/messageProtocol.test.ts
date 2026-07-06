@@ -7,8 +7,7 @@ import { createMessageConnectionClient } from '@backend/client/messageConnection
 import {
   SETTLED_KIND_COMPLETED,
   SETTLED_KIND_ERROR,
-  SUBMIT_STATUS_NEEDS_CONFIGURATION,
-  SUBMIT_STATUS_STREAMING,
+  SETTLED_KIND_NEEDS_CONFIGURATION,
   TURN_STATE_ACTIVE
 } from '@contracts/backend/index.ts';
 import {
@@ -18,9 +17,7 @@ import {
   tokenDeltaNotification,
   turnActivatedNotification,
   turnCancelRequest,
-  turnEndNotification,
   turnEnqueuedNotification,
-  turnErrorNotification,
   turnSettledNotification
 } from '@backend/protocol/messageProtocol.ts';
 
@@ -49,7 +46,7 @@ function streamingServer(server: MessageConnection, deltas: readonly string[]): 
         result: { kind: SETTLED_KIND_COMPLETED, text: deltas.join(''), finishReason: 'stop', errorKind: null, message: null }
       });
     });
-    return { turnId, status: SUBMIT_STATUS_STREAMING };
+    return { turnId };
   });
 }
 
@@ -97,7 +94,7 @@ describe('message protocol client', () => {
     const { client, server } = pairedConnections();
     server.onRequest(messageSubmitRequest, ({ turnId }) => {
       void server.sendNotification(tokenDeltaNotification, { turnId, delta: 'early' });
-      return { turnId, status: SUBMIT_STATUS_STREAMING };
+      return { turnId };
     });
     const backend = createMessageConnectionClient(client);
     const deltas: string[] = [];
@@ -124,7 +121,7 @@ describe('message protocol client', () => {
           message: 'Kimi rejected the API key'
         }
       }));
-      return { turnId, status: SUBMIT_STATUS_STREAMING };
+      return { turnId };
     });
     const backend = createMessageConnectionClient(client);
     const settled = new Promise((resolve) => backend.onTranscriptEvent(resolve));
@@ -134,20 +131,20 @@ describe('message protocol client', () => {
     await expect(settled).resolves.toMatchObject({ type: 'settled', turnId: 'turn-1' });
   });
 
-  it('dispatches needs-configuration from the settled event when the ack reports no key', async () => {
+  it('dispatches needs-configuration from the settled event after accepted ack', async () => {
     const { client, server } = pairedConnections();
     server.onRequest(messageSubmitRequest, ({ turnId }) => {
       queueMicrotask(() => void server.sendNotification(turnSettledNotification, {
         turnId,
         result: {
-          kind: SUBMIT_STATUS_NEEDS_CONFIGURATION,
+          kind: SETTLED_KIND_NEEDS_CONFIGURATION,
           text: null,
           finishReason: null,
           errorKind: null,
           message: null
         }
       }));
-      return { turnId, status: SUBMIT_STATUS_NEEDS_CONFIGURATION };
+      return { turnId };
     });
     const backend = createMessageConnectionClient(client);
     const settled = new Promise((resolve) => backend.onTranscriptEvent(resolve));
@@ -156,7 +153,7 @@ describe('message protocol client', () => {
 
     await expect(settled).resolves.toMatchObject({
       type: 'settled',
-      result: { kind: SUBMIT_STATUS_NEEDS_CONFIGURATION }
+      result: { kind: SETTLED_KIND_NEEDS_CONFIGURATION }
     });
   });
 
@@ -204,17 +201,6 @@ describe('message protocol descriptors', () => {
     await expect(client.sendRequest(turnCancelRequest, { turnId: 'turn-1' })).resolves.toEqual({ ok: true });
   });
 
-  it('keeps legacy turnEnd and turnError notifications round-tripping', async () => {
-    const { client, server } = pairedConnections();
-    const ended = new Promise((resolve) => client.onNotification(turnEndNotification, resolve));
-    const errored = new Promise((resolve) => client.onNotification(turnErrorNotification, resolve));
-
-    await server.sendNotification(turnEndNotification, { turnId: 'turn-1', finishReason: 'stop' });
-    await server.sendNotification(turnErrorNotification, { turnId: 'turn-2', errorKind: 'provider', message: 'failed' });
-
-    await expect(ended).resolves.toEqual({ turnId: 'turn-1', finishReason: 'stop' });
-    await expect(errored).resolves.toEqual({ turnId: 'turn-2', errorKind: 'provider', message: 'failed' });
-  });
 });
 
 describe('git status request', () => {
