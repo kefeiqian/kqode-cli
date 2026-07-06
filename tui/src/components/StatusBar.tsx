@@ -1,8 +1,8 @@
 import { Box, Text } from 'ink';
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useState } from 'react';
-import { armedActionAtom, columnsAtom, statusHintAtom } from '@state/ui/index.ts';
-import { modelLabelAtom } from '@state/global/index.ts';
+import { activeModelLabelAtom, refreshActiveModelAtom } from '@state/global/index.ts';
+import { activeSurfaceAtom, armedActionAtom, columnsAtom, statusHintAtom, Surface } from '@state/ui/index.ts';
 import {
   ArmedAction,
   DEFAULT_STATUS_HINTS,
@@ -15,9 +15,10 @@ import { theme } from '@theme/themeConfig.ts';
 
 export function StatusBar() {
   const columns = useAtomValue(columnsAtom);
-  const modelLabel = useAtomValue(modelLabelAtom);
+  const modelLabel = useAtomValue(activeModelLabelAtom);
   const statusHint = useAtomValue(statusHintAtom);
   const armedAction = useAtomValue(armedActionAtom);
+  useActiveModelRefresh();
   const loadingFrame = useLoadingFrame(statusHint?.kind === 'loading');
   const baseHints = statusHint === undefined ? DEFAULT_STATUS_HINTS : statusHint.text;
   const armedHint =
@@ -29,6 +30,7 @@ export function StatusBar() {
   const leftHints =
     armedHint ??
     (statusHint?.kind === 'loading' ? `${baseHints}${'.'.repeat(loadingFrame)}` : baseHints);
+  const renderedModelLabel = truncateStatusModelLabel(modelLabel, columns, leftHints.length);
 
   return (
     // Fill the terminal's final column for a tight right edge. Ink erases to
@@ -38,10 +40,23 @@ export function StatusBar() {
     <Box width={columns}>
       <Text color={theme.colors.muted}>{leftHints}</Text>
       <Box flexGrow={1} justifyContent="flex-end">
-        <Text color={theme.colors.accentGreen}>{modelLabel}</Text>
+        <Text color={theme.colors.accentGreen} wrap="truncate">
+          {renderedModelLabel}
+        </Text>
       </Box>
     </Box>
   );
+}
+
+function useActiveModelRefresh() {
+  const activeSurface = useAtomValue(activeSurfaceAtom);
+  const refreshActiveModel = useSetAtom(refreshActiveModelAtom);
+
+  useEffect(() => {
+    if (activeSurface === Surface.Home) {
+      void refreshActiveModel();
+    }
+  }, [activeSurface, refreshActiveModel]);
 }
 
 function useLoadingFrame(isLoading: boolean): number {
@@ -63,4 +78,9 @@ function useLoadingFrame(isLoading: boolean): number {
   }, [isLoading]);
 
   return frame;
+}
+
+function truncateStatusModelLabel(label: string, columns: number, leftColumns: number): string {
+  const availableColumns = Math.max(0, columns - leftColumns);
+  return label.slice(0, availableColumns);
 }

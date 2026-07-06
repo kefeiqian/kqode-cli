@@ -1,3 +1,4 @@
+export * from '@state/global/activeModel.ts';
 export * from '@state/global/backend.ts';
 export * from '@state/global/model.ts';
 export * from '@state/global/session.ts';

@@ -8,6 +8,7 @@ import { BodyPane } from '@components/BodyPane.tsx';
 import { formatDisplayCwd } from '@libs/tui/cwdLine.ts';
 import type { BodyEntry } from '@libs/tui/bodyRows.ts';
 import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
+import { NOT_CONFIGURED_MODEL_LABEL } from '@libs/model/index.ts';
 import {
   bodyEntriesAtom,
   columnsTestOverrideAtom,
@@ -79,7 +80,7 @@ describe('HomeScreen', () => {
     expect(output).toContain('@ mention');
     expect(output).toContain('? help');
     expect(output).not.toContain('tab next tab');
-    expect(output).toContain('GPT-5.5');
+    expect(output).toContain(NOT_CONFIGURED_MODEL_LABEL);
   });
 
   it('displays the copied dummy React workspace cwd rather than the TUI package path', () => {
@@ -294,7 +295,7 @@ describe('HomeScreen', () => {
     expect(output).toContain('~');
     expect(output.split('\n')).toContain('>');
     expect(output).not.toContain('Ask KQode...');
-    expect(output).toContain('GPT-5.5');
+    expect(output).toContain(NOT_CONFIGURED_MODEL_LABEL);
     const outputRows = output.split('\n');
     expect(outputRows).toHaveLength(15);
     expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
@@ -393,7 +394,7 @@ describe('HomeScreen', () => {
     expect(scrolledOutput).not.toContain('... newer output hidden ...');
     expect(scrolledOutput).toContain('┃');
     expect(scrolledOutput).toContain('│');
-    expect(scrolledOutput.split('\n').at(-1)).toContain('GPT-5.5');
+    expect(scrolledOutput.split('\n').at(-1)).toContain(NOT_CONFIGURED_MODEL_LABEL);
 
     stdin.write('\u001B[5~');
     await flushInput();

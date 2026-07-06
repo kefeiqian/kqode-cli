@@ -1,4 +1,2 @@
-import { atom } from 'jotai';
-
-export const DEFAULT_MODEL_LABEL = 'GPT-5.5';
-export const modelLabelAtom = atom(DEFAULT_MODEL_LABEL);
+export { DEFAULT_MODEL_LABEL } from '@libs/model/index.ts';
+export { activeModelLabelAtom as modelLabelAtom } from '@state/global/activeModel.ts';
