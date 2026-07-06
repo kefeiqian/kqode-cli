@@ -2,7 +2,7 @@
 
 use crate::config::KimiConfig;
 use crate::provider::ProviderId;
-use crate::provider::registry::{self, ProviderEndpoint};
+use crate::provider::registry;
 use crate::secrets;
 use crate::store::Store;
 
@@ -20,7 +20,7 @@ pub(crate) fn resolve_submit_config(store: Option<&Store>) -> Option<KimiConfig>
         None => effective_default()?,
     };
     let key = secrets::resolve_key(provider)?;
-    let base_url = resolve_base_url(store, provider)?;
+    let base_url = crate::login::resolve_base_url(store, provider)?;
 
     Some(KimiConfig {
         api_key: key.expose().to_owned(),
@@ -41,19 +41,6 @@ fn effective_default() -> Option<(ProviderId, String)> {
         secrets::resolve_key(descriptor.id)?;
         Some((descriptor.id, model))
     })
-}
-
-fn resolve_base_url(store: Option<&Store>, provider: ProviderId) -> Option<String> {
-    match registry::provider_descriptor(provider).endpoint {
-        ProviderEndpoint::Fixed { base_url } => Some(base_url.to_owned()),
-        ProviderEndpoint::Custom => store
-            .and_then(|store| store.provider_settings(ProviderId::Custom).ok().flatten())
-            .map(|settings| settings.base_url)
-            .or_else(|| {
-                crate::config::custom_env_base_url()
-                    .and_then(|url| registry::validate_base_url(&url).ok())
-            }),
-    }
 }
 
 #[cfg(test)]

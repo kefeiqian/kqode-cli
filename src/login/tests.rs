@@ -9,6 +9,8 @@ use crate::protocol::{
     SET_KEY_OUTCOME_UNREACHABLE,
 };
 use crate::provider::ModelInfo;
+use std::env;
+use std::ffi::OsString;
 
 fn model(id: &str) -> ModelInfo {
     ModelInfo {
@@ -21,6 +23,15 @@ fn temp_store() -> (tempfile::TempDir, Store) {
     let dir = tempfile::tempdir().expect("temp dir");
     let store = Store::open_or_bootstrap_at(dir.path().join("kqode.db")).expect("store");
     (dir, store)
+}
+
+fn restore_env(name: &str, previous: Option<OsString>) {
+    unsafe {
+        match previous {
+            Some(value) => env::set_var(name, value),
+            None => env::remove_var(name),
+        }
+    }
 }
 
 #[test]
@@ -183,6 +194,55 @@ fn model_id_sanitization_strips_controls_and_ansi() {
     );
     assert_eq!(sanitize_model_id("a\u{1b}]0;owned\u{7}b"), "ab");
     assert_eq!(sanitize_model_id("a\u{1b}]0;owned\u{1b}\\b"), "ab");
+}
+
+#[test]
+fn resolve_base_url_falls_back_to_custom_env_when_store_has_no_settings() {
+    let _lock = crate::test_env::lock();
+    let previous = env::var_os(crate::config::CUSTOM_BASE_URL_VAR);
+    // A fresh store has no persisted Custom endpoint, so `/model` catalog loads
+    // must reach the workspace `.env` base URL instead of failing to load.
+    unsafe { env::set_var(crate::config::CUSTOM_BASE_URL_VAR, "https://custom.env/v1/") };
+    let (_dir, store) = temp_store();
+
+    let resolved = resolve_base_url(Some(&store), ProviderId::Custom);
+
+    restore_env(crate::config::CUSTOM_BASE_URL_VAR, previous);
+    assert_eq!(resolved.as_deref(), Some("https://custom.env/v1"));
+}
+
+#[test]
+fn resolve_base_url_is_none_for_custom_without_store_or_env() {
+    let _lock = crate::test_env::lock();
+    let previous = env::var_os(crate::config::CUSTOM_BASE_URL_VAR);
+    restore_env(crate::config::CUSTOM_BASE_URL_VAR, None);
+    let (_dir, store) = temp_store();
+
+    let resolved = resolve_base_url(Some(&store), ProviderId::Custom);
+
+    restore_env(crate::config::CUSTOM_BASE_URL_VAR, previous);
+    assert_eq!(resolved, None);
+}
+
+#[test]
+fn resolve_base_url_uses_compiled_endpoint_for_fixed_preset_providers() {
+    let _lock = crate::test_env::lock();
+    let previous = env::var_os(crate::config::CUSTOM_BASE_URL_VAR);
+    // The Custom `.env` base URL must never override a preset's fixed endpoint.
+    unsafe {
+        env::set_var(
+            crate::config::CUSTOM_BASE_URL_VAR,
+            "https://attacker.example/v1",
+        )
+    };
+
+    let resolved = resolve_base_url(None, ProviderId::Kimi);
+
+    restore_env(crate::config::CUSTOM_BASE_URL_VAR, previous);
+    assert_eq!(
+        resolved.as_deref(),
+        Some(crate::config::DEFAULT_KIMI_BASE_URL)
+    );
 }
 
 #[test]

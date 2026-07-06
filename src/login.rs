@@ -84,7 +84,7 @@ pub async fn list_models(store: Option<Store>, provider: ProviderId) -> ModelLis
     let Some(key) = crate::secrets::resolve_key(provider) else {
         return model_failed();
     };
-    let Some(base_url) = model_base_url(store.as_ref(), provider) else {
+    let Some(base_url) = resolve_base_url(store.as_ref(), provider) else {
         return model_failed();
     };
     match http::fetch_models(&base_url, &key).await {
@@ -100,14 +100,24 @@ pub async fn list_models(store: Option<Store>, provider: ProviderId) -> ModelLis
     }
 }
 
-fn model_base_url(store: Option<&Store>, provider: ProviderId) -> Option<String> {
+/// Resolves a provider's API base URL for outbound requests.
+///
+/// Preset (`Fixed`) providers always use their compiled endpoint and never
+/// consult the store or environment, preserving the SSRF guarantee that a
+/// preset URL can't be overridden. The Custom provider prefers persisted store
+/// settings and otherwise falls back to the validated workspace `.env`
+/// `CUSTOM_BASE_URL`. Shared by submit resolution and `/model` catalog loading
+/// so both agree on where to reach a provider.
+#[must_use]
+pub(crate) fn resolve_base_url(store: Option<&Store>, provider: ProviderId) -> Option<String> {
     match provider_descriptor(provider).endpoint {
         ProviderEndpoint::Fixed { base_url } => Some(base_url.to_owned()),
-        ProviderEndpoint::Custom => store?
-            .provider_settings(provider)
-            .ok()
-            .flatten()
-            .map(|settings| settings.base_url),
+        ProviderEndpoint::Custom => store
+            .and_then(|store| store.provider_settings(ProviderId::Custom).ok().flatten())
+            .map(|settings| settings.base_url)
+            .or_else(|| {
+                crate::config::custom_env_base_url().and_then(|url| validate_base_url(&url).ok())
+            }),
     }
 }
 
