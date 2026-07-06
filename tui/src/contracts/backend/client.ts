@@ -6,6 +6,8 @@
  * cycle. Implementations (process, connection, runtime wiring) live in `@backend`.
  */
 
+import type { ActiveSelectionResult, ProviderStatusInfo } from '@contracts/backend/providerMessages.ts';
+
 /** Backend failure categories surfaced to the TUI. */
 export const BackendErrorKind = {
   /** JSON-RPC method/params error or an invalid response shape. */
@@ -66,4 +68,8 @@ export type BackendClient = {
    * formats the label; the TUI renders it verbatim.
    */
   gitStatus(): Promise<string | null>;
+  listProviders(): Promise<ProviderStatusInfo[]>;
+  getActiveSelection(): Promise<ActiveSelectionResult>;
+  setActiveSelection(providerId: string, modelId: string): Promise<void>;
+  clearProviderKey(providerId: string): Promise<void>;
 };

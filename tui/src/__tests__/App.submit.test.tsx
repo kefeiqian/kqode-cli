@@ -28,6 +28,10 @@ function renderApp(backendClient: Partial<BackendClient>, columns = 80, rows = 4
   // streaming tests only supply submitStreaming.
   const client: BackendClient = {
     gitStatus: async () => null,
+    listProviders: async () => [],
+    getActiveSelection: async () => ({ providerId: null, modelId: null }),
+    setActiveSelection: async () => {},
+    clearProviderKey: async () => {},
     submitStreaming: async () => {
       throw new Error('submitStreaming not provided');
     },

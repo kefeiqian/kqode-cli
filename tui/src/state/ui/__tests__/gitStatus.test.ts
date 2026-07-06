@@ -5,7 +5,14 @@ import { backendClientAtom } from '@state/global/index.ts';
 import { gitStatusLabelAtom, refreshGitStatusAtom } from '@state/ui/gitStatus.ts';
 
 function clientWithGitStatus(gitStatus: BackendClient['gitStatus']): BackendClient {
-  return { submitStreaming: vi.fn(), gitStatus };
+  return {
+    submitStreaming: vi.fn(),
+    gitStatus,
+    listProviders: async () => [],
+    getActiveSelection: async () => ({ providerId: null, modelId: null }),
+    setActiveSelection: async () => {},
+    clearProviderKey: async () => {}
+  };
 }
 
 describe('refreshGitStatusAtom', () => {

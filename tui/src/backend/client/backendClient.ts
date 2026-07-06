@@ -9,46 +9,21 @@ import {
   isFatalBackendError,
   toLaunchError
 } from '@backend/client/backendClientErrors.ts';
+import {
+  BackendLifecycleState,
+  type BackendClientHandle,
+  type BackendClientOptions
+} from '@backend/client/backendClientTypes.ts';
 import type {
+  ActiveSelectionResult,
+  ProviderStatusInfo,
   StreamCallbacks,
   StreamOutcome,
   StreamSubmitParams
 } from '@contracts/backend/index.ts';
 
-/** Lifecycle of the TUI-owned backend connection. */
-export const BackendLifecycleState = {
-  /** No backend has been launched yet. */
-  Idle: 'idle',
-  /** A backend launch/connect is in flight. */
-  Starting: 'starting',
-  /** The backend is connected and accepting requests. */
-  Ready: 'ready',
-  /** The TUI is disposing the backend on purpose. */
-  Closing: 'closing',
-  /** The backend exited, crashed, or a fatal transport error occurred. */
-  Dead: 'dead'
-} as const;
-
-export type BackendLifecycleState =
-  (typeof BackendLifecycleState)[keyof typeof BackendLifecycleState];
-
-/** Lifecycle handle over a {@link BackendClient} that owns one child backend at a time. */
-export type BackendClientHandle = BackendClient & {
-  getState(): BackendLifecycleState;
-  /** Registers a listener fired with the session id each time a backend becomes ready (incl. respawn). */
-  onReady(listener: (sessionId: string) => void): void;
-  ensureStarted(): Promise<void>;
-  dispose(): void;
-};
-
-/** Composition inputs for the generic backend client: an injected process launcher. */
-export type BackendClientOptions = {
-  /** Produces a freshly launched backend process; source/packaged factories inject this. */
-  launch: () => Promise<LaunchedBackend>;
-  requestTimeoutMs?: number;
-  /** Ceiling for the launched backend to signal JSON-RPC readiness before it is torn down. */
-  startupTimeoutMs?: number;
-};
+export { BackendLifecycleState };
+export type { BackendClientHandle, BackendClientOptions };
 
 type BackendSession = {
   backend: LaunchedBackend;
@@ -56,19 +31,7 @@ type BackendSession = {
   client: BackendClient;
 };
 
-/**
- * Creates a JSON-RPC client over a launched child backend.
- *
- * One backend serves the whole TUI session. Recoverable method errors keep the
- * process alive; fatal transport/timeout/exit failures dispose the connection
- * and mark the client `dead`. The next submit after `dead` respawns a fresh
- * backend (persisted session restore is added with the session methods), never
- * silently and never auto-replaying interrupted work.
- *
- * `dispose()` is terminal: once disposed, `ensureStarted`/`submitStreaming` reject
- * with a `launch`-kind {@link BackendClientError} without spawning a replacement,
- * so a torn-down client can never orphan a new backend process.
- */
+/** Creates a lifecycle-managed JSON-RPC client over a launched child backend. */
 export function createBackendClient(options: BackendClientOptions): BackendClientHandle {
   const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
   const startupTimeoutMs = options.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS;
@@ -178,6 +141,21 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     return starting;
   };
 
+  const withClient = async <T>(operation: (client: BackendClient) => Promise<T>): Promise<T> => {
+    if (disposed) {
+      throw disposedError();
+    }
+    const active = await ensureSession();
+    try {
+      return await operation(active.client);
+    } catch (error) {
+      if (isFatalBackendError(error)) {
+        markDead();
+      }
+      throw error;
+    }
+  };
+
   return {
     getState: () => state,
     onReady(listener: (sessionId: string) => void): void {
@@ -190,32 +168,22 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
       params: StreamSubmitParams,
       callbacks: StreamCallbacks
     ): Promise<StreamOutcome> {
-      if (disposed) {
-        throw disposedError();
-      }
-      const active = await ensureSession();
-      try {
-        return await active.client.submitStreaming(params, callbacks);
-      } catch (error) {
-        if (isFatalBackendError(error)) {
-          markDead();
-        }
-        throw error;
-      }
+      return withClient((client) => client.submitStreaming(params, callbacks));
     },
     async gitStatus(): Promise<string | null> {
-      if (disposed) {
-        throw disposedError();
-      }
-      const active = await ensureSession();
-      try {
-        return await active.client.gitStatus();
-      } catch (error) {
-        if (isFatalBackendError(error)) {
-          markDead();
-        }
-        throw error;
-      }
+      return withClient((client) => client.gitStatus());
+    },
+    async listProviders(): Promise<ProviderStatusInfo[]> {
+      return withClient((client) => client.listProviders());
+    },
+    async getActiveSelection(): Promise<ActiveSelectionResult> {
+      return withClient((client) => client.getActiveSelection());
+    },
+    async setActiveSelection(providerId: string, modelId: string): Promise<void> {
+      await withClient((client) => client.setActiveSelection(providerId, modelId));
+    },
+    async clearProviderKey(providerId: string): Promise<void> {
+      await withClient((client) => client.clearProviderKey(providerId));
     },
     dispose() {
       disposed = true;

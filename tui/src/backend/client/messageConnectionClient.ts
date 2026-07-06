@@ -15,6 +15,12 @@ import {
   turnEndNotification,
   turnErrorNotification
 } from '@backend/protocol/messageProtocol.ts';
+import {
+  providerClearKeyRequest,
+  providerListRequest,
+  selectionGetRequest,
+  selectionSetRequest
+} from '@backend/protocol/providerProtocol.ts';
 import { withRequestTimeout } from '@backend/client/backendClientErrors.ts';
 import { DEFAULT_REQUEST_TIMEOUT_MS } from '@constants/backend.ts';
 
@@ -119,6 +125,53 @@ export function createMessageConnectionClient(
       } catch (error) {
         throw toBackendClientError(error);
       }
+    },
+    async listProviders() {
+      try {
+        const result = await withRequestTimeout(
+          connection.sendRequest(providerListRequest),
+          requestTimeoutMs
+        );
+        return result.providers;
+      } catch (error) {
+        throw toBackendClientError(error);
+      }
+    },
+    async getActiveSelection() {
+      try {
+        return await withRequestTimeout(
+          connection.sendRequest(selectionGetRequest),
+          requestTimeoutMs
+        );
+      } catch (error) {
+        throw toBackendClientError(error);
+      }
+    },
+    async setActiveSelection(providerId: string, modelId: string) {
+      try {
+        const result = await withRequestTimeout(
+          connection.sendRequest(selectionSetRequest, { providerId, modelId }),
+          requestTimeoutMs
+        );
+        if (!result.ok) {
+          throw new BackendClientError(BackendErrorKind.Protocol, 'backend rejected selection set');
+        }
+      } catch (error) {
+        throw toBackendClientError(error);
+      }
+    },
+    async clearProviderKey(providerId: string) {
+      try {
+        const result = await withRequestTimeout(
+          connection.sendRequest(providerClearKeyRequest, { providerId }),
+          requestTimeoutMs
+        );
+        if (!result.ok) {
+          throw new BackendClientError(BackendErrorKind.Protocol, 'backend rejected provider clearKey');
+        }
+      } catch (error) {
+        throw toBackendClientError(error);
+      }
     }
   };
 }
@@ -127,15 +180,13 @@ function toBackendClientError(error: unknown): BackendClientError {
   if (error instanceof BackendClientError) {
     return error;
   }
-
   if (error instanceof ResponseError) {
     return new BackendClientError(
       BackendErrorKind.Protocol,
-      `backend rejected message submit: ${error.message}`,
+      `backend rejected request: ${error.message}`,
       { cause: error }
     );
   }
-
   return new BackendClientError(
     BackendErrorKind.Transport,
     `backend connection failed: ${errorMessage(error)}`,
