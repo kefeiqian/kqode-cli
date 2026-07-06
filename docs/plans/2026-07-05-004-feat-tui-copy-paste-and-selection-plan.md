@@ -1,7 +1,7 @@
 ---
 title: "feat: TUI copy, paste, and text selection"
 type: feat
-status: active
+status: completed
 date: 2026-07-05
 origin: docs/brainstorms/2026-07-05-tui-copy-paste-and-selection-requirements.md
 ---
