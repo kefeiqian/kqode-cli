@@ -30,7 +30,7 @@ describe('helpContent', () => {
       .map((line) => line.text)
       .join('\n');
 
-    expect(joined).toContain('alt+r');
+    expect(joined).toContain('ctrl+r');
     expect(joined).toContain('Copy Mode');
     expect(joined).toContain('ctrl+o');
     expect(joined).toContain('Copy the last assistant response');

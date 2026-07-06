@@ -95,7 +95,13 @@ export const PASTE_FAILED_HINT = 'paste failed';
 /** Composer key that copies the last assistant response. */
 export const COPY_LAST_RESPONSE_KEY = 'o';
 
-/** Global Alt-modified key that toggles terminal-native Copy Mode. */
+/**
+ * Global Ctrl-modified key that toggles terminal-native Copy Mode. Ctrl (not
+ * Alt) because Alt+letter combos are commonly swallowed by OS/global hotkeys
+ * before reaching the terminal — notably the NVIDIA overlay's Alt+R Instant
+ * Replay binding — so the app never sees the keypress. A Ctrl+letter reliably
+ * arrives as a control byte.
+ */
 export const COPY_MODE_INPUT_KEY = 'r';
 
 /** Persistent status hint shown while terminal-native Copy Mode is active. */

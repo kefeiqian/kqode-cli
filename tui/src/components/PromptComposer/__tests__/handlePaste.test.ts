@@ -98,12 +98,12 @@ describe('handlePaste', () => {
     expect(store.get(transientStatusHintAtom)?.text).toBe(PASTE_FAILED_HINT);
   });
 
-  it('keeps Ctrl+V, Alt+V, and Alt+R out of text editing', () => {
+  it('keeps Ctrl+V, Alt+V, and Ctrl+R out of text editing', () => {
     const store = createStore();
 
     expect(handleTextEdit(context(store, 'v', { ctrl: true }))).toBe(false);
     expect(handleTextEdit(context(store, 'v', { meta: true }))).toBe(false);
-    expect(handleTextEdit(context(store, 'r', { meta: true }))).toBe(false);
+    expect(handleTextEdit(context(store, 'r', { ctrl: true }))).toBe(false);
 
     expect(store.get(composerStateAtom).text).toBe('');
   });

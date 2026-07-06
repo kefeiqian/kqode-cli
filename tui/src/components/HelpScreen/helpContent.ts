@@ -25,7 +25,7 @@ const KEYBINDING_SECTIONS: readonly HelpSection[] = [
     title: 'GLOBAL',
     entries: [
       { keys: '/', description: 'Open the command menu' },
-      { keys: 'alt+r', description: 'Toggle Copy Mode for terminal-native selection' },
+      { keys: 'ctrl+r', description: 'Toggle Copy Mode for terminal-native selection' },
       { keys: 'ctrl+c ×2', description: 'Exit KQode' },
       { keys: 'esc', description: 'Clear the prompt · close the command menu' }
     ]

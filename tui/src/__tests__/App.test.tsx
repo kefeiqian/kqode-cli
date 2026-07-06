@@ -157,7 +157,7 @@ describe('App', () => {
     const { store, stdin } = renderApp({ columns: 100, rows: 20 });
     await flushInput();
 
-    stdin.write('\u001Br');
+    stdin.write('\u0012');
     await flushInput();
     expect(store.get(copyModeActiveAtom)).toBe(true);
 

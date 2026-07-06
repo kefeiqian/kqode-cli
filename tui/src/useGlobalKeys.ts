@@ -24,7 +24,7 @@ export function useGlobalKeys(): void {
 
   useInput((input, key) => {
     const isCtrlC = key.ctrl === true && input === 'c';
-    const isCopyModeToggle = key.meta === true && input === COPY_MODE_INPUT_KEY;
+    const isCopyModeToggle = key.ctrl === true && input === COPY_MODE_INPUT_KEY;
 
     if (copyModeActive) {
       if (key.pageUp === true || key.pageDown === true || key.end === true) {

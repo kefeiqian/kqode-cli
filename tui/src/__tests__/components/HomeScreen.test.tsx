@@ -426,7 +426,7 @@ describe('HomeScreen', () => {
     expect(bottomOutput).not.toContain('... newer output hidden ...');
   });
 
-  it('toggles Copy Mode with Alt+R and keeps scroll keys active', async () => {
+  it('toggles Copy Mode with Ctrl+R and keeps scroll keys active', async () => {
     const entries = Array.from({ length: 10 }, (_, index) => ({
       kind: 'assistant' as const,
       text: `entry ${index + 1}`
@@ -441,7 +441,7 @@ describe('HomeScreen', () => {
     await flushInput();
     write.mockClear();
 
-    stdin.write('\u001Br');
+    stdin.write('\u0012');
     await flushInput();
 
     expect(store.get(copyModeActiveAtom)).toBe(true);
@@ -466,7 +466,7 @@ describe('HomeScreen', () => {
     expect(lastFrame() ?? '').toContain('entry 10');
 
     write.mockClear();
-    stdin.write('\u001Br');
+    stdin.write('\u0012');
     await flushInput();
 
     expect(store.get(copyModeActiveAtom)).toBe(false);
@@ -477,7 +477,7 @@ describe('HomeScreen', () => {
     const { lastFrame, stdin, store } = renderHomeScreen({ columns: 100, rows: 15 });
     await flushInput();
 
-    stdin.write('\u001Br');
+    stdin.write('\u0012');
     await flushInput();
     expect(store.get(copyModeActiveAtom)).toBe(true);
     expect(lastFrame() ?? '').toContain(COPY_MODE_HINT);
