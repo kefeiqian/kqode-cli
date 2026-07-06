@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore } from 'jotai';
 import type { BackendClientHandle } from '@backend/client/backendClient.ts';
+import { createSessionLogger } from '@backend/log/sessionLogger.ts';
 import { startBackendRuntime } from '@backend/runtime/backendRuntime.ts';
 import { resolveRepoRoot, resolveWorkspaceCwd } from '@libs/path/runtimePaths.ts';
 import { PRODUCT_NAME } from '@constants/product.ts';
@@ -66,6 +67,9 @@ export async function createAppRuntime({
   loadPackagedAsset
 }: CreateAppRuntimeOptions): Promise<AppRuntime> {
   const store = createStore();
+  // The composition root owns the TUI session logger for the whole backend
+  // lifetime; it buffers until the backend announces its session id on ready.
+  const logger = createSessionLogger();
   const workspaceCwd = resolveWorkspaceCwd();
   store.set(workspaceCwdAtom, workspaceCwd);
 
@@ -122,7 +126,7 @@ export async function createAppRuntime({
   setTerminalWindowTitle(PRODUCT_NAME, productVersion);
   setTerminalBackground(theme.colors.bodyBackground);
 
-  const disposeBackend = startBackendRuntime(store, client);
+  const disposeBackend = startBackendRuntime(store, client, logger);
 
   // Restore the user's terminal on clean shutdown and on hard exit (Ctrl+C /
   // crash) so neither the OSC 2 window title, the OSC 11 background override,

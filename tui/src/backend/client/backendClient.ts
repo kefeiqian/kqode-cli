@@ -35,6 +35,8 @@ export type BackendLifecycleState =
 /** Lifecycle handle over a {@link BackendClient} that owns one child backend at a time. */
 export type BackendClientHandle = BackendClient & {
   getState(): BackendLifecycleState;
+  /** Registers a listener fired with the session id each time a backend becomes ready (incl. respawn). */
+  onReady(listener: (sessionId: string) => void): void;
   ensureStarted(): Promise<void>;
   dispose(): void;
 };
@@ -76,6 +78,7 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
   let session: BackendSession | null = null;
   let starting: Promise<BackendSession> | null = null;
   let disposed = false;
+  const readyListeners: Array<(sessionId: string) => void> = [];
 
   const disposedError = (): BackendClientError =>
     new BackendClientError(BackendErrorKind.Launch, 'backend client disposed');
@@ -125,8 +128,13 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     // Gate "ready" on the backend actually speaking JSON-RPC (readiness
     // notification) rather than trusting the OS spawn event.
     let connection: MessageConnection;
+    let sessionId: string;
     try {
-      connection = await openReadyConnection({ backend, startupTimeoutMs, onFatal: markDead });
+      ({ connection, sessionId } = await openReadyConnection({
+        backend,
+        startupTimeoutMs,
+        onFatal: markDead
+      }));
     } catch (error) {
       if (state === BackendLifecycleState.Starting) {
         state = BackendLifecycleState.Dead;
@@ -149,6 +157,9 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     };
     session = opened;
     state = BackendLifecycleState.Ready;
+    for (const listener of readyListeners) {
+      listener(sessionId);
+    }
     return opened;
   };
 
@@ -169,6 +180,9 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
 
   return {
     getState: () => state,
+    onReady(listener: (sessionId: string) => void): void {
+      readyListeners.push(listener);
+    },
     async ensureStarted(): Promise<void> {
       await ensureSession();
     },

@@ -1,5 +1,6 @@
 import type { createStore } from 'jotai';
 import type { BackendClient } from '@contracts/backend/index.ts';
+import type { SessionLogger } from '@backend/log/sessionLogger.ts';
 import { backendClientAtom } from '@state/global/backend.ts';
 import { refreshGitStatusAtom } from '@state/ui/gitStatus.ts';
 import { BACKEND_LOADING_HINT, startupStatusHintAtom } from '@state/ui/statusHint.ts';
@@ -8,6 +9,7 @@ type Store = ReturnType<typeof createStore>;
 
 /** Backend seam plus the lifecycle hooks the composition root drives. */
 export type RuntimeBackendClient = BackendClient & {
+  onReady(listener: (sessionId: string) => void): void;
   ensureStarted(): Promise<void>;
   dispose(): void;
 };
@@ -23,9 +25,17 @@ export type RuntimeBackendClient = BackendClient & {
  * `ensureSession()` and, on repeat failure, surfaces a visible error entry
  * instead of silently dropping the prompt.
  */
-export function startBackendRuntime(store: Store, client: RuntimeBackendClient): () => void {
+export function startBackendRuntime(
+  store: Store,
+  client: RuntimeBackendClient,
+  logger: SessionLogger
+): () => void {
   store.set(backendClientAtom, client);
   store.set(startupStatusHintAtom, BACKEND_LOADING_HINT);
+
+  // On readiness the backend announces its session id; adopt it so the TUI log
+  // lands in the same per-session directory. Fires again on respawn.
+  client.onReady((sessionId) => logger.openSession(sessionId));
 
   void client
     .ensureStarted()
@@ -34,9 +44,11 @@ export function startBackendRuntime(store: Store, client: RuntimeBackendClient):
       void store.set(refreshGitStatusAtom);
     })
     .catch(() => {
-      // Keep the Dead-state client in the seam (do not dispose or clear it): the
-      // next submit retries through ensureSession() and, on repeat failure,
-      // settles a visible backend-error entry rather than silently dropping it.
+      // Startup failed without readiness: flush buffered startup events to an
+      // orphan session so the spawn/build failure is still captured. The
+      // Dead-state client stays in the seam so the next submit retries via
+      // ensureSession() and settles a visible error rather than dropping it.
+      logger.openOrphan();
     })
     .finally(() => {
       store.set(startupStatusHintAtom, undefined);
@@ -44,6 +56,7 @@ export function startBackendRuntime(store: Store, client: RuntimeBackendClient):
 
   return () => {
     client.dispose();
+    logger.close();
     store.set(backendClientAtom, undefined);
   };
 }

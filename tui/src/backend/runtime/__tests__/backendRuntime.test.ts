@@ -12,10 +12,15 @@ function fakeClient(overrides: Partial<RuntimeBackendClient> = {}): RuntimeBacke
   return {
     submitStreaming: vi.fn(),
     gitStatus: vi.fn().mockResolvedValue(null),
+    onReady: vi.fn(),
     ensureStarted: vi.fn().mockResolvedValue(undefined),
     dispose: vi.fn(),
     ...overrides
   } as unknown as RuntimeBackendClient;
+}
+
+function fakeLogger() {
+  return { log: vi.fn(), openSession: vi.fn(), openOrphan: vi.fn(), close: vi.fn() };
 }
 
 async function flushMicrotasks(): Promise<void> {
@@ -26,12 +31,18 @@ describe('startBackendRuntime', () => {
   it('injects the client and eagerly starts it behind the loading hint', async () => {
     const store = createStore();
     const client = fakeClient();
+    const logger = fakeLogger();
 
-    const dispose = startBackendRuntime(store, client);
+    const dispose = startBackendRuntime(store, client, logger);
 
     expect(store.get(backendClientAtom)).toBe(client);
     expect(client.ensureStarted).toHaveBeenCalledTimes(1);
     expect(store.get(startupStatusHintAtom)).toEqual(BACKEND_LOADING_HINT);
+
+    // The runtime registers a readiness listener; firing it opens the session.
+    const onReadyListener = vi.mocked(client.onReady).mock.calls[0][0];
+    onReadyListener('sess-42');
+    expect(logger.openSession).toHaveBeenCalledWith('sess-42');
 
     await flushMicrotasks();
 
@@ -40,6 +51,7 @@ describe('startBackendRuntime', () => {
 
     dispose();
     expect(client.dispose).toHaveBeenCalledTimes(1);
+    expect(logger.close).toHaveBeenCalledTimes(1);
     expect(store.get(backendClientAtom)).toBeUndefined();
   });
 
@@ -48,12 +60,16 @@ describe('startBackendRuntime', () => {
     const client = fakeClient({
       ensureStarted: vi.fn().mockRejectedValue(new Error('launch failed'))
     });
+    const logger = fakeLogger();
 
-    const dispose = startBackendRuntime(store, client);
+    const dispose = startBackendRuntime(store, client, logger);
     expect(store.get(backendClientAtom)).toBe(client);
 
     await flushMicrotasks();
 
+    // Startup failed without readiness: buffered events flush to an orphan session.
+    expect(logger.openOrphan).toHaveBeenCalledTimes(1);
+    expect(logger.openSession).not.toHaveBeenCalled();
     // A failed start must not silently drop the seam: the client stays so the
     // next submit retries via ensureSession() instead of vanishing.
     expect(client.dispose).not.toHaveBeenCalled();
@@ -73,7 +89,7 @@ describe('startBackendRuntime', () => {
       submitStreaming: vi.fn().mockRejectedValue(failure)
     });
 
-    startBackendRuntime(store, client);
+    startBackendRuntime(store, client, fakeLogger());
     await flushMicrotasks();
     expect(store.get(backendClientAtom)).toBe(client);
 
