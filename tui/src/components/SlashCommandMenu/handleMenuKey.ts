@@ -1,13 +1,19 @@
 import type { ComposerKeyHandler } from '@components/PromptComposer/input/types.ts';
 import { appendUnknownCommandAtom } from '@state/promptQueue/index.ts';
 import { executeCommand } from '@libs/commands/executeCommand.ts';
+import { validateComposerSubmit } from '@libs/composer/promptText.ts';
+import { captureComposerSubmit, SubmitCaptureKind } from '@libs/composer/submitCapture.ts';
 import {
   commandMenuDismissedAtom,
   commandMenuOpenAtom,
   highlightedCommandAtom,
   moveCommandHighlightAtom
 } from '@state/ui/commands/index.ts';
-import { clearComposerAtom, insertComposerTextAtom } from '@state/ui/composer/index.ts';
+import {
+  clearComposerAtom,
+  insertComposerTextAtom,
+  setComposerValidationErrorAtom
+} from '@state/ui/composer/index.ts';
 
 /**
  * Keyboard behavior for the slash-command menu, colocated with its rendering.
@@ -51,10 +57,20 @@ export const handleMenuKey: ComposerKeyHandler = (context) => {
   }
 
   if (key.return) {
+    const validation = validateComposerSubmit(state.text, maxBytes);
+    if (!validation.ok) {
+      if (validation.reason === 'over-limit') {
+        store.set(setComposerValidationErrorAtom, validation.message);
+      }
+      return true;
+    }
+
     if (highlightedCommand !== undefined) {
+      captureComposerSubmit({ kind: SubmitCaptureKind.MenuCommand, text: highlightedCommand.name });
       executeCommand(highlightedCommand.id, commandActions);
     } else {
-      store.set(appendUnknownCommandAtom, state.text);
+      captureComposerSubmit({ kind: SubmitCaptureKind.UnknownCommand, text: validation.text });
+      store.set(appendUnknownCommandAtom, validation.text);
     }
     store.set(clearComposerAtom);
     return true;

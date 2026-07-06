@@ -20,7 +20,9 @@ import { openHelpAtom } from '@state/ui/help/index.ts';
 import { openLoginSurfaceAtom, openModelSurfaceAtom } from '@state/ui/surface/index.ts';
 import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import { resolveComposerWindow } from '@libs/composer/composerWindow.ts';
+import { subscribeComposerSubmitCapture } from '@libs/composer/submitCapture.ts';
 import {
+  appendComposerRecallSubmitAtom,
   caretSuppressedWhileScrollingAtom,
   composerScrollOffsetRowsAtom,
   composerStateAtom
@@ -68,6 +70,7 @@ export function PromptComposer({
   const setComposerState = useSetAtom(composerStateAtom);
   const setComposerScrollOffsetRows = useSetAtom(composerScrollOffsetRowsAtom);
   const setComposerRows = useSetAtom(composerRowsAtom);
+  const appendComposerRecallSubmit = useSetAtom(appendComposerRecallSubmitAtom);
   const scrollCursorIntoView = useSetAtom(scrollComposerCursorIntoViewAtom);
   const { exit } = useApp();
   const clearTranscript = useSetAtom(clearTranscriptAtom);
@@ -102,6 +105,11 @@ export function PromptComposer({
     setComposerScrollOffsetRows(0);
     setRestoreDraft('');
   }, [restoreDraft, setComposerScrollOffsetRows, setComposerState, setRestoreDraft]);
+
+  useEffect(
+    () => subscribeComposerSubmitCapture((submit) => appendComposerRecallSubmit(submit)),
+    [appendComposerRecallSubmit]
+  );
 
   usePromptComposerInput({
     isActive: resolvedIsActive,

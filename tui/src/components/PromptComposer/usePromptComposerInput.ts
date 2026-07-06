@@ -2,6 +2,7 @@ import { useInput } from 'ink';
 import { useStore } from 'jotai';
 import { handleCursorMove } from '@components/PromptComposer/input/handleCursorMove.ts';
 import { handleEscArmedClear } from '@components/PromptComposer/input/handleEscArmedClear.ts';
+import { handleHistoryRecall } from '@components/PromptComposer/input/handleHistoryRecall.ts';
 import { handleNewline } from '@components/PromptComposer/input/handleNewline.ts';
 import { handleSubmit } from '@components/PromptComposer/input/handleSubmit.ts';
 import { handleTextEdit } from '@components/PromptComposer/input/handleTextEdit.ts';
@@ -34,6 +35,7 @@ const COMPOSER_KEY_HANDLERS: readonly ComposerKeyHandler[] = [
   handleNewline,
   handleMenuKey,
   handleEscArmedClear,
+  handleHistoryRecall,
   handleCursorMove,
   handleSubmit,
   handleTextEdit
