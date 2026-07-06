@@ -11,7 +11,9 @@ function clientWithGitStatus(gitStatus: BackendClient['gitStatus']): BackendClie
     listProviders: async () => [],
     getActiveSelection: async () => ({ providerId: null, modelId: null }),
     setActiveSelection: async () => {},
-    clearProviderKey: async () => {}
+    clearProviderKey: async () => {},
+    setProviderKey: async () => ({ outcome: 'unreachable', selectedModel: null }),
+    listModels: async () => ({ status: 'failed', models: [] })
   };
 }
 

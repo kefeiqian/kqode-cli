@@ -49,6 +49,8 @@ pub enum RpcMethod {
     SelectionGet,
     SelectionSet,
     ProviderClearKey,
+    ProviderSetKey,
+    ProviderModels,
 }
 
 impl RpcMethod {
@@ -60,6 +62,8 @@ impl RpcMethod {
             Self::SelectionGet => SELECTION_GET_METHOD,
             Self::SelectionSet => SELECTION_SET_METHOD,
             Self::ProviderClearKey => PROVIDER_CLEAR_KEY_METHOD,
+            Self::ProviderSetKey => PROVIDER_SET_KEY_METHOD,
+            Self::ProviderModels => PROVIDER_MODELS_METHOD,
         }
     }
 
@@ -74,6 +78,8 @@ impl RpcMethod {
             Self::SelectionGet,
             Self::SelectionSet,
             Self::ProviderClearKey,
+            Self::ProviderSetKey,
+            Self::ProviderModels,
         ]
         .into_iter()
         .find(|candidate| candidate.as_str() == method)

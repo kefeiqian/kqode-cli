@@ -30,6 +30,12 @@ export const DEFAULT_STARTUP_TIMEOUT_MS = 10_000;
 /** Default ceiling for a single message-submit round trip. */
 export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 
+/**
+ * Ceiling for provider validation/model-list requests. Must remain non-fatal:
+ * callers convert timeout into provider-domain failure results.
+ */
+export const VALIDATION_REQUEST_TIMEOUT_MS = 20_000;
+
 /** Captured Cargo stderr is capped so a noisy build cannot exhaust memory. */
 export const BUILD_STDERR_CAP_BYTES = 16 * 1024;
 

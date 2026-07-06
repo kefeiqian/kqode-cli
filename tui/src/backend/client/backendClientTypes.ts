@@ -25,5 +25,6 @@ export type BackendClientHandle = BackendClient & {
 export type BackendClientOptions = {
   launch: () => Promise<LaunchedBackend>;
   requestTimeoutMs?: number;
+  validationRequestTimeoutMs?: number;
   startupTimeoutMs?: number;
 };

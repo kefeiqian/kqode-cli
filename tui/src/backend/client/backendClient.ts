@@ -16,7 +16,10 @@ import {
 } from '@backend/client/backendClientTypes.ts';
 import type {
   ActiveSelectionResult,
+  ModelListResult,
   ProviderStatusInfo,
+  SetKeyParams,
+  SetKeyResult,
   StreamCallbacks,
   StreamOutcome,
   StreamSubmitParams
@@ -34,6 +37,7 @@ type BackendSession = {
 /** Creates a lifecycle-managed JSON-RPC client over a launched child backend. */
 export function createBackendClient(options: BackendClientOptions): BackendClientHandle {
   const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+  const validationRequestTimeoutMs = options.validationRequestTimeoutMs;
   const startupTimeoutMs = options.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS;
   const { launch } = options;
 
@@ -116,7 +120,7 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     const opened: BackendSession = {
       backend,
       connection,
-      client: createMessageConnectionClient(connection, { requestTimeoutMs })
+      client: createMessageConnectionClient(connection, { requestTimeoutMs, validationRequestTimeoutMs })
     };
     session = opened;
     state = BackendLifecycleState.Ready;
@@ -184,6 +188,16 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     },
     async clearProviderKey(providerId: string): Promise<void> {
       await withClient((client) => client.clearProviderKey(providerId));
+    },
+    async setProviderKey(params: SetKeyParams): Promise<SetKeyResult> {
+      // Validation/model-list timeouts are converted inside the connection
+      // client to domain results, so withClient must not markDead() here.
+      return withClient((client) => client.setProviderKey(params));
+    },
+    async listModels(providerId: string): Promise<ModelListResult> {
+      // See setProviderKey: recoverable validation timeouts must not tear down
+      // the backend or abort a concurrent streaming turn.
+      return withClient((client) => client.listModels(providerId));
     },
     dispose() {
       disposed = true;

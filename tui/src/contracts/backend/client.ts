@@ -6,7 +6,13 @@
  * cycle. Implementations (process, connection, runtime wiring) live in `@backend`.
  */
 
-import type { ActiveSelectionResult, ProviderStatusInfo } from '@contracts/backend/providerMessages.ts';
+import type {
+  ActiveSelectionResult,
+  ModelListResult,
+  ProviderStatusInfo,
+  SetKeyParams,
+  SetKeyResult
+} from '@contracts/backend/providerMessages.ts';
 
 /** Backend failure categories surfaced to the TUI. */
 export const BackendErrorKind = {
@@ -72,4 +78,6 @@ export type BackendClient = {
   getActiveSelection(): Promise<ActiveSelectionResult>;
   setActiveSelection(providerId: string, modelId: string): Promise<void>;
   clearProviderKey(providerId: string): Promise<void>;
+  setProviderKey(params: SetKeyParams): Promise<SetKeyResult>;
+  listModels(providerId: string): Promise<ModelListResult>;
 };

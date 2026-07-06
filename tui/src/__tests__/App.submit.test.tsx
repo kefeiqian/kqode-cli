@@ -32,6 +32,8 @@ function renderApp(backendClient: Partial<BackendClient>, columns = 80, rows = 4
     getActiveSelection: async () => ({ providerId: null, modelId: null }),
     setActiveSelection: async () => {},
     clearProviderKey: async () => {},
+    setProviderKey: async () => ({ outcome: 'unreachable', selectedModel: null }),
+    listModels: async () => ({ status: 'failed', models: [] }),
     submitStreaming: async () => {
       throw new Error('submitStreaming not provided');
     },

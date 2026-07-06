@@ -8,6 +8,7 @@ export type SourceBackendClientOptions = {
   /** Workspace directory the backend process runs in. */
   workspaceCwd: string;
   requestTimeoutMs?: number;
+  validationRequestTimeoutMs?: number;
 };
 
 /**
@@ -17,9 +18,10 @@ export type SourceBackendClientOptions = {
  * generic {@link createBackendClient} so the packaged build can tree-shake it.
  */
 export function createSourceBackendClient(options: SourceBackendClientOptions): BackendClientHandle {
-  const { repoRoot, workspaceCwd, requestTimeoutMs } = options;
+  const { repoRoot, workspaceCwd, requestTimeoutMs, validationRequestTimeoutMs } = options;
   return createBackendClient({
     launch: () => launchSourceBackend({ repoRoot, workspaceCwd }),
-    requestTimeoutMs
+    requestTimeoutMs,
+    validationRequestTimeoutMs
   });
 }

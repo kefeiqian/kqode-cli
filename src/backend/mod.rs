@@ -10,6 +10,7 @@ use crate::protocol::{
 use crate::store::Store;
 
 mod git_status;
+mod login;
 mod message;
 mod providers;
 
@@ -139,6 +140,12 @@ fn handle_request(
         )),
         Some(RpcMethod::SelectionSet) => Some(handle_selection_set(request, store)),
         Some(RpcMethod::ProviderClearKey) => Some(handle_provider_clear_key(request, store)),
+        Some(RpcMethod::ProviderSetKey) => {
+            login::handle_provider_set_key(request, connection, store)
+        }
+        Some(RpcMethod::ProviderModels) => {
+            login::handle_provider_models(request, connection, store)
+        }
         None => Some(Response::new_err(
             request.id,
             JSON_RPC_METHOD_NOT_FOUND,
@@ -173,4 +180,33 @@ fn handle_provider_clear_key(request: Request, store: Option<&Store>) -> Respons
         }
     };
     Response::new_ok(request.id, providers::clear_provider_key(store, params))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lsp_server::{Connection, RequestId};
+
+    #[test]
+    fn set_key_rejects_bad_custom_url_immediately_without_worker() {
+        let (backend, client) = Connection::memory();
+        let request = Request {
+            id: RequestId::from(1),
+            method: crate::protocol::PROVIDER_SET_KEY_METHOD.to_owned(),
+            params: serde_json::json!({
+                "providerId": "custom",
+                "baseUrl": "http://example.test/v1",
+                "apiKey": "sk-pre-network",
+                "label": null
+            }),
+        };
+
+        let response = handle_request(request, &backend, None).expect("immediate error");
+
+        assert_eq!(response.error.unwrap().code, JSON_RPC_INVALID_PARAMS);
+        assert!(
+            client.receiver.try_recv().is_err(),
+            "no deferred worker sent a response"
+        );
+    }
 }

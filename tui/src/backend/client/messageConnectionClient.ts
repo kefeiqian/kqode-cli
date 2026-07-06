@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { type MessageConnection, ResponseError } from 'vscode-jsonrpc';
-import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.ts';
-import { SUBMIT_STATUS_NEEDS_CONFIGURATION } from '@contracts/backend/index.ts';
+import {
+  BackendClientError,
+  BackendErrorKind,
+  SUBMIT_STATUS_NEEDS_CONFIGURATION
+} from '@contracts/backend/index.ts';
 import type {
   BackendClient,
   StreamCallbacks,
@@ -21,8 +24,9 @@ import {
   selectionGetRequest,
   selectionSetRequest
 } from '@backend/protocol/providerProtocol.ts';
+import { listModels, setProviderKey } from '@backend/client/validationRequests.ts';
 import { withRequestTimeout } from '@backend/client/backendClientErrors.ts';
-import { DEFAULT_REQUEST_TIMEOUT_MS } from '@constants/backend.ts';
+import { DEFAULT_REQUEST_TIMEOUT_MS, VALIDATION_REQUEST_TIMEOUT_MS } from '@constants/backend.ts';
 
 /** Per-turn hooks the notification handlers dispatch to, keyed by `turnId`. */
 type ActiveTurn = {
@@ -36,6 +40,8 @@ type ActiveTurn = {
 export type MessageConnectionClientOptions = {
   /** Ceiling for the streaming ack response (not the whole stream). */
   requestTimeoutMs?: number;
+  /** Non-fatal ceiling for provider validation/model-list requests. */
+  validationRequestTimeoutMs?: number;
 };
 
 /**
@@ -54,6 +60,8 @@ export function createMessageConnectionClient(
   options: MessageConnectionClientOptions = {}
 ): BackendClient {
   const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+  const validationRequestTimeoutMs =
+    options.validationRequestTimeoutMs ?? VALIDATION_REQUEST_TIMEOUT_MS;
   const activeTurns = new Map<string, ActiveTurn>();
 
   connection.onNotification(tokenDeltaNotification, ({ turnId, delta }) => {
@@ -172,6 +180,12 @@ export function createMessageConnectionClient(
       } catch (error) {
         throw toBackendClientError(error);
       }
+    },
+    async setProviderKey(params) {
+      return setProviderKey(connection, params, validationRequestTimeoutMs);
+    },
+    async listModels(providerId) {
+      return listModels(connection, providerId, validationRequestTimeoutMs);
     }
   };
 }

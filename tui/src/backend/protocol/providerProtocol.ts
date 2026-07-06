@@ -1,6 +1,8 @@
 import { RequestType, RequestType0 } from 'vscode-jsonrpc';
 import {
   PROVIDER_CLEAR_KEY_METHOD,
+  PROVIDER_MODELS_METHOD,
+  PROVIDER_SET_KEY_METHOD,
   PROVIDER_LIST_METHOD,
   SELECTION_GET_METHOD,
   SELECTION_SET_METHOD
@@ -10,8 +12,12 @@ import type {
   ClearKeyParams,
   ClearKeyResult,
   ProviderListResult,
+  ModelListParams,
+  ModelListResult,
   SelectionSetParams,
-  SelectionSetResult
+  SelectionSetResult,
+  SetKeyParams,
+  SetKeyResult
 } from '@contracts/backend/index.ts';
 
 /** Typed descriptor for the parameterless `kqode.provider.list` request. */
@@ -32,4 +38,14 @@ export const selectionSetRequest = new RequestType<SelectionSetParams, Selection
 /** Typed descriptor for the `kqode.provider.clearKey` request. */
 export const providerClearKeyRequest = new RequestType<ClearKeyParams, ClearKeyResult, void>(
   PROVIDER_CLEAR_KEY_METHOD
+);
+
+/** Typed descriptor for the `kqode.provider.setKey` request. */
+export const providerSetKeyRequest = new RequestType<SetKeyParams, SetKeyResult, void>(
+  PROVIDER_SET_KEY_METHOD
+);
+
+/** Typed descriptor for the `kqode.provider.models` request. */
+export const providerModelsRequest = new RequestType<ModelListParams, ModelListResult, void>(
+  PROVIDER_MODELS_METHOD
 );

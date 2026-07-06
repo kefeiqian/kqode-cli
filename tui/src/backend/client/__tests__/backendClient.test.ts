@@ -12,19 +12,31 @@ import {
 } from 'vscode-jsonrpc/node';
 import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.ts';
 import { type LaunchedBackend } from '@backend/process/backendProcess.ts';
-import { SUBMIT_STATUS_STREAMING } from '@contracts/backend/index.ts';
+import {
+  MODEL_LIST_STATUS_EMPTY,
+  MODEL_LIST_STATUS_FAILED,
+  MODEL_LIST_STATUS_LOADED,
+  SET_KEY_OUTCOME_CONNECTED,
+  SET_KEY_OUTCOME_UNREACHABLE,
+  SUBMIT_STATUS_STREAMING
+} from '@contracts/backend/index.ts';
 import {
   messageSubmitRequest,
   backendReadyNotification,
   tokenDeltaNotification,
   turnEndNotification
 } from '@backend/protocol/messageProtocol.ts';
+import {
+  providerModelsRequest,
+  providerSetKeyRequest
+} from '@backend/protocol/providerProtocol.ts';
 import type { MessageSubmitResult } from '@contracts/backend/index.ts';
 import {
   BackendLifecycleState,
   createBackendClient
 } from '@backend/client/backendClient.ts';
 import { createSourceBackendClient } from '@backend/client/sourceBackendClient.ts';
+import type { ModelListResult, SetKeyResult } from '@contracts/backend/index.ts';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..');
 const INTEGRATION_TIMEOUT_MS = 180_000;
@@ -204,6 +216,95 @@ describe('createBackendClient (fake backend)', () => {
 
     fake.emitExit();
     expect(client.getState()).toBe(BackendLifecycleState.Dead);
+    client.dispose();
+  });
+
+  it('round-trips provider setKey outcomes', async () => {
+    const fake = makeFakeBackend((server) => {
+      server.onRequest(providerSetKeyRequest, ({ providerId, baseUrl, apiKey, label }) => {
+        expect({ providerId, baseUrl, apiKey, label }).toEqual({
+          providerId: 'custom',
+          baseUrl: 'https://example.test/v1',
+          apiKey: 'sk-test',
+          label: 'Example'
+        });
+        return { outcome: SET_KEY_OUTCOME_CONNECTED, selectedModel: 'gpt-4o-mini' };
+      });
+    });
+    const client = createBackendClient({ launch: async () => fake.launched });
+
+    await expect(
+      client.setProviderKey({
+        providerId: 'custom',
+        baseUrl: 'https://example.test/v1',
+        apiKey: 'sk-test',
+        label: 'Example'
+      })
+    ).resolves.toEqual({
+      outcome: SET_KEY_OUTCOME_CONNECTED,
+      selectedModel: 'gpt-4o-mini'
+    });
+    expect(client.getState()).toBe(BackendLifecycleState.Ready);
+    client.dispose();
+  });
+
+  it('round-trips model-list loaded empty and failed statuses', async () => {
+    const responses: ModelListResult[] = [
+      { status: MODEL_LIST_STATUS_LOADED, models: [{ id: 'gpt-4o-mini', ownedBy: null }] },
+      { status: MODEL_LIST_STATUS_EMPTY, models: [] },
+      { status: MODEL_LIST_STATUS_FAILED, models: [] }
+    ];
+    const fake = makeFakeBackend((server) => {
+      server.onRequest(providerModelsRequest, ({ providerId }) => {
+        expect(providerId).toBe('custom');
+        return responses.shift() as ModelListResult;
+      });
+    });
+    const client = createBackendClient({ launch: async () => fake.launched });
+
+    await expect(client.listModels('custom')).resolves.toEqual({
+      status: MODEL_LIST_STATUS_LOADED,
+      models: [{ id: 'gpt-4o-mini', ownedBy: null }]
+    });
+    await expect(client.listModels('custom')).resolves.toEqual({
+      status: MODEL_LIST_STATUS_EMPTY,
+      models: []
+    });
+    await expect(client.listModels('custom')).resolves.toEqual({
+      status: MODEL_LIST_STATUS_FAILED,
+      models: []
+    });
+    expect(client.getState()).toBe(BackendLifecycleState.Ready);
+    client.dispose();
+  });
+
+  it('keeps validation timeouts recoverable without marking the backend dead', async () => {
+    const fake = makeFakeBackend((server) => {
+      server.onRequest(providerSetKeyRequest, () => new Promise<SetKeyResult>(() => undefined));
+      server.onRequest(providerModelsRequest, () => new Promise<ModelListResult>(() => undefined));
+    });
+    const client = createBackendClient({
+      launch: async () => fake.launched,
+      validationRequestTimeoutMs: 20
+    });
+
+    await expect(
+      client.setProviderKey({
+        providerId: 'custom',
+        baseUrl: 'https://example.test/v1',
+        apiKey: 'sk-hung',
+        label: null
+      })
+    ).resolves.toEqual({ outcome: SET_KEY_OUTCOME_UNREACHABLE, selectedModel: null });
+    expect(client.getState()).toBe(BackendLifecycleState.Ready);
+    expect(fake.disposed()).toBe(false);
+
+    await expect(client.listModels('custom')).resolves.toEqual({
+      status: MODEL_LIST_STATUS_FAILED,
+      models: []
+    });
+    expect(client.getState()).toBe(BackendLifecycleState.Ready);
+    expect(fake.disposed()).toBe(false);
     client.dispose();
   });
 
