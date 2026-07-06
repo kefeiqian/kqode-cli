@@ -1,7 +1,7 @@
 ---
 title: "feat: Backend-Owned Conversation Queue & Transcript, with TUI Prompt Recall"
 type: feat
-status: active
+status: completed
 date: 2026-07-05
 deepened: 2026-07-06
 origin: docs/brainstorms/2026-07-05-backend-owned-transcript-queue-and-prompt-recall-requirements.md
