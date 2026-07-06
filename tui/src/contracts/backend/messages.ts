@@ -14,6 +14,12 @@
  */
 export const MESSAGE_SUBMIT_METHOD = 'kqode.message.submit';
 
+/** Must match `RpcMethod::ConversationClear` (via `RpcMethod::as_str`) in `src/protocol.rs`. */
+export const CONVERSATION_CLEAR_METHOD = 'kqode.conversation.clear';
+
+/** Must match `RpcMethod::TurnCancel` (via `RpcMethod::as_str`) in `src/protocol.rs`. */
+export const TURN_CANCEL_METHOD = 'kqode.turn.cancel';
+
 /**
  * KQode-owned JSON-RPC method returning the workspace git status label.
  *
@@ -60,6 +66,33 @@ export const TURN_END_METHOD = 'kqode/turnEnd';
  */
 export const TURN_ERROR_METHOD = 'kqode/turnError';
 
+/** Must match `TURN_ENQUEUED_METHOD` in `src/protocol.rs`. */
+export const TURN_ENQUEUED_METHOD = 'kqode/turnEnqueued';
+
+/** Must match `TURN_ACTIVATED_METHOD` in `src/protocol.rs`. */
+export const TURN_ACTIVATED_METHOD = 'kqode/turnActivated';
+
+/** Must match `TURN_SETTLED_METHOD` in `src/protocol.rs`. */
+export const TURN_SETTLED_METHOD = 'kqode/turnSettled';
+
+/** Must match `TURN_STATE_ACTIVE` in `src/protocol.rs`. */
+export const TURN_STATE_ACTIVE = 'active';
+
+/** Must match `TURN_STATE_PENDING` in `src/protocol.rs`. */
+export const TURN_STATE_PENDING = 'pending';
+
+/** Must match `SETTLED_KIND_COMPLETED` in `src/protocol.rs`. */
+export const SETTLED_KIND_COMPLETED = 'completed';
+
+/** Must match `SETTLED_KIND_NEEDS_CONFIGURATION` in `src/protocol.rs`. */
+export const SETTLED_KIND_NEEDS_CONFIGURATION = 'needsConfiguration';
+
+/** Must match `SETTLED_KIND_ERROR` in `src/protocol.rs`. */
+export const SETTLED_KIND_ERROR = 'error';
+
+/** Must match `SETTLED_KIND_CANCELLED` in `src/protocol.rs`. */
+export const SETTLED_KIND_CANCELLED = 'cancelled';
+
 /** `status` value when a submit is accepted and streaming has begun. */
 export const SUBMIT_STATUS_STREAMING = 'streaming';
 
@@ -89,6 +122,24 @@ export type MessageSubmitResult = {
   status: string;
 };
 
+/** Must match `ConversationClearParams` in `src/protocol.rs`. */
+export type ConversationClearParams = Record<string, never>;
+
+/** Must match `ConversationClearResult` in `src/protocol.rs`. */
+export type ConversationClearResult = {
+  ok: boolean;
+};
+
+/** Must match `TurnCancelParams` in `src/protocol.rs`. */
+export type TurnCancelParams = {
+  turnId: string;
+};
+
+/** Must match `TurnCancelResult` in `src/protocol.rs`. */
+export type TurnCancelResult = {
+  ok: boolean;
+};
+
 /** Payload for {@link TOKEN_DELTA_METHOD}. */
 export type TokenDeltaParams = {
   turnId: string;
@@ -106,6 +157,33 @@ export type TurnErrorParams = {
   turnId: string;
   errorKind: string;
   message: string;
+};
+
+/** Payload for {@link TURN_ENQUEUED_METHOD}. Must match `EnqueuedParams` in `src/protocol.rs`. */
+export type EnqueuedParams = {
+  turnId: string;
+  seq: number;
+  state: string;
+};
+
+/** Payload for {@link TURN_ACTIVATED_METHOD}. Must match `ActivatedParams` in `src/protocol.rs`. */
+export type ActivatedParams = {
+  turnId: string;
+};
+
+/** Payload for {@link TURN_SETTLED_METHOD}. Must match `SettledParams` in `src/protocol.rs`. */
+export type SettledParams = {
+  turnId: string;
+  result: TurnResult;
+};
+
+/** Must match `TurnResult` in `src/protocol.rs`. */
+export type TurnResult = {
+  kind: string;
+  text: string | null;
+  finishReason: string | null;
+  errorKind: string | null;
+  message: string | null;
 };
 
 /**

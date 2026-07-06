@@ -1,18 +1,29 @@
 import { NotificationType, RequestType, RequestType0 } from 'vscode-jsonrpc';
 import {
   BACKEND_READY_METHOD,
+  CONVERSATION_CLEAR_METHOD,
   GIT_STATUS_METHOD,
   MESSAGE_SUBMIT_METHOD,
   TOKEN_DELTA_METHOD,
+  TURN_ACTIVATED_METHOD,
+  TURN_CANCEL_METHOD,
+  TURN_ENQUEUED_METHOD,
   TURN_END_METHOD,
-  TURN_ERROR_METHOD
+  TURN_ERROR_METHOD,
+  TURN_SETTLED_METHOD
 } from '@contracts/backend/index.ts';
 import type {
+  ActivatedParams,
   BackendReadyParams,
+  ConversationClearResult,
+  EnqueuedParams,
   GitStatusResult,
   MessageSubmitParams,
   MessageSubmitResult,
+  SettledParams,
   TokenDeltaParams,
+  TurnCancelParams,
+  TurnCancelResult,
   TurnEndParams,
   TurnErrorParams
 } from '@contracts/backend/index.ts';
@@ -26,6 +37,16 @@ import type {
  */
 export const messageSubmitRequest = new RequestType<MessageSubmitParams, MessageSubmitResult, void>(
   MESSAGE_SUBMIT_METHOD
+);
+
+/** Typed descriptor for the parameterless `kqode.conversation.clear` request. */
+export const conversationClearRequest = new RequestType0<ConversationClearResult, void>(
+  CONVERSATION_CLEAR_METHOD
+);
+
+/** Typed request descriptor for `kqode.turn.cancel`. */
+export const turnCancelRequest = new RequestType<TurnCancelParams, TurnCancelResult, void>(
+  TURN_CANCEL_METHOD
 );
 
 /**
@@ -52,6 +73,17 @@ export const backendReadyNotification = new NotificationType<BackendReadyParams>
 
 /** Streamed assistant-text chunk for an in-flight turn. */
 export const tokenDeltaNotification = new NotificationType<TokenDeltaParams>(TOKEN_DELTA_METHOD);
+
+/** Queue lifecycle notification emitted when a turn is enqueued. */
+export const turnEnqueuedNotification = new NotificationType<EnqueuedParams>(TURN_ENQUEUED_METHOD);
+
+/** Queue lifecycle notification emitted when a pending turn becomes active. */
+export const turnActivatedNotification = new NotificationType<ActivatedParams>(
+  TURN_ACTIVATED_METHOD
+);
+
+/** Unified terminal result notification for a turn. */
+export const turnSettledNotification = new NotificationType<SettledParams>(TURN_SETTLED_METHOD);
 
 /** Terminal "turn finished" notification carrying the finish reason. */
 export const turnEndNotification = new NotificationType<TurnEndParams>(TURN_END_METHOD);

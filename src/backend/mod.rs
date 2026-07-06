@@ -4,8 +4,8 @@ use lsp_server::{Connection, Message, Notification, Request, Response};
 
 use crate::debug_log;
 use crate::protocol::{
-    BACKEND_READY_METHOD, BackendReadyParams, ClearKeyParams, JSON_RPC_INVALID_PARAMS,
-    JSON_RPC_METHOD_NOT_FOUND, RpcMethod, SelectionSetParams,
+    BackendReadyParams, ClearKeyParams, RpcMethod, SelectionSetParams, BACKEND_READY_METHOD,
+    JSON_RPC_INVALID_PARAMS, JSON_RPC_METHOD_NOT_FOUND,
 };
 use crate::store::Store;
 
@@ -129,6 +129,11 @@ fn handle_request(
         Some(RpcMethod::MessageSubmit) => {
             Some(message::handle_message_submit(request, connection, store))
         }
+        Some(RpcMethod::ConversationClear | RpcMethod::TurnCancel) => Some(Response::new_err(
+            request.id,
+            JSON_RPC_METHOD_NOT_FOUND,
+            format!("unsupported method `{}`", request.method),
+        )),
         Some(RpcMethod::GitStatus) => {
             git_status::spawn_git_status(request, connection);
             None

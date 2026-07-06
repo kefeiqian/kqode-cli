@@ -1,7 +1,11 @@
 use serde::{Deserialize, Serialize};
 
 mod providers;
+mod queue;
+#[cfg(test)]
+mod tests;
 pub use providers::*;
+pub use queue::*;
 
 /// Hidden argument that starts the internal JSON-RPC backend loop.
 pub const BACKEND_MODE_ARG: &str = "--__kqode-json-rpc-backend";
@@ -44,6 +48,8 @@ pub const JSON_RPC_INVALID_PARAMS: i32 = -32602;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RpcMethod {
     MessageSubmit,
+    ConversationClear,
+    TurnCancel,
     GitStatus,
     ProviderList,
     SelectionGet,
@@ -57,6 +63,8 @@ impl RpcMethod {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::MessageSubmit => "kqode.message.submit",
+            Self::ConversationClear => "kqode.conversation.clear",
+            Self::TurnCancel => "kqode.turn.cancel",
             Self::GitStatus => "kqode.git.status",
             Self::ProviderList => PROVIDER_LIST_METHOD,
             Self::SelectionGet => SELECTION_GET_METHOD,
@@ -73,6 +81,8 @@ impl RpcMethod {
     pub fn from_method(method: &str) -> Option<Self> {
         [
             Self::MessageSubmit,
+            Self::ConversationClear,
+            Self::TurnCancel,
             Self::GitStatus,
             Self::ProviderList,
             Self::SelectionGet,
