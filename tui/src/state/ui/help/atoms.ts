@@ -1,25 +1,40 @@
 import { atom } from 'jotai';
 import { clamp } from '@libs/math/clamp.ts';
+import {
+  activeSurfaceAtom,
+  closeActiveSurfaceAtom,
+  openHelpSurfaceAtom,
+  Surface
+} from '@state/ui/surface/index.ts';
 
 /**
- * True while the fullscreen `/help` viewer is showing. `App` swaps the home
- * screen for the help screen when this flips, so the help viewer fully replaces
- * the transcript (a `more`-style pager) rather than rendering inline.
+ * Compatibility selector for help visibility. The active surface is the source
+ * of truth; setting this preserves older callers while folding help into the
+ * mutually exclusive surface selector.
  */
-export const helpVisibleAtom = atom(false);
+export const helpVisibleAtom = atom(
+  (get) => get(activeSurfaceAtom) === Surface.Help,
+  (_get, set, visible: boolean) => {
+    if (visible) {
+      set(openHelpSurfaceAtom);
+    } else {
+      set(closeActiveSurfaceAtom);
+    }
+  }
+);
 
 /** Rows scrolled down from the top of the help content (0 == top). */
 export const helpScrollOffsetAtom = atom(0);
 
 /** Opens the help viewer and resets the scroll position to the top. */
 export const openHelpAtom = atom(null, (_get, set) => {
-  set(helpVisibleAtom, true);
+  set(openHelpSurfaceAtom);
   set(helpScrollOffsetAtom, 0);
 });
 
 /** Closes the help viewer and resets the scroll position to the top. */
 export const closeHelpAtom = atom(null, (_get, set) => {
-  set(helpVisibleAtom, false);
+  set(closeActiveSurfaceAtom);
   set(helpScrollOffsetAtom, 0);
 });
 

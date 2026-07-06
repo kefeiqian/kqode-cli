@@ -5,3 +5,4 @@ export * from '@state/ui/gitStatus.ts';
 export * from '@state/ui/inputLock.ts';
 export * from '@state/ui/keyArm.ts';
 export * from '@state/ui/statusHint.ts';
+export * from '@state/ui/surface/index.ts';

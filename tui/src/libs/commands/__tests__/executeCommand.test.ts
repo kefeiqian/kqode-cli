@@ -5,7 +5,9 @@ import { CommandId } from '@libs/commands/registry.ts';
 const makeActions = () => ({
   exit: vi.fn(),
   clearTranscript: vi.fn(),
-  showHelp: vi.fn()
+  showHelp: vi.fn(),
+  openLogin: vi.fn(),
+  openModel: vi.fn()
 });
 
 describe('executeCommand', () => {
@@ -34,5 +36,27 @@ describe('executeCommand', () => {
     expect(actions.showHelp).toHaveBeenCalledTimes(1);
     expect(actions.exit).not.toHaveBeenCalled();
     expect(actions.clearTranscript).not.toHaveBeenCalled();
+  });
+
+  it('runs openLogin only for the login command', () => {
+    const actions = makeActions();
+    executeCommand(CommandId.Login, actions);
+
+    expect(actions.openLogin).toHaveBeenCalledTimes(1);
+    expect(actions.openModel).not.toHaveBeenCalled();
+    expect(actions.exit).not.toHaveBeenCalled();
+    expect(actions.clearTranscript).not.toHaveBeenCalled();
+    expect(actions.showHelp).not.toHaveBeenCalled();
+  });
+
+  it('runs openModel only for the model command without awaiting command lookup', () => {
+    const actions = makeActions();
+    executeCommand(CommandId.Model, actions);
+
+    expect(actions.openModel).toHaveBeenCalledTimes(1);
+    expect(actions.openLogin).not.toHaveBeenCalled();
+    expect(actions.exit).not.toHaveBeenCalled();
+    expect(actions.clearTranscript).not.toHaveBeenCalled();
+    expect(actions.showHelp).not.toHaveBeenCalled();
   });
 });

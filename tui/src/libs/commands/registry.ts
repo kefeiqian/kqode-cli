@@ -10,10 +10,21 @@
 export const CommandId = {
   Help: 'help',
   Clear: 'clear',
-  Exit: 'exit'
+  Exit: 'exit',
+  Login: 'login',
+  Model: 'model'
 } as const;
 
 export type CommandId = (typeof CommandId)[keyof typeof CommandId];
+
+/** Slash names for built-in commands. */
+export const CommandName = {
+  Help: '/help',
+  Clear: '/clear',
+  Exit: '/exit',
+  Login: '/login',
+  Model: '/model'
+} as const;
 
 /** A single slash command: its id, the `/name` shown in the menu, and a short description. */
 export type CommandDefinition = {
@@ -29,9 +40,11 @@ export type CommandDefinition = {
  * command is still one entry below — the sort keeps display order consistent.
  */
 const BUILT_IN_COMMANDS: readonly CommandDefinition[] = [
-  { id: CommandId.Help, name: '/help', description: 'Show available commands' },
-  { id: CommandId.Clear, name: '/clear', description: 'Clear the conversation and scrollback' },
-  { id: CommandId.Exit, name: '/exit', description: 'Exit KQode' }
+  { id: CommandId.Help, name: CommandName.Help, description: 'Show available commands' },
+  { id: CommandId.Clear, name: CommandName.Clear, description: 'Clear the conversation and scrollback' },
+  { id: CommandId.Exit, name: CommandName.Exit, description: 'Exit KQode' },
+  { id: CommandId.Login, name: CommandName.Login, description: 'Connect or update provider credentials' },
+  { id: CommandId.Model, name: CommandName.Model, description: 'Choose the active provider model' }
 ];
 
 export const COMMAND_REGISTRY: readonly CommandDefinition[] = [...BUILT_IN_COMMANDS].sort((a, b) =>

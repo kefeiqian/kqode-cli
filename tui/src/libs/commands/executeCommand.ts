@@ -5,6 +5,8 @@ export type CommandActions = {
   exit: () => void;
   clearTranscript: () => void;
   showHelp: () => void;
+  openLogin: () => void;
+  openModel: () => void | Promise<void>;
 };
 
 /**
@@ -21,6 +23,12 @@ export function executeCommand(id: CommandId, actions: CommandActions): void {
       return;
     case CommandId.Help:
       actions.showHelp();
+      return;
+    case CommandId.Login:
+      actions.openLogin();
+      return;
+    case CommandId.Model:
+      void actions.openModel();
       return;
   }
 }

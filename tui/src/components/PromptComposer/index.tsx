@@ -13,6 +13,7 @@ import { usePromptComposerInput } from '@components/PromptComposer/usePromptComp
 import { DEFAULT_COMPOSER_VISIBLE_LINES } from '@constants/ui.ts';
 import { clearTranscriptAtom, enqueuePromptAtom } from '@state/promptQueue/index.ts';
 import { openHelpAtom } from '@state/ui/help/index.ts';
+import { openLoginSurfaceAtom, openModelSurfaceAtom } from '@state/ui/surface/index.ts';
 import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import { resolveComposerWindow } from '@libs/composer/composerWindow.ts';
 import {
@@ -63,6 +64,8 @@ export function PromptComposer({
   const { exit } = useApp();
   const clearTranscript = useSetAtom(clearTranscriptAtom);
   const openHelp = useSetAtom(openHelpAtom);
+  const openLogin = useSetAtom(openLoginSurfaceAtom);
+  const openModel = useSetAtom(openModelSurfaceAtom);
   const composerRef = useRef<DOMElement | null>(null);
   const composerMetrics = useBoxMetrics(composerRef);
   const { setCursorPosition } = useCursor();
@@ -75,8 +78,8 @@ export function PromptComposer({
   const resolvedVisibleRowsChange = onVisibleRowsChange ?? setComposerRows;
 
   const commandActions = useMemo(
-    () => ({ exit, clearTranscript, showHelp: openHelp }),
-    [exit, clearTranscript, openHelp]
+    () => ({ exit, clearTranscript, showHelp: openHelp, openLogin, openModel }),
+    [exit, clearTranscript, openHelp, openLogin, openModel]
   );
 
   usePromptComposerInput({

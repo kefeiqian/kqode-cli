@@ -29,10 +29,12 @@ describe('command menu atoms', () => {
     expect(store.get(commandMenuMatchesAtom).map((command) => command.id)).toEqual([
       CommandId.Clear,
       CommandId.Exit,
-      CommandId.Help
+      CommandId.Help,
+      CommandId.Login,
+      CommandId.Model
     ]);
     expect(store.get(highlightedCommandAtom)?.id).toBe(CommandId.Clear);
-    expect(store.get(commandMenuDesiredRowsAtom)).toBe(3);
+    expect(store.get(commandMenuDesiredRowsAtom)).toBe(5);
   });
 
   it('narrows matches as the query grows', () => {
@@ -83,7 +85,7 @@ describe('command menu atoms', () => {
     expect(store.get(commandMenuHighlightIndexAtom)).toBe(1);
 
     store.set(moveCommandHighlightAtom, 5);
-    expect(store.get(commandMenuHighlightIndexAtom)).toBe(2);
+    expect(store.get(commandMenuHighlightIndexAtom)).toBe(4);
 
     store.set(moveCommandHighlightAtom, -10);
     expect(store.get(commandMenuHighlightIndexAtom)).toBe(0);

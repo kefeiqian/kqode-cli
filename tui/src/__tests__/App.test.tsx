@@ -196,4 +196,27 @@ describe('App', () => {
     expect(homeFrame).toContain('/ commands | @ mention | ? help');
     expect(homeFrame).not.toContain('↑/↓ scroll · esc close');
   });
+
+  it('disarms Ctrl+C when Esc closes an active surface', async () => {
+    const { store, stdin } = renderApp({ columns: 100, rows: 24 });
+    await flushInput();
+
+    stdin.write('/help');
+    await flushInput();
+    stdin.write('\r');
+    await flushInput();
+
+    stdin.write('\u0003');
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBe(ArmedAction.Exit);
+
+    stdin.write('\u001B');
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(store.get(helpVisibleAtom)).toBe(false);
+    expect(store.get(armedActionAtom)).toBeNull();
+
+    stdin.write('\u0003');
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBe(ArmedAction.Exit);
+  });
 });

@@ -7,7 +7,9 @@ describe('filterCommands', () => {
     expect(filterCommands('').map((command) => command.id)).toEqual([
       CommandId.Clear,
       CommandId.Exit,
-      CommandId.Help
+      CommandId.Help,
+      CommandId.Login,
+      CommandId.Model
     ]);
   });
 
@@ -30,11 +32,13 @@ describe('filterCommands', () => {
 });
 
 describe('COMMAND_REGISTRY', () => {
-  it('contains exactly clear, exit, and help sorted alphabetically with non-empty descriptions', () => {
+  it('contains exactly built-in commands sorted alphabetically with non-empty descriptions', () => {
     expect(COMMAND_REGISTRY.map((command) => command.id)).toEqual([
       CommandId.Clear,
       CommandId.Exit,
-      CommandId.Help
+      CommandId.Help,
+      CommandId.Login,
+      CommandId.Model
     ]);
 
     expect(COMMAND_REGISTRY.map((command) => command.name)).toEqual([...COMMAND_REGISTRY]
