@@ -119,6 +119,17 @@ For functions that can fail in non-obvious ways, include a `# Errors` section. U
 - Start evaluation with deterministic harness tests before provider or benchmark tests. The first golden tasks should dogfood KQode on this repository.
 - `docs/solutions/` holds documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (`module`, `tags`, `problem_type`); relevant when implementing or debugging in documented areas.
 
+## Provider configuration and storage
+
+Provider credentials and the active `(provider, model)` selection are **user-global**, while a workspace `.env` stays **workspace-scoped** (read from the backend's cwd). Precedence is **keychain > `.env`**, resolved per operation (never cached), so clearing a key takes effect immediately.
+
+- **SQLite index** at `~/.kqode/kqode.db` holds non-secret provider settings + the active selection (plus a provisional sessions/turns spine). It is a rebuildable index over the JSONL transcript truth, opened/migrated at backend init via a forward-only, additive-only `user_version` runner (each step transactional with double-checked locking). A DB that fails to open/migrate, or is at a newer `user_version`, degrades to `.env`-only chat and is **never auto-deleted**. Override the DB file path with `KQODE_DB_PATH` (used by tests). The store holds **no key material** — only a non-secret `key_present` bit.
+- **OS keychain** holds API keys under the service constant `dev.kqode.providers`, keyed by provider id (`kimi`/`custom`). Keys are validated before storage and never logged, serialized, or written to the DB/JSONL. When the keychain is unavailable, `/login` refuses to store and points at the `.env` fallback.
+- **Config-scope surprise:** clearing a key deletes neither the provider's settings row nor a workspace `.env` key, so after a clear the status can read **"connected via .env"** rather than "not configured" — clearing a keychain key can re-expose a `.env` key.
+- **Preset vs Custom:** the preset Kimi base URL is a compiled constant (a workspace `.env` `KIMI_BASE_URL` cannot redirect a keychain key to another host); Custom providers are keychain-only (no `.env` fallback) and their base URL must persist in the DB, so Custom cannot connect when persistence is degraded.
+- **Commands:** `/login` connects or clears a provider (masked key entry; the key never enters a Jotai atom, only component-local state → the set-key request); `/model` picks the active model across connected providers.
+- `rusqlite` (bundled), `keyring`, `secrecy`, and `tempfile` (dev) are new to the dependency graph for this store/keychain work; `bundled` `rusqlite` compiles SQLite via `cc` (a C toolchain requirement new to the otherwise pure-Rust/rustls graph).
+
 ## Commit workflow
 
 Implement plan work one commit-sized unit at a time. After each commit, run code review on the completed unit, then pause for user review and wait for explicit consent before starting the next commit.
