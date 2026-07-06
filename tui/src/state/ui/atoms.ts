@@ -1,7 +1,7 @@
 import { atom } from 'jotai';
 import { countBodyRows, DEFAULT_BODY_ENTRIES } from '@libs/tui/bodyRows.ts';
-import { queueToBodyEntries } from '@libs/promptQueue/promptQueue.ts';
-import { promptQueueAtom, streamingTextByIdAtom } from '@state/promptQueue/store.ts';
+import { composeTranscriptRows } from '@libs/promptQueue/rowComposition.ts';
+import { clientOnlyRowsAtom, promptQueueAtom, streamingTextByIdAtom } from '@state/promptQueue/store.ts';
 import { countCwdRows } from '@libs/tui/cwdLine.ts';
 import {
   BODY_CWD_GAP_ROWS,
@@ -26,7 +26,11 @@ export const bodyScrollOffsetRowsAtom = atom(0);
 export const composerRowsAtom = atom(DEFAULT_COMPOSER_ROWS);
 /** Transcript body rows derived from the prompt queue and live streaming text. */
 export const submittedPromptEntriesAtom = atom((get) =>
-  queueToBodyEntries(get(promptQueueAtom), get(streamingTextByIdAtom))
+  composeTranscriptRows(
+    get(promptQueueAtom),
+    get(clientOnlyRowsAtom),
+    get(streamingTextByIdAtom)
+  )
 );
 
 /**

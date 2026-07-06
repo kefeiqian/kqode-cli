@@ -7,7 +7,12 @@ import type { BackendClient, StreamSubmitParams, TranscriptEvent } from '@contra
 import { SETTLED_KIND_COMPLETED } from '@contracts/backend/index.ts';
 import { activeSurfaceAtom, columnsTestOverrideAtom, rowsTestOverrideAtom, Surface } from '@state/ui/index.ts';
 import { backendClientAtom, productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
-import { promptQueueAtom, restoreComposerDraftAtom, transcriptEventAtom } from '@state/promptQueue/index.ts';
+import {
+  clientOnlyRowsAtom,
+  promptQueueAtom,
+  restoreComposerDraftAtom,
+  transcriptEventAtom
+} from '@state/promptQueue/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
@@ -117,9 +122,9 @@ describe('App submit and event-fed output', () => {
     await typePrompt(stdin, '/nope');
 
     const frame = await waitForFrame(lastFrame, (output) => output.includes('Unknown command: /nope'));
-    expect(frame).toContain('❯ /nope');
     expect(backend.submit).not.toHaveBeenCalled();
-    expect(store.get(promptQueueAtom).some((item) => item.state === 'active')).toBe(false);
+    expect(store.get(promptQueueAtom)).toEqual([]);
+    expect(store.get(clientOnlyRowsAtom)).toHaveLength(1);
   });
 
   it('renders auth errors and reroutes to login with the prompt restored', async () => {

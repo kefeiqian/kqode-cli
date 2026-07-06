@@ -19,7 +19,7 @@ import { armedActionAtom } from '@state/ui/index.ts';
 type PromptComposerInputOptions = {
   isActive: boolean;
   maxBytes: number;
-  onSubmit: (prompt: string) => void;
+  onSubmit: (prompt: string, submissionSequence?: number) => void;
   state: ComposerInputState;
   commandActions: CommandActions;
 };

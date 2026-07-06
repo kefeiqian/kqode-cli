@@ -1,22 +1,23 @@
 import { atom } from 'jotai';
 import type { Getter, Setter } from 'jotai';
-import { BodyEntryKind } from '@constants/bodyEntry.ts';
 import { STREAM_RENDER_FLUSH_MS } from '@constants/backend.ts';
-import { BackendErrorKind, SETTLED_KIND_COMPLETED, SETTLED_KIND_ERROR } from '@contracts/backend/index.ts';
+import { SETTLED_KIND_COMPLETED } from '@contracts/backend/index.ts';
 import type { TranscriptEvent } from '@contracts/backend/index.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { bodyScrollOffsetRowsAtom } from '@state/ui/index.ts';
 import { openLoginSurfaceAtom } from '@state/ui/surface/index.ts';
 import { refreshGitStatusAtom } from '@state/ui/index.ts';
-import { sanitizeDisplayText } from '@libs/text/sanitizeDisplayText.ts';
-import { unknownCommandMessage } from '@libs/commands/unknownCommand.ts';
 import { createDeltaCoalescer } from '@libs/promptQueue/streamCoalescer.ts';
 import { BACKEND_UNAVAILABLE_MESSAGE, backendErrorMessage } from '@libs/promptQueue/promptQueue.ts';
 import type { QueueItem } from '@libs/promptQueue/promptQueue.ts';
 import { reduceTranscriptEvent } from '@libs/promptQueue/transcriptReducer.ts';
+import { appendClientOnlyError, sequencedText } from '@state/promptQueue/clientOnlyRows.ts';
 import {
   conversationGenerationAtom,
+  clientOnlyRowsAtom,
+  nextClientOnlyRowIdAtom,
   nextQueueItemIdAtom,
+  nextSubmissionSequenceAtom,
   promptQueueAtom,
   settledTurnIdsAtom,
   streamingTextByIdAtom,
@@ -24,8 +25,11 @@ import {
   turnGenerationByIdAtom
 } from '@state/promptQueue/store.ts';
 export {
+  clientOnlyRowsAtom,
   conversationGenerationAtom,
+  nextClientOnlyRowIdAtom,
   nextQueueItemIdAtom,
+  nextSubmissionSequenceAtom,
   promptQueueAtom,
   settledTurnIdsAtom,
   streamingTextByIdAtom,
@@ -39,28 +43,35 @@ export const restoreComposerDraftAtom = atom('');
 /** Factory for caller-side backend turn ids, injected by the composition root. */
 export const newTurnIdAtom = atom({ newTurnId: () => `${localTurnIdPrefix}-${fallbackTurnCounter++}` });
 /** Appends a prompt optimistically and submits its caller-minted turn id. */
-export const enqueuePromptAtom = atom(null, async (get, set, rawText: string) => {
-  const backendClient = get(backendClientAtom);
-  const turnId = get(newTurnIdAtom).newTurnId();
-  const item: QueueItem = {
-    id: get(nextQueueItemIdAtom),
-    turnId,
-    text: rawText,
-    state: 'active'
-  };
-  set(nextQueueItemIdAtom, item.id + 1);
-  set(promptQueueAtom, (queue) => [...queue, item]);
-  set(bodyScrollOffsetRowsAtom, 0);
-  if (backendClient === undefined) {
-    set(transcriptEventAtom, transportFailureEvent(turnId, BACKEND_UNAVAILABLE_MESSAGE));
-    return;
+export const enqueuePromptAtom = atom(
+  null,
+  async (get, set, input: string | { text: string; submissionSequence: number }) => {
+    const { text: rawText, submissionSequence } = sequencedText(get, set, input);
+    const backendClient = get(backendClientAtom);
+    const turnId = get(newTurnIdAtom).newTurnId();
+    const item: QueueItem = {
+      id: get(nextQueueItemIdAtom),
+      turnId,
+      submissionSequence,
+      text: rawText,
+      state: 'active'
+    };
+    set(nextQueueItemIdAtom, item.id + 1);
+    set(promptQueueAtom, (queue) => [...queue, item]);
+    set(bodyScrollOffsetRowsAtom, 0);
+    if (backendClient === undefined) {
+      appendClientOnlyError(get, set, submissionSequence, BACKEND_UNAVAILABLE_MESSAGE);
+      settleLocalSubmitFailure(set, turnId);
+      return;
+    }
+    try {
+      await backendClient.submit({ turnId, text: rawText });
+    } catch (error) {
+      appendClientOnlyError(get, set, submissionSequence, backendErrorMessage(error));
+      settleLocalSubmitFailure(set, turnId);
+    }
   }
-  try {
-    await backendClient.submit({ turnId, text: rawText });
-  } catch (error) {
-    set(transcriptEventAtom, transportFailureEvent(turnId, backendErrorMessage(error)));
-  }
-});
+);
 /** Applies one backend transcript event to the local read-model. */
 export const transcriptEventAtom = atom(null, (get, set, event: TranscriptEvent) => {
   if (event.type === 'tokenDelta') {
@@ -82,10 +93,11 @@ export const clearTranscriptAtom = atom(null, (get, set) => {
   bumpGeneration(set);
   ignoreTurnIds(set, visibleTurnIds(get(promptQueueAtom)));
   set(promptQueueAtom, []);
+  set(clientOnlyRowsAtom, []);
   set(streamingTextByIdAtom, new Map());
   set(turnGenerationByIdAtom, new Map());
   set(bodyScrollOffsetRowsAtom, 0);
-  void get(backendClientAtom)?.clearConversation();
+  void get(backendClientAtom)?.clearConversation().catch(() => undefined);
 });
 /** Bumps generation on backend respawn and drops backend-owned mirror rows. */
 export const resetTranscriptMirrorAtom = atom(null, (get, set) => {
@@ -101,17 +113,6 @@ export const resetTranscriptMirrorAtom = atom(null, (get, set) => {
   );
   set(streamingTextByIdAtom, new Map());
   set(turnGenerationByIdAtom, new Map());
-});
-export const appendUnknownCommandAtom = atom(null, (get, set, rawText: string) => {
-  const item: QueueItem = {
-    id: get(nextQueueItemIdAtom),
-    text: rawText,
-    state: 'settled',
-    result: { kind: BodyEntryKind.Error, text: sanitizeDisplayText(unknownCommandMessage(rawText)) }
-  };
-  set(nextQueueItemIdAtom, item.id + 1);
-  set(promptQueueAtom, (queue) => [...queue, item]);
-  set(bodyScrollOffsetRowsAtom, 0);
 });
 function applyTranscriptEvent(get: Getter, set: Setter, event: TranscriptEvent): void {
   const result = reduceTranscriptEvent(
@@ -151,6 +152,7 @@ function rerouteToLogin(get: Getter, set: Setter, draft: string, keepSettled: bo
   }
   if (!keepSettled) {
     set(promptQueueAtom, []);
+    set(clientOnlyRowsAtom, []);
     set(streamingTextByIdAtom, new Map());
   }
 }
@@ -179,16 +181,10 @@ function ignoreTurnIds(set: Setter, turnIds: readonly string[]): void {
   }
   set(settledTurnIdsAtom, (previous) => new Set([...previous, ...turnIds]));
 }
-function transportFailureEvent(turnId: string, message: string): TranscriptEvent {
-  return {
-    type: 'settled',
-    turnId,
-    result: {
-      kind: SETTLED_KIND_ERROR,
-      text: null,
-      finishReason: null,
-      errorKind: BackendErrorKind.Transport,
-      message
-    }
-  };
+
+function settleLocalSubmitFailure(set: Setter, turnId: string): void {
+  set(promptQueueAtom, (queue) =>
+    queue.map((item) => (item.turnId === turnId ? { ...item, state: 'settled' } : item))
+  );
+  set(settledTurnIdsAtom, (turnIds) => new Set([...turnIds, turnId]));
 }

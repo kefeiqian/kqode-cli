@@ -1,5 +1,5 @@
 import type { ComposerKeyHandler } from '@components/PromptComposer/input/types.ts';
-import { appendUnknownCommandAtom } from '@state/promptQueue/index.ts';
+import { appendUnknownCommandNoticeAtom } from '@state/promptQueue/index.ts';
 import { executeCommand } from '@libs/commands/executeCommand.ts';
 import { validateComposerSubmit } from '@libs/composer/promptText.ts';
 import { captureComposerSubmit, SubmitCaptureKind } from '@libs/composer/submitCapture.ts';
@@ -69,8 +69,14 @@ export const handleMenuKey: ComposerKeyHandler = (context) => {
       captureComposerSubmit({ kind: SubmitCaptureKind.MenuCommand, text: highlightedCommand.name });
       executeCommand(highlightedCommand.id, commandActions);
     } else {
-      captureComposerSubmit({ kind: SubmitCaptureKind.UnknownCommand, text: validation.text });
-      store.set(appendUnknownCommandAtom, validation.text);
+      const captured = captureComposerSubmit({
+        kind: SubmitCaptureKind.UnknownCommand,
+        text: validation.text
+      });
+      store.set(appendUnknownCommandNoticeAtom, {
+        text: validation.text,
+        submissionSequence: captured.sequence
+      });
     }
     store.set(clearComposerAtom);
     return true;

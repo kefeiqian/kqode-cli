@@ -1,9 +1,13 @@
 import { atom } from 'jotai';
 import type { QueueItem } from '@libs/promptQueue/promptQueue.ts';
+import type { ClientOnlyRow } from '@libs/promptQueue/rowComposition.ts';
 import type { TranscriptReducerState } from '@libs/promptQueue/transcriptReducer.ts';
 
 /** Ordered record of submitted prompts and their backend outcomes. */
 export const promptQueueAtom = atom<QueueItem[]>([]);
+
+/** Client-only rows that are composed with, but never stored in, the mirror. */
+export const clientOnlyRowsAtom = atom<ClientOnlyRow[]>([]);
 
 /**
  * Live assistant text for in-flight turns, keyed by {@link QueueItem} `id`.
@@ -28,6 +32,12 @@ export const settledTurnIdsAtom = atom<ReadonlySet<string>>(new Set<string>());
 
 /** Next numeric queue id for body-row keys. */
 export const nextQueueItemIdAtom = atom(0);
+
+/** Next id for stable client-only body-row keys. */
+export const nextClientOnlyRowIdAtom = atom(0);
+
+/** Fallback submit sequence for tests and direct atom callers. */
+export const nextSubmissionSequenceAtom = atom(0);
 
 /** Snapshot atom used to feed the pure transcript reducer. */
 export const transcriptReducerStateAtom = atom<TranscriptReducerState>((get) => ({

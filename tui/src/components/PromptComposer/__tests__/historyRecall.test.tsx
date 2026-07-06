@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createStore } from 'jotai';
 import { PromptComposer } from '@components/PromptComposer/index.tsx';
 import { resetSubmitCaptureForTests } from '@libs/composer/submitCapture.ts';
+import { promptQueueAtom } from '@state/promptQueue/index.ts';
 import { helpVisibleAtom } from '@state/ui/help/index.ts';
+import { bodyScrollOffsetRowsAtom, submittedPromptEntriesAtom } from '@state/ui/index.ts';
 import { commandMenuDismissedAtom, commandMenuOpenAtom, highlightedCommandAtom } from '@state/ui/commands/index.ts';
 import { composerStateAtom } from '@state/ui/composer/index.ts';
 import { flushInput } from '@test/flushInput.ts';
@@ -131,6 +133,28 @@ describe('PromptComposer history recall', () => {
     await writeAndFlush(stdin, UP);
     expect(store.get(composerStateAtom).text).toBe('');
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('clears local transcript and scroll while leaving recall history intact', async () => {
+    const store = createStore();
+    const { stdin } = renderWithJotai(<PromptComposer columns={40} />, store);
+
+    await writeAndFlush(stdin, 'remember me');
+    await writeAndFlush(stdin, '\r');
+    store.set(bodyScrollOffsetRowsAtom, 3);
+    expect(store.get(promptQueueAtom)).not.toEqual([]);
+
+    await writeAndFlush(stdin, '/clear');
+    await writeAndFlush(stdin, '\r');
+
+    expect(store.get(promptQueueAtom)).toEqual([]);
+    expect(store.get(submittedPromptEntriesAtom)).toEqual([]);
+    expect(store.get(bodyScrollOffsetRowsAtom)).toBe(0);
+
+    await writeAndFlush(stdin, UP);
+    expect(store.get(composerStateAtom).text).toBe('/clear');
+    await writeAndFlush(stdin, UP);
+    expect(store.get(composerStateAtom).text).toBe('remember me');
   });
 
   it('keeps menu arrow precedence, dismisses on recall, and reopens on edit', async () => {

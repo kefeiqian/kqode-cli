@@ -82,7 +82,13 @@ export function PromptComposer({
   const { setCursorPosition } = useCursor();
 
   const resolvedColumns = columns ?? atomColumns;
-  const resolvedSubmit = onSubmit ?? ((prompt: string) => void enqueuePrompt(prompt));
+  const resolvedSubmit: (prompt: string, submissionSequence?: number) => void =
+    onSubmit === undefined
+      ? (prompt: string, submissionSequence?: number) =>
+          void enqueuePrompt(
+            submissionSequence === undefined ? prompt : { text: prompt, submissionSequence }
+          )
+      : (prompt: string) => onSubmit(prompt);
   const resolvedIsActive = isActive ?? !atomInputLocked;
   const resolvedMaxVisibleLines = maxVisibleLines ?? atomLayout.composerVisibleRows ?? DEFAULT_COMPOSER_VISIBLE_LINES;
   const resolvedCursorTop = cursorTop ?? atomComposerTop;

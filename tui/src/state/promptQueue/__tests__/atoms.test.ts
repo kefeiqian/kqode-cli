@@ -1,14 +1,15 @@
 import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  appendUnknownCommandAtom,
+  appendUnknownCommandNoticeAtom,
+  clientOnlyRowsAtom,
   clearTranscriptAtom,
   enqueuePromptAtom,
   newTurnIdAtom,
   promptQueueAtom,
   restoreComposerDraftAtom,
   transcriptEventAtom
-} from '@state/promptQueue/atoms.ts';
+} from '@state/promptQueue/index.ts';
 import { BACKEND_UNAVAILABLE_MESSAGE } from '@libs/promptQueue/promptQueue.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { activeSurfaceAtom, bodyScrollOffsetRowsAtom, submittedPromptEntriesAtom, Surface } from '@state/ui/index.ts';
@@ -45,6 +46,7 @@ describe('enqueuePromptAtom', () => {
 
     const errorEntry = store.get(submittedPromptEntriesAtom).find((entry) => entry.kind === 'error');
     expect(errorEntry?.text).toContain(BACKEND_UNAVAILABLE_MESSAGE);
+    expect(store.get(clientOnlyRowsAtom)).toHaveLength(1);
   });
 
   it('optimistically appends the user row and submits a caller-minted turn id', async () => {
@@ -138,15 +140,50 @@ describe('clearTranscriptAtom', () => {
     expect(store.get(promptQueueAtom)).toEqual([]);
     expect(store.get(submittedPromptEntriesAtom)).toEqual([]);
   });
+
+  it('clears local rows and scroll when the backend is unavailable', () => {
+    const store = createStore();
+    store.set(appendUnknownCommandNoticeAtom, { text: '/hepl', submissionSequence: 0 });
+    store.set(bodyScrollOffsetRowsAtom, 4);
+
+    store.set(clearTranscriptAtom);
+
+    expect(store.get(clientOnlyRowsAtom)).toEqual([]);
+    expect(store.get(submittedPromptEntriesAtom)).toEqual([]);
+    expect(store.get(bodyScrollOffsetRowsAtom)).toBe(0);
+  });
+
+  it('keeps the local clear when the backend clear RPC rejects', async () => {
+    const store = createStore();
+    const clearConversation = vi.fn(async () => {
+      throw new Error('dead backend');
+    });
+    store.set(backendClientAtom, { ...clientWithSubmit(async () => undefined), clearConversation });
+    await store.set(enqueuePromptAtom, 'hello');
+
+    store.set(clearTranscriptAtom);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(clearConversation).toHaveBeenCalledTimes(1);
+    expect(store.get(submittedPromptEntriesAtom)).toEqual([]);
+  });
 });
 
-describe('appendUnknownCommandAtom', () => {
-  it('posts the raw command as a prompt entry and a red error entry without a backend call', () => {
+describe('settled git status refresh', () => {
+  it('refreshes git status after a completed turn settles', async () => {
     const store = createStore();
+    const gitStatus = vi.fn(async () => 'main*');
+    store.set(newTurnIdAtom, { newTurnId: () => 'turn-1' });
+    store.set(backendClientAtom, { ...clientWithSubmit(async () => undefined), gitStatus });
 
-    store.set(appendUnknownCommandAtom, '/nope arg1 arg2');
+    await store.set(enqueuePromptAtom, 'hello');
+    store.set(transcriptEventAtom, {
+      type: 'settled',
+      turnId: 'turn-1',
+      result: { kind: 'completed', text: 'done', finishReason: 'stop', errorKind: null, message: null }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(store.get(submittedPromptEntriesAtom).map((entry) => entry.kind)).toEqual(['user', 'error']);
-    expect(store.get(promptQueueAtom).every((item) => item.state === 'settled')).toBe(true);
+    expect(gitStatus).toHaveBeenCalledTimes(1);
   });
 });

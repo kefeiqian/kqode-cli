@@ -335,7 +335,7 @@ describe('PromptComposer', () => {
     expect(store.get(submittedPromptEntriesAtom)).toEqual([]);
   });
 
-  it('posts an unknown command and its error into the transcript without sending it', async () => {
+  it('posts an unknown command notice without sending it', async () => {
     const store = createStore();
     const onSubmit = vi.fn();
     const { stdin } = renderWithJotai(
@@ -350,7 +350,6 @@ describe('PromptComposer', () => {
 
     const entries = store.get(submittedPromptEntriesAtom);
     expect(entries.map((entry) => ({ kind: entry.kind, text: entry.text }))).toEqual([
-      { kind: 'user', text: '/zzz' },
       { kind: 'error', text: 'Unknown command: /zzz' }
     ]);
     expect(store.get(composerStateAtom).text).toBe('');

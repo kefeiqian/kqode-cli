@@ -1,5 +1,5 @@
 import type { ComposerKeyContext, ComposerKeyHandler } from '@components/PromptComposer/input/types.ts';
-import { appendUnknownCommandAtom } from '@state/promptQueue/index.ts';
+import { appendUnknownCommandNoticeAtom } from '@state/promptQueue/index.ts';
 import { executeCommand } from '@libs/commands/executeCommand.ts';
 import { exactCommandMatch } from '@libs/commands/matchCommand.ts';
 import { captureComposerSubmit, SubmitCaptureKind } from '@libs/composer/submitCapture.ts';
@@ -42,14 +42,20 @@ function submitPrompt({ state, maxBytes, onSubmit, commandActions, store }: Comp
       captureComposerSubmit({ kind: SubmitCaptureKind.ValidCommand, text: command.name });
       executeCommand(command.id, commandActions);
     } else {
-      captureComposerSubmit({ kind: SubmitCaptureKind.UnknownCommand, text: validation.text });
-      store.set(appendUnknownCommandAtom, validation.text);
+      const captured = captureComposerSubmit({
+        kind: SubmitCaptureKind.UnknownCommand,
+        text: validation.text
+      });
+      store.set(appendUnknownCommandNoticeAtom, {
+        text: validation.text,
+        submissionSequence: captured.sequence
+      });
     }
     store.set(clearComposerAtom);
     return;
   }
 
-  captureComposerSubmit({ kind: SubmitCaptureKind.Prompt, text: validation.text });
-  onSubmit(validation.text);
+  const captured = captureComposerSubmit({ kind: SubmitCaptureKind.Prompt, text: validation.text });
+  onSubmit(validation.text, captured.sequence);
   store.set(clearComposerAtom);
 }

@@ -25,6 +25,7 @@ export const BACKEND_UNAVAILABLE_MESSAGE = 'Rust backend unavailable';
 export type QueueItem = {
   id: number;
   turnId?: string;
+  submissionSequence?: number;
   text: string;
   state: QueueItemState;
   result?: BackendResult;
