@@ -81,6 +81,9 @@ export const TURN_STATE_ACTIVE = 'active';
 /** Must match `TURN_STATE_PENDING` in `src/protocol.rs`. */
 export const TURN_STATE_PENDING = 'pending';
 
+/** Must match turn state constants in `src/protocol.rs`. */
+export type TurnState = typeof TURN_STATE_ACTIVE | typeof TURN_STATE_PENDING;
+
 /** Must match `SETTLED_KIND_COMPLETED` in `src/protocol.rs`. */
 export const SETTLED_KIND_COMPLETED = 'completed';
 
@@ -92,6 +95,13 @@ export const SETTLED_KIND_ERROR = 'error';
 
 /** Must match `SETTLED_KIND_CANCELLED` in `src/protocol.rs`. */
 export const SETTLED_KIND_CANCELLED = 'cancelled';
+
+/** Must match settled kind constants in `src/protocol.rs`. */
+export type SettledKind =
+  | typeof SETTLED_KIND_COMPLETED
+  | typeof SETTLED_KIND_NEEDS_CONFIGURATION
+  | typeof SETTLED_KIND_ERROR
+  | typeof SETTLED_KIND_CANCELLED;
 
 /** `status` value when a submit is accepted and streaming has begun. */
 export const SUBMIT_STATUS_STREAMING = 'streaming';
@@ -163,7 +173,7 @@ export type TurnErrorParams = {
 export type EnqueuedParams = {
   turnId: string;
   seq: number;
-  state: string;
+  state: TurnState;
 };
 
 /** Payload for {@link TURN_ACTIVATED_METHOD}. Must match `ActivatedParams` in `src/protocol.rs`. */
@@ -179,7 +189,7 @@ export type SettledParams = {
 
 /** Must match `TurnResult` in `src/protocol.rs`. */
 export type TurnResult = {
-  kind: string;
+  kind: SettledKind;
   text: string | null;
   finishReason: string | null;
   errorKind: string | null;

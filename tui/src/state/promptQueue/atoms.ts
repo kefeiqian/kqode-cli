@@ -1,198 +1,194 @@
 import { atom } from 'jotai';
 import type { Getter, Setter } from 'jotai';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
-import { sanitizeDisplayText } from '@libs/text/sanitizeDisplayText.ts';
-import { unknownCommandMessage } from '@libs/commands/unknownCommand.ts';
+import { STREAM_RENDER_FLUSH_MS } from '@constants/backend.ts';
+import { BackendErrorKind, SETTLED_KIND_COMPLETED, SETTLED_KIND_ERROR } from '@contracts/backend/index.ts';
+import type { TranscriptEvent } from '@contracts/backend/index.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { bodyScrollOffsetRowsAtom } from '@state/ui/index.ts';
-import { promptQueueAtom, streamingTextByIdAtom } from '@state/promptQueue/store.ts';
-import { refreshGitStatusAtom } from '@state/ui/index.ts';
 import { openLoginSurfaceAtom } from '@state/ui/surface/index.ts';
+import { refreshGitStatusAtom } from '@state/ui/index.ts';
+import { sanitizeDisplayText } from '@libs/text/sanitizeDisplayText.ts';
+import { unknownCommandMessage } from '@libs/commands/unknownCommand.ts';
 import { createDeltaCoalescer } from '@libs/promptQueue/streamCoalescer.ts';
-import { STREAM_RENDER_FLUSH_MS } from '@constants/backend.ts';
+import { BACKEND_UNAVAILABLE_MESSAGE, backendErrorMessage } from '@libs/promptQueue/promptQueue.ts';
+import type { QueueItem } from '@libs/promptQueue/promptQueue.ts';
+import { reduceTranscriptEvent } from '@libs/promptQueue/transcriptReducer.ts';
 import {
-  BACKEND_UNAVAILABLE_MESSAGE,
-  backendErrorMessage,
-  outcomeToResult
-} from '@libs/promptQueue/promptQueue.ts';
-import type { BackendResult, QueueItem } from '@libs/promptQueue/promptQueue.ts';
-
-export { promptQueueAtom, streamingTextByIdAtom };
-
+  conversationGenerationAtom,
+  nextQueueItemIdAtom,
+  promptQueueAtom,
+  settledTurnIdsAtom,
+  streamingTextByIdAtom,
+  transcriptReducerStateAtom,
+  turnGenerationByIdAtom
+} from '@state/promptQueue/store.ts';
+export {
+  conversationGenerationAtom,
+  nextQueueItemIdAtom,
+  promptQueueAtom,
+  settledTurnIdsAtom,
+  streamingTextByIdAtom,
+  turnGenerationByIdAtom
+};
 const AUTH_ERROR_KIND = 'auth';
-
-let nextQueueItemId = 0;
-
-const drainingAtom = atom(false);
-
+const localTurnIdPrefix = 'local-turn';
+let fallbackTurnCounter = 0;
+const deltaCoalescers = new Map<string, ReturnType<typeof createDeltaCoalescer>>();
 export const restoreComposerDraftAtom = atom('');
-
-type StreamActiveResult =
-  | { kind: 'settled'; result: BackendResult }
-  | { kind: 'needsConfiguration' }
-  | { kind: 'authError'; result: BackendResult };
-
-/** Appends a submitted prompt and drains the backend queue one request at a time. */
+/** Factory for caller-side backend turn ids, injected by the composition root. */
+export const newTurnIdAtom = atom({ newTurnId: () => `${localTurnIdPrefix}-${fallbackTurnCounter++}` });
+/** Appends a prompt optimistically and submits its caller-minted turn id. */
 export const enqueuePromptAtom = atom(null, async (get, set, rawText: string) => {
-  const hasActive = get(promptQueueAtom).some((item) => item.state === 'active');
+  const backendClient = get(backendClientAtom);
+  const turnId = get(newTurnIdAtom).newTurnId();
   const item: QueueItem = {
-    id: nextQueueItemId++,
+    id: get(nextQueueItemIdAtom),
+    turnId,
     text: rawText,
-    state: hasActive ? 'queued' : 'active'
+    state: 'active'
   };
-
+  set(nextQueueItemIdAtom, item.id + 1);
   set(promptQueueAtom, (queue) => [...queue, item]);
   set(bodyScrollOffsetRowsAtom, 0);
-  await drainQueue(get, set);
+  if (backendClient === undefined) {
+    set(transcriptEventAtom, transportFailureEvent(turnId, BACKEND_UNAVAILABLE_MESSAGE));
+    return;
+  }
+  try {
+    await backendClient.submit({ turnId, text: rawText });
+  } catch (error) {
+    set(transcriptEventAtom, transportFailureEvent(turnId, backendErrorMessage(error)));
+  }
 });
-
-/** Clears all transcript entries (prompts and results) and resets scroll. */
-export const clearTranscriptAtom = atom(null, (_get, set) => {
+/** Applies one backend transcript event to the local read-model. */
+export const transcriptEventAtom = atom(null, (get, set, event: TranscriptEvent) => {
+  if (event.type === 'tokenDelta') {
+    coalesceDelta(set, event);
+    return;
+  }
+  flushCoalescer(event.turnId);
+  applyTranscriptEvent(get, set, event);
+  if (event.type === 'settled') {
+    cancelCoalescer(event.turnId);
+  }
+});
+const coalescedTranscriptEventAtom = atom(null, (get, set, event: TranscriptEvent) => {
+  applyTranscriptEvent(get, set, event);
+});
+/** Clears all transcript entries locally and asks the backend to clear too. */
+export const clearTranscriptAtom = atom(null, (get, set) => {
+  clearAllCoalescers();
+  bumpGeneration(set);
+  ignoreTurnIds(set, visibleTurnIds(get(promptQueueAtom)));
   set(promptQueueAtom, []);
   set(streamingTextByIdAtom, new Map());
+  set(turnGenerationByIdAtom, new Map());
   set(bodyScrollOffsetRowsAtom, 0);
+  void get(backendClientAtom)?.clearConversation();
 });
-
-export const appendUnknownCommandAtom = atom(null, (_get, set, rawText: string) => {
+/** Bumps generation on backend respawn and drops backend-owned mirror rows. */
+export const resetTranscriptMirrorAtom = atom(null, (get, set) => {
+  clearAllCoalescers();
+  bumpGeneration(set);
+  const generations = get(turnGenerationByIdAtom);
+  ignoreTurnIds(
+    set,
+    visibleTurnIds(get(promptQueueAtom)).filter((turnId) => generations.has(turnId))
+  );
+  set(promptQueueAtom, (queue) =>
+    queue.filter((item) => item.turnId === undefined || !generations.has(item.turnId))
+  );
+  set(streamingTextByIdAtom, new Map());
+  set(turnGenerationByIdAtom, new Map());
+});
+export const appendUnknownCommandAtom = atom(null, (get, set, rawText: string) => {
   const item: QueueItem = {
-    id: nextQueueItemId++,
+    id: get(nextQueueItemIdAtom),
     text: rawText,
     state: 'settled',
     result: { kind: BodyEntryKind.Error, text: sanitizeDisplayText(unknownCommandMessage(rawText)) }
   };
-
+  set(nextQueueItemIdAtom, item.id + 1);
   set(promptQueueAtom, (queue) => [...queue, item]);
   set(bodyScrollOffsetRowsAtom, 0);
 });
-
-async function drainQueue(get: Getter, set: Setter): Promise<void> {
-  if (get(drainingAtom)) {
-    return;
+function applyTranscriptEvent(get: Getter, set: Setter, event: TranscriptEvent): void {
+  const result = reduceTranscriptEvent(
+    get(transcriptReducerStateAtom),
+    event,
+    get(conversationGenerationAtom)
+  );
+  set(promptQueueAtom, result.state.queue);
+  set(streamingTextByIdAtom, result.state.streamingTextById);
+  set(turnGenerationByIdAtom, result.state.generationByTurnId);
+  set(settledTurnIdsAtom, result.state.settledTurnIds);
+  set(nextQueueItemIdAtom, result.state.nextQueueItemId);
+  set(bodyScrollOffsetRowsAtom, 0);
+  if (event.type === 'settled' && event.result.kind === SETTLED_KIND_COMPLETED) {
+    void set(refreshGitStatusAtom);
   }
-
-  set(drainingAtom, true);
-  try {
-    let active = findActive(get);
-    while (active !== undefined) {
-      const result = await streamActive(get, set, active.id, active.text);
-      if (result.kind === 'needsConfiguration') {
-        rerouteToLogin(set, active.id, active.text, false);
-        return;
-      }
-      if (result.kind === 'authError') {
-        settleActive(set, active.id, result.result);
-        rerouteToLogin(set, active.id, active.text, true);
-        return;
-      }
-      settleActive(set, active.id, result.result);
-      // A completed turn may have changed the working tree; refresh the git label
-      // (fire-and-forget so it never delays draining the next queued prompt).
-      void set(refreshGitStatusAtom);
-      active = findActive(get);
-    }
-  } finally {
-    set(drainingAtom, false);
+  if (result.effect !== undefined) {
+    rerouteToLogin(get, set, result.effect.turnText, result.effect.type === AUTH_ERROR_KIND);
   }
 }
-
-async function streamActive(
-  get: Getter,
+function coalesceDelta(
   set: Setter,
-  id: number,
-  text: string
-): Promise<StreamActiveResult> {
-  const backendClient = get(backendClientAtom);
-  if (backendClient === undefined) {
-    return {
-      kind: 'settled',
-      result: { kind: BodyEntryKind.Error, text: sanitizeDisplayText(BACKEND_UNAVAILABLE_MESSAGE) }
-    };
+  event: Extract<TranscriptEvent, { type: 'tokenDelta' }>
+): void {
+  const coalescer =
+    deltaCoalescers.get(event.turnId) ??
+    createDeltaCoalescer((delta) => {
+      set(coalescedTranscriptEventAtom, { ...event, delta });
+    }, STREAM_RENDER_FLUSH_MS);
+  deltaCoalescers.set(event.turnId, coalescer);
+  coalescer.push(event.delta);
+}
+function rerouteToLogin(get: Getter, set: Setter, draft: string, keepSettled: boolean): void {
+  if (get(restoreComposerDraftAtom) === '') {
+    set(restoreComposerDraftAtom, draft);
+    set(openLoginSurfaceAtom);
   }
-
-  updateStreamingText(set, id, () => '');
-
-  const coalescer = createDeltaCoalescer((batch) => {
-    updateStreamingText(set, id, (current) => current + batch);
-    set(bodyScrollOffsetRowsAtom, 0);
-  }, STREAM_RENDER_FLUSH_MS);
-
-  try {
-    const outcome = await backendClient.submitStreaming(
-      { text },
-      { onDelta: (delta) => coalescer.push(delta) }
-    );
-    if (outcome.kind === 'needsConfiguration') {
-      return { kind: 'needsConfiguration' };
-    }
-    const result = outcomeToResult(outcome);
-    return outcome.kind === 'error' && outcome.errorKind === AUTH_ERROR_KIND
-      ? { kind: 'authError', result }
-      : { kind: 'settled', result };
-  } catch (error) {
-    return {
-      kind: 'settled',
-      result: { kind: BodyEntryKind.Error, text: sanitizeDisplayText(backendErrorMessage(error)) }
-    };
-  } finally {
+  if (!keepSettled) {
+    set(promptQueueAtom, []);
+    set(streamingTextByIdAtom, new Map());
+  }
+}
+function bumpGeneration(set: Setter): void {
+  set(conversationGenerationAtom, (generation) => generation + 1);
+}
+function flushCoalescer(turnId: string): void {
+  deltaCoalescers.get(turnId)?.flush();
+}
+function cancelCoalescer(turnId: string): void {
+  deltaCoalescers.get(turnId)?.cancel();
+  deltaCoalescers.delete(turnId);
+}
+function clearAllCoalescers(): void {
+  for (const coalescer of deltaCoalescers.values()) {
     coalescer.cancel();
   }
+  deltaCoalescers.clear();
 }
-
-function updateStreamingText(
-  set: Setter,
-  id: number,
-  update: (current: string) => string
-): void {
-  set(streamingTextByIdAtom, (previous) => {
-    const next = new Map(previous);
-    next.set(id, update(previous.get(id) ?? ''));
-    return next;
-  });
+function visibleTurnIds(queue: readonly QueueItem[]): string[] {
+  return queue.flatMap((item) => (item.turnId === undefined ? [] : [item.turnId]));
 }
-
-function settleActive(set: Setter, id: number, result: BackendResult): void {
-  set(promptQueueAtom, (queue) => {
-    let promoted = false;
-    return queue.map((item) => {
-      if (item.id === id) {
-        return { ...item, state: 'settled' as const, result };
-      }
-      if (!promoted && item.state === 'queued') {
-        promoted = true;
-        return { ...item, state: 'active' as const };
-      }
-      return item;
-    });
-  });
-  discardStreamingText(set, id);
+function ignoreTurnIds(set: Setter, turnIds: readonly string[]): void {
+  if (turnIds.length === 0) {
+    return;
+  }
+  set(settledTurnIdsAtom, (previous) => new Set([...previous, ...turnIds]));
 }
-
-function rerouteToLogin(
-  set: Setter,
-  activeId: number,
-  draft: string,
-  keepSettledActive: boolean
-): void {
-  set(promptQueueAtom, (queue) =>
-    queue.filter((item) => item.state === 'settled' || (keepSettledActive && item.id === activeId))
-  );
-  set(streamingTextByIdAtom, new Map());
-  set(restoreComposerDraftAtom, draft);
-  set(openLoginSurfaceAtom);
-}
-
-/** Drops a settled item's streaming buffer so the map holds at most one entry. */
-function discardStreamingText(set: Setter, id: number): void {
-  set(streamingTextByIdAtom, (previous) => {
-    if (!previous.has(id)) {
-      return previous;
+function transportFailureEvent(turnId: string, message: string): TranscriptEvent {
+  return {
+    type: 'settled',
+    turnId,
+    result: {
+      kind: SETTLED_KIND_ERROR,
+      text: null,
+      finishReason: null,
+      errorKind: BackendErrorKind.Transport,
+      message
     }
-    const next = new Map(previous);
-    next.delete(id);
-    return next;
-  });
-}
-
-function findActive(get: Getter): QueueItem | undefined {
-  return get(promptQueueAtom).find((item) => item.state === 'active');
+  };
 }

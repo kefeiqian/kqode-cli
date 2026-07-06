@@ -33,7 +33,7 @@ describe('createPackagedBackendClient', () => {
     });
 
     await expect(
-      client.submitStreaming({ text: 'hello' }, { onDelta: () => {} })
+      client.submit({ turnId: 'turn-1', text: 'hello' })
     ).rejects.toMatchObject({
       kind: BackendErrorKind.Launch
     });

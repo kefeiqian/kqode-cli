@@ -28,7 +28,10 @@ export function fakeClient(options: {
   lists?: Record<string, ModelListResult | Promise<ModelListResult>>;
 }): BackendClient {
   return {
-    submitStreaming: vi.fn(),
+    submit: vi.fn(),
+    onTranscriptEvent: () => () => undefined,
+    clearConversation: async () => undefined,
+    cancelTurn: async () => undefined,
     gitStatus: vi.fn(async () => null),
     listProviders: vi.fn(async () => ({ persistenceAvailable: true, providers: options.providers })),
     getActiveSelection: vi.fn(async () => options.active ?? { providerId: null, modelId: null }),

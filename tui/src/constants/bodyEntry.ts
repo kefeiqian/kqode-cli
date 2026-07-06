@@ -14,7 +14,9 @@ export const BodyEntryKind = {
   /** A successful command or backend result. */
   Success: 'success',
   /** A failed command or backend result. */
-  Error: 'error'
+  Error: 'error',
+  /** A muted non-error terminal result, such as a cancelled backend turn. */
+  Muted: 'muted'
 } as const;
 
 export type BodyEntryKind = (typeof BodyEntryKind)[keyof typeof BodyEntryKind];

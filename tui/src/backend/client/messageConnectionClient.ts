@@ -1,22 +1,19 @@
-import { randomUUID } from 'node:crypto';
 import { type MessageConnection, ResponseError } from 'vscode-jsonrpc';
 import {
   BackendClientError,
   BackendErrorKind,
-  SUBMIT_STATUS_NEEDS_CONFIGURATION
+  SETTLED_KIND_ERROR
 } from '@contracts/backend/index.ts';
-import type {
-  BackendClient,
-  StreamCallbacks,
-  StreamOutcome,
-  StreamSubmitParams
-} from '@contracts/backend/index.ts';
+import type { BackendClient, TranscriptEvent } from '@contracts/backend/index.ts';
 import {
+  conversationClearRequest,
   gitStatusRequest,
   messageSubmitRequest,
   tokenDeltaNotification,
-  turnEndNotification,
-  turnErrorNotification
+  turnActivatedNotification,
+  turnCancelRequest,
+  turnEnqueuedNotification,
+  turnSettledNotification
 } from '@backend/protocol/messageProtocol.ts';
 import {
   providerClearKeyRequest,
@@ -25,171 +22,142 @@ import {
   selectionSetRequest
 } from '@backend/protocol/providerProtocol.ts';
 import { listModels, setProviderKey } from '@backend/client/validationRequests.ts';
-import { withRequestTimeout } from '@backend/client/backendClientErrors.ts';
+import {
+  isFatalBackendError,
+  withRequestTimeout
+} from '@backend/client/backendClientErrors.ts';
 import { DEFAULT_REQUEST_TIMEOUT_MS, VALIDATION_REQUEST_TIMEOUT_MS } from '@constants/backend.ts';
-
-/** Per-turn hooks the notification handlers dispatch to, keyed by `turnId`. */
-type ActiveTurn = {
-  onDelta: (delta: string) => void;
-  complete: (finishReason: string | null) => void;
-  fail: (errorKind: string, message: string) => void;
-  die: (reason: string) => void;
-};
-
 /** Composition inputs for {@link createMessageConnectionClient}. */
 export type MessageConnectionClientOptions = {
-  /** Ceiling for the streaming ack response (not the whole stream). */
+  /** Ceiling for request/ack responses. */
   requestTimeoutMs?: number;
   /** Non-fatal ceiling for provider validation/model-list requests. */
   validationRequestTimeoutMs?: number;
 };
-
-/**
- * Builds a {@link BackendClient} over an already-established JSON-RPC connection.
- *
- * The caller owns the connection lifecycle. Streamed turns are correlated by a
- * client-generated `turnId`: the notification handlers are registered before the
- * submit request is sent, so a `tokenDelta`/`turnEnd` that races ahead of the ack
- * still matches. A turn resolves on `kqode/turnEnd` (completed) or
- * `kqode/turnError`, and rejects only if the ack times out or the connection
- * dies mid-stream — so it can be exercised over in-memory streams without a Rust
- * child process.
- */
+export type MessageConnectionBackendClient = BackendClient & {
+  failInFlight(reason: string): void;
+};
+/** Builds a {@link BackendClient} over an established JSON-RPC connection. */
 export function createMessageConnectionClient(
   connection: MessageConnection,
   options: MessageConnectionClientOptions = {}
-): BackendClient {
+): MessageConnectionBackendClient {
   const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
   const validationRequestTimeoutMs =
     options.validationRequestTimeoutMs ?? VALIDATION_REQUEST_TIMEOUT_MS;
-  const activeTurns = new Map<string, ActiveTurn>();
-
-  connection.onNotification(tokenDeltaNotification, ({ turnId, delta }) => {
-    activeTurns.get(turnId)?.onDelta(delta);
-  });
-  connection.onNotification(turnEndNotification, ({ turnId, finishReason }) => {
-    activeTurns.get(turnId)?.complete(finishReason);
-  });
-  connection.onNotification(turnErrorNotification, ({ turnId, errorKind, message }) => {
-    activeTurns.get(turnId)?.fail(errorKind, message);
-  });
-
-  const failAllTurns = (reason: string): void => {
-    for (const turn of [...activeTurns.values()]) {
-      turn.die(reason);
+  const handlers = new Set<(event: TranscriptEvent) => void>();
+  const inFlightTurnIds = new Set<string>();
+  const emit = (event: TranscriptEvent): void => {
+    if (event.type === 'settled') {
+      inFlightTurnIds.delete(event.turnId);
+    }
+    for (const handler of handlers) {
+      handler(event);
     }
   };
-  connection.onClose(() => failAllTurns('backend connection closed before the turn completed'));
-  connection.onError(() => failAllTurns('backend connection errored before the turn completed'));
-
+  connection.onNotification(turnEnqueuedNotification, (event) =>
+    emit({ type: 'enqueued', ...event })
+  );
+  connection.onNotification(turnActivatedNotification, (event) =>
+    emit({ type: 'activated', ...event })
+  );
+  connection.onNotification(tokenDeltaNotification, (event) =>
+    emit({ type: 'tokenDelta', ...event })
+  );
+  connection.onNotification(turnSettledNotification, (event) =>
+    emit({ type: 'settled', ...event })
+  );
+  const failInFlight = (reason: string): void => {
+    for (const turnId of [...inFlightTurnIds]) {
+      emit(transportFailureEvent(turnId, reason));
+    }
+  };
+  connection.onClose(() => failInFlight('backend connection closed before the turn completed'));
+  connection.onError((error) => {
+    const clientError = toBackendClientError(error);
+    if (isFatalBackendError(clientError)) {
+      failInFlight(clientError.message);
+    }
+  });
   return {
-    submitStreaming(params: StreamSubmitParams, callbacks: StreamCallbacks): Promise<StreamOutcome> {
-      const turnId = randomUUID();
-      return new Promise<StreamOutcome>((resolve, reject) => {
-        let settled = false;
-        let text = '';
-        const finish = (settle: () => void): void => {
-          if (settled) {
-            return;
-          }
-          settled = true;
-          activeTurns.delete(turnId);
-          settle();
-        };
-
-        activeTurns.set(turnId, {
-          onDelta: (delta) => {
-            text += delta;
-            callbacks.onDelta(delta);
-          },
-          complete: (finishReason) =>
-            finish(() => resolve({ kind: 'completed', text, finishReason })),
-          fail: (errorKind, message) => finish(() => resolve({ kind: 'error', errorKind, message })),
-          die: (reason) =>
-            finish(() => reject(new BackendClientError(BackendErrorKind.Transport, reason)))
-        });
-
-        withRequestTimeout(
-          connection.sendRequest(messageSubmitRequest, { text: params.text, turnId }),
+    async submit({ turnId, text }): Promise<void> {
+      inFlightTurnIds.add(turnId);
+      try {
+        await withRequestTimeout(
+          connection.sendRequest(messageSubmitRequest, { text, turnId }),
           requestTimeoutMs
-        ).then(
-          (ack) => {
-            if (ack.status === SUBMIT_STATUS_NEEDS_CONFIGURATION) {
-              finish(() => resolve({ kind: 'needsConfiguration' }));
-            }
-            // Otherwise the turn is streaming: wait for turnEnd/turnError.
-          },
-          (error: unknown) => finish(() => reject(toBackendClientError(error)))
         );
-      });
+      } catch (error) {
+        inFlightTurnIds.delete(turnId);
+        throw toBackendClientError(error);
+      }
+    },
+    onTranscriptEvent(handler) {
+      handlers.add(handler);
+      return () => {
+        handlers.delete(handler);
+      };
+    },
+    async clearConversation(): Promise<void> {
+      await okRequest(connection.sendRequest(conversationClearRequest), requestTimeoutMs);
+    },
+    async cancelTurn(turnId: string): Promise<void> {
+      await okRequest(connection.sendRequest(turnCancelRequest, { turnId }), requestTimeoutMs);
     },
     async gitStatus(): Promise<string | null> {
-      try {
-        const result = await withRequestTimeout(
-          connection.sendRequest(gitStatusRequest),
-          requestTimeoutMs
-        );
-        return result.label;
-      } catch (error) {
-        throw toBackendClientError(error);
-      }
+      const result = await request(connection.sendRequest(gitStatusRequest), requestTimeoutMs);
+      return result.label;
     },
     async listProviders() {
-      try {
-        const result = await withRequestTimeout(
-          connection.sendRequest(providerListRequest),
-          requestTimeoutMs
-        );
-        return result;
-      } catch (error) {
-        throw toBackendClientError(error);
-      }
+      return request(connection.sendRequest(providerListRequest), requestTimeoutMs);
     },
     async getActiveSelection() {
-      try {
-        return await withRequestTimeout(
-          connection.sendRequest(selectionGetRequest),
-          requestTimeoutMs
-        );
-      } catch (error) {
-        throw toBackendClientError(error);
-      }
+      return request(connection.sendRequest(selectionGetRequest), requestTimeoutMs);
     },
     async setActiveSelection(providerId: string, modelId: string) {
-      try {
-        const result = await withRequestTimeout(
-          connection.sendRequest(selectionSetRequest, { providerId, modelId }),
-          requestTimeoutMs
-        );
-        if (!result.ok) {
-          throw new BackendClientError(BackendErrorKind.Protocol, 'backend rejected selection set');
-        }
-      } catch (error) {
-        throw toBackendClientError(error);
-      }
+      await okRequest(
+        connection.sendRequest(selectionSetRequest, { providerId, modelId }),
+        requestTimeoutMs
+      );
     },
     async clearProviderKey(providerId: string) {
-      try {
-        const result = await withRequestTimeout(
-          connection.sendRequest(providerClearKeyRequest, { providerId }),
-          requestTimeoutMs
-        );
-        if (!result.ok) {
-          throw new BackendClientError(BackendErrorKind.Protocol, 'backend rejected provider clearKey');
-        }
-      } catch (error) {
-        throw toBackendClientError(error);
-      }
+      await okRequest(connection.sendRequest(providerClearKeyRequest, { providerId }), requestTimeoutMs);
     },
     async setProviderKey(params) {
       return setProviderKey(connection, params, validationRequestTimeoutMs);
     },
     async listModels(providerId) {
       return listModels(connection, providerId, validationRequestTimeoutMs);
+    },
+    failInFlight
+  };
+}
+async function request<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  try {
+    return await withRequestTimeout(promise, timeoutMs);
+  } catch (error) {
+    throw toBackendClientError(error);
+  }
+}
+async function okRequest(promise: Promise<{ ok: boolean }>, timeoutMs: number): Promise<void> {
+  const result = await request(promise, timeoutMs);
+  if (!result.ok) {
+    throw new BackendClientError(BackendErrorKind.Protocol, 'backend rejected request');
+  }
+}
+function transportFailureEvent(turnId: string, message: string): TranscriptEvent {
+  return {
+    type: 'settled',
+    turnId,
+    result: {
+      kind: SETTLED_KIND_ERROR,
+      text: null,
+      finishReason: null,
+      errorKind: BackendErrorKind.Transport,
+      message
     }
   };
 }
-
 function toBackendClientError(error: unknown): BackendClientError {
   if (error instanceof BackendClientError) {
     return error;
@@ -207,7 +175,6 @@ function toBackendClientError(error: unknown): BackendClientError {
     { cause: error }
   );
 }
-
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }

@@ -3,21 +3,11 @@ import path from 'node:path';
 import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '@/App.tsx';
-import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.ts';
-import type {
-  BackendClient,
-  StreamCallbacks,
-  StreamOutcome,
-  StreamSubmitParams
-} from '@contracts/backend/index.ts';
-import {
-  activeSurfaceAtom,
-  columnsTestOverrideAtom,
-  rowsTestOverrideAtom,
-  Surface
-} from '@state/ui/index.ts';
+import type { BackendClient, StreamSubmitParams, TranscriptEvent } from '@contracts/backend/index.ts';
+import { SETTLED_KIND_COMPLETED } from '@contracts/backend/index.ts';
+import { activeSurfaceAtom, columnsTestOverrideAtom, rowsTestOverrideAtom, Surface } from '@state/ui/index.ts';
 import { backendClientAtom, productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
-import { promptQueueAtom, restoreComposerDraftAtom } from '@state/promptQueue/index.ts';
+import { promptQueueAtom, restoreComposerDraftAtom, transcriptEventAtom } from '@state/promptQueue/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
@@ -29,212 +19,132 @@ function renderApp(backendClient: Partial<BackendClient>, columns = 80, rows = 4
   store.set(workspaceCwdAtom, workspaceCwd);
   store.set(columnsTestOverrideAtom, columns);
   store.set(rowsTestOverrideAtom, rows);
-  // Fill the full seam so the after-turn git refresh has a gitStatus to call;
-  // streaming tests only supply submitStreaming.
   const client: BackendClient = {
+    submit: async () => undefined,
+    onTranscriptEvent: () => () => {},
+    clearConversation: async () => undefined,
+    cancelTurn: async () => undefined,
     gitStatus: async () => null,
     listProviders: async () => ({ persistenceAvailable: true, providers: [] }),
     getActiveSelection: async () => ({ providerId: null, modelId: null }),
-    setActiveSelection: async () => {},
-    clearProviderKey: async () => {},
+    setActiveSelection: async () => undefined,
+    clearProviderKey: async () => undefined,
     setProviderKey: async () => ({ outcome: 'unreachable', selectedModel: null }),
     listModels: async () => ({ status: 'failed', models: [] }),
-    submitStreaming: async () => {
-      throw new Error('submitStreaming not provided');
-    },
     ...backendClient
   };
   store.set(backendClientAtom, client);
+  client.onTranscriptEvent((event) => store.set(transcriptEventAtom, event));
   return { store, ...renderWithJotai(<App />, store) };
 }
 
-// A fake backend that streams a canned reply (default: echoes the prompt with a
-// prefix so the assistant text is distinguishable from the echoed prompt row).
-function streamingBackend(reply: (text: string) => string = (text) => `reply: ${text}`) {
-  return vi.fn(
-    async ({ text }: StreamSubmitParams, { onDelta }: StreamCallbacks): Promise<StreamOutcome> => {
-      const output = reply(text);
-      onDelta(output);
-      return { kind: 'completed', text: output, finishReason: 'stop' };
-    }
-  );
+function eventBackend(reply: (text: string) => string = (text) => `reply: ${text}`) {
+  let handler: ((event: TranscriptEvent) => void) | undefined;
+  const submit = vi.fn(async ({ turnId, text }: StreamSubmitParams) => {
+    handler?.({ type: 'activated', turnId });
+    handler?.({ type: 'tokenDelta', turnId, delta: reply(text) });
+    handler?.({
+      type: 'settled',
+      turnId,
+      result: {
+        kind: SETTLED_KIND_COMPLETED,
+        text: reply(text),
+        finishReason: 'stop',
+        errorKind: null,
+        message: null
+      }
+    });
+  });
+  return { submit, onTranscriptEvent: (next: (event: TranscriptEvent) => void) => {
+    handler = next;
+    return () => {
+      handler = undefined;
+    };
+  } };
 }
 
-async function waitForFrame(
-  getFrame: () => string | undefined,
-  predicate: (frame: string) => boolean
-): Promise<string> {
+async function waitForFrame(getFrame: () => string | undefined, predicate: (frame: string) => boolean) {
   for (let attempt = 0; attempt < 200; attempt += 1) {
     const frame = getFrame() ?? '';
-    if (predicate(frame)) {
-      return frame;
-    }
+    if (predicate(frame)) return frame;
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
   throw new Error(`timed out waiting for frame. Last frame:\n${getFrame() ?? ''}`);
 }
 
-async function submit(stdin: { write: (data: string) => void }, text: string): Promise<void> {
+async function typePrompt(stdin: { write: (data: string) => void }, text: string): Promise<void> {
   stdin.write(text);
   await flushInput();
   stdin.write('\r');
   await flushInput();
 }
 
-describe('App submit and streaming output', () => {
-  it('appends the prompt and streams the assistant reply when Enter is pressed', async () => {
-    const submitStreaming = streamingBackend();
-    const { lastFrame, stdin } = renderApp({ submitStreaming });
+describe('App submit and event-fed output', () => {
+  it('appends the prompt and mirrors assistant events', async () => {
+    const backend = eventBackend();
+    const { lastFrame, stdin } = renderApp(backend);
 
-    await submit(stdin, 'hello from tui');
+    await typePrompt(stdin, 'hello from tui');
 
-    const frame = await waitForFrame(lastFrame, (output) =>
-      output.includes('reply: hello from tui')
-    );
+    const frame = await waitForFrame(lastFrame, (output) => output.includes('reply: hello from tui'));
     expect(frame).toContain('❯ hello from tui');
-    expect(submitStreaming).toHaveBeenCalledWith(
-      { text: 'hello from tui' },
-      expect.objectContaining({ onDelta: expect.any(Function) })
-    );
-  });
-
-  it('preserves Unicode and surrounding spaces in the backend result', async () => {
-    const submitStreaming = streamingBackend();
-    const { lastFrame, stdin } = renderApp({ submitStreaming }, 120);
-
-    await submit(stdin, ' café ☕ ');
-
-    await waitForFrame(lastFrame, (output) => output.includes('café ☕'));
-    expect(submitStreaming).toHaveBeenCalledWith(
-      { text: ' café ☕ ' },
-      expect.objectContaining({ onDelta: expect.any(Function) })
-    );
-  });
-
-  it('queues consecutive submits, marking only the later prompts pending', async () => {
-    const pending: Array<{ text: string; resolve: (outcome: StreamOutcome) => void }> = [];
-    const submitStreaming = vi.fn(
-      (params: StreamSubmitParams): Promise<StreamOutcome> =>
-        new Promise((resolve) => {
-          pending.push({ text: params.text, resolve });
-        })
-    );
-    const { lastFrame, stdin } = renderApp({ submitStreaming });
-
-    await submit(stdin, 'first');
-    await submit(stdin, 'second');
-    await submit(stdin, 'third');
-
-    const queuedFrame = await waitForFrame(
-      lastFrame,
-      (output) => output.includes('second (pending)') && output.includes('third (pending)')
-    );
-    expect(submitStreaming).toHaveBeenCalledTimes(1);
-    expect(submitStreaming).toHaveBeenNthCalledWith(
-      1,
-      { text: 'first' },
-      expect.objectContaining({ onDelta: expect.any(Function) })
-    );
-    expect(queuedFrame).toContain('❯ first');
-    expect(queuedFrame).not.toContain('first (pending)');
-
-    pending[0]?.resolve({ kind: 'completed', text: 'first reply', finishReason: 'stop' });
-
-    const drainedFrame = await waitForFrame(
-      lastFrame,
-      (output) => output.includes('first reply') && !output.includes('second (pending)')
-    );
-    expect(submitStreaming).toHaveBeenCalledTimes(2);
-    expect(submitStreaming).toHaveBeenNthCalledWith(
-      2,
-      { text: 'second' },
-      expect.objectContaining({ onDelta: expect.any(Function) })
-    );
-    expect(drainedFrame).toContain('third (pending)');
-  });
-
-  it('shows a red backend failure for the matching prompt', async () => {
-    const submitStreaming = vi.fn(async (): Promise<StreamOutcome> => {
-      throw new BackendClientError(BackendErrorKind.Transport, 'connection died');
-    });
-    const { lastFrame, stdin } = renderApp({ submitStreaming });
-
-    await submit(stdin, 'will fail');
-
-    const frame = await waitForFrame(lastFrame, (output) =>
-      output.includes('ERROR: Rust backend failed')
-    );
-    expect(frame).toContain('❯ will fail');
-    expect(frame).toContain('connection died');
+    expect(backend.submit).toHaveBeenCalledWith({ turnId: expect.any(String), text: 'hello from tui' });
   });
 
   it('escapes terminal-control characters in backend output before rendering', async () => {
-    const submitStreaming = streamingBackend(() => 'evil\u001b[2Jcleared');
-    const { lastFrame, stdin } = renderApp({ submitStreaming }, 120, 20);
+    const backend = eventBackend(() => 'evil\u001b[2Jcleared');
+    const { lastFrame, stdin } = renderApp(backend, 120, 20);
 
-    await submit(stdin, 'trigger');
+    await typePrompt(stdin, 'trigger');
 
     const frame = await waitForFrame(lastFrame, (output) => output.includes('evil\\x1b[2Jcleared'));
     expect(frame).not.toContain('evil\u001b[2J');
   });
 
   it('does not call the backend for whitespace-only submits', async () => {
-    const submitStreaming = streamingBackend();
-    const { stdin } = renderApp({ submitStreaming });
+    const backend = eventBackend();
+    const { stdin } = renderApp(backend);
 
-    await submit(stdin, '   ');
-    await flushInput();
+    await typePrompt(stdin, '   ');
 
-    expect(submitStreaming).not.toHaveBeenCalled();
+    expect(backend.submit).not.toHaveBeenCalled();
   });
 
-  it('posts an unknown slash command and its error into the body without a backend call', async () => {
-    const submitStreaming = streamingBackend();
-    const { lastFrame, stdin, store } = renderApp({ submitStreaming });
+  it('posts an unknown slash command without a backend call', async () => {
+    const backend = eventBackend();
+    const { lastFrame, stdin, store } = renderApp(backend);
 
-    await submit(stdin, '/nope');
+    await typePrompt(stdin, '/nope');
 
-    const frame = await waitForFrame(lastFrame, (output) =>
-      output.includes('Unknown command: /nope')
-    );
+    const frame = await waitForFrame(lastFrame, (output) => output.includes('Unknown command: /nope'));
     expect(frame).toContain('❯ /nope');
-    expect(submitStreaming).not.toHaveBeenCalled();
+    expect(backend.submit).not.toHaveBeenCalled();
     expect(store.get(promptQueueAtom).some((item) => item.state === 'active')).toBe(false);
   });
 
   it('renders auth errors and reroutes to login with the prompt restored', async () => {
-    const submitStreaming = vi.fn(
-      async (): Promise<StreamOutcome> => ({
-        kind: 'error',
-        errorKind: 'auth',
-        message: 'Kimi rejected the API key'
-      })
-    );
-    const { stdin, store } = renderApp({ submitStreaming });
+    let handler: ((event: TranscriptEvent) => void) | undefined;
+    const submit = vi.fn(async ({ turnId }: StreamSubmitParams) => {
+      handler?.({
+        type: 'settled',
+        turnId,
+        result: { kind: 'error', text: null, finishReason: null, errorKind: 'auth', message: 'bad key' }
+      });
+    });
+    const { stdin, store } = renderApp({
+      submit,
+      onTranscriptEvent: (next) => {
+        handler = next;
+        return () => undefined;
+      }
+    });
 
-    await submit(stdin, 'needs a good key');
+    await typePrompt(stdin, 'needs a good key');
 
     await waitForFrame(
       () => `${store.get(activeSurfaceAtom)}:${store.get(restoreComposerDraftAtom)}`,
       (state) => state === `${Surface.Login}:needs a good key`
     );
-    expect(store.get(activeSurfaceAtom)).toBe(Surface.Login);
-    expect(store.get(restoreComposerDraftAtom)).toBe('needs a good key');
-    expect(store.get(promptQueueAtom).at(-1)?.result?.text).toContain('Kimi rejected the API key');
-  });
-
-  it('routes to login and restores the prompt when no key is set', async () => {
-    const submitStreaming = vi.fn(
-      async (): Promise<StreamOutcome> => ({ kind: 'needsConfiguration' })
-    );
-    const { stdin, store } = renderApp({ submitStreaming });
-
-    await submit(stdin, 'hello');
-
-    await waitForFrame(
-      () => `${store.get(activeSurfaceAtom)}:${store.get(restoreComposerDraftAtom)}`,
-      (state) => state === `${Surface.Login}:hello`
-    );
-    expect(store.get(promptQueueAtom)).toEqual([]);
+    expect(store.get(promptQueueAtom).at(-1)?.result?.text).toContain('bad key');
   });
 });

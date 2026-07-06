@@ -18,13 +18,16 @@ import {
   MODEL_LIST_STATUS_LOADED,
   SET_KEY_OUTCOME_CONNECTED,
   SET_KEY_OUTCOME_UNREACHABLE,
+  SETTLED_KIND_CANCELLED,
+  SETTLED_KIND_COMPLETED,
   SUBMIT_STATUS_STREAMING
 } from '@contracts/backend/index.ts';
 import {
   messageSubmitRequest,
   backendReadyNotification,
   tokenDeltaNotification,
-  turnEndNotification
+  turnCancelRequest,
+  turnSettledNotification
 } from '@backend/protocol/messageProtocol.ts';
 import {
   providerModelsRequest,
@@ -36,7 +39,7 @@ import {
   createBackendClient
 } from '@backend/client/backendClient.ts';
 import { createSourceBackendClient } from '@backend/client/sourceBackendClient.ts';
-import type { ModelListResult, SetKeyResult } from '@contracts/backend/index.ts';
+import type { ModelListResult, SetKeyResult, TranscriptEvent } from '@contracts/backend/index.ts';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..');
 const INTEGRATION_TIMEOUT_MS = 180_000;
@@ -45,19 +48,22 @@ type FakeBackend = {
   launched: LaunchedBackend;
   disposed: () => boolean;
   emitExit: () => void;
+  closeServer: () => void;
 };
 
 let openServers: MessageConnection[] = [];
 
-// A fake backend that streams the submitted text back as one delta then ends
-// the turn, so `submitStreaming` resolves `completed` with that exact text.
+// A fake backend that streams the submitted text back as one delta then settles.
 function ack(server: MessageConnection): void {
   server.onRequest(messageSubmitRequest, ({ text, turnId }) => {
     queueMicrotask(async () => {
       if (text.length > 0) {
         await server.sendNotification(tokenDeltaNotification, { turnId, delta: text });
       }
-      await server.sendNotification(turnEndNotification, { turnId, finishReason: 'stop' });
+      await server.sendNotification(turnSettledNotification, {
+        turnId,
+        result: { kind: SETTLED_KIND_COMPLETED, text, finishReason: 'stop', errorKind: null, message: null }
+      });
     });
     return { turnId, status: SUBMIT_STATUS_STREAMING };
   });
@@ -102,6 +108,11 @@ function makeFakeBackend(
       for (const listener of exitListeners) {
         listener({ code: 1, signal: null });
       }
+    },
+    closeServer: () => {
+      server.dispose();
+      backendStdout.destroy();
+      backendStdin.destroy();
     }
   };
 }
@@ -124,8 +135,7 @@ describe('createBackendClient (fake backend)', () => {
     expect(client.getState()).toBe(BackendLifecycleState.Ready);
     expect(launch).toHaveBeenCalledTimes(1);
 
-    const result = await client.submitStreaming({ text: 'hello' }, { onDelta: () => {} });
-    expect(result).toEqual({ kind: 'completed', text: 'hello', finishReason: 'stop' });
+    await client.submit({ turnId: 'turn-1', text: 'hello' });
     expect(launch).toHaveBeenCalledTimes(1);
     client.dispose();
   });
@@ -135,10 +145,98 @@ describe('createBackendClient (fake backend)', () => {
     const client = createBackendClient({ launch: async () => fake.launched });
 
     expect(client.getState()).toBe(BackendLifecycleState.Idle);
-    const result = await client.submitStreaming({ text: 'hello' }, { onDelta: () => {} });
+    await client.submit({ turnId: 'turn-1', text: 'hello' });
 
-    expect(result).toEqual({ kind: 'completed', text: 'hello', finishReason: 'stop' });
     expect(client.getState()).toBe(BackendLifecycleState.Ready);
+    client.dispose();
+  });
+
+  it('fans transcript events from the connection in order', async () => {
+    const fake = makeFakeBackend(ack);
+    const client = createBackendClient({ launch: async () => fake.launched });
+    const events: string[] = [];
+    client.onTranscriptEvent((event) => events.push(event.type));
+
+    await client.submit({ turnId: 'turn-1', text: 'hello' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(events).toEqual(['tokenDelta', 'settled']);
+    client.dispose();
+  });
+
+  it('reattaches transcript events and fires onReady after respawn', async () => {
+    const hung = makeFakeBackend((server) =>
+      server.onRequest(messageSubmitRequest, () => new Promise<MessageSubmitResult>(() => undefined))
+    );
+    const healthy = makeFakeBackend(ack);
+    const backends = [hung, healthy];
+    const launch = vi.fn(async () => backends.shift()?.launched as LaunchedBackend);
+    const client = createBackendClient({ launch, requestTimeoutMs: 20 });
+    const ready: string[] = [];
+    const events: TranscriptEvent[] = [];
+    client.onReady((sessionId) => ready.push(sessionId));
+    client.onTranscriptEvent((event) => events.push(event));
+
+    await expect(client.submit({ turnId: 'turn-1', text: 'hung' })).rejects.toMatchObject({
+      kind: BackendErrorKind.Timeout
+    });
+    await client.submit({ turnId: 'turn-2', text: 'ok' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(ready).toEqual(['test-session', 'test-session']);
+    expect(events.some((event) => event.turnId === 'turn-2' && event.type === 'settled')).toBe(true);
+    client.dispose();
+  });
+
+  it('sends cancelTurn and delivers the fake cancelled settlement', async () => {
+    const fake = makeFakeBackend((server) => {
+      server.onRequest(turnCancelRequest, ({ turnId }) => {
+        queueMicrotask(() => void server.sendNotification(turnSettledNotification, {
+          turnId,
+          result: { kind: SETTLED_KIND_CANCELLED, text: null, finishReason: null, errorKind: null, message: null }
+        }));
+        return { ok: true };
+      });
+    });
+    const client = createBackendClient({ launch: async () => fake.launched });
+    const settled = new Promise((resolve) =>
+      client.onTranscriptEvent((event) => {
+        if (event.type === 'settled') {
+          resolve(event);
+        }
+      })
+    );
+
+    await client.cancelTurn('turn-1');
+
+    await expect(settled).resolves.toMatchObject({
+      type: 'settled',
+      turnId: 'turn-1',
+      result: { kind: SETTLED_KIND_CANCELLED }
+    });
+    client.dispose();
+  });
+
+  it('synthesizes a terminal event for in-flight turns on fatal close', async () => {
+    const fake = makeFakeBackend((server) => {
+      server.onRequest(messageSubmitRequest, ({ turnId }) => ({ turnId, status: SUBMIT_STATUS_STREAMING }));
+    });
+    const client = createBackendClient({ launch: async () => fake.launched });
+    const events: TranscriptEvent[] = [];
+    client.onTranscriptEvent((event) => events.push(event));
+
+    await client.submit({ turnId: 'turn-1', text: 'hang' });
+    fake.emitExit();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const transportSettled = events.filter(
+      (event) =>
+        event.type === 'settled' &&
+        event.turnId === 'turn-1' &&
+        event.result.kind === 'error' &&
+        event.result.errorKind === 'transport'
+    );
+    expect(transportSettled).toHaveLength(1);
     client.dispose();
   });
 
@@ -167,7 +265,7 @@ describe('createBackendClient (fake backend)', () => {
     const client = createBackendClient({ launch });
 
     await expect(
-      client.submitStreaming({ text: 'x' }, { onDelta: () => {} })
+      client.submit({ turnId: 'turn-1', text: 'x' })
     ).rejects.toMatchObject({
       kind: BackendErrorKind.Protocol
     });
@@ -175,7 +273,7 @@ describe('createBackendClient (fake backend)', () => {
     expect(fake.disposed()).toBe(false);
 
     await expect(
-      client.submitStreaming({ text: 'y' }, { onDelta: () => {} })
+      client.submit({ turnId: 'turn-2', text: 'y' })
     ).rejects.toMatchObject({
       kind: BackendErrorKind.Protocol
     });
@@ -193,15 +291,14 @@ describe('createBackendClient (fake backend)', () => {
     const client = createBackendClient({ launch, requestTimeoutMs: 100 });
 
     await expect(
-      client.submitStreaming({ text: 'first' }, { onDelta: () => {} })
+      client.submit({ turnId: 'turn-1', text: 'first' })
     ).rejects.toMatchObject({
       kind: BackendErrorKind.Timeout
     });
     expect(client.getState()).toBe(BackendLifecycleState.Dead);
     expect(hung.disposed()).toBe(true);
 
-    const result = await client.submitStreaming({ text: 'second' }, { onDelta: () => {} });
-    expect(result).toEqual({ kind: 'completed', text: 'second', finishReason: 'stop' });
+    await client.submit({ turnId: 'turn-2', text: 'second' });
     expect(client.getState()).toBe(BackendLifecycleState.Ready);
     expect(launch).toHaveBeenCalledTimes(2);
     client.dispose();
@@ -211,7 +308,7 @@ describe('createBackendClient (fake backend)', () => {
     const fake = makeFakeBackend(ack);
     const client = createBackendClient({ launch: async () => fake.launched });
 
-    await client.submitStreaming({ text: 'alive' }, { onDelta: () => {} });
+    await client.submit({ turnId: 'turn-1', text: 'alive' });
     expect(client.getState()).toBe(BackendLifecycleState.Ready);
 
     fake.emitExit();
@@ -319,7 +416,7 @@ describe('createBackendClient (fake backend)', () => {
     client.dispose();
 
     await expect(
-      client.submitStreaming({ text: 'after dispose' }, { onDelta: () => {} })
+      client.submit({ turnId: 'turn-1', text: 'after dispose' })
     ).rejects.toMatchObject({
       kind: BackendErrorKind.Launch
     });
@@ -339,7 +436,7 @@ describe('createBackendClient (fake backend)', () => {
     );
     const client = createBackendClient({ launch });
 
-    const submit = client.submitStreaming({ text: 'race' }, { onDelta: () => {} });
+    const submit = client.submit({ turnId: 'turn-1', text: 'race' });
     client.dispose();
     resolveLaunch?.(fake.launched);
 
@@ -359,8 +456,18 @@ describe('createSourceBackendClient (integration)', () => {
       const workspaceCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-src-client-'));
       const client = createSourceBackendClient({ repoRoot, workspaceCwd });
       try {
-        const outcome = await client.submitStreaming({ text: 'hello' }, { onDelta: () => {} });
-        expect(outcome).toEqual({ kind: 'needsConfiguration' });
+        const settled = new Promise((resolve) =>
+          client.onTranscriptEvent((event) => {
+            if (event.type === 'settled') {
+              resolve(event);
+            }
+          })
+        );
+        await client.submit({ turnId: 'turn-1', text: 'hello' });
+        await expect(settled).resolves.toMatchObject({
+          type: 'settled',
+          result: { kind: 'needsConfiguration' }
+        });
       } finally {
         client.dispose();
         // Best-effort: on Windows the just-killed backend may still hold the cwd

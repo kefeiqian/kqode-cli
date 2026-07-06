@@ -4,6 +4,7 @@ import type { BackendClient } from '@contracts/backend/index.ts';
 import { DEFAULT_REQUEST_TIMEOUT_MS, DEFAULT_STARTUP_TIMEOUT_MS } from '@constants/backend.ts';
 import type { LaunchedBackend } from '@backend/process/backendProcess.ts';
 import { createMessageConnectionClient } from '@backend/client/messageConnectionClient.ts';
+import type { MessageConnectionBackendClient } from '@backend/client/messageConnectionClient.ts';
 import { openReadyConnection } from '@backend/client/backendReadiness.ts';
 import {
   isFatalBackendError,
@@ -20,59 +21,54 @@ import type {
   ProviderListResult,
   SetKeyParams,
   SetKeyResult,
-  StreamCallbacks,
-  StreamOutcome,
-  StreamSubmitParams
+  StreamSubmitParams,
+  TranscriptEvent
 } from '@contracts/backend/index.ts';
-
 export { BackendLifecycleState };
 export type { BackendClientHandle, BackendClientOptions };
-
 type BackendSession = {
   backend: LaunchedBackend;
   connection: MessageConnection;
-  client: BackendClient;
+  client: MessageConnectionBackendClient;
 };
-
 /** Creates a lifecycle-managed JSON-RPC client over a launched child backend. */
 export function createBackendClient(options: BackendClientOptions): BackendClientHandle {
   const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
   const validationRequestTimeoutMs = options.validationRequestTimeoutMs;
   const startupTimeoutMs = options.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS;
   const { launch } = options;
-
   let state: BackendLifecycleState = BackendLifecycleState.Idle;
   let session: BackendSession | null = null;
   let starting: Promise<BackendSession> | null = null;
   let disposed = false;
   const readyListeners: Array<(sessionId: string) => void> = [];
-
+  const transcriptListeners = new Set<(event: TranscriptEvent) => void>();
+  let detachTranscriptEvents: (() => void) | undefined;
   const disposedError = (): BackendClientError =>
     new BackendClientError(BackendErrorKind.Launch, 'backend client disposed');
-
   const abortedError = (): BackendClientError =>
     new BackendClientError(
       BackendErrorKind.Launch,
       'backend launch was aborted before it became ready'
     );
-
   const teardown = (nextState: BackendLifecycleState): void => {
     const current = session;
     session = null;
     state = nextState;
     if (current !== null) {
+      current.client.failInFlight('backend connection closed before the turn completed');
       current.connection.dispose();
+      detachTranscriptEvents?.();
+      detachTranscriptEvents = undefined;
       current.backend.dispose();
     }
   };
-
   const markDead = (): void => {
     if (state === BackendLifecycleState.Closing || state === BackendLifecycleState.Dead) {
       return;
     }
     teardown(BackendLifecycleState.Dead);
   };
-
   const start = async (): Promise<BackendSession> => {
     state = BackendLifecycleState.Starting;
     let backend: LaunchedBackend;
@@ -82,18 +78,10 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
       state = BackendLifecycleState.Dead;
       throw toLaunchError(error);
     }
-
-    // The client may have been disposed (or marked dead) while the launch was in
-    // flight. Only `dispose()` can change state during this window because no
-    // connection/exit listeners are wired yet; reclaim the process instead of
-    // resurrecting a backend nobody will dispose.
     if (state !== BackendLifecycleState.Starting) {
       backend.dispose();
       throw abortedError();
     }
-
-    // Gate "ready" on the backend actually speaking JSON-RPC (readiness
-    // notification) rather than trusting the OS spawn event.
     let connection: MessageConnection;
     let sessionId: string;
     try {
@@ -108,19 +96,24 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
       }
       throw error;
     }
-
-    // Disposal can land while we await readiness; reclaim the freshly launched
-    // backend instead of publishing a session over a client that is tearing down.
     if (state !== BackendLifecycleState.Starting) {
       connection.dispose();
       backend.dispose();
       throw abortedError();
     }
-
+    const innerClient = createMessageConnectionClient(connection, {
+      requestTimeoutMs,
+      validationRequestTimeoutMs
+    });
+    detachTranscriptEvents = innerClient.onTranscriptEvent((event) => {
+      for (const listener of transcriptListeners) {
+        listener(event);
+      }
+    });
     const opened: BackendSession = {
       backend,
       connection,
-      client: createMessageConnectionClient(connection, { requestTimeoutMs, validationRequestTimeoutMs })
+      client: innerClient
     };
     session = opened;
     state = BackendLifecycleState.Ready;
@@ -129,7 +122,6 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     }
     return opened;
   };
-
   const ensureSession = (): Promise<BackendSession> => {
     if (disposed) {
       return Promise.reject(disposedError());
@@ -144,7 +136,6 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     }
     return starting;
   };
-
   const withClient = async <T>(operation: (client: BackendClient) => Promise<T>): Promise<T> => {
     if (disposed) {
       throw disposedError();
@@ -159,44 +150,34 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
       throw error;
     }
   };
-
   return {
     getState: () => state,
-    onReady(listener: (sessionId: string) => void): void {
-      readyListeners.push(listener);
+    onReady: (listener: (sessionId: string) => void): void => void readyListeners.push(listener),
+    onTranscriptEvent(listener: (event: TranscriptEvent) => void): () => void {
+      transcriptListeners.add(listener);
+      return () => {
+        transcriptListeners.delete(listener);
+      };
     },
-    async ensureStarted(): Promise<void> {
-      await ensureSession();
-    },
-    async submitStreaming(
-      params: StreamSubmitParams,
-      callbacks: StreamCallbacks
-    ): Promise<StreamOutcome> {
-      return withClient((client) => client.submitStreaming(params, callbacks));
-    },
-    async gitStatus(): Promise<string | null> {
-      return withClient((client) => client.gitStatus());
-    },
-    async listProviders(): Promise<ProviderListResult> {
-      return withClient((client) => client.listProviders());
-    },
-    async getActiveSelection(): Promise<ActiveSelectionResult> {
-      return withClient((client) => client.getActiveSelection());
-    },
-    async setActiveSelection(providerId: string, modelId: string): Promise<void> {
-      await withClient((client) => client.setActiveSelection(providerId, modelId));
-    },
-    async clearProviderKey(providerId: string): Promise<void> {
-      await withClient((client) => client.clearProviderKey(providerId));
-    },
+    ensureStarted: async (): Promise<void> => void (await ensureSession()),
+    submit: async (params: StreamSubmitParams): Promise<void> =>
+      void (await withClient((client) => client.submit(params))),
+    clearConversation: async (): Promise<void> =>
+      void (await withClient((client) => client.clearConversation())),
+    cancelTurn: async (turnId: string): Promise<void> =>
+      void (await withClient((client) => client.cancelTurn(turnId))),
+    gitStatus: (): Promise<string | null> => withClient((client) => client.gitStatus()),
+    listProviders: (): Promise<ProviderListResult> => withClient((client) => client.listProviders()),
+    getActiveSelection: (): Promise<ActiveSelectionResult> =>
+      withClient((client) => client.getActiveSelection()),
+    setActiveSelection: async (providerId: string, modelId: string): Promise<void> =>
+      void (await withClient((client) => client.setActiveSelection(providerId, modelId))),
+    clearProviderKey: async (providerId: string): Promise<void> =>
+      void (await withClient((client) => client.clearProviderKey(providerId))),
     async setProviderKey(params: SetKeyParams): Promise<SetKeyResult> {
-      // Validation/model-list timeouts are converted inside the connection
-      // client to domain results, so withClient must not markDead() here.
       return withClient((client) => client.setProviderKey(params));
     },
     async listModels(providerId: string): Promise<ModelListResult> {
-      // See setProviderKey: recoverable validation timeouts must not tear down
-      // the backend or abort a concurrent streaming turn.
       return withClient((client) => client.listModels(providerId));
     },
     dispose() {

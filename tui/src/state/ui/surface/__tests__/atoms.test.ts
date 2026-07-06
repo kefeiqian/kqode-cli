@@ -21,7 +21,10 @@ const provider = (status: ProviderStatusInfo['status']): ProviderStatusInfo => (
 });
 
 const clientWithProviders = (providers: ProviderStatusInfo[]): BackendClient => ({
-  submitStreaming: vi.fn(),
+  submit: vi.fn(),
+  onTranscriptEvent: () => () => undefined,
+  clearConversation: async () => undefined,
+  cancelTurn: async () => undefined,
   gitStatus: async () => null,
   listProviders: async () => ({ persistenceAvailable: true, providers }),
   getActiveSelection: async () => ({ providerId: null, modelId: null }),

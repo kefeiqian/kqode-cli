@@ -6,6 +6,7 @@ import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.t
 import { createMessageConnectionClient } from '@backend/client/messageConnectionClient.ts';
 import {
   SETTLED_KIND_COMPLETED,
+  SETTLED_KIND_ERROR,
   SUBMIT_STATUS_NEEDS_CONFIGURATION,
   SUBMIT_STATUS_STREAMING,
   TURN_STATE_ACTIVE
@@ -41,8 +42,12 @@ function pairedConnections(): PairedConnections {
 function streamingServer(server: MessageConnection, deltas: readonly string[]): void {
   server.onRequest(messageSubmitRequest, ({ turnId }) => {
     queueMicrotask(async () => {
+      await server.sendNotification(turnEnqueuedNotification, { turnId, seq: 1, state: TURN_STATE_ACTIVE });
       for (const delta of deltas) await server.sendNotification(tokenDeltaNotification, { turnId, delta });
-      await server.sendNotification(turnEndNotification, { turnId, finishReason: 'stop' });
+      await server.sendNotification(turnSettledNotification, {
+        turnId,
+        result: { kind: SETTLED_KIND_COMPLETED, text: deltas.join(''), finishReason: 'stop', errorKind: null, message: null }
+      });
     });
     return { turnId, status: SUBMIT_STATUS_STREAMING };
   });
@@ -58,57 +63,101 @@ describe('message protocol client', () => {
     const { client, server } = pairedConnections();
     streamingServer(server, ['Hello', ', ', 'world']);
     const deltas: string[] = [];
+    const events: unknown[] = [];
+    const backend = createMessageConnectionClient(client);
+    backend.onTranscriptEvent((event) => {
+      events.push(event);
+      if (event.type === 'tokenDelta') deltas.push(event.delta);
+    });
 
-    const outcome = await createMessageConnectionClient(client).submitStreaming(
-      { text: 'hello from tui' },
-      { onDelta: (delta) => deltas.push(delta) }
-    );
+    await backend.submit({ turnId: 'turn-1', text: 'hello from tui' });
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(deltas).toEqual(['Hello', ', ', 'world']);
-    expect(outcome).toEqual({ kind: 'completed', text: 'Hello, world', finishReason: 'stop' });
+    expect(events.at(-1)).toMatchObject({ type: 'settled', turnId: 'turn-1' });
   });
 
   it('preserves Unicode and whitespace across streamed deltas', async () => {
     const { client, server } = pairedConnections();
     streamingServer(server, ['  café\n', '☕ 日本語  ']);
 
-    const outcome = await createMessageConnectionClient(client).submitStreaming(
-      { text: 'unicode' },
-      { onDelta: () => {} }
-    );
+    const events: string[] = [];
+    const backend = createMessageConnectionClient(client);
+    backend.onTranscriptEvent((event) => {
+      if (event.type === 'tokenDelta') events.push(event.delta);
+    });
 
-    expect(outcome).toEqual({ kind: 'completed', text: '  café\n☕ 日本語  ', finishReason: 'stop' });
+    await backend.submit({ turnId: 'turn-1', text: 'unicode' });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(events.join('')).toBe('  café\n☕ 日本語  ');
   });
 
-  it('resolves an error outcome when the backend emits kqode/turnError', async () => {
+  it('dispatches token deltas that arrive before the submit ack resolves', async () => {
     const { client, server } = pairedConnections();
     server.onRequest(messageSubmitRequest, ({ turnId }) => {
-      queueMicrotask(() => void server.sendNotification(turnErrorNotification, {
+      void server.sendNotification(tokenDeltaNotification, { turnId, delta: 'early' });
+      return { turnId, status: SUBMIT_STATUS_STREAMING };
+    });
+    const backend = createMessageConnectionClient(client);
+    const deltas: string[] = [];
+    backend.onTranscriptEvent((event) => {
+      if (event.type === 'tokenDelta') deltas.push(event.delta);
+    });
+
+    await backend.submit({ turnId: 'turn-early', text: 'race' });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(deltas).toEqual(['early']);
+  });
+
+  it('dispatches an error event when the backend emits turnSettled(error)', async () => {
+    const { client, server } = pairedConnections();
+    server.onRequest(messageSubmitRequest, ({ turnId }) => {
+      queueMicrotask(() => void server.sendNotification(turnSettledNotification, {
         turnId,
-        errorKind: 'auth',
-        message: 'Kimi rejected the API key'
+        result: {
+          kind: SETTLED_KIND_ERROR,
+          text: null,
+          finishReason: null,
+          errorKind: 'auth',
+          message: 'Kimi rejected the API key'
+        }
       }));
       return { turnId, status: SUBMIT_STATUS_STREAMING };
     });
+    const backend = createMessageConnectionClient(client);
+    const settled = new Promise((resolve) => backend.onTranscriptEvent(resolve));
 
-    const outcome = await createMessageConnectionClient(client).submitStreaming(
-      { text: 'boom' },
-      { onDelta: () => {} }
-    );
+    await backend.submit({ turnId: 'turn-1', text: 'boom' });
 
-    expect(outcome).toEqual({ kind: 'error', errorKind: 'auth', message: 'Kimi rejected the API key' });
+    await expect(settled).resolves.toMatchObject({ type: 'settled', turnId: 'turn-1' });
   });
 
-  it('resolves a needs-configuration outcome when the ack reports no key', async () => {
+  it('dispatches needs-configuration from the settled event when the ack reports no key', async () => {
     const { client, server } = pairedConnections();
-    server.onRequest(messageSubmitRequest, ({ turnId }) => ({ turnId, status: SUBMIT_STATUS_NEEDS_CONFIGURATION }));
+    server.onRequest(messageSubmitRequest, ({ turnId }) => {
+      queueMicrotask(() => void server.sendNotification(turnSettledNotification, {
+        turnId,
+        result: {
+          kind: SUBMIT_STATUS_NEEDS_CONFIGURATION,
+          text: null,
+          finishReason: null,
+          errorKind: null,
+          message: null
+        }
+      }));
+      return { turnId, status: SUBMIT_STATUS_NEEDS_CONFIGURATION };
+    });
+    const backend = createMessageConnectionClient(client);
+    const settled = new Promise((resolve) => backend.onTranscriptEvent(resolve));
 
-    const outcome = await createMessageConnectionClient(client).submitStreaming(
-      { text: 'no key' },
-      { onDelta: () => {} }
-    );
+    await backend.submit({ turnId: 'turn-1', text: 'no key' });
 
-    expect(outcome).toEqual({ kind: 'needsConfiguration' });
+    await expect(settled).resolves.toMatchObject({
+      type: 'settled',
+      result: { kind: SUBMIT_STATUS_NEEDS_CONFIGURATION }
+    });
   });
 
   it('surfaces JSON-RPC method errors as typed protocol client errors', async () => {
@@ -117,7 +166,7 @@ describe('message protocol client', () => {
       throw new ResponseError(ErrorCodes.InvalidParams, 'invalid message submit params');
     });
 
-    const submit = createMessageConnectionClient(client).submitStreaming({ text: 'boom' }, { onDelta: () => {} });
+    const submit = createMessageConnectionClient(client).submit({ turnId: 'turn-1', text: 'boom' });
 
     await expect(submit).rejects.toBeInstanceOf(BackendClientError);
     await expect(submit).rejects.toMatchObject({ kind: BackendErrorKind.Protocol });

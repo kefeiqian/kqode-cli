@@ -1,5 +1,9 @@
 import { BackendClientError } from '@contracts/backend/index.ts';
-import type { StreamOutcome } from '@contracts/backend/index.ts';
+import {
+  SETTLED_KIND_CANCELLED,
+  SETTLED_KIND_COMPLETED
+} from '@contracts/backend/index.ts';
+import type { TurnResult } from '@contracts/backend/index.ts';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
 import { sanitizeDisplayText } from '@libs/text/sanitizeDisplayText.ts';
 import type { BodyEntry } from '@libs/tui/bodyRows.ts';
@@ -10,7 +14,8 @@ export type BackendResult = {
   kind:
     | typeof BodyEntryKind.Assistant
     | typeof BodyEntryKind.Success
-    | typeof BodyEntryKind.Error;
+    | typeof BodyEntryKind.Error
+    | typeof BodyEntryKind.Muted;
   text: string;
 };
 
@@ -19,6 +24,7 @@ export const BACKEND_UNAVAILABLE_MESSAGE = 'Rust backend unavailable';
 
 export type QueueItem = {
   id: number;
+  turnId?: string;
   text: string;
   state: QueueItemState;
   result?: BackendResult;
@@ -91,12 +97,15 @@ function buildItemEntries(item: QueueItem, streamingText: string | undefined): B
   return [promptEntry];
 }
 
-/** Maps a streamed turn's terminal {@link StreamOutcome} to a transcript result. */
-export function outcomeToResult(outcome: Exclude<StreamOutcome, { kind: 'needsConfiguration' }>): BackendResult {
-  if (outcome.kind === 'completed') {
-    return { kind: BodyEntryKind.Assistant, text: sanitizeDisplayText(outcome.text) };
+/** Maps a backend terminal turn result to a transcript result. */
+export function turnResultToBackendResult(result: TurnResult): BackendResult | undefined {
+  if (result.kind === SETTLED_KIND_COMPLETED) {
+    return { kind: BodyEntryKind.Assistant, text: sanitizeDisplayText(result.text ?? '') };
   }
-  return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(outcome.message) };
+  if (result.kind === SETTLED_KIND_CANCELLED) {
+    return { kind: BodyEntryKind.Muted, text: 'Cancelled' };
+  }
+  return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(result.message ?? 'Turn failed') };
 }
 
 export function backendErrorMessage(error: unknown): string {

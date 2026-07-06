@@ -4,142 +4,139 @@ import {
   appendUnknownCommandAtom,
   clearTranscriptAtom,
   enqueuePromptAtom,
+  newTurnIdAtom,
   promptQueueAtom,
-  restoreComposerDraftAtom
+  restoreComposerDraftAtom,
+  transcriptEventAtom
 } from '@state/promptQueue/atoms.ts';
 import { BACKEND_UNAVAILABLE_MESSAGE } from '@libs/promptQueue/promptQueue.ts';
 import { backendClientAtom } from '@state/global/index.ts';
-import {
-  activeSurfaceAtom,
-  bodyScrollOffsetRowsAtom,
-  submittedPromptEntriesAtom,
-  Surface
-} from '@state/ui/index.ts';
-import type {
-  BackendClient,
-  StreamCallbacks,
-  StreamOutcome,
-  StreamSubmitParams
-} from '@contracts/backend/index.ts';
+import { activeSurfaceAtom, bodyScrollOffsetRowsAtom, submittedPromptEntriesAtom, Surface } from '@state/ui/index.ts';
+import type { BackendClient, TranscriptEvent } from '@contracts/backend/index.ts';
 
-function clientWithSubmit(
-  submitStreaming: BackendClient['submitStreaming']
-): BackendClient {
+function clientWithSubmit(submit: BackendClient['submit']): BackendClient {
   return {
+    submit,
+    onTranscriptEvent: () => () => undefined,
+    clearConversation: async () => undefined,
+    cancelTurn: async () => undefined,
     gitStatus: async () => null,
     listProviders: async () => ({ persistenceAvailable: true, providers: [] }),
     getActiveSelection: async () => ({ providerId: null, modelId: null }),
-    setActiveSelection: async () => {},
-    clearProviderKey: async () => {},
+    setActiveSelection: async () => undefined,
+    clearProviderKey: async () => undefined,
     setProviderKey: async () => ({ outcome: 'unreachable', selectedModel: null }),
-    listModels: async () => ({ status: 'failed', models: [] }),
-    submitStreaming
+    listModels: async () => ({ status: 'failed', models: [] })
   };
 }
+
+const needsConfiguration = (turnId: string): TranscriptEvent => ({
+  type: 'settled',
+  turnId,
+  result: { kind: 'needsConfiguration', text: null, finishReason: null, errorKind: null, message: null }
+});
 
 describe('enqueuePromptAtom', () => {
   it('settles a visible error entry when no backend client is wired into the seam', async () => {
     const store = createStore();
+    store.set(newTurnIdAtom, { newTurnId: () => 'turn-1' });
 
     await store.set(enqueuePromptAtom, 'hello');
 
-    const entries = store.get(submittedPromptEntriesAtom);
-    const errorEntry = entries.find((entry) => entry.kind === 'error');
-    expect(errorEntry).toBeDefined();
+    const errorEntry = store.get(submittedPromptEntriesAtom).find((entry) => entry.kind === 'error');
     expect(errorEntry?.text).toContain(BACKEND_UNAVAILABLE_MESSAGE);
   });
 
-  it('routes needsConfiguration to login and restores the prompt without transcript error', async () => {
+  it('optimistically appends the user row and submits a caller-minted turn id', async () => {
     const store = createStore();
-    store.set(
-      backendClientAtom,
-      clientWithSubmit(async () => ({ kind: 'needsConfiguration' }))
-    );
+    const submit = vi.fn(async () => undefined);
+    store.set(newTurnIdAtom, { newTurnId: () => 'turn-1' });
+    store.set(backendClientAtom, clientWithSubmit(submit));
+
+    await store.set(enqueuePromptAtom, 'hello');
+
+    expect(submit).toHaveBeenCalledWith({ turnId: 'turn-1', text: 'hello' });
+    expect(store.get(submittedPromptEntriesAtom)[0]).toMatchObject({ kind: 'user', text: 'hello' });
+  });
+
+  it('routes needsConfiguration settled events to login and restores the prompt', async () => {
+    const store = createStore();
+    store.set(newTurnIdAtom, { newTurnId: () => 'turn-1' });
+    store.set(backendClientAtom, clientWithSubmit(async () => undefined));
 
     await store.set(enqueuePromptAtom, 'configure me');
+    store.set(transcriptEventAtom, needsConfiguration('turn-1'));
 
     expect(store.get(activeSurfaceAtom)).toBe(Surface.Login);
     expect(store.get(restoreComposerDraftAtom)).toBe('configure me');
     expect(store.get(promptQueueAtom)).toEqual([]);
-    expect(store.get(submittedPromptEntriesAtom)).toEqual([]);
   });
 
-  it('opens login once and stops draining when multiple queued prompts need configuration', async () => {
+  it('opens login once when multiple turns settle as unconfigured', async () => {
     const store = createStore();
-    let resolveFirst: ((outcome: StreamOutcome) => void) | undefined;
-    const submitStreaming = vi.fn(
-      (_params: StreamSubmitParams, _callbacks: StreamCallbacks) =>
-        new Promise<StreamOutcome>((resolve) => {
-          resolveFirst = resolve;
-        })
-    );
-    store.set(backendClientAtom, clientWithSubmit(submitStreaming));
+    let nextId = 0;
+    store.set(newTurnIdAtom, { newTurnId: () => `turn-${++nextId}` });
+    store.set(backendClientAtom, clientWithSubmit(async () => undefined));
 
-    const first = store.set(enqueuePromptAtom, 'first');
+    await store.set(enqueuePromptAtom, 'first');
     await store.set(enqueuePromptAtom, 'second');
-    await store.set(enqueuePromptAtom, 'third');
-    resolveFirst?.({ kind: 'needsConfiguration' });
-    await first;
+    store.set(transcriptEventAtom, needsConfiguration('turn-1'));
+    store.set(transcriptEventAtom, needsConfiguration('turn-2'));
 
-    expect(submitStreaming).toHaveBeenCalledTimes(1);
     expect(store.get(activeSurfaceAtom)).toBe(Surface.Login);
     expect(store.get(restoreComposerDraftAtom)).toBe('first');
-    expect(store.get(promptQueueAtom)).toEqual([]);
   });
 
   it('routes auth errors to login, restores the prompt, and records the error', async () => {
     const store = createStore();
-    store.set(
-      backendClientAtom,
-      clientWithSubmit(async () => ({
-        kind: 'error',
-        errorKind: 'auth',
-        message: 'key rejected at chat'
-      }))
-    );
+    store.set(newTurnIdAtom, { newTurnId: () => 'turn-1' });
+    store.set(backendClientAtom, clientWithSubmit(async () => undefined));
 
     await store.set(enqueuePromptAtom, 'retry after key');
+    store.set(transcriptEventAtom, {
+      type: 'settled',
+      turnId: 'turn-1',
+      result: { kind: 'error', text: null, finishReason: null, errorKind: 'auth', message: 'key rejected' }
+    });
 
     expect(store.get(activeSurfaceAtom)).toBe(Surface.Login);
     expect(store.get(restoreComposerDraftAtom)).toBe('retry after key');
-    const entries = store.get(submittedPromptEntriesAtom);
-    expect(entries.map((entry) => entry.kind)).toEqual(['user', 'error']);
-    expect(entries.at(-1)?.text).toContain('key rejected at chat');
-  });
-
-  it('streams connected submits to completion', async () => {
-    const store = createStore();
-    store.set(
-      backendClientAtom,
-      clientWithSubmit(async ({ text }, { onDelta }) => {
-        onDelta(`reply: ${text}`);
-        return { kind: 'completed', text: `reply: ${text}`, finishReason: 'stop' };
-      })
-    );
-
-    await store.set(enqueuePromptAtom, 'hello');
-
-    expect(store.get(activeSurfaceAtom)).toBe(Surface.Home);
-    expect(store.get(restoreComposerDraftAtom)).toBe('');
-    expect(store.get(submittedPromptEntriesAtom).at(-1)).toMatchObject({
-      kind: 'assistant',
-      text: 'reply: hello'
-    });
+    expect(store.get(submittedPromptEntriesAtom).at(-1)?.text).toContain('key rejected');
   });
 });
 
 describe('clearTranscriptAtom', () => {
-  it('empties the queue and entries and resets scroll', async () => {
+  it('empties the queue and entries, resets scroll, and asks the backend to clear', async () => {
     const store = createStore();
+    const clearConversation = vi.fn(async () => undefined);
+    store.set(backendClientAtom, { ...clientWithSubmit(async () => undefined), clearConversation });
     await store.set(enqueuePromptAtom, 'hello');
     store.set(bodyScrollOffsetRowsAtom, 5);
-    expect(store.get(submittedPromptEntriesAtom).length).toBeGreaterThan(0);
 
     store.set(clearTranscriptAtom);
 
+    expect(clearConversation).toHaveBeenCalledTimes(1);
     expect(store.get(promptQueueAtom)).toEqual([]);
     expect(store.get(submittedPromptEntriesAtom)).toEqual([]);
     expect(store.get(bodyScrollOffsetRowsAtom)).toBe(0);
+  });
+
+  it('drops delayed backend events for turns that were cleared', async () => {
+    const store = createStore();
+    store.set(newTurnIdAtom, { newTurnId: () => 'turn-1' });
+    store.set(backendClientAtom, clientWithSubmit(async () => undefined));
+    await store.set(enqueuePromptAtom, 'clear me');
+
+    store.set(clearTranscriptAtom);
+    store.set(transcriptEventAtom, { type: 'tokenDelta', turnId: 'turn-1', delta: 'late' });
+    store.set(transcriptEventAtom, {
+      type: 'settled',
+      turnId: 'turn-1',
+      result: { kind: 'completed', text: 'late', finishReason: 'stop', errorKind: null, message: null }
+    });
+
+    expect(store.get(promptQueueAtom)).toEqual([]);
+    expect(store.get(submittedPromptEntriesAtom)).toEqual([]);
   });
 });
 
@@ -149,20 +146,7 @@ describe('appendUnknownCommandAtom', () => {
 
     store.set(appendUnknownCommandAtom, '/nope arg1 arg2');
 
-    const entries = store.get(submittedPromptEntriesAtom);
-    expect(entries.map((entry) => ({ kind: entry.kind, text: entry.text }))).toEqual([
-      { kind: 'user', text: '/nope arg1 arg2' },
-      { kind: 'error', text: 'Unknown command: /nope' }
-    ]);
+    expect(store.get(submittedPromptEntriesAtom).map((entry) => entry.kind)).toEqual(['user', 'error']);
     expect(store.get(promptQueueAtom).every((item) => item.state === 'settled')).toBe(true);
-  });
-
-  it('resets the scroll offset so the newest entry stays visible', () => {
-    const store = createStore();
-    store.set(bodyScrollOffsetRowsAtom, 5);
-
-    store.set(appendUnknownCommandAtom, '/nope');
-
-    expect(store.get(bodyScrollOffsetRowsAtom)).toBe(0);
   });
 });

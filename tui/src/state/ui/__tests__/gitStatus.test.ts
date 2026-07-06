@@ -6,7 +6,10 @@ import { gitStatusLabelAtom, refreshGitStatusAtom } from '@state/ui/gitStatus.ts
 
 function clientWithGitStatus(gitStatus: BackendClient['gitStatus']): BackendClient {
   return {
-    submitStreaming: vi.fn(),
+    submit: vi.fn(),
+    onTranscriptEvent: () => () => undefined,
+    clearConversation: async () => undefined,
+    cancelTurn: async () => undefined,
     gitStatus,
     listProviders: async () => ({ persistenceAvailable: true, providers: [] }),
     getActiveSelection: async () => ({ providerId: null, modelId: null }),

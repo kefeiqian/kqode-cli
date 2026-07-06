@@ -162,6 +162,7 @@ function colorForEntry(kind: BodyEntry['kind']): string {
     case BodyEntryKind.User:
       return theme.colors.foreground;
     case BodyEntryKind.Assistant:
+    case BodyEntryKind.Muted:
       return theme.colors.muted;
   }
 }

@@ -13,6 +13,7 @@ import type {
   SetKeyParams,
   SetKeyResult
 } from '@contracts/backend/providerMessages.ts';
+import type { TurnResult, TurnState } from '@contracts/backend/messages.ts';
 
 /** Backend failure categories surfaced to the TUI. */
 export const BackendErrorKind = {
@@ -39,34 +40,30 @@ export class BackendClientError extends Error {
   }
 }
 
-/** Params the TUI submits; the client generates the wire `turnId` internally. */
+/** Params the TUI submits; callers mint `turnId` before the optimistic echo. */
 export type StreamSubmitParams = {
+  turnId: string;
   text: string;
 };
 
-/** Callbacks invoked while a streamed turn is in flight. */
-export type StreamCallbacks = {
-  /** Called for each chunk of assistant text as it streams in. */
-  onDelta: (delta: string) => void;
-};
-
-/** Terminal outcome of a streamed turn (transport failures reject instead). */
-export type StreamOutcome =
-  | { kind: 'completed'; text: string; finishReason: string | null }
-  | { kind: 'error'; errorKind: string; message: string }
-  | { kind: 'needsConfiguration' };
+/** Backend transcript event delivered through the single subscription seam. */
+export type TranscriptEvent =
+  | { type: 'enqueued'; turnId: string; seq: number; state: TurnState }
+  | { type: 'activated'; turnId: string }
+  | { type: 'tokenDelta'; turnId: string; delta: string }
+  | { type: 'settled'; turnId: string; result: TurnResult };
 
 /**
- * Narrow backend seam the TUI uses for streaming chat turns.
+ * Narrow backend seam the TUI uses for backend-backed transcript turns.
  *
- * `submitStreaming` streams assistant text through `callbacks.onDelta` and
- * resolves with a {@link StreamOutcome} when the turn ends (completed, provider
- * error, or needs-configuration). It rejects with a {@link BackendClientError}
- * only for transport/timeout failures; display components depend only on this
- * interface so process and protocol mechanics stay out of the render tree.
+ * `submit` resolves once the backend accepts the caller-minted `turnId`; token
+ * deltas and terminal outcomes arrive through `onTranscriptEvent`.
  */
 export type BackendClient = {
-  submitStreaming(params: StreamSubmitParams, callbacks: StreamCallbacks): Promise<StreamOutcome>;
+  submit(params: StreamSubmitParams): Promise<void>;
+  onTranscriptEvent(handler: (event: TranscriptEvent) => void): () => void;
+  clearConversation(): Promise<void>;
+  cancelTurn(turnId: string): Promise<void>;
   /**
    * Fetches the workspace git status label (e.g. `⎇ main*`), or `null` when the
    * workspace is not a git repository or `git` could not be queried. Rejects

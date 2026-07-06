@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createStore } from 'jotai';
 import type { BackendClientHandle } from '@backend/client/backendClient.ts';
@@ -25,6 +26,7 @@ import {
   sessionStartedAtAtom,
   workspaceCwdAtom
 } from '@state/global/index.ts';
+import { newTurnIdAtom } from '@state/promptQueue/atoms.ts';
 import { theme } from '@theme/themeConfig.ts';
 import type { EmbeddedBackendAsset } from '@backend/packaged/materializeBackend.ts';
 
@@ -67,6 +69,7 @@ export async function createAppRuntime({
   loadPackagedAsset
 }: CreateAppRuntimeOptions): Promise<AppRuntime> {
   const store = createStore();
+  store.set(newTurnIdAtom, { newTurnId: randomUUID });
   // The composition root owns the TUI session logger for the whole backend
   // lifetime; it buffers until the backend announces its session id on ready.
   const logger = createSessionLogger();

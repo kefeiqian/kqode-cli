@@ -46,7 +46,10 @@ export function fakeClient(options: {
   ];
   let listIndex = 0;
   return {
-    submitStreaming: vi.fn(),
+    submit: vi.fn(),
+    onTranscriptEvent: () => () => undefined,
+    clearConversation: async () => undefined,
+    cancelTurn: async () => undefined,
     gitStatus: vi.fn(async () => null),
     listProviders: vi.fn(async () => ({
       persistenceAvailable: options.persistenceAvailable ?? true,

@@ -97,7 +97,10 @@ function clientWith({
   active?: Awaited<ReturnType<BackendClient['getActiveSelection']>>;
 }): BackendClient {
   return {
-    submitStreaming: async () => ({ kind: 'completed', text: '', finishReason: null }),
+    submit: async () => undefined,
+    onTranscriptEvent: () => () => undefined,
+    clearConversation: async () => undefined,
+    cancelTurn: async () => undefined,
     gitStatus: async () => null,
     listProviders: async () => ({ persistenceAvailable: true, providers }),
     getActiveSelection: async () => active,
@@ -113,7 +116,10 @@ function mutableLoginClient(): BackendClient {
   let providers: ProviderStatusInfo[] = [];
   let active = { providerId: null, modelId: null } as Awaited<ReturnType<BackendClient['getActiveSelection']>>;
   return {
-    submitStreaming: async () => ({ kind: 'completed', text: '', finishReason: null }),
+    submit: async () => undefined,
+    onTranscriptEvent: () => () => undefined,
+    clearConversation: async () => undefined,
+    cancelTurn: async () => undefined,
     gitStatus: async () => null,
     listProviders: async () => ({ persistenceAvailable: true, providers }),
     getActiveSelection: async () => active,

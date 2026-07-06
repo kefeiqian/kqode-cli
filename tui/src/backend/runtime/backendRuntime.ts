@@ -2,6 +2,7 @@ import type { createStore } from 'jotai';
 import type { BackendClient } from '@contracts/backend/index.ts';
 import type { SessionLogger } from '@backend/log/sessionLogger.ts';
 import { backendClientAtom } from '@state/global/backend.ts';
+import { resetTranscriptMirrorAtom, transcriptEventAtom } from '@state/promptQueue/atoms.ts';
 import { refreshGitStatusAtom } from '@state/ui/gitStatus.ts';
 import { BACKEND_LOADING_HINT, startupStatusHintAtom } from '@state/ui/statusHint.ts';
 
@@ -32,10 +33,14 @@ export function startBackendRuntime(
 ): () => void {
   store.set(backendClientAtom, client);
   store.set(startupStatusHintAtom, BACKEND_LOADING_HINT);
+  const unsubscribeTranscript = client.onTranscriptEvent((event) => {
+    store.set(transcriptEventAtom, event);
+  });
 
   // On readiness the backend announces its session id; adopt it so the TUI log
   // lands in the same per-session directory. Fires again on respawn.
   client.onReady((sessionId) => {
+    store.set(resetTranscriptMirrorAtom);
     logger.openSession(sessionId);
     logger.log({ event: 'backendReady', sessionId });
   });
@@ -60,6 +65,7 @@ export function startBackendRuntime(
 
   return () => {
     logger.log({ event: 'sessionExit' });
+    unsubscribeTranscript();
     client.dispose();
     logger.close();
     store.set(backendClientAtom, undefined);
