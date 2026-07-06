@@ -88,6 +88,7 @@ export async function createAppRuntime({
   if (rows) {
     store.set(windowRowsAtom, rows);
   }
+  logger.log({ event: 'sessionStart', columns: columns ?? null, rows: rows ?? null });
 
   // Snapshot the session start time and git baseline at boot so the exit summary
   // can report real Duration and a working-tree Changes delta. Seeding here (not

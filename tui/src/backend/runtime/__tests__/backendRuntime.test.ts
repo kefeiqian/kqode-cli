@@ -43,6 +43,7 @@ describe('startBackendRuntime', () => {
     const onReadyListener = vi.mocked(client.onReady).mock.calls[0][0];
     onReadyListener('sess-42');
     expect(logger.openSession).toHaveBeenCalledWith('sess-42');
+    expect(logger.log).toHaveBeenCalledWith({ event: 'backendReady', sessionId: 'sess-42' });
 
     await flushMicrotasks();
 
@@ -52,6 +53,7 @@ describe('startBackendRuntime', () => {
     dispose();
     expect(client.dispose).toHaveBeenCalledTimes(1);
     expect(logger.close).toHaveBeenCalledTimes(1);
+    expect(logger.log).toHaveBeenCalledWith({ event: 'sessionExit' });
     expect(store.get(backendClientAtom)).toBeUndefined();
   });
 
@@ -70,6 +72,7 @@ describe('startBackendRuntime', () => {
     // Startup failed without readiness: buffered events flush to an orphan session.
     expect(logger.openOrphan).toHaveBeenCalledTimes(1);
     expect(logger.openSession).not.toHaveBeenCalled();
+    expect(logger.log).toHaveBeenCalledWith({ event: 'backendStartFailed' });
     // A failed start must not silently drop the seam: the client stays so the
     // next submit retries via ensureSession() instead of vanishing.
     expect(client.dispose).not.toHaveBeenCalled();

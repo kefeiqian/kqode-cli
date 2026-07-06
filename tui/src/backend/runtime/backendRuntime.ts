@@ -35,7 +35,10 @@ export function startBackendRuntime(
 
   // On readiness the backend announces its session id; adopt it so the TUI log
   // lands in the same per-session directory. Fires again on respawn.
-  client.onReady((sessionId) => logger.openSession(sessionId));
+  client.onReady((sessionId) => {
+    logger.openSession(sessionId);
+    logger.log({ event: 'backendReady', sessionId });
+  });
 
   void client
     .ensureStarted()
@@ -49,12 +52,14 @@ export function startBackendRuntime(
       // Dead-state client stays in the seam so the next submit retries via
       // ensureSession() and settles a visible error rather than dropping it.
       logger.openOrphan();
+      logger.log({ event: 'backendStartFailed' });
     })
     .finally(() => {
       store.set(startupStatusHintAtom, undefined);
     });
 
   return () => {
+    logger.log({ event: 'sessionExit' });
     client.dispose();
     logger.close();
     store.set(backendClientAtom, undefined);
