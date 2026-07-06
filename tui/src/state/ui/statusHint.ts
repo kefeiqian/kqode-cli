@@ -11,6 +11,12 @@ export const BACKEND_LOADING_HINT: StatusHint = {
   kind: 'loading'
 };
 
+/** Status hint shown while a submitted turn is awaiting its LLM response. */
+export const WORKING_STATUS_HINT: StatusHint = {
+  text: 'Working',
+  kind: 'loading'
+};
+
 export const startupStatusHintAtom = atom<StatusHint | undefined>(undefined);
 
 /** Auto-clearing status hint for short-lived copy/paste feedback. */

@@ -2,14 +2,14 @@ import { atom } from 'jotai';
 import { PROVIDER_STATUS_CONNECTED } from '@contracts/backend/providerMessages.ts';
 import type { ActiveSelectionResult, ProviderStatusInfo } from '@contracts/backend/providerMessages.ts';
 import {
-  DEFAULT_MODEL_LABEL,
   formatModelLabel,
   NOT_CONFIGURED_HERE_MODEL_LABEL,
-  NOT_CONFIGURED_MODEL_LABEL
+  NOT_CONFIGURED_MODEL_LABEL,
+  UNRESOLVED_MODEL_LABEL
 } from '@libs/model/index.ts';
 import { backendClientAtom } from '@state/global/backend.ts';
 
-const activeModelLabelStateAtom = atom(DEFAULT_MODEL_LABEL);
+const activeModelLabelStateAtom = atom(UNRESOLVED_MODEL_LABEL);
 const activeModelRefreshVersionAtom = atom(0);
 
 /** Backend-resolved status-bar model label for the current workspace. */

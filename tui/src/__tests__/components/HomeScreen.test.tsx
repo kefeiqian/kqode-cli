@@ -71,7 +71,7 @@ function renderHomeScreen({
 }
 
 describe('HomeScreen', () => {
-  it('renders the first-frame identity, cwd, composer, hints, and model label', () => {
+  it('renders the first-frame identity, cwd, composer, and hints with the model label hidden until the backend resolves', () => {
     const { lastFrame } = renderHomeScreen({ columns: 100, rows: 20 });
 
     const output = lastFrame() ?? '';
@@ -88,7 +88,9 @@ describe('HomeScreen', () => {
     expect(output).toContain('@ mention');
     expect(output).toContain('? help');
     expect(output).not.toContain('tab next tab');
-    expect(output).toContain(NOT_CONFIGURED_MODEL_LABEL);
+    // The model label stays hidden until the backend resolves it, so the first
+    // frame must not flash "not configured".
+    expect(output).not.toContain(NOT_CONFIGURED_MODEL_LABEL);
   });
 
   it('displays the copied dummy React workspace cwd rather than the TUI package path', () => {
@@ -295,7 +297,7 @@ describe('HomeScreen', () => {
     expect(openOutput.split('\n').at(-1)).toContain('/ commands | @ mention | ? help');
   });
 
-  it('keeps cwd, composer, status hints, and model label visible at the minimum 60x15', async () => {
+  it('keeps cwd, composer, and status hints visible with the model label hidden until resolved at the minimum 60x15', async () => {
     const { lastFrame, stdin } = renderHomeScreen({ columns: 60, rows: 15 });
 
     const output = lastFrame() ?? '';
@@ -303,7 +305,8 @@ describe('HomeScreen', () => {
     expect(output).toContain('~');
     expect(output.split('\n')).toContain('>');
     expect(output).not.toContain('Ask KQode...');
-    expect(output).toContain(NOT_CONFIGURED_MODEL_LABEL);
+    // The model label is hidden until the backend resolves it.
+    expect(output).not.toContain(NOT_CONFIGURED_MODEL_LABEL);
     const outputRows = output.split('\n');
     expect(outputRows).toHaveLength(15);
     expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');

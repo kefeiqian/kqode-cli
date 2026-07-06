@@ -10,11 +10,18 @@ import {
 import {
   NOT_CONFIGURED_HERE_MODEL_LABEL,
   NOT_CONFIGURED_MODEL_LABEL,
+  UNRESOLVED_MODEL_LABEL,
   formatModelLabel
 } from '@libs/model/index.ts';
 import { activeModelLabelAtom, backendClientAtom, refreshActiveModelAtom } from '@state/global/index.ts';
 
 describe('activeModel atoms', () => {
+  it('starts hidden (unresolved) before the backend responds', () => {
+    const store = createStore();
+
+    expect(store.get(activeModelLabelAtom)).toBe(UNRESOLVED_MODEL_LABEL);
+  });
+
   it('falls back to not configured when the backend client is unavailable', async () => {
     const store = createStore();
 

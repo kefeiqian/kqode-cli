@@ -14,6 +14,16 @@ export const activeTurnIdAtom = atom((get) => {
   return activeItem?.turnId ?? null;
 });
 
+/**
+ * True while any submitted turn is still in flight — active or queued behind an
+ * active turn — so the agent is working on an LLM response. Stays true across the
+ * active→settled→next-active handoff (queued items keep it set), so the status
+ * bar's working indicator does not flicker between turns.
+ */
+export const turnInFlightAtom = atom((get) =>
+  get(promptQueueAtom).some((item) => item.state !== 'settled')
+);
+
 /** Client-only rows that are composed with, but never stored in, the mirror. */
 export const clientOnlyRowsAtom = atom<ClientOnlyRow[]>([]);
 

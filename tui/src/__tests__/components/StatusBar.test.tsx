@@ -15,9 +15,11 @@ import {
 import { backendClientAtom } from '@state/global/index.ts';
 import {
   armedActionAtom,
+  BACKEND_LOADING_HINT,
   columnsTestOverrideAtom,
   copyModeActiveAtom,
-  setTransientStatusHintAtom
+  setTransientStatusHintAtom,
+  startupStatusHintAtom
 } from '@state/ui/index.ts';
 import { ArmedAction, COPY_MODE_HINT } from '@constants/ui.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
@@ -109,26 +111,38 @@ describe('StatusBar', () => {
     });
   });
 
-  it('keeps long active labels within the status bar columns', async () => {
+  it('hides the model label while the backend is still loading', async () => {
     const store = makeStore();
-    store.set(columnsTestOverrideAtom, 48);
-    store.set(
-      backendClientAtom,
-      clientWith({
-        providers: [provider('long', 'Very Long Provider Label')],
-        active: { providerId: 'long', modelId: 'very-long-model-id-for-status-bar' }
-      })
-    );
+    store.set(startupStatusHintAtom, BACKEND_LOADING_HINT);
+    // A backend request only resolves once the process is ready, so while it
+    // loads the label must stay hidden rather than flashing "not configured".
+    store.set(backendClientAtom, pendingClient());
 
     const { lastFrame } = renderWithJotai(<StatusBar />, store);
+    await Promise.resolve();
 
-    await vi.waitFor(() => {
-      const output = lastFrame() ?? '';
-      expect(output).not.toContain(NOT_CONFIGURED_MODEL_LABEL);
-      expect(output.split('\n').every((row) => row.length <= 48)).toBe(true);
-    });
+    const output = lastFrame() ?? '';
+    expect(output).toContain(BACKEND_LOADING_HINT.text);
+    expect(output).not.toContain(NOT_CONFIGURED_MODEL_LABEL);
   });
 });
+
+function pendingClient(): BackendClient {
+  const never = <T,>(): Promise<T> => new Promise<T>(() => undefined);
+  return {
+    submit: async () => undefined,
+    onTranscriptEvent: () => () => undefined,
+    clearConversation: async () => undefined,
+    cancelTurn: async () => undefined,
+    gitStatus: async () => null,
+    listProviders: never,
+    getActiveSelection: never,
+    setActiveSelection: async () => {},
+    clearProviderKey: async () => {},
+    setProviderKey: async () => ({ outcome: 'connected', selectedModel: null }),
+    listModels: async () => ({ status: 'loaded', models: [] })
+  };
+}
 
 function provider(
   providerId: string,

@@ -2,6 +2,7 @@ import { Box, Text } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useState } from 'react';
 import { activeModelLabelAtom, refreshActiveModelAtom } from '@state/global/index.ts';
+import { turnInFlightAtom } from '@state/promptQueue/index.ts';
 import {
   activeSurfaceAtom,
   armedActionAtom,
@@ -10,7 +11,8 @@ import {
   setTransientStatusHintAtom,
   startupStatusHintAtom,
   Surface,
-  transientStatusHintAtom
+  transientStatusHintAtom,
+  WORKING_STATUS_HINT
 } from '@state/ui/index.ts';
 import {
   ArmedAction,
@@ -31,10 +33,16 @@ export function StatusBar() {
   const transientStatusHint = useAtomValue(transientStatusHintAtom);
   const copyModeActive = useAtomValue(copyModeActiveAtom);
   const armedAction = useAtomValue(armedActionAtom);
+  const turnInFlight = useAtomValue(turnInFlightAtom);
   useActiveModelRefresh();
   useTransientStatusHintClear(transientStatusHint);
-  const loadingFrame = useLoadingFrame(startupStatusHint?.kind === 'loading');
-  const persistentStatusHint = startupStatusHint ?? (copyModeActive ? { text: COPY_MODE_HINT } : undefined);
+  // Backend startup takes precedence over the working spinner, which in turn
+  // sits ahead of Copy Mode; a loading-kind hint drives the animated dots.
+  const persistentStatusHint =
+    startupStatusHint ??
+    (turnInFlight ? WORKING_STATUS_HINT : undefined) ??
+    (copyModeActive ? { text: COPY_MODE_HINT } : undefined);
+  const loadingFrame = useLoadingFrame(persistentStatusHint?.kind === 'loading');
   const baseHints = persistentStatusHint?.text ?? transientStatusHint?.text ?? DEFAULT_STATUS_HINTS;
   const armedHint =
     armedAction === ArmedAction.ClearInput

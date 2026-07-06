@@ -23,7 +23,8 @@ import {
   settledTurnIdsAtom,
   streamingTextByIdAtom,
   transcriptReducerStateAtom,
-  turnGenerationByIdAtom
+  turnGenerationByIdAtom,
+  turnInFlightAtom
 } from '@state/promptQueue/store.ts';
 export {
   activeTurnIdAtom,
@@ -35,7 +36,8 @@ export {
   promptQueueAtom,
   settledTurnIdsAtom,
   streamingTextByIdAtom,
-  turnGenerationByIdAtom
+  turnGenerationByIdAtom,
+  turnInFlightAtom
 };
 const AUTH_ERROR_KIND = 'auth';
 const localTurnIdPrefix = 'local-turn';

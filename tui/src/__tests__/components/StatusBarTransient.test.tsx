@@ -6,8 +6,10 @@ import {
   columnsTestOverrideAtom,
   setTransientStatusHintAtom,
   startupStatusHintAtom,
-  transientStatusHintAtom
+  transientStatusHintAtom,
+  WORKING_STATUS_HINT
 } from '@state/ui/index.ts';
+import { promptQueueAtom } from '@state/promptQueue/index.ts';
 import { DEFAULT_STATUS_HINTS, TRANSIENT_STATUS_HINT_MS } from '@constants/ui.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
@@ -69,5 +71,37 @@ describe('StatusBar transient hints', () => {
     });
     unmount();
     vi.useRealTimers();
+  });
+});
+
+describe('StatusBar working hint', () => {
+  it('shows the working hint while a turn is in flight', () => {
+    const store = makeStore();
+    store.set(promptQueueAtom, [{ id: 0, turnId: 't1', text: 'hi', state: 'active' }]);
+
+    const { lastFrame } = renderWithJotai(<StatusBar />, store);
+
+    expect(lastFrame() ?? '').toContain(WORKING_STATUS_HINT.text);
+  });
+
+  it('drops the working hint once every turn settles', () => {
+    const store = makeStore();
+    store.set(promptQueueAtom, [{ id: 0, turnId: 't1', text: 'hi', state: 'settled' }]);
+
+    const { lastFrame } = renderWithJotai(<StatusBar />, store);
+
+    expect(lastFrame() ?? '').not.toContain(WORKING_STATUS_HINT.text);
+    expect(lastFrame() ?? '').toContain(DEFAULT_STATUS_HINTS);
+  });
+
+  it('keeps the backend loading hint ahead of the working hint', () => {
+    const store = makeStore();
+    store.set(startupStatusHintAtom, BACKEND_LOADING_HINT);
+    store.set(promptQueueAtom, [{ id: 0, turnId: 't1', text: 'hi', state: 'active' }]);
+
+    const { lastFrame } = renderWithJotai(<StatusBar />, store);
+
+    expect(lastFrame() ?? '').toContain(BACKEND_LOADING_HINT.text);
+    expect(lastFrame() ?? '').not.toContain(WORKING_STATUS_HINT.text);
   });
 });
