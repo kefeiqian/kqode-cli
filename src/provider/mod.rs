@@ -5,10 +5,16 @@
 pub mod error;
 pub mod id;
 pub mod kimi;
+pub mod models;
+pub mod registry;
 
 pub use error::ProviderError;
 pub use id::ProviderId;
 pub use kimi::KimiProvider;
+pub use models::{ModelInfo, ValidationOutcome, parse_models_response};
+pub use registry::{
+    CredentialSource, KeyResolver, KeySource, ProviderStatus, derive_status, validate_base_url,
+};
 
 use serde::Serialize;
 

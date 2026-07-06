@@ -5,17 +5,20 @@
 use std::future::ready;
 use std::time::Duration;
 
-use eventsource_stream::{Event, EventStreamError, Eventsource};
+use eventsource_stream::Eventsource;
 use futures_util::{Stream, StreamExt};
-use serde::Deserialize;
 use serde_json::json;
 
 use crate::config::KimiConfig;
 use crate::provider::error::ProviderError;
+use crate::provider::models::{ModelInfo, parse_models_response};
+use crate::provider::registry::validate_base_url;
 use crate::provider::{ProviderRequest, StreamEvent};
 
-/// SSE payload that marks the end of an OpenAI-compatible stream.
-const DONE_SENTINEL: &str = "[DONE]";
+mod streaming;
+use streaming::map_event;
+#[cfg(test)]
+use streaming::parse_chunk;
 
 /// Ceiling for establishing the TCP/TLS connection (not the whole stream).
 const CONNECT_TIMEOUT_SECS: u64 = 30;
@@ -30,6 +33,7 @@ pub struct KimiProvider {
     client: reqwest::Client,
     api_key: String,
     base_url: String,
+    model: String,
 }
 
 impl KimiProvider {
@@ -37,19 +41,29 @@ impl KimiProvider {
     ///
     /// # Errors
     ///
-    /// Returns [`ProviderError::Config`] when the base URL is not HTTPS or the
-    /// underlying HTTP client cannot be constructed.
+    /// Returns [`ProviderError::Config`] when the base URL is not a valid HTTPS
+    /// URL or the underlying HTTP client cannot be constructed.
     pub fn new(config: KimiConfig) -> Result<Self, ProviderError> {
-        if !config.base_url.starts_with("https://") {
-            return Err(ProviderError::Config(format!(
-                "base URL must use https, got `{}`",
-                config.base_url
-            )));
-        }
+        Self::from_endpoint(config.base_url, config.api_key, config.model)
+    }
 
+    /// Builds a neutral OpenAI-compatible client from endpoint parts.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError::Config`] when `base_url` is invalid or the HTTP
+    /// client cannot be constructed.
+    pub fn from_endpoint(
+        base_url: String,
+        api_key: String,
+        model: String,
+    ) -> Result<Self, ProviderError> {
         let client = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
             .read_timeout(Duration::from_secs(READ_TIMEOUT_SECS))
+            // Never follow redirects, so bearer auth cannot ride to another
+            // origin. TLS verification remains enabled by reqwest defaults.
+            .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|error| {
                 ProviderError::Config(format!("could not build HTTP client: {error}"))
@@ -57,8 +71,9 @@ impl KimiProvider {
 
         Ok(Self {
             client,
-            api_key: config.api_key,
-            base_url: config.base_url,
+            api_key,
+            base_url: validate_base_url(&base_url)?,
+            model,
         })
     }
 
@@ -77,8 +92,13 @@ impl KimiProvider {
         request: ProviderRequest,
     ) -> Result<impl Stream<Item = Result<StreamEvent, ProviderError>>, ProviderError> {
         let url = format!("{}/chat/completions", self.base_url);
+        let model = if request.model.trim().is_empty() {
+            &self.model
+        } else {
+            &request.model
+        };
         let body = json!({
-            "model": request.model,
+            "model": model,
             "stream": true,
             "messages": request.messages,
         });
@@ -111,6 +131,34 @@ impl KimiProvider {
 
         Ok(events)
     }
+
+    /// Fetches the OpenAI-compatible model catalog.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ProviderError`] if the request fails, the server responds
+    /// with a non-success status, or the catalog cannot be decoded.
+    pub async fn list_models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
+        let url = format!("{}/models", self.base_url);
+        let response = self
+            .client
+            .get(&url)
+            .bearer_auth(&self.api_key)
+            .send()
+            .await
+            .map_err(|error| ProviderError::Network(error.to_string()))?;
+
+        let status = response.status();
+        if !status.is_success() {
+            return Err(classify_status(status.as_u16()));
+        }
+
+        let body = response
+            .text()
+            .await
+            .map_err(|error| ProviderError::Network(error.to_string()))?;
+        parse_models_response(&body)
+    }
 }
 
 /// Maps HTTP status codes to typed provider errors.
@@ -120,73 +168,6 @@ fn classify_status(code: u16) -> ProviderError {
         429 => ProviderError::RateLimit,
         other => ProviderError::Network(format!("HTTP {other}")),
     }
-}
-
-/// Converts one SSE event (or framing error) into an optional stream event.
-fn map_event(
-    event: Result<Event, EventStreamError<reqwest::Error>>,
-) -> Result<Option<StreamEvent>, ProviderError> {
-    match event {
-        Ok(event) => parse_chunk(&event.data),
-        Err(error) => Err(ProviderError::Network(error.to_string())),
-    }
-}
-
-/// Parses one SSE `data:` payload into an optional [`StreamEvent`].
-///
-/// Returns `Ok(None)` for keep-alive/role-only chunks that carry no text and no
-/// finish reason, so the caller can drop them silently.
-///
-/// # Errors
-///
-/// Returns [`ProviderError::Decode`] when a non-sentinel payload is not valid
-/// chat-completion chunk JSON.
-fn parse_chunk(data: &str) -> Result<Option<StreamEvent>, ProviderError> {
-    let data = data.trim();
-    if data.is_empty() {
-        return Ok(None);
-    }
-    if data == DONE_SENTINEL {
-        return Ok(Some(StreamEvent::Done {
-            finish_reason: None,
-        }));
-    }
-
-    let chunk: ChatChunk =
-        serde_json::from_str(data).map_err(|error| ProviderError::Decode(error.to_string()))?;
-    let Some(choice) = chunk.choices.into_iter().next() else {
-        return Ok(None);
-    };
-
-    if let Some(content) = choice.delta.content
-        && !content.is_empty()
-    {
-        return Ok(Some(StreamEvent::Delta(content)));
-    }
-
-    Ok(choice.finish_reason.map(|reason| StreamEvent::Done {
-        finish_reason: Some(reason),
-    }))
-}
-
-#[derive(Deserialize)]
-struct ChatChunk {
-    #[serde(default)]
-    choices: Vec<ChunkChoice>,
-}
-
-#[derive(Deserialize)]
-struct ChunkChoice {
-    #[serde(default)]
-    delta: Delta,
-    #[serde(default)]
-    finish_reason: Option<String>,
-}
-
-#[derive(Default, Deserialize)]
-struct Delta {
-    #[serde(default)]
-    content: Option<String>,
 }
 
 #[cfg(test)]

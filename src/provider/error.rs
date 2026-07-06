@@ -52,11 +52,19 @@ impl ProviderError {
 impl fmt::Display for ProviderError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Auth => formatter.write_str("Kimi rejected the API key (authentication failed)"),
-            Self::RateLimit => formatter.write_str("Kimi rate limit reached; try again shortly"),
-            Self::Network(detail) => write!(formatter, "network error talking to Kimi: {detail}"),
-            Self::Decode(detail) => write!(formatter, "could not decode Kimi response: {detail}"),
-            Self::Config(detail) => write!(formatter, "invalid Kimi configuration: {detail}"),
+            Self::Auth => formatter.write_str(
+                "the provider rejected the API key (authentication failed)",
+            ),
+            Self::RateLimit => {
+                formatter.write_str("the provider rate limit was reached; try again shortly")
+            }
+            Self::Network(detail) => {
+                write!(formatter, "network error talking to the provider: {detail}")
+            }
+            Self::Decode(detail) => {
+                write!(formatter, "could not decode provider response: {detail}")
+            }
+            Self::Config(detail) => write!(formatter, "invalid provider configuration: {detail}"),
         }
     }
 }
