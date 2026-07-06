@@ -43,17 +43,23 @@ function resolveActiveModelLabel(
   selection: ActiveSelectionResult,
   providers: readonly ProviderStatusInfo[]
 ): string {
-  if (selection.providerId === null || selection.modelId === null) {
+  if (selection.providerId !== null && selection.modelId !== null) {
+    const provider = providers.find((candidate) => candidate.providerId === selection.providerId);
+    if (provider?.status !== PROVIDER_STATUS_CONNECTED) {
+      return NOT_CONFIGURED_HERE_MODEL_LABEL;
+    }
+    return formatModelLabel(provider.label || provider.providerId, selection.modelId, provider.credentialSource);
+  }
+
+  const defaultProvider = providers.find(
+    (provider) => provider.status === PROVIDER_STATUS_CONNECTED && provider.defaultModel !== null
+  );
+  if (defaultProvider === undefined || defaultProvider.defaultModel === null) {
     return NOT_CONFIGURED_MODEL_LABEL;
   }
-
-  const connectedProvider = providers.find(
-    (provider) =>
-      provider.providerId === selection.providerId && provider.status === PROVIDER_STATUS_CONNECTED
+  return formatModelLabel(
+    defaultProvider.label || defaultProvider.providerId,
+    defaultProvider.defaultModel,
+    defaultProvider.credentialSource
   );
-  if (connectedProvider === undefined) {
-    return NOT_CONFIGURED_HERE_MODEL_LABEL;
-  }
-
-  return formatModelLabel(connectedProvider.label || connectedProvider.providerId, selection.modelId);
 }

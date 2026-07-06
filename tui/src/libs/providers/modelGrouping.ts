@@ -4,7 +4,9 @@ import type {
   ModelListResult,
   ProviderStatusInfo
 } from '@contracts/backend/providerMessages.ts';
+import { PROVIDER_STATUS_CONNECTED } from '@contracts/backend/providerMessages.ts';
 import { sanitizeModelId } from '@libs/providers/sanitizeModelId.ts';
+import { appendProviderSourceTag } from '@libs/providers/statusLabel.ts';
 
 /** Input pair for a provider and its fetched model-list result. */
 export type ProviderModelsInput = {
@@ -39,7 +41,10 @@ export function groupProviderModels(
 ): ProviderModelGroup[] {
   return inputs.map(({ provider, modelList }) => ({
     providerId: provider.providerId,
-    label: provider.label,
+    label:
+      provider.status === PROVIDER_STATUS_CONNECTED
+        ? appendProviderSourceTag(provider.label, provider.credentialSource)
+        : provider.label,
     status: provider.status,
     listStatus: modelList.status,
     models: modelList.models.map((model) => {

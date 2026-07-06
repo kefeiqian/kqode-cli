@@ -4,7 +4,10 @@ import {
   MODEL_LIST_STATUS_FAILED
 } from '@contracts/backend/providerMessages.ts';
 import type { ModelHighlightIdentity, ModelSurfaceRow } from '@state/ui/model/index.ts';
-import { MODEL_LOAD_STATUS_LOADING } from '@state/ui/model/index.ts';
+import {
+  MODEL_LOAD_STATUS_LOADING,
+  MODEL_LOAD_STATUS_NOT_CONNECTED
+} from '@state/ui/model/index.ts';
 import { theme } from '@theme/themeConfig.ts';
 
 const SELECTED_MARKER = '›';
@@ -24,6 +27,14 @@ export function ModelRow({
 }) {
   if (row.type === 'provider') {
     return <Text color={theme.colors.accentBlue}>{truncate(row.label, columns)}</Text>;
+  }
+
+  if (row.type === 'status' && row.status === MODEL_LOAD_STATUS_NOT_CONNECTED) {
+    return (
+      <Text color={theme.colors.muted} wrap="truncate">
+        {truncate(statusLine(row, PLAIN_MARKER), columns)}
+      </Text>
+    );
   }
 
   const selected = isHighlighted(row, highlight);
@@ -53,6 +64,9 @@ function statusLine(row: Extract<ModelSurfaceRow, { type: 'status' }>, marker: s
   }
   if (row.status === MODEL_LIST_STATUS_EMPTY) {
     return `${marker}    (no models)`;
+  }
+  if (row.status === MODEL_LOAD_STATUS_NOT_CONNECTED) {
+    return `${marker}    (not connected — /login to add)`;
   }
   return `${marker}    ${row.status}`;
 }

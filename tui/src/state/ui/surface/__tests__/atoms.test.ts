@@ -16,6 +16,7 @@ const provider = (status: ProviderStatusInfo['status']): ProviderStatusInfo => (
   providerId: `provider-${status}`,
   label: `Provider ${status}`,
   baseUrl: null,
+  defaultModel: status === PROVIDER_STATUS_CONNECTED ? 'default-model' : null,
   status,
   credentialSource: status === PROVIDER_STATUS_CONNECTED ? 'keychain' : null
 });

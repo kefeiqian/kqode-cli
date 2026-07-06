@@ -3,8 +3,6 @@ import type { Getter, Setter } from 'jotai';
 import { MODEL_LIST_STATUS_LOADED } from '@contracts/backend/providerMessages.ts';
 import type {
   ActiveSelectionResult,
-  ModelInfoWire,
-  ModelListResult,
   ProviderStatusInfo
 } from '@contracts/backend/providerMessages.ts';
 import {
@@ -15,11 +13,12 @@ import {
 import type { ProviderModelGroup, ProviderModelRow } from '@libs/providers/index.ts';
 import { clamp } from '@libs/math/clamp.ts';
 import { MODEL_LOAD_STATUS_LOADING } from '@state/ui/model/constants.ts';
+import type { ModelLoadStatus, ProviderModelLoad } from '@state/ui/model/providerLoads.ts';
 import { identityEquals, rowIdentity, toWireList } from '@state/ui/model/rowIdentity.ts';
-
-export type ModelLoadStatus = ModelListResult['status'] | typeof MODEL_LOAD_STATUS_LOADING;
-
-export type ProviderModelLoad = { status: ModelLoadStatus; models: ModelInfoWire[] };
+import {
+  initialProviderModelLoads,
+  isFocusableModelStatus
+} from '@state/ui/model/providerLoads.ts';
 
 /** Identity anchor for the highlighted focusable row. */
 export type ModelHighlightIdentity = { providerId: string; modelId: string | null };
@@ -51,13 +50,10 @@ export const resetModelSurfaceAtom = atom(null, (_get, set) => {
   set(modelWindowOffsetAtom, 0);
 });
 
-/** Stores connected providers and marks each provider as loading immediately. */
+/** Stores providers and marks each connected provider as loading immediately. */
 export const setModelProvidersLoadingAtom = atom(null, (get, set, providers: ProviderStatusInfo[]) => {
   set(modelProvidersAtom, providers);
-  set(
-    providerModelLoadsAtom,
-    Object.fromEntries(providers.map((provider) => [provider.providerId, { status: MODEL_LOAD_STATUS_LOADING, models: [] }]))
-  );
+  set(providerModelLoadsAtom, initialProviderModelLoads(providers));
   ensureHighlight(get, set);
 });
 
@@ -143,7 +139,9 @@ export const modelRowsAtom = atom<ModelSurfaceRow[]>((get) => {
 });
 
 export const modelFocusableRowsAtom = atom((get) => {
-  return get(modelRowsAtom).filter((row) => row.type === 'model' || row.type === 'status');
+  return get(modelRowsAtom).filter(
+    (row) => row.type === 'model' || (row.type === 'status' && isFocusableModelStatus(row.status))
+  );
 });
 
 function ensureHighlight(get: Getter, set: Setter, visualRow?: number | null) {

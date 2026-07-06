@@ -87,6 +87,7 @@ export type ProviderStatusInfo = {
   providerId: string;
   label: string;
   baseUrl: string | null;
+  defaultModel: string | null;
   status: ProviderStatus;
   credentialSource: CredentialSource | null;
 };

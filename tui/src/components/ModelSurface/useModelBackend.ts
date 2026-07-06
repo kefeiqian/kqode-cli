@@ -6,7 +6,11 @@ import {
   MODEL_LIST_STATUS_LOADED,
   PROVIDER_STATUS_CONNECTED
 } from '@contracts/backend/providerMessages.ts';
-import type { ModelListResult, ProviderStatusInfo } from '@contracts/backend/providerMessages.ts';
+import type {
+  ActiveSelectionResult,
+  ModelListResult,
+  ProviderStatusInfo
+} from '@contracts/backend/providerMessages.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { openLoginSurfaceAtom } from '@state/ui/index.ts';
 import {
@@ -69,8 +73,8 @@ export function useModelBackend(onSelected: () => void) {
         openLogin();
         return;
       }
-      setProvidersLoading(connected);
-      setActiveSelection(active);
+      setProvidersLoading(providerList.providers);
+      setActiveSelection(effectiveSelection(active, providerList.providers));
       connected.forEach((provider) => void loadProviderModels(provider.providerId, version));
     } catch {
       if (requestVersion.current === version) {
@@ -99,4 +103,22 @@ function normalizeListResult(result: ModelListResult): ModelListResult {
     return { status: MODEL_LIST_STATUS_EMPTY, models: [] };
   }
   return result;
+}
+
+function effectiveSelection(
+  active: ActiveSelectionResult,
+  providers: readonly ProviderStatusInfo[]
+): ActiveSelectionResult {
+  if (active.providerId !== null && active.modelId !== null) {
+    const provider = providers.find((candidate) => candidate.providerId === active.providerId);
+    if (provider?.status === PROVIDER_STATUS_CONNECTED) {
+      return active;
+    }
+  }
+  const provider = providers.find(
+    (candidate) => candidate.status === PROVIDER_STATUS_CONNECTED && candidate.defaultModel !== null
+  );
+  return provider?.defaultModel === undefined || provider.defaultModel === null
+    ? active
+    : { providerId: provider.providerId, modelId: provider.defaultModel };
 }

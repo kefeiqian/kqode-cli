@@ -27,6 +27,7 @@ describe('login atoms', () => {
         providerId: PROVIDER_ID_KIMI,
         label: 'Kimi',
         baseUrl: null,
+        defaultModel: null,
         status: PROVIDER_STATUS_NOT_CONFIGURED,
         credentialSource: null
       },
@@ -34,6 +35,7 @@ describe('login atoms', () => {
         providerId: PROVIDER_ID_CUSTOM,
         label: 'Custom',
         baseUrl: 'https://api.example.test/v1',
+        defaultModel: null,
         status: PROVIDER_STATUS_CONNECTED,
         credentialSource: CREDENTIAL_SOURCE_KEYCHAIN
       }

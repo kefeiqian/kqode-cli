@@ -17,6 +17,7 @@ const inputs: ProviderModelsInput[] = [
       providerId: 'kimi',
       label: 'Kimi',
       baseUrl: 'https://api.moonshot.cn/v1',
+      defaultModel: 'kimi-k2.7-code',
       status: PROVIDER_STATUS_CONNECTED,
       credentialSource: CREDENTIAL_SOURCE_KEYCHAIN
     },
@@ -33,6 +34,7 @@ const inputs: ProviderModelsInput[] = [
       providerId: 'custom',
       label: 'Custom',
       baseUrl: 'https://models.example/v1',
+      defaultModel: null,
       status: PROVIDER_STATUS_CONNECTED,
       credentialSource: CREDENTIAL_SOURCE_KEYCHAIN
     },

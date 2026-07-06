@@ -28,3 +28,20 @@ export function statusLabel(
 
   return 'not configured';
 }
+
+/** Formats a short provider-header credential source tag. */
+export function providerSourceTag(source: CredentialSource | null): string | null {
+  if (source === CREDENTIAL_SOURCE_KEYCHAIN) {
+    return 'via keychain';
+  }
+  if (source === CREDENTIAL_SOURCE_ENV) {
+    return 'via .env';
+  }
+  return null;
+}
+
+/** Appends the short provider-header credential source tag when present. */
+export function appendProviderSourceTag(label: string, source: CredentialSource | null): string {
+  const tag = providerSourceTag(source);
+  return tag === null ? label : `${label} (${tag})`;
+}

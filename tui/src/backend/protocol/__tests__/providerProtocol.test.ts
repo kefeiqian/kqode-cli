@@ -61,6 +61,7 @@ describe('provider protocol client', () => {
           providerId: 'kimi',
           label: 'Kimi',
           baseUrl: 'https://api.moonshot.cn/v1',
+          defaultModel: 'kimi-k2.7-code',
           status: 'connected',
           credentialSource: 'keychain'
         }
@@ -74,6 +75,7 @@ describe('provider protocol client', () => {
           providerId: 'kimi',
           label: 'Kimi',
           baseUrl: 'https://api.moonshot.cn/v1',
+          defaultModel: 'kimi-k2.7-code',
           status: 'connected',
           credentialSource: 'keychain'
         }

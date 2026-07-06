@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { StatusBar } from '@components/StatusBar.tsx';
 import type { BackendClient, ProviderStatusInfo } from '@contracts/backend/index.ts';
 import {
+  CREDENTIAL_SOURCE_KEYCHAIN,
   PROVIDER_STATUS_CONNECTED,
   PROVIDER_STATUS_NOT_CONFIGURED
 } from '@contracts/backend/index.ts';
@@ -75,11 +76,11 @@ describe('StatusBar', () => {
     const { lastFrame } = renderWithJotai(<StatusBar />, store);
 
     await vi.waitFor(() => {
-      expect(lastFrame() ?? '').toContain(formatModelLabel('Kimi', 'moonshot-v1'));
+      expect(lastFrame() ?? '').toContain(formatModelLabel('Kimi', 'moonshot-v1', CREDENTIAL_SOURCE_KEYCHAIN));
     });
   });
 
-  it('shows not configured when no active selection exists', async () => {
+  it('shows the effective default model when no active selection exists', async () => {
     const store = makeStore();
     store.set(backendClientAtom, clientWith({ providers: [provider('kimi', 'Kimi')] }));
 
@@ -87,7 +88,7 @@ describe('StatusBar', () => {
 
     await vi.waitFor(() => {
       const output = lastFrame() ?? '';
-      expect(output).toContain(NOT_CONFIGURED_MODEL_LABEL);
+      expect(output).toContain(formatModelLabel('Kimi', 'moonshot-v1', CREDENTIAL_SOURCE_KEYCHAIN));
     });
   });
 
@@ -138,8 +139,9 @@ function provider(
     providerId,
     label,
     baseUrl: null,
+    defaultModel: status === PROVIDER_STATUS_CONNECTED ? 'moonshot-v1' : null,
     status,
-    credentialSource: status === PROVIDER_STATUS_CONNECTED ? 'keychain' : null
+    credentialSource: status === PROVIDER_STATUS_CONNECTED ? CREDENTIAL_SOURCE_KEYCHAIN : null
   };
 }
 

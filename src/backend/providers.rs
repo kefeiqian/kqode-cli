@@ -38,6 +38,9 @@ pub(crate) fn provider_list(store: Option<&Store>) -> ProviderListResult {
                     .as_ref()
                     .map(|settings| settings.base_url.clone())
                     .or_else(|| descriptor_base_url(descriptor.endpoint)),
+                default_model: registry::provider_descriptor(descriptor.id)
+                    .default_model
+                    .map(str::to_owned),
                 status,
                 credential_source,
             }

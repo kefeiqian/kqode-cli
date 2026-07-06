@@ -12,13 +12,19 @@ import { backendClientAtom } from '@state/global/index.ts';
 import { activeSurfaceAtom, columnsTestOverrideAtom, rowsTestOverrideAtom, Surface } from '@state/ui/index.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
-export function provider(providerId: string, label = providerId, connected = true): ProviderStatusInfo {
+export function provider(
+  providerId: string,
+  label = providerId,
+  connected = true,
+  source: ProviderStatusInfo['credentialSource'] = connected ? 'keychain' : null
+): ProviderStatusInfo {
   return {
     providerId,
     label,
     baseUrl: null,
+    defaultModel: connected ? `${providerId}-default` : null,
     status: connected ? PROVIDER_STATUS_CONNECTED : PROVIDER_STATUS_NOT_CONFIGURED,
-    credentialSource: connected ? 'keychain' : null
+    credentialSource: source
   };
 }
 

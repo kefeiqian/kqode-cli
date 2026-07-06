@@ -86,6 +86,10 @@ fn provider_list_empty_store_without_env_marks_kimi_not_configured() {
         .unwrap();
     assert_eq!(kimi.status, PROVIDER_STATUS_NOT_CONFIGURED);
     assert_eq!(kimi.credential_source, None);
+    assert_eq!(
+        kimi.default_model.as_deref(),
+        Some(crate::config::DEFAULT_KIMI_MODEL)
+    );
 }
 
 #[test]

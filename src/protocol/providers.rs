@@ -66,6 +66,7 @@ pub struct ProviderStatusInfo {
     pub provider_id: String,
     pub label: String,
     pub base_url: Option<String>,
+    pub default_model: Option<String>,
     pub status: &'static str,
     pub credential_source: Option<&'static str>,
 }

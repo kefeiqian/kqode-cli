@@ -2,6 +2,8 @@ import { createStore } from 'jotai';
 import { describe, expect, it } from 'vitest';
 import type { BackendClient, ProviderStatusInfo, SetKeyParams } from '@contracts/backend/index.ts';
 import {
+  CREDENTIAL_SOURCE_ENV,
+  CREDENTIAL_SOURCE_KEYCHAIN,
   PROVIDER_STATUS_CONNECTED,
   PROVIDER_STATUS_NOT_CONFIGURED
 } from '@contracts/backend/index.ts';
@@ -33,12 +35,53 @@ describe('activeModel atoms', () => {
 
     await store.set(refreshActiveModelAtom);
 
-    expect(store.get(activeModelLabelAtom)).toBe(formatModelLabel('Kimi', 'moonshot-v1'));
+    expect(store.get(activeModelLabelAtom)).toBe(formatModelLabel('Kimi', 'moonshot-v1', CREDENTIAL_SOURCE_KEYCHAIN));
   });
 
-  it('shows not configured when the global selection is empty', async () => {
+  it('uses the first connected provider default model when the global selection is empty', async () => {
     const store = createStore();
-    store.set(backendClientAtom, clientWith({ providers: [provider('kimi', 'Kimi')] }));
+    store.set(
+      backendClientAtom,
+      clientWith({
+        providers: [provider('kimi', 'Kimi', PROVIDER_STATUS_CONNECTED, CREDENTIAL_SOURCE_ENV, 'kimi-k2.7-code')]
+      })
+    );
+
+    await store.set(refreshActiveModelAtom);
+
+    expect(store.get(activeModelLabelAtom)).toBe(formatModelLabel('Kimi', 'kimi-k2.7-code', CREDENTIAL_SOURCE_ENV));
+  });
+
+  it('shows not configured when no connected provider has a default model', async () => {
+    const store = createStore();
+    store.set(
+      backendClientAtom,
+      clientWith({
+        providers: [
+          provider(
+            'custom',
+            'Custom',
+            PROVIDER_STATUS_CONNECTED,
+            CREDENTIAL_SOURCE_KEYCHAIN,
+            null
+          )
+        ]
+      })
+    );
+
+    await store.set(refreshActiveModelAtom);
+
+    expect(store.get(activeModelLabelAtom)).toBe(NOT_CONFIGURED_MODEL_LABEL);
+  });
+
+  it('shows not configured when nothing is connected', async () => {
+    const store = createStore();
+    store.set(
+      backendClientAtom,
+      clientWith({
+        providers: [provider('kimi', 'Kimi', PROVIDER_STATUS_NOT_CONFIGURED)]
+      })
+    );
 
     await store.set(refreshActiveModelAtom);
 
@@ -71,21 +114,24 @@ describe('activeModel atoms', () => {
     await client.setProviderKey({ providerId: 'kimi', baseUrl: null, label: null, apiKey: 'secret' });
     await store.set(refreshActiveModelAtom);
 
-    expect(store.get(activeModelLabelAtom)).toBe(formatModelLabel('Kimi', 'moonshot-v1'));
+    expect(store.get(activeModelLabelAtom)).toBe(formatModelLabel('Kimi', 'moonshot-v1', CREDENTIAL_SOURCE_KEYCHAIN));
   });
 });
 
 function provider(
   providerId: string,
   label = providerId,
-  status: ProviderStatusInfo['status'] = PROVIDER_STATUS_CONNECTED
+  status: ProviderStatusInfo['status'] = PROVIDER_STATUS_CONNECTED,
+  source: ProviderStatusInfo['credentialSource'] = status === PROVIDER_STATUS_CONNECTED ? CREDENTIAL_SOURCE_KEYCHAIN : null,
+  defaultModel: string | null = status === PROVIDER_STATUS_CONNECTED ? 'moonshot-v1' : null
 ): ProviderStatusInfo {
   return {
     providerId,
     label,
     baseUrl: null,
+    defaultModel,
     status,
-    credentialSource: status === PROVIDER_STATUS_CONNECTED ? 'keychain' : null
+    credentialSource: source
   };
 }
 

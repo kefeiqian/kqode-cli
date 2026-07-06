@@ -28,6 +28,7 @@ export function provider(
       providerId === PROVIDER_ID_CUSTOM && status === PROVIDER_STATUS_CONNECTED
         ? 'https://api.old.test/v1'
         : null,
+    defaultModel: providerId === PROVIDER_ID_KIMI ? 'kimi-k2.7-code' : null,
     status,
     credentialSource: source
   };

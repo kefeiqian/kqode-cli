@@ -4,7 +4,8 @@ import {
   MODEL_LIST_STATUS_EMPTY,
   MODEL_LIST_STATUS_FAILED,
   MODEL_LIST_STATUS_LOADED,
-  PROVIDER_STATUS_CONNECTED
+  PROVIDER_STATUS_CONNECTED,
+  PROVIDER_STATUS_NOT_CONFIGURED
 } from '@contracts/backend/providerMessages.ts';
 import type { ProviderStatusInfo } from '@contracts/backend/providerMessages.ts';
 import {
@@ -13,6 +14,7 @@ import {
   modelRowsAtom,
   modelVisibleRowsAtom,
   modelWindowOffsetAtom,
+  MODEL_LOAD_STATUS_NOT_CONNECTED,
   moveModelHighlightAtom,
   setModelActiveSelectionAtom,
   setModelProvidersLoadingAtom,
@@ -23,6 +25,7 @@ const provider = (providerId: string): ProviderStatusInfo => ({
   providerId,
   label: providerId,
   baseUrl: null,
+  defaultModel: `${providerId}-default`,
   status: PROVIDER_STATUS_CONNECTED,
   credentialSource: 'keychain'
 });
@@ -62,5 +65,26 @@ describe('model atoms', () => {
     store.set(setModelActiveSelectionAtom, { providerId: 'b', modelId: 'b1' });
     expect(store.get(modelActiveSelectionAtom)).toEqual({ providerId: 'b', modelId: 'b1' });
     expect(store.get(modelRowsAtom).some((row) => row.type === 'status')).toBe(true);
+  });
+
+  it('renders not-connected providers without making them focusable', () => {
+    const store = createStore();
+    store.set(setModelProvidersLoadingAtom, [
+      provider('kimi'),
+      {
+        ...provider('custom'),
+        defaultModel: null,
+        status: PROVIDER_STATUS_NOT_CONFIGURED,
+        credentialSource: null
+      }
+    ]);
+
+    const rows = store.get(modelRowsAtom);
+    expect(rows).toContainEqual({
+      type: 'status',
+      providerId: 'custom',
+      status: MODEL_LOAD_STATUS_NOT_CONNECTED
+    });
+    expect(store.get(modelHighlightAtom)).toEqual({ providerId: 'kimi', modelId: null });
   });
 });
