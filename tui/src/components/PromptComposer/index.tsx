@@ -92,6 +92,14 @@ export function PromptComposer({
           )
       : (prompt: string) => onSubmit(prompt);
   const resolvedIsActive = isActive ?? (!atomInputLocked && !copyModeActive);
+  // The caret tracks the prompt whenever the composer owns the screen — even
+  // while startup input is locked. Without this, during backend loading the
+  // composer sets no cursor position, and on the Windows fullscreen repaint
+  // path Ink leaves the hardware cursor at the end of the last output row (the
+  // status bar / model label) instead of hiding it. Copy Mode is the one
+  // deliberate exception: it releases the cursor to the terminal for native
+  // selection.
+  const caretTracksPrompt = isActive ?? !copyModeActive;
   const resolvedMaxVisibleLines = maxVisibleLines ?? atomLayout.composerVisibleRows ?? DEFAULT_COMPOSER_VISIBLE_LINES;
   const resolvedCursorTop = cursorTop ?? atomComposerTop;
   const resolvedVisibleRowsChange = onVisibleRowsChange ?? setComposerRows;
@@ -160,7 +168,7 @@ export function PromptComposer({
   }, [state.cursorIndex, state.text, scrollCursorIntoView]);
 
   if (
-    resolvedIsActive &&
+    caretTracksPrompt &&
     composerMetrics.hasMeasured &&
     composerWindow.cursorVisible &&
     !caretSuppressed
