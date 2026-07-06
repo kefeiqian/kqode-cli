@@ -7,4 +7,5 @@ pub mod git;
 pub mod paths;
 pub mod protocol;
 pub mod provider;
+pub mod secrets;
 pub mod store;

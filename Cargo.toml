@@ -20,9 +20,11 @@ path = "main.rs"
 dotenvy = "0.15.7"
 eventsource-stream = "0.2.3"
 futures-util = "0.3.32"
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
 lsp-server = "0.7"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "json"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
+secrecy = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1.52.3", default-features = false, features = ["rt", "net", "time", "process"] }
