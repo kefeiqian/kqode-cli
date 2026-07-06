@@ -8,7 +8,7 @@ function clientWithGitStatus(gitStatus: BackendClient['gitStatus']): BackendClie
   return {
     submitStreaming: vi.fn(),
     gitStatus,
-    listProviders: async () => [],
+    listProviders: async () => ({ persistenceAvailable: true, providers: [] }),
     getActiveSelection: async () => ({ providerId: null, modelId: null }),
     setActiveSelection: async () => {},
     clearProviderKey: async () => {},

@@ -52,11 +52,11 @@ export const openModelSurfaceAtom = atom(null, async (get, set) => {
   set(surfaceNavigationVersionAtom, requestVersion);
 
   try {
-    const providers = await client.listProviders();
+    const providerList = await client.listProviders();
     if (get(surfaceNavigationVersionAtom) !== requestVersion) {
       return;
     }
-    const nextSurface = providers.some((provider) => provider.status === PROVIDER_STATUS_CONNECTED)
+    const nextSurface = providerList.providers.some((provider) => provider.status === PROVIDER_STATUS_CONNECTED)
       ? Surface.Model
       : Surface.Login;
     set(activeSurfaceAtom, nextSurface);

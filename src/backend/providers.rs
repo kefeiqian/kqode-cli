@@ -12,19 +12,19 @@ use crate::secrets::KeychainError;
 use crate::store::{ActiveSelection, ProviderSettings, Store};
 
 /// Builds provider status rows from SQLite's cached key-present bit and Kimi's
-/// environment fallback, without reading the OS keychain.
+/// fixed-endpoint fallbacks when persistence is degraded.
 #[must_use]
 pub(crate) fn provider_list(store: Option<&Store>) -> ProviderListResult {
     let providers = registry::PROVIDERS
         .iter()
         .map(|descriptor| {
             let settings = provider_settings(store, descriptor.id);
-            let source = key_source(descriptor.id, settings.as_ref());
+            let source = key_source(descriptor.id, settings.as_ref(), store.is_some());
             let status = registry::derive_status(descriptor.id, &move |provider| {
                 if provider == descriptor.id {
                     source
                 } else {
-                    key_source(provider, None)
+                    key_source(provider, None, store.is_some())
                 }
             });
             let (status, credential_source) = status_fields(status);
@@ -43,7 +43,10 @@ pub(crate) fn provider_list(store: Option<&Store>) -> ProviderListResult {
             }
         })
         .collect();
-    ProviderListResult { providers }
+    ProviderListResult {
+        persistence_available: store.is_some(),
+        providers,
+    }
 }
 
 /// Reads the active selection, returning nulls when persistence is degraded or unset.
@@ -104,8 +107,18 @@ fn provider_settings(store: Option<&Store>, provider: ProviderId) -> Option<Prov
     store.and_then(|store| store.provider_settings(provider).ok().flatten())
 }
 
-fn key_source(provider: ProviderId, settings: Option<&ProviderSettings>) -> KeySource {
+fn key_source(
+    provider: ProviderId,
+    settings: Option<&ProviderSettings>,
+    persistence_available: bool,
+) -> KeySource {
     if settings.is_some_and(|settings| settings.key_present) {
+        return KeySource::Keychain;
+    }
+    if !persistence_available
+        && provider == ProviderId::Kimi
+        && matches!(crate::secrets::get_key(provider), Ok(Some(_)))
+    {
         return KeySource::Keychain;
     }
     if provider == ProviderId::Kimi

@@ -27,7 +27,7 @@ function clientWithSubmit(
 ): BackendClient {
   return {
     gitStatus: async () => null,
-    listProviders: async () => [],
+    listProviders: async () => ({ persistenceAvailable: true, providers: [] }),
     getActiveSelection: async () => ({ providerId: null, modelId: null }),
     setActiveSelection: async () => {},
     clearProviderKey: async () => {},

@@ -1,9 +1,12 @@
 use super::*;
 use crate::login::sanitize::sanitize_model_id;
-use crate::login::selection::{persist_connected_provider, select_default_model, set_key_outcome};
+use crate::login::selection::{
+    persist_connected_provider, persist_session_only, select_default_model, set_key_outcome,
+};
 use crate::protocol::{
     SET_KEY_OUTCOME_AUTH_FAILED, SET_KEY_OUTCOME_CONNECTED, SET_KEY_OUTCOME_EMPTY_CATALOG,
-    SET_KEY_OUTCOME_NOT_COMPATIBLE, SET_KEY_OUTCOME_RATE_LIMITED, SET_KEY_OUTCOME_UNREACHABLE,
+    SET_KEY_OUTCOME_NOT_COMPATIBLE, SET_KEY_OUTCOME_RATE_LIMITED, SET_KEY_OUTCOME_STORE_FAILED,
+    SET_KEY_OUTCOME_UNREACHABLE,
 };
 use crate::provider::ModelInfo;
 
@@ -106,6 +109,70 @@ fn connect_path_sanitizes_selected_and_persisted_model_id() {
     assert_eq!(result.selected_model.as_deref(), Some("gpt-4o-mini"));
     let selection = store.active_selection().unwrap().expect("active selection");
     assert_eq!(selection.model_id, "gpt-4o-mini");
+}
+
+#[test]
+fn degraded_kimi_connect_writes_keychain_only_and_returns_selected_model() {
+    let work = SetKeyWork {
+        provider: ProviderId::Kimi,
+        base_url: crate::config::DEFAULT_KIMI_BASE_URL.to_owned(),
+        label: None,
+        key: ApiKey::new("sk-session-kimi".to_owned()),
+    };
+    let mut wrote_key = false;
+    let result = persist_session_only(
+        &work,
+        &[model(crate::config::DEFAULT_KIMI_MODEL)],
+        |provider, _| {
+            wrote_key = provider == ProviderId::Kimi;
+            Ok(())
+        },
+    )
+    .unwrap();
+
+    assert!(wrote_key);
+    assert_eq!(result.outcome, SET_KEY_OUTCOME_CONNECTED);
+    assert_eq!(
+        result.selected_model.as_deref(),
+        Some(crate::config::DEFAULT_KIMI_MODEL)
+    );
+}
+
+#[test]
+fn degraded_kimi_connect_reports_store_failed_when_keychain_write_fails() {
+    let work = SetKeyWork {
+        provider: ProviderId::Kimi,
+        base_url: crate::config::DEFAULT_KIMI_BASE_URL.to_owned(),
+        label: None,
+        key: ApiKey::new("sk-session-kimi".to_owned()),
+    };
+    let result = persist_session_only(
+        &work,
+        &[model(crate::config::DEFAULT_KIMI_MODEL)],
+        |_, _| Err(crate::secrets::KeychainError::Backend),
+    )
+    .unwrap_or_else(|()| crate::login::selection::store_failed());
+
+    assert_eq!(result.outcome, SET_KEY_OUTCOME_STORE_FAILED);
+}
+
+#[test]
+fn degraded_custom_connect_refuses_without_writing_keychain() {
+    let work = SetKeyWork {
+        provider: ProviderId::Custom,
+        base_url: "https://example.test/v1".to_owned(),
+        label: None,
+        key: ApiKey::new("sk-custom".to_owned()),
+    };
+    let mut wrote_key = false;
+    let result = persist_session_only(&work, &[model("gpt-4o-mini")], |_, _| {
+        wrote_key = true;
+        Ok(())
+    })
+    .unwrap_or_else(|()| crate::login::selection::store_failed());
+
+    assert!(!wrote_key);
+    assert_eq!(result.outcome, SET_KEY_OUTCOME_STORE_FAILED);
 }
 
 #[test]

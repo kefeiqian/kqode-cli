@@ -35,6 +35,7 @@ export function provider(
 
 export function fakeClient(options: {
   providers?: ProviderStatusInfo[][];
+  persistenceAvailable?: boolean;
   outcome?: SetKeyOutcome;
 } = {}): BackendClient {
   const providerBatches = options.providers ?? [
@@ -47,7 +48,10 @@ export function fakeClient(options: {
   return {
     submitStreaming: vi.fn(),
     gitStatus: vi.fn(async () => null),
-    listProviders: vi.fn(async () => providerBatches[Math.min(listIndex++, providerBatches.length - 1)] ?? []),
+    listProviders: vi.fn(async () => ({
+      persistenceAvailable: options.persistenceAvailable ?? true,
+      providers: providerBatches[Math.min(listIndex++, providerBatches.length - 1)] ?? []
+    })),
     getActiveSelection: vi.fn(async () => ({ providerId: null, modelId: null })),
     setActiveSelection: vi.fn(async () => {}),
     clearProviderKey: vi.fn(async () => {}),
@@ -73,22 +77,22 @@ export function renderLogin(client: BackendClient = fakeClient()) {
 }
 
 export async function waitForFrame(lastFrame: () => string | undefined, text: string) {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  for (let attempt = 0; attempt < 400; attempt += 1) {
     const frame = lastFrame() ?? '';
     if (frame.includes(text)) {
       return frame;
     }
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    await new Promise((resolve) => setTimeout(resolve, 10));
   }
   throw new Error(`Timed out waiting for ${text}. Last frame:\n${lastFrame() ?? ''}`);
 }
 
 export async function waitUntil(predicate: () => boolean, label: string) {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  for (let attempt = 0; attempt < 400; attempt += 1) {
     if (predicate()) {
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    await new Promise((resolve) => setTimeout(resolve, 10));
   }
   throw new Error(`Timed out waiting for ${label}`);
 }

@@ -55,6 +55,7 @@ describe('provider protocol client', () => {
   it('lists providers from the backend result', async () => {
     const { client, server } = pairedConnections();
     server.onRequest(providerListRequest, () => ({
+      persistenceAvailable: true,
       providers: [
         {
           providerId: 'kimi',
@@ -66,15 +67,18 @@ describe('provider protocol client', () => {
       ]
     }));
 
-    await expect(createMessageConnectionClient(client).listProviders()).resolves.toEqual([
-      {
-        providerId: 'kimi',
-        label: 'Kimi',
-        baseUrl: 'https://api.moonshot.cn/v1',
-        status: 'connected',
-        credentialSource: 'keychain'
-      }
-    ]);
+    await expect(createMessageConnectionClient(client).listProviders()).resolves.toEqual({
+      persistenceAvailable: true,
+      providers: [
+        {
+          providerId: 'kimi',
+          label: 'Kimi',
+          baseUrl: 'https://api.moonshot.cn/v1',
+          status: 'connected',
+          credentialSource: 'keychain'
+        }
+      ]
+    });
   });
 
   it('round-trips active selection get and set params', async () => {

@@ -27,11 +27,11 @@ export const refreshActiveModelAtom = atom(null, async (get, set) => {
   }
 
   try {
-    const [selection, providers] = await Promise.all([client.getActiveSelection(), client.listProviders()]);
+    const [selection, providerList] = await Promise.all([client.getActiveSelection(), client.listProviders()]);
     if (get(activeModelRefreshVersionAtom) !== requestVersion) {
       return;
     }
-    set(activeModelLabelStateAtom, resolveActiveModelLabel(selection, providers));
+    set(activeModelLabelStateAtom, resolveActiveModelLabel(selection, providerList.providers));
   } catch {
     if (get(activeModelRefreshVersionAtom) === requestVersion) {
       set(activeModelLabelStateAtom, NOT_CONFIGURED_MODEL_LABEL);

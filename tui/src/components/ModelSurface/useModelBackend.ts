@@ -57,14 +57,14 @@ export function useModelBackend(onSelected: () => void) {
     requestVersion.current = version;
 
     try {
-      const [providers, active] = await Promise.all([
+      const [providerList, active] = await Promise.all([
         client.listProviders(),
         client.getActiveSelection().catch(() => ({ providerId: null, modelId: null }))
       ]);
       if (requestVersion.current !== version) {
         return;
       }
-      const connected = providers.filter((provider) => provider.status === PROVIDER_STATUS_CONNECTED);
+      const connected = providerList.providers.filter((provider) => provider.status === PROVIDER_STATUS_CONNECTED);
       if (connected.length === 0) {
         openLogin();
         return;

@@ -135,7 +135,7 @@ function clientWith({
   return {
     submitStreaming: async () => ({ kind: 'completed', text: '', finishReason: null }),
     gitStatus: async () => null,
-    listProviders: async () => providers,
+    listProviders: async () => ({ persistenceAvailable: true, providers }),
     getActiveSelection: async () => active,
     setActiveSelection: async () => {},
     clearProviderKey: async () => {},

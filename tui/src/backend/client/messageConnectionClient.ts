@@ -140,7 +140,7 @@ export function createMessageConnectionClient(
           connection.sendRequest(providerListRequest),
           requestTimeoutMs
         );
-        return result.providers;
+        return result;
       } catch (error) {
         throw toBackendClientError(error);
       }

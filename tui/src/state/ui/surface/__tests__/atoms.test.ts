@@ -23,7 +23,7 @@ const provider = (status: ProviderStatusInfo['status']): ProviderStatusInfo => (
 const clientWithProviders = (providers: ProviderStatusInfo[]): BackendClient => ({
   submitStreaming: vi.fn(),
   gitStatus: async () => null,
-  listProviders: async () => providers,
+  listProviders: async () => ({ persistenceAvailable: true, providers }),
   getActiveSelection: async () => ({ providerId: null, modelId: null }),
   setActiveSelection: async () => {},
   clearProviderKey: async () => {},
@@ -96,7 +96,7 @@ describe('surface atoms', () => {
     const pending = deferredProviders();
     store.set(backendClientAtom, {
       ...clientWithProviders([]),
-      listProviders: () => pending.promise
+      listProviders: async () => ({ persistenceAvailable: true, providers: await pending.promise })
     });
 
     const openModel = store.set(openModelSurfaceAtom);

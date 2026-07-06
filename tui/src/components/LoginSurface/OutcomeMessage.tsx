@@ -9,6 +9,7 @@ import {
   SET_KEY_OUTCOME_UNREACHABLE
 } from '@contracts/backend/providerMessages.ts';
 import type { SetKeyOutcome } from '@contracts/backend/providerMessages.ts';
+import { PROVIDER_ID_CUSTOM } from '@state/ui/login/index.ts';
 import { theme } from '@theme/themeConfig.ts';
 
 const OUTCOME_MESSAGES: Record<SetKeyOutcome, { color: string; text: string }> = {
@@ -43,9 +44,13 @@ const OUTCOME_MESSAGES: Record<SetKeyOutcome, { color: string; text: string }> =
 };
 
 /** Themed set-key result copy keyed by backend outcome constants. */
-export function OutcomeMessage({ outcome }: { outcome: SetKeyOutcome | null }) {
+export function OutcomeMessage({ outcome, providerId }: { outcome: SetKeyOutcome | null; providerId: string | null }) {
   if (outcome === null) {
     return null;
+  }
+
+  if (outcome === SET_KEY_OUTCOME_STORE_FAILED && providerId === PROVIDER_ID_CUSTOM) {
+    return <Text color={theme.colors.errorRed}>Custom can&apos;t be saved while settings storage is unavailable.</Text>;
   }
 
   const message = OUTCOME_MESSAGES[outcome];

@@ -78,6 +78,7 @@ fn active_selection_core_is_null_when_unset() {
 fn provider_list_empty_store_without_env_marks_kimi_not_configured() {
     let (_dir, store, _env) = bootstrap();
     let result = provider_list(Some(&store));
+    assert!(result.persistence_available);
     let kimi = result
         .providers
         .iter()
@@ -85,6 +86,39 @@ fn provider_list_empty_store_without_env_marks_kimi_not_configured() {
         .unwrap();
     assert_eq!(kimi.status, PROVIDER_STATUS_NOT_CONFIGURED);
     assert_eq!(kimi.credential_source, None);
+}
+
+#[test]
+fn provider_list_without_store_reports_degraded_persistence() {
+    let lock = test_env::lock();
+    let dir = tempfile::tempdir().expect("temp dir");
+    let _guard = EnvGuard::new(&dir.path().join("unused.db"), lock);
+    let result = provider_list(None);
+    assert!(!result.persistence_available);
+}
+
+#[test]
+fn provider_list_without_store_reports_kimi_keychain_status() {
+    let lock = test_env::lock();
+    let dir = tempfile::tempdir().expect("temp dir");
+    let _guard = EnvGuard::new(&dir.path().join("unused.db"), lock);
+    crate::secrets::clear_key(ProviderId::Kimi).unwrap();
+    crate::secrets::set_key(
+        ProviderId::Kimi,
+        &crate::secrets::ApiKey::new("sk-degraded-kimi".to_owned()),
+    )
+    .unwrap();
+
+    let result = provider_list(None);
+    let kimi = result
+        .providers
+        .iter()
+        .find(|row| row.provider_id == "kimi")
+        .unwrap();
+
+    assert_eq!(kimi.status, PROVIDER_STATUS_CONNECTED);
+    assert_eq!(kimi.credential_source, Some(CREDENTIAL_SOURCE_KEYCHAIN));
+    crate::secrets::clear_key(ProviderId::Kimi).unwrap();
 }
 
 #[test]

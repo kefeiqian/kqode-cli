@@ -68,11 +68,14 @@ pub async fn set_provider_key(store: Option<Store>, work: SetKeyWork) -> SetKeyR
             selected_model: None,
         };
     };
-    let Some(store) = store else {
-        return selection::store_failed();
-    };
-    selection::persist_connected_provider(&store, &work, &models, crate::secrets::set_key)
-        .unwrap_or_else(|()| selection::store_failed())
+    match store {
+        Some(store) => {
+            selection::persist_connected_provider(&store, &work, &models, crate::secrets::set_key)
+                .unwrap_or_else(|()| selection::store_failed())
+        }
+        None => selection::persist_session_only(&work, &models, crate::secrets::set_key)
+            .unwrap_or_else(|()| selection::store_failed()),
+    }
 }
 
 /// Loads a provider's model catalog using the currently resolvable key.

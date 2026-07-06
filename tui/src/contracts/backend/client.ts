@@ -9,7 +9,7 @@
 import type {
   ActiveSelectionResult,
   ModelListResult,
-  ProviderStatusInfo,
+  ProviderListResult,
   SetKeyParams,
   SetKeyResult
 } from '@contracts/backend/providerMessages.ts';
@@ -74,7 +74,7 @@ export type BackendClient = {
    * formats the label; the TUI renders it verbatim.
    */
   gitStatus(): Promise<string | null>;
-  listProviders(): Promise<ProviderStatusInfo[]>;
+  listProviders(): Promise<ProviderListResult>;
   getActiveSelection(): Promise<ActiveSelectionResult>;
   setActiveSelection(providerId: string, modelId: string): Promise<void>;
   clearProviderKey(providerId: string): Promise<void>;

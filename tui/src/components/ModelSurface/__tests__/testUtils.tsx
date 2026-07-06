@@ -30,7 +30,7 @@ export function fakeClient(options: {
   return {
     submitStreaming: vi.fn(),
     gitStatus: vi.fn(async () => null),
-    listProviders: vi.fn(async () => options.providers),
+    listProviders: vi.fn(async () => ({ persistenceAvailable: true, providers: options.providers })),
     getActiveSelection: vi.fn(async () => options.active ?? { providerId: null, modelId: null }),
     setActiveSelection: vi.fn(async () => {}),
     clearProviderKey: vi.fn(async () => {}),

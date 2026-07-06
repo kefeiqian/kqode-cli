@@ -17,7 +17,7 @@ import {
 import type {
   ActiveSelectionResult,
   ModelListResult,
-  ProviderStatusInfo,
+  ProviderListResult,
   SetKeyParams,
   SetKeyResult,
   StreamCallbacks,
@@ -177,7 +177,7 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     async gitStatus(): Promise<string | null> {
       return withClient((client) => client.gitStatus());
     },
-    async listProviders(): Promise<ProviderStatusInfo[]> {
+    async listProviders(): Promise<ProviderListResult> {
       return withClient((client) => client.listProviders());
     },
     async getActiveSelection(): Promise<ActiveSelectionResult> {

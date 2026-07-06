@@ -33,7 +33,7 @@ function renderApp(backendClient: Partial<BackendClient>, columns = 80, rows = 4
   // streaming tests only supply submitStreaming.
   const client: BackendClient = {
     gitStatus: async () => null,
-    listProviders: async () => [],
+    listProviders: async () => ({ persistenceAvailable: true, providers: [] }),
     getActiveSelection: async () => ({ providerId: null, modelId: null }),
     setActiveSelection: async () => {},
     clearProviderKey: async () => {},

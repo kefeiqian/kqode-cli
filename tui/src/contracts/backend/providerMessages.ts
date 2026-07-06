@@ -93,6 +93,7 @@ export type ProviderStatusInfo = {
 
 /** Must match `ProviderListResult` in `src/protocol.rs`. */
 export type ProviderListResult = {
+  persistenceAvailable: boolean;
   providers: ProviderStatusInfo[];
 };
 
