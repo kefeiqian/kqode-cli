@@ -3,6 +3,7 @@ use crate::provider::ProviderId;
 use refinery::error::Kind;
 use rusqlite::Connection;
 use std::process::Command;
+use std::time::Duration;
 
 const CHILD_BOOTSTRAP_DB_ENV: &str = "KQODE_STORE_BOOTSTRAP_CHILD_DB";
 
@@ -119,10 +120,22 @@ fn fresh_path_bootstraps_to_latest_with_all_tables() {
 #[test]
 #[ignore]
 fn bootstrap_child_process() {
-    let Some(path) = std::env::var_os(CHILD_BOOTSTRAP_DB_ENV) else {
-        return;
-    };
-    Store::open_or_bootstrap_at(PathBuf::from(path)).expect("child bootstrap");
+    Store::open_or_bootstrap_at(child_db_path()).expect("child bootstrap");
+}
+
+#[test]
+#[ignore]
+fn bootstrap_lock_timeout_child_process() {
+    let err = lock::acquire_for_test(
+        &child_db_path(),
+        Duration::from_millis(80),
+        Duration::from_millis(10),
+    )
+    .unwrap_err();
+    assert!(matches!(
+        err,
+        StoreError::BootstrapLockTimeout { timeout_ms: 80 }
+    ));
 }
 
 #[test]
@@ -160,6 +173,37 @@ fn concurrent_bootstraps_across_processes_all_succeed() {
     assert_eq!(history_rows(&conn).len(), 1);
     assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(1));
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
+}
+
+#[test]
+fn bootstrap_lock_timeout_is_typed() {
+    let (_dir, path) = temp_db();
+    let _lock = lock::acquire_for_test(
+        &path,
+        Duration::from_millis(1_000),
+        Duration::from_millis(10),
+    )
+    .expect("parent lock");
+    let exe = std::env::current_exe().expect("current test executable");
+    let output = Command::new(&exe)
+        .arg("--exact")
+        .arg("store::tests::bootstrap_lock_timeout_child_process")
+        .arg("--ignored")
+        .env(CHILD_BOOTSTRAP_DB_ENV, &path)
+        .output()
+        .expect("run timeout child process");
+    assert!(
+        output.status.success(),
+        "timeout child failed:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+fn child_db_path() -> PathBuf {
+    let path = std::env::var_os(CHILD_BOOTSTRAP_DB_ENV)
+        .expect("child bootstrap DB path env var is required");
+    PathBuf::from(path)
 }
 
 #[test]
