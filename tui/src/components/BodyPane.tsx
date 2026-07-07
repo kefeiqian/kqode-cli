@@ -6,9 +6,9 @@ import { clamp } from '@libs/math/clamp.ts';
 import {
   bodyScrollOffsetRowsAtom,
   displayedBodyEntriesAtom,
-  layoutAtom
+  layoutAtom,
+  safeChromeColumnsAtom
 } from '@state/ui/index.ts';
-import { columnsAtom } from '@state/ui/index.ts';
 import { theme } from '@theme/themeConfig.ts';
 import { SCROLLBAR_THUMB, SCROLLBAR_TRACK } from '@constants/ui.ts';
 
@@ -23,6 +23,12 @@ type ScrollbarCell = {
 type BodyPaneProps = {
   entries?: readonly BodyEntry[];
   rows?: number;
+  /**
+   * Safe content width the body wraps into. The physical final terminal column
+   * is a reserved gutter owned by the parent background box, so no body glyph
+   * lands in the risky last cell (see `safeChromeColumnsAtom`). Defaults to that
+   * atom; tests pass an explicit width, which is treated as the content width.
+   */
   columns?: number;
   scrollOffsetRows?: number;
 };
@@ -35,12 +41,12 @@ export function BodyPane({
 }: BodyPaneProps) {
   const atomEntries = useAtomValue(displayedBodyEntriesAtom);
   const atomLayout = useAtomValue(layoutAtom);
-  const atomColumns = useAtomValue(columnsAtom);
+  const atomSafeColumns = useAtomValue(safeChromeColumnsAtom);
   const atomScrollOffsetRows = useAtomValue(bodyScrollOffsetRowsAtom);
 
   const resolvedEntries = entries ?? atomEntries ?? DEFAULT_BODY_ENTRIES;
   const resolvedRows = rows ?? atomLayout.bodyRows;
-  const resolvedColumns = columns ?? atomColumns;
+  const resolvedColumns = columns ?? atomSafeColumns;
   const resolvedScrollOffsetRows = scrollOffsetRows ?? atomScrollOffsetRows;
   const visibleRows = Math.max(1, resolvedRows);
   const visibleColumns = Math.max(1, resolvedColumns);

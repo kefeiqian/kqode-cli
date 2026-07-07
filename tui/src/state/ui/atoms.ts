@@ -13,7 +13,6 @@ import { clamp } from '@libs/math/clamp.ts';
 import { workspaceCwdAtom } from '@state/global/index.ts';
 import { bodyEntriesAtom } from '@state/ui/body.ts';
 import {
-  columnsAtom,
   composerInputColumnsAtom,
   rowsAtom,
   safeChromeColumnsAtom
@@ -82,11 +81,13 @@ export const commandMenuRowsAtom = atom((get) => {
 });
 
 export const layoutAtom = atom((get) => {
-  const columns = get(columnsAtom);
+  const safeColumns = get(safeChromeColumnsAtom);
   const rows = get(rowsAtom);
   const composerRows = get(composerRowsAtom);
   const displayedBodyEntries = get(displayedBodyEntriesAtom);
-  const bodyEntryRows = countBodyRows(displayedBodyEntries, columns, rows);
+  // Body wraps within the shared safe content width (the physical final column
+  // is a reserved gutter), so count rows at that width to match the render.
+  const bodyEntryRows = countBodyRows(displayedBodyEntries, safeColumns, rows);
 
   return resolveHomeScreenLayout(
     rows,
@@ -98,9 +99,13 @@ export const layoutAtom = atom((get) => {
 });
 
 export const maxBodyScrollOffsetRowsAtom = atom((get) => {
-  const columns = get(columnsAtom);
+  const safeColumns = get(safeChromeColumnsAtom);
   const layout = get(layoutAtom);
-  const bodyRowsForScroll = countBodyRows(get(displayedBodyEntriesAtom), columns, layout.bodyRows);
+  const bodyRowsForScroll = countBodyRows(
+    get(displayedBodyEntriesAtom),
+    safeColumns,
+    layout.bodyRows
+  );
 
   return Math.max(0, bodyRowsForScroll - layout.bodyRows);
 });

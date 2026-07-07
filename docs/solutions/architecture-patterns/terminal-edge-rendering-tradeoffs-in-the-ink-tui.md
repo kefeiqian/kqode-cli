@@ -50,7 +50,9 @@ product decision to **prioritize Windows Terminal** — removed all of it in fav
 of unconditional edge-to-edge rendering. That decision was superseded on
 2026-07-07 by the TUI ink-safe rendering plan: KQode now prioritizes
 artifact-free Ink rendering, reserves a physical guard row, and uses a shared
-safe content width for bottom chrome while keeping body/transcript columns raw.
+safe content width for all rendered glyph content — bottom chrome plus
+body/transcript (extended to the body on 2026-07-07 after a store-fatal error
+message reproduced the last-column glyph drop in the body).
 This doc captures the mechanism so the decision history and knobs are
 understood, not rediscovered.
 
@@ -116,8 +118,9 @@ are untouched and keep their last column.
 ### Full-width backgrounds: Box-with-width paints the edge; bare Text may not
 
 A `<Box width={columns} backgroundColor>` paints its background as a solid
-rectangle that reaches the last column even on WezTerm (see `BodyPane` bubbles,
-`tui/src/components/BodyPane.tsx`). A bare full-width `<Text>` can lose its last
+rectangle that reaches the last column even on WezTerm (the root background box
+in `tui/src/components/HomeScreen/HomeScreenView.tsx` keeps raw columns and fills
+the reserved final column behind the safe-width body rows). A bare full-width `<Text>` can lose its last
 glyph on WezTerm (this is why right-aligned `GPT-5.5` clipped to `GPT-5.` in the
 status bar). Mirroring the Box-with-explicit-width pattern fixes static
 full-width rows — but it does **not** defeat the incremental `ESC[K` clip on a
@@ -134,9 +137,10 @@ On Windows you cannot have both on WezTerm:
 
 **Current decision: prioritize stability.** Render one physical row under the
 terminal (`FULLSCREEN_GUARD_ROWS = 1`, `INK_CURSOR_ROW_ORIGIN_OFFSET = 0`) and
-reserve a safe content column for bottom chrome. Composer, cwd, status,
-slash-menu, and fullscreen footer content should use the safe width; body and
-transcript rows keep raw columns unless the artifact reproduces there.
+reserve a safe content column for all rendered glyph content. Composer, cwd,
+status, slash-menu, fullscreen footer, and body/transcript text all use the safe
+width; only background boxes keep raw columns and fill the reserved final column
+as a gutter.
 
 ## Why This Matters
 
@@ -194,8 +198,8 @@ Status bar using the safe chrome width (`tui/src/components/StatusBar.tsx`):
 Observed on WezTerm-on-Windows with `FULLSCREEN_GUARD_ROWS = 1`: no flicker, but
 the composer bar can show a ~1-column dark block at the right after the first
 keystroke if editable rows still paint through the physical final column. The
-current fix pairs the guard row with `safeChromeColumnsAtom` for bottom chrome so
-incremental rendering no longer depends on that final cell.
+current fix pairs the guard row with `safeChromeColumnsAtom` for bottom chrome
+and body/transcript so incremental rendering no longer depends on that final cell.
 
 ## Related
 
