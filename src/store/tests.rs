@@ -369,18 +369,34 @@ fn a_corrupt_file_surfaces_a_typed_error_without_panicking() {
 }
 
 #[test]
+fn directory_db_path_keeps_filesystem_remedy_not_reset_remedy() {
+    let (dir, _path) = temp_db();
+    let path = dir.path().join("as-directory");
+    std::fs::create_dir(&path).unwrap();
+    let err = Store::open_or_bootstrap_at(path.clone()).unwrap_err();
+    let message = err.to_string();
+    assert!(matches!(err.root_cause(), StoreError::Open(_)));
+    assert!(message.contains(&path.display().to_string()));
+    assert!(message.contains("Fix filesystem permissions"));
+    assert!(
+        !message.to_lowercase().contains("delete"),
+        "non-resettable open failures should not use reset remedy: {message}"
+    );
+}
+
+#[test]
 fn an_uncreatable_parent_dir_surfaces_create_dir_error() {
     let dir = tempfile::tempdir().unwrap();
     // Parent resolves *through* a regular file, so `create_dir_all` must fail.
     let blocker = dir.path().join("blocker");
     std::fs::write(&blocker, b"x").unwrap();
     let path = blocker.join("nested").join("kqode.db");
-    let result = Store::open_or_bootstrap_at(path);
+    let result = Store::open_or_bootstrap_at(path.clone());
     let err = result.unwrap_err();
     assert!(matches!(err.root_cause(), StoreError::CreateDir(_)));
     let message = err.to_string();
     assert!(message.starts_with(STORE_FATAL_SENTINEL));
-    assert!(message.contains("kqode.db"));
+    assert!(message.contains(&path.display().to_string()));
     assert!(message.contains("Fix filesystem permissions"));
 }
 
