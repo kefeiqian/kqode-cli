@@ -79,6 +79,7 @@ fn lock_path(db_path: &Path) -> PathBuf {
 }
 
 #[cfg(test)]
+/// Takes the sidecar bootstrap lock with test-controlled timeout and polling.
 pub(super) fn acquire_for_test(
     db_path: &Path,
     timeout: Duration,
