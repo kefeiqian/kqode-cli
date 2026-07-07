@@ -88,7 +88,7 @@ fn run_stdio_with(
 ) -> Result<(), BackendError> {
     announce_ready(&connection, session_id)?;
     let coordinator = Coordinator::start(json_rpc_event_sink(&connection));
-    let loop_result = run_loop(connection, Some(store), coordinator.sender());
+    let loop_result = run_loop(connection, store, coordinator.sender());
     coordinator.shutdown_and_join();
     loop_result
 }
@@ -130,7 +130,7 @@ fn announce_ready(connection: &Connection, session_id: &str) -> Result<(), Backe
 
 fn run_loop(
     connection: Connection,
-    store: Option<&Store>,
+    store: &Store,
     coordinator: Sender<Command>,
 ) -> Result<(), BackendError> {
     while let Ok(message) = connection.receiver.recv() {
@@ -166,7 +166,7 @@ fn send_response(connection: &Connection, response: Response) -> Result<(), Back
 fn handle_request(
     request: Request,
     connection: &Connection,
-    store: Option<&Store>,
+    store: &Store,
     coordinator: &Sender<Command>,
 ) -> Option<Response> {
     match RpcMethod::from_method(&request.method) {
@@ -290,7 +290,7 @@ fn protocol_turn_result(result: &TurnResult) -> crate::protocol::TurnResult {
     }
 }
 
-fn handle_selection_set(request: Request, store: Option<&Store>) -> Response {
+fn handle_selection_set(request: Request, store: &Store) -> Response {
     let params = match serde_json::from_value::<SelectionSetParams>(request.params) {
         Ok(params) => params,
         Err(error) => {
@@ -304,7 +304,7 @@ fn handle_selection_set(request: Request, store: Option<&Store>) -> Response {
     Response::new_ok(request.id, providers::set_active_selection(store, params))
 }
 
-fn handle_provider_clear_key(request: Request, store: Option<&Store>) -> Response {
+fn handle_provider_clear_key(request: Request, store: &Store) -> Response {
     let params = match serde_json::from_value::<ClearKeyParams>(request.params) {
         Ok(params) => params,
         Err(error) => {

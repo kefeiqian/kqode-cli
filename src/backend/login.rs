@@ -12,7 +12,7 @@ static CUSTOM_PROVIDER_LOCK: Mutex<()> = Mutex::new(());
 pub(super) fn handle_provider_set_key(
     request: Request,
     connection: &Connection,
-    store: Option<&Store>,
+    store: &Store,
 ) -> Option<Response> {
     let params = match serde_json::from_value::<SetKeyParams>(request.params) {
         Ok(params) => params,
@@ -42,7 +42,7 @@ pub(super) fn handle_provider_set_key(
     };
     let id = request.id;
     let sender = connection.sender.clone();
-    let store = store.cloned();
+    let store = store.clone();
     std::thread::spawn(move || {
         let response = match tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -66,7 +66,7 @@ pub(super) fn handle_provider_set_key(
 pub(super) fn handle_provider_models(
     request: Request,
     connection: &Connection,
-    store: Option<&Store>,
+    store: &Store,
 ) -> Option<Response> {
     let params = match serde_json::from_value::<ModelListParams>(request.params) {
         Ok(params) => params,
@@ -87,7 +87,7 @@ pub(super) fn handle_provider_models(
     };
     let id = request.id;
     let sender = connection.sender.clone();
-    let store = store.cloned();
+    let store = store.clone();
     std::thread::spawn(move || {
         let response = match tokio::runtime::Builder::new_current_thread()
             .enable_all()

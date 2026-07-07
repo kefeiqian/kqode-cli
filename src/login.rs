@@ -60,7 +60,7 @@ pub fn prepare_set_key_work(
 
 /// Validates a key and persists settings/key/selection on success.
 #[must_use]
-pub async fn set_provider_key(store: Option<Store>, work: SetKeyWork) -> SetKeyResult {
+pub async fn set_provider_key(store: Store, work: SetKeyWork) -> SetKeyResult {
     let outcome = http::fetch_models(&work.base_url, &work.key).await;
     let ValidationOutcome::Connected(models) = outcome else {
         return SetKeyResult {
@@ -68,14 +68,8 @@ pub async fn set_provider_key(store: Option<Store>, work: SetKeyWork) -> SetKeyR
             selected_model: None,
         };
     };
-    match store {
-        Some(store) => {
-            selection::persist_connected_provider(&store, &work, &models, crate::secrets::set_key)
-                .unwrap_or_else(|()| selection::store_failed())
-        }
-        None => selection::persist_session_only(&work, &models, crate::secrets::set_key)
-            .unwrap_or_else(|()| selection::store_failed()),
-    }
+    selection::persist_connected_provider(&store, &work, &models, crate::secrets::set_key)
+        .unwrap_or_else(|()| selection::store_failed())
 }
 
 /// Loads a provider's model catalog using the currently resolvable key.
@@ -87,7 +81,7 @@ pub async fn set_provider_key(store: Option<Store>, work: SetKeyWork) -> SetKeyR
 /// anyway. Keychain-configured Custom logins (no `.env` model) and preset
 /// providers still fetch the full catalog.
 #[must_use]
-pub async fn list_models(store: Option<Store>, provider: ProviderId) -> ModelListResult {
+pub async fn list_models(store: Store, provider: ProviderId) -> ModelListResult {
     if provider == ProviderId::Custom
         && let Some(model_id) = crate::config::custom_env_model()
     {
@@ -96,7 +90,7 @@ pub async fn list_models(store: Option<Store>, provider: ProviderId) -> ModelLis
     let Some(key) = crate::secrets::resolve_key(provider) else {
         return model_failed();
     };
-    let Some(base_url) = resolve_base_url(store.as_ref(), provider) else {
+    let Some(base_url) = resolve_base_url(&store, provider) else {
         return model_failed();
     };
     match http::fetch_models(&base_url, &key).await {
@@ -136,11 +130,13 @@ fn custom_env_model_result(model_id: &str) -> ModelListResult {
 /// `CUSTOM_BASE_URL`. Shared by submit resolution and `/model` catalog loading
 /// so both agree on where to reach a provider.
 #[must_use]
-pub(crate) fn resolve_base_url(store: Option<&Store>, provider: ProviderId) -> Option<String> {
+pub(crate) fn resolve_base_url(store: &Store, provider: ProviderId) -> Option<String> {
     match provider_descriptor(provider).endpoint {
         ProviderEndpoint::Fixed { base_url } => Some(base_url.to_owned()),
         ProviderEndpoint::Custom => store
-            .and_then(|store| store.provider_settings(ProviderId::Custom).ok().flatten())
+            .provider_settings(ProviderId::Custom)
+            .ok()
+            .flatten()
             .map(|settings| settings.base_url)
             .or_else(|| {
                 crate::config::custom_env_base_url().and_then(|url| validate_base_url(&url).ok())

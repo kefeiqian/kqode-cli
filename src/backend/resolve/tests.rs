@@ -96,7 +96,7 @@ fn active_selection_with_resolvable_key_returns_selected_provider_model_and_url(
         })
         .unwrap();
 
-    let config = resolve_submit_config(Some(&store)).expect("resolved config");
+    let config = resolve_submit_config(&store).expect("resolved config");
 
     assert_eq!(config.api_key, "sk-custom-active");
     assert_eq!(config.model, "custom-model");
@@ -113,7 +113,7 @@ fn no_active_row_uses_custom_env_default() {
         env::set_var(CUSTOM_BASE_URL_VAR, "https://models.example/v1");
     }
 
-    let config = resolve_submit_config(Some(&store)).expect("effective default");
+    let config = resolve_submit_config(&store).expect("effective default");
 
     assert_eq!(config.api_key, "sk-env-custom");
     assert_eq!(config.model, "env-model");
@@ -130,7 +130,7 @@ fn custom_env_base_url_must_be_https_or_submit_needs_config() {
         env::set_var(CUSTOM_BASE_URL_VAR, "http://insecure.example/v1");
     }
 
-    assert!(resolve_submit_config(Some(&store)).is_none());
+    assert!(resolve_submit_config(&store).is_none());
 }
 
 #[test]
@@ -143,7 +143,7 @@ fn kimi_keychain_default_uses_fixed_base_url() {
     )
     .unwrap();
 
-    let config = resolve_submit_config(Some(&store)).expect("effective default");
+    let config = resolve_submit_config(&store).expect("effective default");
 
     assert_eq!(config.api_key, "sk-keychain-kimi");
     assert_eq!(config.model, DEFAULT_KIMI_MODEL);
@@ -175,7 +175,7 @@ fn active_provider_without_key_returns_none_even_when_another_provider_resolves(
         })
         .unwrap();
 
-    assert!(resolve_submit_config(Some(&store)).is_none());
+    assert!(resolve_submit_config(&store).is_none());
 }
 
 #[test]
@@ -183,5 +183,5 @@ fn nothing_configured_returns_none() {
     let state = IsolatedState::new();
     let store = state.store();
 
-    assert!(resolve_submit_config(Some(&store)).is_none());
+    assert!(resolve_submit_config(&store).is_none());
 }

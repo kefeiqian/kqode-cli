@@ -15,7 +15,7 @@ use crate::store::Store;
 pub(super) fn handle_message_submit(
     request: Request,
     coordinator: &Sender<Command>,
-    store: Option<&Store>,
+    store: &Store,
 ) -> Response {
     let params = match serde_json::from_value::<MessageSubmitParams>(request.params) {
         Ok(params) => params,

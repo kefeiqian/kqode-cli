@@ -58,14 +58,14 @@ fn bootstrap() -> (tempfile::TempDir, Store, EnvGuard) {
 fn set_active_selection_core_round_trips() {
     let (_dir, store, _env) = bootstrap();
     let result = set_active_selection(
-        Some(&store),
+        &store,
         SelectionSetParams {
             provider_id: "kimi".to_owned(),
             model_id: "kimi-k2.7-code".to_owned(),
         },
     );
     assert!(result.ok);
-    let selection = active_selection(Some(&store));
+    let selection = active_selection(&store);
     assert_eq!(selection.provider_id.as_deref(), Some("kimi"));
     assert_eq!(selection.model_id.as_deref(), Some("kimi-k2.7-code"));
 }
@@ -73,7 +73,7 @@ fn set_active_selection_core_round_trips() {
 #[test]
 fn active_selection_core_is_null_when_unset() {
     let (_dir, store, _env) = bootstrap();
-    let result = active_selection(Some(&store));
+    let result = active_selection(&store);
     assert_eq!(result.provider_id, None);
     assert_eq!(result.model_id, None);
 }
@@ -81,7 +81,7 @@ fn active_selection_core_is_null_when_unset() {
 #[test]
 fn provider_list_empty_store_without_env_marks_kimi_not_configured() {
     let (_dir, store, _env) = bootstrap();
-    let result = provider_list(Some(&store));
+    let result = provider_list(&store);
     let kimi = result
         .providers
         .iter()
@@ -107,7 +107,7 @@ fn provider_list_uses_cached_key_present_bit_for_keychain_status() {
             last_connected_at: None,
         })
         .unwrap();
-    let result = provider_list(Some(&store));
+    let result = provider_list(&store);
     let kimi = result
         .providers
         .iter()
@@ -126,7 +126,7 @@ fn provider_list_reports_custom_connected_via_env_with_default_model() {
         env::set_var(CUSTOM_BASE_URL_VAR, "https://models.example/v1");
     }
 
-    let result = provider_list(Some(&store));
+    let result = provider_list(&store);
 
     let custom = result
         .providers
@@ -157,7 +157,7 @@ fn provider_list_marks_custom_not_configured_without_a_base_url() {
         env::set_var(CUSTOM_MODEL_VAR, "env-model");
     }
 
-    let result = provider_list(Some(&store));
+    let result = provider_list(&store);
 
     let custom = result
         .providers

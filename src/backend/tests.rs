@@ -17,7 +17,10 @@ fn set_key_rejects_bad_custom_url_immediately_without_worker() {
         }),
     };
 
-    let response = handle_request(request, &backend, None, &coordinator).expect("immediate error");
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open_or_bootstrap_at(dir.path().join("kqode.db")).unwrap();
+    let response =
+        handle_request(request, &backend, &store, &coordinator).expect("immediate error");
 
     assert_eq!(response.error.unwrap().code, JSON_RPC_INVALID_PARAMS);
     assert!(

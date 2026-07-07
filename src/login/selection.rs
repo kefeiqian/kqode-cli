@@ -50,23 +50,6 @@ pub(super) fn persist_connected_provider(
     })
 }
 
-pub(super) fn persist_session_only(
-    work: &SetKeyWork,
-    models: &[ModelInfo],
-    set_key: impl FnOnce(ProviderId, &ApiKey) -> Result<(), crate::secrets::KeychainError>,
-) -> Result<SetKeyResult, ()> {
-    if work.provider != ProviderId::Kimi {
-        return Err(());
-    }
-    set_key(work.provider, &work.key).map_err(|_| ())?;
-    let selected_model =
-        select_default_model(work.provider, models).map(super::sanitize::sanitize_model_id);
-    Ok(SetKeyResult {
-        outcome: SET_KEY_OUTCOME_CONNECTED,
-        selected_model,
-    })
-}
-
 pub(super) fn set_key_outcome(outcome: &ValidationOutcome) -> &'static str {
     match outcome {
         ValidationOutcome::Connected(_) => SET_KEY_OUTCOME_CONNECTED,

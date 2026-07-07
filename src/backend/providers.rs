@@ -13,7 +13,7 @@ use crate::store::{ActiveSelection, ProviderSettings, Store};
 
 /// Builds provider status rows from SQLite's cached key-present bit and env fallbacks.
 #[must_use]
-pub(crate) fn provider_list(store: Option<&Store>) -> ProviderListResult {
+pub(crate) fn provider_list(store: &Store) -> ProviderListResult {
     let providers = registry::PROVIDERS
         .iter()
         .map(|descriptor| {
@@ -50,8 +50,8 @@ pub(crate) fn provider_list(store: Option<&Store>) -> ProviderListResult {
 
 /// Reads the active selection, returning nulls when unset.
 #[must_use]
-pub(crate) fn active_selection(store: Option<&Store>) -> ActiveSelectionResult {
-    match store.and_then(|store| store.active_selection().ok().flatten()) {
+pub(crate) fn active_selection(store: &Store) -> ActiveSelectionResult {
+    match store.active_selection().ok().flatten() {
         Some(selection) => ActiveSelectionResult {
             provider_id: Some(selection.provider.as_str().to_owned()),
             model_id: Some(selection.model_id),
@@ -66,12 +66,9 @@ pub(crate) fn active_selection(store: Option<&Store>) -> ActiveSelectionResult {
 /// Persists the active provider/model selection.
 #[must_use]
 pub(crate) fn set_active_selection(
-    store: Option<&Store>,
+    store: &Store,
     params: SelectionSetParams,
 ) -> SelectionSetResult {
-    let Some(store) = store else {
-        return SelectionSetResult { ok: false };
-    };
     let Some(provider) = ProviderId::parse(&params.provider_id) else {
         return SelectionSetResult { ok: false };
     };
@@ -86,7 +83,7 @@ pub(crate) fn set_active_selection(
 
 /// Clears the provider key best-effort and clears SQLite's key-present bit.
 #[must_use]
-pub(crate) fn clear_provider_key(store: Option<&Store>, params: ClearKeyParams) -> ClearKeyResult {
+pub(crate) fn clear_provider_key(store: &Store, params: ClearKeyParams) -> ClearKeyResult {
     let Some(provider) = ProviderId::parse(&params.provider_id) else {
         return ClearKeyResult { ok: false };
     };
@@ -94,22 +91,17 @@ pub(crate) fn clear_provider_key(store: Option<&Store>, params: ClearKeyParams) 
         crate::secrets::clear_key(provider),
         Ok(()) | Err(KeychainError::Unavailable)
     );
-    let store_ok = store
-        .map(|store| store.set_key_present(provider, false).is_ok())
-        .unwrap_or(true);
+    let store_ok = store.set_key_present(provider, false).is_ok();
     ClearKeyResult {
         ok: keychain_ok && store_ok,
     }
 }
 
-fn provider_settings(store: Option<&Store>, provider: ProviderId) -> Option<ProviderSettings> {
-    store.and_then(|store| store.provider_settings(provider).ok().flatten())
+fn provider_settings(store: &Store, provider: ProviderId) -> Option<ProviderSettings> {
+    store.provider_settings(provider).ok().flatten()
 }
 
-fn key_source(
-    provider: ProviderId,
-    settings: Option<&ProviderSettings>,
-) -> KeySource {
+fn key_source(provider: ProviderId, settings: Option<&ProviderSettings>) -> KeySource {
     if settings.is_some_and(|settings| settings.key_present) {
         return KeySource::Keychain;
     }

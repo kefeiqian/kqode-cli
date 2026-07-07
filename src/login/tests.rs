@@ -1,12 +1,9 @@
 use super::*;
 use crate::login::sanitize::sanitize_model_id;
-use crate::login::selection::{
-    persist_connected_provider, persist_session_only, select_default_model, set_key_outcome,
-};
+use crate::login::selection::{persist_connected_provider, select_default_model, set_key_outcome};
 use crate::protocol::{
     SET_KEY_OUTCOME_AUTH_FAILED, SET_KEY_OUTCOME_CONNECTED, SET_KEY_OUTCOME_EMPTY_CATALOG,
-    SET_KEY_OUTCOME_NOT_COMPATIBLE, SET_KEY_OUTCOME_RATE_LIMITED, SET_KEY_OUTCOME_STORE_FAILED,
-    SET_KEY_OUTCOME_UNREACHABLE,
+    SET_KEY_OUTCOME_NOT_COMPATIBLE, SET_KEY_OUTCOME_RATE_LIMITED, SET_KEY_OUTCOME_UNREACHABLE,
 };
 use crate::provider::ModelInfo;
 use std::env;
@@ -123,70 +120,6 @@ fn connect_path_sanitizes_selected_and_persisted_model_id() {
 }
 
 #[test]
-fn degraded_kimi_connect_writes_keychain_only_and_returns_selected_model() {
-    let work = SetKeyWork {
-        provider: ProviderId::Kimi,
-        base_url: crate::config::DEFAULT_KIMI_BASE_URL.to_owned(),
-        label: None,
-        key: ApiKey::new("sk-session-kimi".to_owned()),
-    };
-    let mut wrote_key = false;
-    let result = persist_session_only(
-        &work,
-        &[model(crate::config::DEFAULT_KIMI_MODEL)],
-        |provider, _| {
-            wrote_key = provider == ProviderId::Kimi;
-            Ok(())
-        },
-    )
-    .unwrap();
-
-    assert!(wrote_key);
-    assert_eq!(result.outcome, SET_KEY_OUTCOME_CONNECTED);
-    assert_eq!(
-        result.selected_model.as_deref(),
-        Some(crate::config::DEFAULT_KIMI_MODEL)
-    );
-}
-
-#[test]
-fn degraded_kimi_connect_reports_store_failed_when_keychain_write_fails() {
-    let work = SetKeyWork {
-        provider: ProviderId::Kimi,
-        base_url: crate::config::DEFAULT_KIMI_BASE_URL.to_owned(),
-        label: None,
-        key: ApiKey::new("sk-session-kimi".to_owned()),
-    };
-    let result = persist_session_only(
-        &work,
-        &[model(crate::config::DEFAULT_KIMI_MODEL)],
-        |_, _| Err(crate::secrets::KeychainError::Backend),
-    )
-    .unwrap_or_else(|()| crate::login::selection::store_failed());
-
-    assert_eq!(result.outcome, SET_KEY_OUTCOME_STORE_FAILED);
-}
-
-#[test]
-fn degraded_custom_connect_refuses_without_writing_keychain() {
-    let work = SetKeyWork {
-        provider: ProviderId::Custom,
-        base_url: "https://example.test/v1".to_owned(),
-        label: None,
-        key: ApiKey::new("sk-custom".to_owned()),
-    };
-    let mut wrote_key = false;
-    let result = persist_session_only(&work, &[model("gpt-4o-mini")], |_, _| {
-        wrote_key = true;
-        Ok(())
-    })
-    .unwrap_or_else(|()| crate::login::selection::store_failed());
-
-    assert!(!wrote_key);
-    assert_eq!(result.outcome, SET_KEY_OUTCOME_STORE_FAILED);
-}
-
-#[test]
 fn model_id_sanitization_strips_controls_and_ansi() {
     assert_eq!(
         sanitize_model_id("good\u{1b}[31m-red\u{1b}[0m\u{7f}\u{9f}\n-id"),
@@ -205,7 +138,7 @@ fn resolve_base_url_falls_back_to_custom_env_when_store_has_no_settings() {
     unsafe { env::set_var(crate::config::CUSTOM_BASE_URL_VAR, "https://custom.env/v1/") };
     let (_dir, store) = temp_store();
 
-    let resolved = resolve_base_url(Some(&store), ProviderId::Custom);
+    let resolved = resolve_base_url(&store, ProviderId::Custom);
 
     restore_env(crate::config::CUSTOM_BASE_URL_VAR, previous);
     assert_eq!(resolved.as_deref(), Some("https://custom.env/v1"));
@@ -218,7 +151,7 @@ fn resolve_base_url_is_none_for_custom_without_store_or_env() {
     restore_env(crate::config::CUSTOM_BASE_URL_VAR, None);
     let (_dir, store) = temp_store();
 
-    let resolved = resolve_base_url(Some(&store), ProviderId::Custom);
+    let resolved = resolve_base_url(&store, ProviderId::Custom);
 
     restore_env(crate::config::CUSTOM_BASE_URL_VAR, previous);
     assert_eq!(resolved, None);
@@ -235,8 +168,9 @@ fn resolve_base_url_uses_compiled_endpoint_for_fixed_preset_providers() {
             "https://attacker.example/v1",
         )
     };
+    let (_dir, store) = temp_store();
 
-    let resolved = resolve_base_url(None, ProviderId::Kimi);
+    let resolved = resolve_base_url(&store, ProviderId::Kimi);
 
     restore_env(crate::config::CUSTOM_BASE_URL_VAR, previous);
     assert_eq!(
@@ -263,7 +197,7 @@ fn unreachable_set_key_does_not_leak_sentinel_to_persistent_sinks() {
         .enable_all()
         .build()
         .unwrap();
-    let result = runtime.block_on(set_provider_key(Some(store.clone()), work));
+    let result = runtime.block_on(set_provider_key(store.clone(), work));
 
     assert_eq!(result.outcome, SET_KEY_OUTCOME_UNREACHABLE);
     assert!(!serde_json::to_string(&result).unwrap().contains(&sentinel));
@@ -298,7 +232,8 @@ fn list_models_pins_custom_env_model_without_fetch() {
         .enable_all()
         .build()
         .unwrap();
-    let result = runtime.block_on(list_models(None, ProviderId::Custom));
+    let (_dir, store) = temp_store();
+    let result = runtime.block_on(list_models(store.clone(), ProviderId::Custom));
 
     restore_env(crate::config::CUSTOM_MODEL_VAR, previous);
     assert_eq!(result.status, MODEL_LIST_STATUS_LOADED);

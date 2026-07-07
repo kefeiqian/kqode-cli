@@ -14,7 +14,7 @@ use crate::store::Store;
 /// the first registry provider with a resolvable key and a resolvable default
 /// model (a preset's compiled default, or the Custom provider's `.env` model).
 #[must_use]
-pub(crate) fn resolve_submit_config(store: Option<&Store>) -> Option<KimiConfig> {
+pub(crate) fn resolve_submit_config(store: &Store) -> Option<KimiConfig> {
     let (provider, model) = match active_choice(store) {
         Some(choice) => choice,
         None => effective_default()?,
@@ -29,9 +29,11 @@ pub(crate) fn resolve_submit_config(store: Option<&Store>) -> Option<KimiConfig>
     })
 }
 
-fn active_choice(store: Option<&Store>) -> Option<(ProviderId, String)> {
+fn active_choice(store: &Store) -> Option<(ProviderId, String)> {
     store
-        .and_then(|store| store.active_selection().ok().flatten())
+        .active_selection()
+        .ok()
+        .flatten()
         .map(|selection| (selection.provider, selection.model_id))
 }
 
