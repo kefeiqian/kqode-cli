@@ -3,17 +3,18 @@ mod cli;
 
 use std::process::Command;
 
-use kqode::{
-    backend::STORE_FAILURE_EXIT_CODE, protocol::BACKEND_MODE_ARG, store::STORE_FATAL_SENTINEL,
-};
+use kqode::{protocol::BACKEND_MODE_ARG, store::STORE_FATAL_SENTINEL};
 
 use cli::run_cli;
+
+const STORE_FAILURE_EXIT_CODE: i32 = 75;
 
 #[test]
 fn invalid_invocation_exits_with_visible_error() {
     let output = run_cli(&["--not-a-kqode-mode"]);
 
     assert!(!output.status.success(), "{output:?}");
+    assert_ne!(output.status.code(), Some(STORE_FAILURE_EXIT_CODE));
     assert!(!output.stderr.is_empty());
 }
 
@@ -22,6 +23,7 @@ fn backend_mode_rejects_extra_arguments() {
     let output = run_cli(&[BACKEND_MODE_ARG, "extra"]);
 
     assert!(!output.status.success(), "{output:?}");
+    assert_ne!(output.status.code(), Some(STORE_FAILURE_EXIT_CODE));
     assert!(String::from_utf8_lossy(&output.stderr).contains("extra argument"));
 }
 
@@ -49,10 +51,7 @@ fn backend_store_failure_exits_with_store_code_without_ready() {
         .output()
         .expect("binary runs");
 
-    assert_eq!(
-        output.status.code(),
-        Some(i32::from(STORE_FAILURE_EXIT_CODE))
-    );
+    assert_eq!(output.status.code(), Some(STORE_FAILURE_EXIT_CODE));
     assert!(
         output.stdout.is_empty(),
         "store failure must not emit backend ready: {:?}",
@@ -63,4 +62,29 @@ fn backend_store_failure_exits_with_store_code_without_ready() {
         "store failure stderr must start with sentinel: {:?}",
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+#[test]
+fn backend_without_home_exits_with_store_code_and_sentinel() {
+    let output = Command::new(env!("CARGO_BIN_EXE_kqode"))
+        .arg(BACKEND_MODE_ARG)
+        .env_remove("HOME")
+        .env_remove("USERPROFILE")
+        .env("CUSTOM_API_KEY", "")
+        .env("KQODE_DEBUG", "0")
+        .output()
+        .expect("binary runs");
+
+    assert_eq!(output.status.code(), Some(STORE_FAILURE_EXIT_CODE));
+    assert!(
+        output.stdout.is_empty(),
+        "store failure must not emit backend ready: {:?}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.starts_with(STORE_FATAL_SENTINEL),
+        "store failure stderr must start with sentinel: {stderr:?}"
+    );
+    assert!(stderr.contains("could not resolve the KQode database path"));
 }

@@ -1,19 +1,19 @@
 use std::{env, ffi::OsStr, process::ExitCode};
 
 use kqode::{
-    backend::{BackendError, STORE_FAILURE_EXIT_CODE},
+    backend::BackendError,
     protocol::BACKEND_MODE_ARG,
+    store::{STORE_FATAL_SENTINEL, StoreError},
 };
+
+/// Process exit code used when the backend cannot open or migrate the store.
+const STORE_FAILURE_EXIT_CODE: u8 = 75;
 
 fn main() -> ExitCode {
     match run() {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            if matches!(error, CliError::Backend(BackendError::Store(_))) {
-                eprintln!("{error}");
-            } else {
-                eprintln!("kqode failed: {error}");
-            }
+            eprintln!("{}", error.stderr_line());
             error.exit_code()
         }
     }
@@ -56,6 +56,15 @@ impl CliError {
             Self::Backend(BackendError::Transport(_)) | Self::Message(_) => ExitCode::FAILURE,
         }
     }
+
+    fn stderr_line(&self) -> String {
+        match self {
+            Self::Backend(BackendError::Store(error)) => store_failure_line(error),
+            Self::Backend(BackendError::Transport(_)) | Self::Message(_) => {
+                format!("kqode failed: {self}")
+            }
+        }
+    }
 }
 
 impl std::fmt::Display for CliError {
@@ -64,5 +73,14 @@ impl std::fmt::Display for CliError {
             Self::Backend(error) => write!(formatter, "{error}"),
             Self::Message(message) => formatter.write_str(message),
         }
+    }
+}
+
+fn store_failure_line(error: &StoreError) -> String {
+    let message = error.to_string();
+    if message.starts_with(STORE_FATAL_SENTINEL) {
+        message
+    } else {
+        format!("{STORE_FATAL_SENTINEL} {message}")
     }
 }

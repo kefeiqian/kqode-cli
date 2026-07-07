@@ -38,7 +38,7 @@ fn store_failure_returns_before_ready_or_loop() {
         }))
         .unwrap();
 
-    let result = run_stdio_with(backend, Err(StoreError::NoPath), "session-test");
+    let result = run_stdio_with_store_result(backend, Err(StoreError::NoPath), "session-test");
 
     assert!(matches!(
         result,
@@ -61,7 +61,7 @@ fn healthy_store_announces_ready_before_loop() {
     let dir = tempfile::tempdir().unwrap();
     let store = Store::open_or_bootstrap_at(dir.path().join("kqode.db")).unwrap();
 
-    run_stdio_with(backend, Ok(store), "session-test").unwrap();
+    run_stdio_with(backend, &store, "session-test").unwrap();
 
     let ready = client_receiver.try_recv().expect("ready notification");
     match ready {

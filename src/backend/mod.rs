@@ -23,9 +23,6 @@ mod resolve;
 #[cfg(test)]
 mod tests;
 
-/// Process exit code used when the backend cannot open or migrate the store.
-pub const STORE_FAILURE_EXIT_CODE: u8 = 75;
-
 #[derive(Debug)]
 pub enum BackendError {
     Store(StoreError),
@@ -75,7 +72,7 @@ pub fn run_stdio() -> Result<(), BackendError> {
     let _log_guard = debug_log::init(&session_id);
     let store = Store::open_or_bootstrap().map_err(BackendError::Store)?;
     let (connection, io_threads) = Connection::stdio();
-    let loop_result = run_stdio_with(connection, Ok(store), &session_id);
+    let loop_result = run_stdio_with(connection, &store, &session_id);
     match loop_result {
         Ok(()) => io_threads.join().map_err(|error| {
             BackendError::Transport(format!("JSON-RPC transport failed: {error}"))
@@ -86,15 +83,24 @@ pub fn run_stdio() -> Result<(), BackendError> {
 
 fn run_stdio_with(
     connection: Connection,
+    store: &Store,
+    session_id: &str,
+) -> Result<(), BackendError> {
+    announce_ready(&connection, session_id)?;
+    let coordinator = Coordinator::start(json_rpc_event_sink(&connection));
+    let loop_result = run_loop(connection, Some(store), coordinator.sender());
+    coordinator.shutdown_and_join();
+    loop_result
+}
+
+#[cfg(test)]
+fn run_stdio_with_store_result(
+    connection: Connection,
     store: Result<Store, StoreError>,
     session_id: &str,
 ) -> Result<(), BackendError> {
     let store = store.map_err(BackendError::Store)?;
-    announce_ready(&connection, session_id)?;
-    let coordinator = Coordinator::start(json_rpc_event_sink(&connection));
-    let loop_result = run_loop(connection, Some(&store), coordinator.sender());
-    coordinator.shutdown_and_join();
-    loop_result
+    run_stdio_with(connection, &store, session_id)
 }
 
 /// Emits the one-shot backend-ready notification over `connection`, carrying the
