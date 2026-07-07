@@ -149,6 +149,7 @@ fn run_loop(
         }
     }
 
+    let _ = coordinator.send(Command::Shutdown);
     Ok(())
 }
 
