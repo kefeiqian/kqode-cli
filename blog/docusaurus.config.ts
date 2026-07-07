@@ -111,19 +111,15 @@ const config: Config = {
       // These three are not, so their fenced blocks render unhighlighted without this.
       additionalLanguages: ['bash', 'diff', 'toml'],
     },
-    // Algolia DocSearch (navbar search box). The @docusaurus/theme-search-algolia
-    // theme is already bundled by preset-classic, so no install is needed.
-    // Apply for the free program at https://docsearch.algolia.com/apply/ ; once
-    // approved you'll receive appId, a search-only apiKey (public, safe to commit),
-    // and indexName. Paste them below and uncomment. contextualSearch keeps the
-    // zh-Hans and en locale results separate. Search only returns results after
-    // Algolia's first crawl of the deployed site completes.
-    // algolia: {
-    //   appId: 'YOUR_APP_ID',
-    //   apiKey: 'YOUR_SEARCH_ONLY_KEY',
-    //   indexName: 'YOUR_INDEX_NAME',
-    //   contextualSearch: true,
-    // },
+    // Algolia DocSearch (navbar search box). The apiKey is the public
+    // search-only key; contextualSearch keeps zh-Hans and en locale results
+    // separate.
+    algolia: {
+      appId: 'PZBHVRNDHC',
+      apiKey: '648c7fb0adf7b3ee0afc4f9e03f0c341',
+      indexName: 'KQode Blog',
+      contextualSearch: true,
+    },
     navbar: {
       title: 'KQode',
       items: [
