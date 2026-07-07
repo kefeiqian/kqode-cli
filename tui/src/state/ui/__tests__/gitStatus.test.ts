@@ -11,7 +11,7 @@ function clientWithGitStatus(gitStatus: BackendClient['gitStatus']): BackendClie
     clearConversation: async () => undefined,
     cancelTurn: async () => undefined,
     gitStatus,
-    listProviders: async () => ({ persistenceAvailable: true, providers: [] }),
+    listProviders: async () => ({ providers: [] }),
     getActiveSelection: async () => ({ providerId: null, modelId: null }),
     setActiveSelection: async () => {},
     clearProviderKey: async () => {},

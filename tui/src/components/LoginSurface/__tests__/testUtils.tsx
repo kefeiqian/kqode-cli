@@ -36,7 +36,6 @@ export function provider(
 
 export function fakeClient(options: {
   providers?: ProviderStatusInfo[][];
-  persistenceAvailable?: boolean;
   outcome?: SetKeyOutcome;
 } = {}): BackendClient {
   const providerBatches = options.providers ?? [
@@ -53,7 +52,6 @@ export function fakeClient(options: {
     cancelTurn: async () => undefined,
     gitStatus: vi.fn(async () => null),
     listProviders: vi.fn(async () => ({
-      persistenceAvailable: options.persistenceAvailable ?? true,
       providers: providerBatches[Math.min(listIndex++, providerBatches.length - 1)] ?? []
     })),
     getActiveSelection: vi.fn(async () => ({ providerId: null, modelId: null })),

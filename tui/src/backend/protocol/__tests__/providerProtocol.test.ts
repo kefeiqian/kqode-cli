@@ -55,7 +55,6 @@ describe('provider protocol client', () => {
   it('lists providers from the backend result', async () => {
     const { client, server } = pairedConnections();
     server.onRequest(providerListRequest, () => ({
-      persistenceAvailable: true,
       providers: [
         {
           providerId: 'kimi',
@@ -69,7 +68,6 @@ describe('provider protocol client', () => {
     }));
 
     await expect(createMessageConnectionClient(client).listProviders()).resolves.toEqual({
-      persistenceAvailable: true,
       providers: [
         {
           providerId: 'kimi',

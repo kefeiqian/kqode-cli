@@ -75,8 +75,6 @@ pub struct ProviderStatusInfo {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderListResult {
-    /// Whether SQLite-backed settings and selections can be persisted.
-    pub persistence_available: bool,
     /// Provider status rows for the current workspace.
     pub providers: Vec<ProviderStatusInfo>,
 }
@@ -195,14 +193,13 @@ mod tests {
     }
 
     #[test]
-    fn provider_list_result_uses_camel_case_persistence_flag() {
+    fn provider_list_result_uses_camel_case() {
         let result = ProviderListResult {
-            persistence_available: false,
             providers: Vec::new(),
         };
         assert_eq!(
             serde_json::to_value(&result).unwrap(),
-            serde_json::json!({"persistenceAvailable":false,"providers":[]})
+            serde_json::json!({"providers":[]})
         );
     }
 

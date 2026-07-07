@@ -23,7 +23,6 @@ import {
   customLabelErrorAtom,
   loginInFlightAtom,
   loginLastOutcomeAtom,
-  loginPersistenceAvailableAtom,
   loginProvidersAtom,
   loginRequestErrorAtom,
   loginSelectedIndexAtom,
@@ -39,7 +38,6 @@ export function LoginSurface() {
   const rows = useAtomValue(rowsAtom);
   const cwd = useAtomValue(workspaceCwdAtom);
   const providers = useAtomValue(loginProvidersAtom);
-  const persistenceAvailable = useAtomValue(loginPersistenceAvailableAtom);
   const selectedIndex = useAtomValue(loginSelectedIndexAtom);
   const selectedProvider = useAtomValue(selectedProviderAtom);
   const step = useAtomValue(loginStepAtom);
@@ -67,7 +65,6 @@ export function LoginSurface() {
     <Box flexDirection="column" width={columns} height={rows} backgroundColor={theme.colors.bodyBackground}>
       <Text color={theme.colors.accentBlue}>/login</Text>
       <Text color={theme.colors.muted}>Connect a provider. Secrets stay in masked local input only.</Text>
-      {!persistenceAvailable ? <PersistenceDegradedMessage providerId={selectedProvider?.providerId ?? null} /> : null}
       <ProviderList cwd={cwd} providers={providers} selectedIndex={selectedIndex} />
       {selectedProvider !== null && step === LoginStep.ConnectedActions ? (
         <ConnectedActions actionIndex={actionIndex} confirmClear={confirmClear} provider={selectedProvider} />
@@ -87,19 +84,6 @@ export function LoginSurface() {
       {inFlight ? <Text color={theme.colors.warning}>Working…</Text> : null}
       <OutcomeMessage outcome={outcome?.outcome ?? null} providerId={outcome?.providerId ?? null} />
       <RequestErrorMessage message={requestError} />
-    </Box>
-  );
-}
-
-function PersistenceDegradedMessage({ providerId }: { providerId: string | null }) {
-  return (
-    <Box flexDirection="column" borderStyle="round" borderColor={theme.colors.warning} paddingX={1}>
-      <Text color={theme.colors.warning}>
-        Settings won&apos;t persist (storage unavailable); set `CUSTOM_API_KEY` in `.env` to persist across restarts.
-      </Text>
-      {providerId === PROVIDER_ID_CUSTOM ? (
-        <Text color={theme.colors.warning}>Custom can&apos;t be saved in this mode because its base URL needs storage.</Text>
-      ) : null}
     </Box>
   );
 }

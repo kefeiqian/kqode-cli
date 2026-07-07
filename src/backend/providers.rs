@@ -11,20 +11,19 @@ use crate::provider::registry::{
 use crate::secrets::KeychainError;
 use crate::store::{ActiveSelection, ProviderSettings, Store};
 
-/// Builds provider status rows from SQLite's cached key-present bit and Kimi's
-/// fixed-endpoint fallbacks when persistence is degraded.
+/// Builds provider status rows from SQLite's cached key-present bit and env fallbacks.
 #[must_use]
 pub(crate) fn provider_list(store: Option<&Store>) -> ProviderListResult {
     let providers = registry::PROVIDERS
         .iter()
         .map(|descriptor| {
             let settings = provider_settings(store, descriptor.id);
-            let source = key_source(descriptor.id, settings.as_ref(), store.is_some());
+            let source = key_source(descriptor.id, settings.as_ref());
             let raw_status = registry::derive_status(descriptor.id, &move |provider| {
                 if provider == descriptor.id {
                     source
                 } else {
-                    key_source(provider, None, store.is_some())
+                    key_source(provider, None)
                 }
             });
             let base_url = settings
@@ -46,13 +45,10 @@ pub(crate) fn provider_list(store: Option<&Store>) -> ProviderListResult {
             }
         })
         .collect();
-    ProviderListResult {
-        persistence_available: store.is_some(),
-        providers,
-    }
+    ProviderListResult { providers }
 }
 
-/// Reads the active selection, returning nulls when persistence is degraded or unset.
+/// Reads the active selection, returning nulls when unset.
 #[must_use]
 pub(crate) fn active_selection(store: Option<&Store>) -> ActiveSelectionResult {
     match store.and_then(|store| store.active_selection().ok().flatten()) {
@@ -113,12 +109,8 @@ fn provider_settings(store: Option<&Store>, provider: ProviderId) -> Option<Prov
 fn key_source(
     provider: ProviderId,
     settings: Option<&ProviderSettings>,
-    persistence_available: bool,
 ) -> KeySource {
     if settings.is_some_and(|settings| settings.key_present) {
-        return KeySource::Keychain;
-    }
-    if !persistence_available && matches!(crate::secrets::get_key(provider), Ok(Some(_))) {
         return KeySource::Keychain;
     }
     if provider == ProviderId::Custom

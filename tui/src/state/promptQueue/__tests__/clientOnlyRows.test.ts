@@ -19,7 +19,7 @@ function clientWithSubmit(submit: BackendClient['submit']): BackendClient {
     clearConversation: async () => undefined,
     cancelTurn: async () => undefined,
     gitStatus: async () => null,
-    listProviders: async () => ({ persistenceAvailable: true, providers: [] }),
+    listProviders: async () => ({ providers: [] }),
     getActiveSelection: async () => ({ providerId: null, modelId: null }),
     setActiveSelection: async () => undefined,
     clearProviderKey: async () => undefined,

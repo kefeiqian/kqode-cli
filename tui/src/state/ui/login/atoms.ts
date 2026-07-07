@@ -31,9 +31,6 @@ export type LoginOutcome = SetKeyResult & { providerId: string };
 /** Backend-computed provider rows shown by `/login`. */
 export const loginProvidersAtom = atom<ProviderStatusInfo[]>([]);
 
-/** Whether provider settings can persist to the local SQLite store. */
-export const loginPersistenceAvailableAtom = atom(true);
-
 /** Currently highlighted provider row in the list. */
 export const loginSelectedIndexAtom = atom(0);
 
@@ -80,7 +77,6 @@ export const resetLoginSurfaceAtom = atom(null, (_get, set) => {
   set(loginInFlightAtom, false);
   set(loginLastOutcomeAtom, null);
   set(loginRequestErrorAtom, null);
-  set(loginPersistenceAvailableAtom, true);
   set(customBaseUrlAtom, '');
   set(customLabelAtom, '');
   set(customBaseUrlErrorAtom, null);

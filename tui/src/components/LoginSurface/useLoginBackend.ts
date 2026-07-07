@@ -6,7 +6,6 @@ import {
   customLabelErrorAtom,
   loginInFlightAtom,
   loginLastOutcomeAtom,
-  loginPersistenceAvailableAtom,
   loginProvidersAtom,
   loginRequestErrorAtom,
   loginSelectedIndexAtom,
@@ -23,7 +22,6 @@ export function useLoginBackend(baseUrl: string, label: string) {
   const selectedProvider = useAtomValue(selectedProviderAtom);
   const inFlight = useAtomValue(loginInFlightAtom);
   const setProviders = useSetAtom(loginProvidersAtom);
-  const setPersistenceAvailable = useSetAtom(loginPersistenceAvailableAtom);
   const setSelectedIndex = useSetAtom(loginSelectedIndexAtom);
   const setStep = useSetAtom(loginStepAtom);
   const setInFlight = useSetAtom(loginInFlightAtom);
@@ -42,13 +40,12 @@ export function useLoginBackend(baseUrl: string, label: string) {
     try {
       const result = await client.listProviders();
       setProviders(result.providers);
-      setPersistenceAvailable(result.persistenceAvailable);
       setSelectedIndex((current) => Math.min(current, Math.max(0, result.providers.length - 1)));
       setRequestError(null);
     } catch {
       setRequestError('Could not read providers — if keychain is unavailable, set `CUSTOM_API_KEY` in `.env`.');
     }
-  }, [client, setPersistenceAvailable, setProviders, setRequestError, setSelectedIndex]);
+  }, [client, setProviders, setRequestError, setSelectedIndex]);
 
   const submitKey = useCallback(
     async (apiKey: string) => {

@@ -116,23 +116,6 @@ describe('LoginSurface', () => {
     expect(frame).toContain('connected via .env (`C:\\repo`)');
   });
 
-  it('renders persistence-degraded messaging from provider list status', async () => {
-    const { lastFrame } = renderLogin(fakeClient({ persistenceAvailable: false }));
-    const frame = await waitForFrame(lastFrame, "Settings won't persist");
-
-    expect(frame).toContain('set `CUSTOM_API_KEY` in `.env`');
-  });
-
-  it("warns that Custom can't be saved when persistence is degraded", async () => {
-    const { store, lastFrame } = renderLogin(fakeClient({ persistenceAvailable: false }));
-    await waitForFrame(lastFrame, 'Custom');
-
-    store.set(loginSelectedIndexAtom, 1);
-    const frame = await waitForFrame(lastFrame, "Custom can't be saved");
-
-    expect(frame).toContain('base URL needs storage');
-  });
-
   it("renders a Custom-specific store failure instead of a keychain hint", async () => {
     const client = fakeClient({ outcome: 'storeFailed' });
     const { store, stdin, lastFrame } = renderLogin(client);
@@ -151,16 +134,15 @@ describe('LoginSurface', () => {
     expect(frame).not.toContain('Keychain write failed');
   });
 
-  it('still shows .env-connected providers while persistence is degraded', async () => {
+  it('shows .env-connected providers', async () => {
     const { lastFrame } = renderLogin(
       fakeClient({
-        persistenceAvailable: false,
         providers: [[provider(PROVIDER_ID_KIMI, 'Kimi', PROVIDER_STATUS_CONNECTED, CREDENTIAL_SOURCE_ENV)]]
       })
     );
     const frame = await waitForFrame(lastFrame, 'connected via .env');
 
-    expect(frame).toContain("Settings won't persist");
+    expect(frame).toContain('connected via .env (`C:\\repo`)');
   });
 
   it('advances and backs through Custom fields without advancing invalid URLs', async () => {

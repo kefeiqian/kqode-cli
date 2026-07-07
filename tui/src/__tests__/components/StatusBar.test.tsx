@@ -185,7 +185,7 @@ function clientWith({
     clearConversation: async () => undefined,
     cancelTurn: async () => undefined,
     gitStatus: async () => null,
-    listProviders: async () => ({ persistenceAvailable: true, providers }),
+    listProviders: async () => ({ providers }),
     getActiveSelection: async () => active,
     setActiveSelection: async () => {},
     clearProviderKey: async () => {},
