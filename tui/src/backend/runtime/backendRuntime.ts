@@ -4,7 +4,7 @@ import type { SessionLogger } from '@backend/log/sessionLogger.ts';
 import { backendClientAtom } from '@state/global/backend.ts';
 import { resetTranscriptMirrorAtom, transcriptEventAtom } from '@state/promptQueue/atoms.ts';
 import { appendClientOnlyErrorAtom } from '@state/promptQueue/clientOnlyRows.ts';
-import { refreshGitStatusAtom } from '@state/ui/gitStatus.ts';
+import { gitStatusLabelAtom } from '@state/ui/gitStatus.ts';
 import { BACKEND_LOADING_HINT, startupStatusHintAtom } from '@state/ui/statusHint.ts';
 
 type Store = ReturnType<typeof createStore>;
@@ -54,7 +54,7 @@ export function startBackendRuntime(
         return;
       }
       // Backend is ready: fetch the initial git label off the render path.
-      void store.set(refreshGitStatusAtom);
+      void refreshGitStatusUnlessDisposed(store, client, () => disposed);
     })
     .catch((error: unknown) => {
       if (disposed) {
@@ -92,4 +92,19 @@ function startupFailureMessage(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+async function refreshGitStatusUnlessDisposed(
+  store: Store,
+  client: RuntimeBackendClient,
+  isDisposed: () => boolean
+): Promise<void> {
+  try {
+    const label = await client.gitStatus();
+    if (!isDisposed()) {
+      store.set(gitStatusLabelAtom, label ?? undefined);
+    }
+  } catch {
+    // Keep the last known label; a transient failure should not blank the cwd row.
+  }
 }

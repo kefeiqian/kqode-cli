@@ -5,6 +5,7 @@ import { backendClientAtom } from '@state/global/backend.ts';
 import { BACKEND_LOADING_HINT, startupStatusHintAtom } from '@state/ui/statusHint.ts';
 import { enqueuePromptAtom } from '@state/promptQueue/index.ts';
 import { bodyScrollOffsetRowsAtom, submittedPromptEntriesAtom } from '@state/ui/index.ts';
+import { gitStatusLabelAtom } from '@state/ui/gitStatus.ts';
 import { startBackendRuntime } from '@backend/runtime/backendRuntime.ts';
 import type { RuntimeBackendClient } from '@backend/runtime/backendRuntime.ts';
 
@@ -140,6 +141,38 @@ describe('startBackendRuntime', () => {
 
     expect(client.gitStatus).not.toHaveBeenCalled();
     expect(store.get(startupStatusHintAtom)).toBeUndefined();
+  });
+
+  it('does not write git status after disposal while refresh is in flight', async () => {
+    const store = createStore();
+    let resolveStart: (() => void) | undefined;
+    let resolveGitStatus: ((status: string) => void) | undefined;
+    const client = fakeClient({
+      ensureStarted: vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveStart = resolve;
+          })
+      ),
+      gitStatus: vi.fn(
+        () =>
+          new Promise<string>((resolve) => {
+            resolveGitStatus = resolve;
+          })
+      )
+    });
+
+    const dispose = startBackendRuntime(store, client, fakeLogger());
+    resolveStart?.();
+    await flushMicrotasks();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(client.gitStatus).toHaveBeenCalledTimes(1);
+
+    dispose();
+    resolveGitStatus?.('main');
+    await flushMicrotasks();
+
+    expect(store.get(gitStatusLabelAtom)).toBeUndefined();
   });
 
   it('settles a visible error entry for a submit after a failed start (no silent drop)', async () => {
