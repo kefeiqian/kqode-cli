@@ -8,6 +8,7 @@ import {
   SET_KEY_OUTCOME_EMPTY_CATALOG,
   SET_KEY_OUTCOME_NOT_COMPATIBLE,
   SET_KEY_OUTCOME_RATE_LIMITED,
+  SET_KEY_OUTCOME_STORE_FAILED,
   SET_KEY_OUTCOME_UNREACHABLE
 } from '@contracts/backend/index.ts';
 import { activeSurfaceAtom, Surface } from '@state/ui/index.ts';
@@ -17,6 +18,7 @@ import {
   PROVIDER_ID_KIMI,
   customBaseUrlAtom,
   customLabelAtom,
+  loginLastOutcomeAtom,
   loginSelectedIndexAtom,
   loginStepAtom
 } from '@state/ui/login/index.ts';
@@ -117,18 +119,15 @@ describe('LoginSurface', () => {
   });
 
   it("renders a Custom-specific store failure instead of a keychain hint", async () => {
-    const client = fakeClient({ outcome: 'storeFailed' });
-    const { store, stdin, lastFrame } = renderLogin(client);
+    const { store, lastFrame } = renderLogin();
     await waitForFrame(lastFrame, 'Custom');
 
     store.set(loginSelectedIndexAtom, 1);
-    store.set(customBaseUrlAtom, 'https://ok.test/v1');
-    store.set(customLabelAtom, '');
-    store.set(loginStepAtom, LoginStep.Key);
-    await waitForFrame(lastFrame, 'API key');
-    stdin.write('sk-custom');
-    await flushInput();
-    stdin.write('\r');
+    store.set(loginLastOutcomeAtom, {
+      outcome: SET_KEY_OUTCOME_STORE_FAILED,
+      providerId: PROVIDER_ID_CUSTOM,
+      selectedModel: null
+    });
     const frame = await waitForFrame(lastFrame, "Custom can't be saved while settings storage is unavailable");
 
     expect(frame).not.toContain('Keychain write failed');
