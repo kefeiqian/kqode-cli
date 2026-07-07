@@ -19,6 +19,7 @@ path = "main.rs"
 [dependencies]
 dotenvy = "0.15.7"
 eventsource-stream = "0.2.3"
+fs2 = "0.4"
 futures-util = "0.3.32"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
 lsp-server = "0.7"

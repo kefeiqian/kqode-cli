@@ -8,8 +8,10 @@
 //! handle behind a mutex (WAL + `busy_timeout` make this cheap and safe).
 
 mod error;
+mod lock;
 mod migrations;
 mod providers;
+mod recovery;
 #[cfg(test)]
 mod tests;
 
@@ -25,9 +27,7 @@ pub use providers::{ActiveSelection, ProviderSettings};
 /// request ceiling, then surface `SQLITE_BUSY` (bootstrap degrades, never crashes).
 const BUSY_TIMEOUT_MS: u64 = 500;
 
-/// How many times to retry the one-time WAL conversion when a concurrent
-/// first-boot holds the brief exclusive lock (`busy_timeout` does not reliably
-/// cover the journal-mode change). After this we surface the error and degrade.
+/// WAL conversion retries for a concurrent first-boot's brief exclusive lock.
 const WAL_SET_MAX_RETRIES: u32 = 5;
 
 /// Linear backoff base between WAL-conversion retries (attempt N waits N×this).
@@ -70,6 +70,7 @@ impl Store {
                 std::fs::create_dir_all(parent).map_err(StoreError::CreateDir)?;
                 set_private_dir_permissions(parent);
             }
+            let _lock = lock::acquire(&path)?;
             let mut conn = open_connection(&path).map_err(StoreError::Open)?;
             ensure_wal(&conn).map_err(StoreError::Open)?;
             migrations::migrate(&mut conn)?;

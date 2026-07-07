@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 
+use super::recovery::{is_resettable_open_error, is_upgrade_only_history_error, reset_remedy};
+
 /// Stable prefix for backend stderr/TUI attribution of fatal store failures.
 pub const STORE_FATAL_SENTINEL: &str = "KQODE_STORE_FATAL:";
 
@@ -19,6 +21,10 @@ pub enum StoreError {
     CreateDir(std::io::Error),
     /// Opening the connection or applying pragmas (e.g. a WAL-set failure) failed.
     Open(rusqlite::Error),
+    /// Taking the bootstrap file lock failed.
+    BootstrapLock(std::io::Error),
+    /// Another process held the bootstrap lock past the bounded startup wait.
+    BootstrapLockTimeout { timeout_ms: u64 },
     /// A pre-refinery or partial schema exists without usable refinery history.
     LegacyReset { user_version: i64, table_count: i64 },
     /// Applying the embedded refinery migration chain failed.
@@ -47,6 +53,10 @@ impl std::fmt::Display for StoreError {
             ),
             Self::CreateDir(err) => write!(f, "could not create the database directory: {err}"),
             Self::Open(err) => write!(f, "could not open the database: {err}"),
+            Self::BootstrapLock(err) => write!(f, "could not take the bootstrap lock: {err}"),
+            Self::BootstrapLockTimeout { timeout_ms } => {
+                write!(f, "bootstrap lock was busy for {timeout_ms} ms")
+            }
             Self::LegacyReset {
                 user_version,
                 table_count,
@@ -98,6 +108,14 @@ impl StoreError {
             Self::WithPath { .. } => unreachable!("root_cause removes path wrappers"),
             Self::CreateDir(err) => format!("the database directory could not be created: {err}."),
             Self::Open(err) => format!("the database could not be opened: {err}."),
+            Self::BootstrapLock(err) => {
+                format!("the database bootstrap lock could not be taken: {err}.")
+            }
+            Self::BootstrapLockTimeout { timeout_ms } => {
+                format!(
+                    "another KQode process held the database bootstrap lock for more than {timeout_ms} ms."
+                )
+            }
             Self::LegacyReset {
                 user_version,
                 table_count,
@@ -121,7 +139,10 @@ impl StoreError {
             Self::NoPath => "Set a valid home directory and restart KQode.".to_owned(),
             Self::WithPath { .. } => unreachable!("root_cause removes path wrappers"),
             Self::Open(err) if is_resettable_open_error(err) => reset_remedy(path),
-            Self::CreateDir(_) | Self::Open(_) => {
+            Self::BootstrapLockTimeout { .. } => {
+                "Close other KQode instances using this database, then restart.".to_owned()
+            }
+            Self::CreateDir(_) | Self::Open(_) | Self::BootstrapLock(_) => {
                 "Fix filesystem permissions or move the KQode home directory, then restart."
                     .to_owned()
             }
@@ -144,50 +165,13 @@ impl std::error::Error for StoreError {
             Self::NoPath
             | Self::LegacyReset { .. }
             | Self::MigrationHistoryCorrupt(_)
-            | Self::SchemaHistoryMismatch { .. } => None,
+            | Self::SchemaHistoryMismatch { .. }
+            | Self::BootstrapLockTimeout { .. } => None,
             Self::WithPath { source, .. } => Some(source),
             Self::CreateDir(err) => Some(err),
+            Self::BootstrapLock(err) => Some(err),
             Self::Open(err) | Self::Sanity(err) => Some(err),
             Self::Migrate(err) | Self::MigrationHistory(err) => Some(err),
         }
     }
-}
-
-fn is_upgrade_only_history_error(err: &refinery::Error) -> bool {
-    match err.kind() {
-        refinery::error::Kind::DivergentVersion(_, _) => true,
-        refinery::error::Kind::MissingVersion(migration) => {
-            i64::from(migration.version()) > super::migrations::latest_version()
-        }
-        _ => false,
-    }
-}
-
-fn is_resettable_open_error(err: &rusqlite::Error) -> bool {
-    matches!(
-        err,
-        rusqlite::Error::SqliteFailure(inner, message)
-            if inner.code == rusqlite::ErrorCode::DatabaseCorrupt
-                || inner.code == rusqlite::ErrorCode::NotADatabase
-                || message
-                    .as_deref()
-                    .is_some_and(|message| message.contains("not a database"))
-    )
-}
-
-fn reset_remedy(path: &Path) -> String {
-    let wal = sidecar_path(path, "-wal");
-    let shm = sidecar_path(path, "-shm");
-    format!(
-        "After KQode exits, delete `{}`, `{}`, and `{}`, then restart; the index rebuilds from JSONL.",
-        path.display(),
-        wal.display(),
-        shm.display()
-    )
-}
-
-fn sidecar_path(path: &Path, suffix: &str) -> PathBuf {
-    let mut os_path = path.as_os_str().to_owned();
-    os_path.push(suffix);
-    PathBuf::from(os_path)
 }

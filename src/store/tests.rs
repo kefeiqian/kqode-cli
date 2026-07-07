@@ -2,6 +2,9 @@ use super::*;
 use crate::provider::ProviderId;
 use refinery::error::Kind;
 use rusqlite::Connection;
+use std::process::Command;
+
+const CHILD_BOOTSTRAP_DB_ENV: &str = "KQODE_STORE_BOOTSTRAP_CHILD_DB";
 
 /// A fresh temp directory + a DB path inside it. The `TempDir` guard cleans up
 /// the DB plus its `-wal`/`-shm` sidecars on drop.
@@ -111,6 +114,52 @@ fn fresh_path_bootstraps_to_latest_with_all_tables() {
     assert_eq!(rows[0].version, 1);
     assert_eq!(rows[0].name, "initial_schema");
     assert_eq!(rows[0].checksum, migrations::v1_checksum().to_string());
+}
+
+#[test]
+#[ignore]
+fn bootstrap_child_process() {
+    let Some(path) = std::env::var_os(CHILD_BOOTSTRAP_DB_ENV) else {
+        return;
+    };
+    Store::open_or_bootstrap_at(PathBuf::from(path)).expect("child bootstrap");
+}
+
+#[test]
+fn concurrent_bootstraps_across_processes_all_succeed() {
+    let (_dir, path) = temp_db();
+    let exe = std::env::current_exe().expect("current test executable");
+    let mut children = Vec::new();
+    for _ in 0..4 {
+        children.push(
+            Command::new(&exe)
+                .arg("--exact")
+                .arg("store::tests::bootstrap_child_process")
+                .arg("--ignored")
+                .env(CHILD_BOOTSTRAP_DB_ENV, &path)
+                .env("KQODE_STORE_BOOTSTRAP_HOLD_LOCK_MS", "150")
+                .spawn()
+                .expect("spawn child bootstrap process"),
+        );
+    }
+
+    let mut combined_output = String::new();
+    for child in children {
+        let output = child.wait_with_output().expect("wait for child process");
+        combined_output.push_str(&String::from_utf8_lossy(&output.stdout));
+        combined_output.push_str(&String::from_utf8_lossy(&output.stderr));
+        assert!(output.status.success(), "child failed:\n{combined_output}");
+    }
+    assert!(
+        !combined_output.contains("table provider_settings already exists"),
+        "race surfaced duplicate-create failure:\n{combined_output}"
+    );
+
+    let store = Store::open_or_bootstrap_at(path).unwrap();
+    let conn = store.connect().unwrap();
+    assert_eq!(history_rows(&conn).len(), 1);
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(1));
+    assert_eq!(table_names(&conn), EXPECTED_TABLES);
 }
 
 #[test]
