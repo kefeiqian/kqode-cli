@@ -71,17 +71,15 @@ export function waitForBackendReady(
       );
     };
 
-    const rejectAfterExit = (reason: string): void => backend.onExit((exit) => rejectDied(reason, exit));
-
     registrations.push(
       connection.onNotification(backendReadyNotification, ({ sessionId }) =>
         settle(() => resolve(sessionId))
       ),
       connection.onClose(() =>
-        rejectAfterExit('backend connection closed before it reported readiness')
+        rejectDied('backend connection closed before it reported readiness')
       ),
       connection.onError(() =>
-        rejectAfterExit('backend connection errored before it reported readiness')
+        rejectDied('backend connection errored before it reported readiness')
       )
     );
     backend.onExit((exit) => rejectDied('backend exited before it reported readiness', exit));
@@ -99,7 +97,7 @@ function startupFailureMessage(
   }
   if (exit !== undefined) {
     const ended = exit.signal === null ? `code ${exit.code ?? 'null'}` : `signal ${exit.signal}`;
-    return stderr.length === 0 ? `${fallback} (${ended})` : `${fallback} (${ended}): ${stderr}`;
+    return `${fallback} (${ended})`;
   }
   return fallback;
 }

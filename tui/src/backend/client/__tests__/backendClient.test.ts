@@ -332,7 +332,27 @@ describe('createBackendClient (fake backend)', () => {
       message: expect.stringContaining('backend exited before it reported readiness')
     });
     await expect(start).rejects.toMatchObject({
-      message: expect.not.stringContaining('delete /tmp/kqode.db')
+      message: expect.not.stringContaining('panic: unrelated')
+    });
+    client.dispose();
+  });
+
+  it('fails fast when the startup transport closes before readiness', async () => {
+    const fake = makeFakeBackend(() => undefined, {
+      signalReady: false
+    });
+    const client = createBackendClient({
+      launch: async () => fake.launched,
+      startupTimeoutMs: 5_000
+    });
+
+    const start = client.ensureStarted();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fake.closeServer();
+
+    await expect(start).rejects.toMatchObject({
+      kind: BackendErrorKind.Launch,
+      message: 'backend connection closed before it reported readiness'
     });
     client.dispose();
   });

@@ -58,6 +58,9 @@ export async function spawnBackend({
     windowsHide: true
   });
 
+  const stderrBuffer = new CappedBuffer(BACKEND_STDERR_CAP_BYTES);
+  child.stderr?.on('data', (chunk: Buffer) => stderrBuffer.append(chunk));
+
   await waitForSpawn(child);
 
   const { stdin, stdout, stderr } = child;
@@ -66,8 +69,6 @@ export async function spawnBackend({
     throw new BackendClientError(BackendErrorKind.Launch, 'backend process is missing stdio pipes');
   }
 
-  const stderrBuffer = new CappedBuffer(BACKEND_STDERR_CAP_BYTES);
-  stderr.on('data', (chunk: Buffer) => stderrBuffer.append(chunk));
   let exit: BackendExit | undefined;
   const exitListeners: Array<(exit: BackendExit) => void> = [];
   child.once('close', (code, signal) => {

@@ -4,7 +4,7 @@ import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.t
 import { backendClientAtom } from '@state/global/backend.ts';
 import { BACKEND_LOADING_HINT, startupStatusHintAtom } from '@state/ui/statusHint.ts';
 import { enqueuePromptAtom } from '@state/promptQueue/index.ts';
-import { submittedPromptEntriesAtom } from '@state/ui/index.ts';
+import { bodyScrollOffsetRowsAtom, submittedPromptEntriesAtom } from '@state/ui/index.ts';
 import { startBackendRuntime } from '@backend/runtime/backendRuntime.ts';
 import type { RuntimeBackendClient } from '@backend/runtime/backendRuntime.ts';
 
@@ -68,6 +68,7 @@ describe('startBackendRuntime', () => {
       ensureStarted: vi.fn().mockRejectedValue(new Error('launch failed'))
     });
     const logger = fakeLogger();
+    store.set(bodyScrollOffsetRowsAtom, 12);
 
     const dispose = startBackendRuntime(store, client, logger);
     expect(store.get(backendClientAtom)).toBe(client);
@@ -89,10 +90,34 @@ describe('startBackendRuntime', () => {
     expect(store.get(submittedPromptEntriesAtom)).toContainEqual(
       expect.objectContaining({ kind: 'error', text: 'launch failed' })
     );
+    expect(store.get(bodyScrollOffsetRowsAtom)).toBe(0);
 
     dispose();
     expect(client.dispose).toHaveBeenCalledTimes(1);
     expect(store.get(backendClientAtom)).toBeUndefined();
+  });
+
+  it('does not append startup errors after runtime disposal', async () => {
+    const store = createStore();
+    let rejectStart: ((error: Error) => void) | undefined;
+    const client = fakeClient({
+      ensureStarted: vi.fn(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            rejectStart = reject;
+          })
+      )
+    });
+    const logger = fakeLogger();
+
+    const dispose = startBackendRuntime(store, client, logger);
+    dispose();
+    rejectStart?.(new Error('late launch failed'));
+    await flushMicrotasks();
+
+    expect(store.get(submittedPromptEntriesAtom)).toEqual([]);
+    expect(logger.openOrphan).not.toHaveBeenCalled();
+    expect(store.get(startupStatusHintAtom)).toBeUndefined();
   });
 
   it('settles a visible error entry for a submit after a failed start (no silent drop)', async () => {

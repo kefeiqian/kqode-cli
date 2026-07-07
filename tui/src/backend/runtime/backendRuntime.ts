@@ -32,6 +32,7 @@ export function startBackendRuntime(
   client: RuntimeBackendClient,
   logger: SessionLogger
 ): () => void {
+  let disposed = false;
   store.set(backendClientAtom, client);
   store.set(startupStatusHintAtom, BACKEND_LOADING_HINT);
   const unsubscribeTranscript = client.onTranscriptEvent((event) => {
@@ -53,6 +54,9 @@ export function startBackendRuntime(
       void store.set(refreshGitStatusAtom);
     })
     .catch((error: unknown) => {
+      if (disposed) {
+        return;
+      }
       // Startup failed without readiness: flush buffered startup events to an
       // orphan session so the spawn/build failure is still captured. The
       // Dead-state client stays in the seam so the next submit retries via
@@ -63,15 +67,20 @@ export function startBackendRuntime(
       store.set(appendClientOnlyErrorAtom, message);
     })
     .finally(() => {
+      if (disposed) {
+        return;
+      }
       store.set(startupStatusHintAtom, undefined);
     });
 
   return () => {
+    disposed = true;
     logger.log({ event: 'sessionExit' });
     unsubscribeTranscript();
     client.dispose();
     logger.close();
     store.set(backendClientAtom, undefined);
+    store.set(startupStatusHintAtom, undefined);
   };
 }
 
