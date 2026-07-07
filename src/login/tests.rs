@@ -284,3 +284,36 @@ fn unreachable_set_key_does_not_leak_sentinel_to_persistent_sinks() {
         }
     }
 }
+
+#[test]
+fn list_models_pins_custom_env_model_without_fetch() {
+    let _lock = crate::test_env::lock();
+    let previous = env::var_os(crate::config::CUSTOM_MODEL_VAR);
+    // A `.env`-pinned Custom model is authoritative: `/model` must offer just
+    // that one model. Reaching this result with no key, base URL, or runtime
+    // network I/O proves the catalog fetch is skipped entirely.
+    unsafe { env::set_var(crate::config::CUSTOM_MODEL_VAR, "my-pinned-model") };
+
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let result = runtime.block_on(list_models(None, ProviderId::Custom));
+
+    restore_env(crate::config::CUSTOM_MODEL_VAR, previous);
+    assert_eq!(result.status, MODEL_LIST_STATUS_LOADED);
+    assert_eq!(result.models.len(), 1);
+    assert_eq!(result.models[0].id, "my-pinned-model");
+    assert_eq!(result.models[0].owned_by, None);
+}
+
+#[test]
+fn custom_env_model_result_sanitizes_pinned_id() {
+    // The pinned id is display-bound, so it is scrubbed on the same boundary as
+    // a fetched catalog entry even though it originates from the user's `.env`.
+    let result = custom_env_model_result("gpt-4o\u{1b}[31m-mini");
+    assert_eq!(result.status, MODEL_LIST_STATUS_LOADED);
+    assert_eq!(result.models.len(), 1);
+    assert_eq!(result.models[0].id, "gpt-4o-mini");
+    assert_eq!(result.models[0].owned_by, None);
+}

@@ -1,6 +1,6 @@
 import { createStore } from 'jotai';
 import { describe, expect, it } from 'vitest';
-import { MIN_ROWS } from '@constants/ui.ts';
+import { COMMAND_MENU_PANEL_ROWS, MIN_ROWS } from '@constants/ui.ts';
 import { BODY_CWD_GAP_ROWS, DEFAULT_COMPOSER_ROWS, HEADER_ROWS } from '@libs/tui/layout.ts';
 import { composerStateAtom } from '@state/ui/composer/index.ts';
 import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/dimensions.ts';
@@ -23,12 +23,12 @@ const pinViewport = (store: Store, columns: number, rows: number): void => {
 };
 
 describe('command menu layout atoms', () => {
-  it('renders all matches when there is room above the composer', () => {
+  it('reserves the fixed panel height when there is room above the composer', () => {
     const store = createStore();
     pinViewport(store, 80, 24);
     setText(store, '/');
 
-    expect(store.get(commandMenuRowsAtom)).toBe(5);
+    expect(store.get(commandMenuRowsAtom)).toBe(COMMAND_MENU_PANEL_ROWS);
   });
 
   it('collapses the cwd row while the menu is open without moving the composer', () => {

@@ -39,7 +39,7 @@ const WAL_SET_RETRY_MS: u64 = 20;
 /// the caller degrades to session-only. The DB is never auto-deleted.
 #[derive(Debug)]
 pub enum StoreError {
-    /// The DB path could not be resolved (no home dir and no `KQODE_DB_PATH`).
+    /// The DB path could not be resolved (no home dir).
     NoPath,
     /// The DB's parent directory could not be created.
     CreateDir(std::io::Error),

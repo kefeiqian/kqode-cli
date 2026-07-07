@@ -18,9 +18,12 @@ const NAME_DESCRIPTION_GAP = '  ';
 /**
  * The floating slash-command menu, rendered directly above the composer while a
  * command query is open. Its height is budgeted by `commandMenuRowsAtom` (U4),
- * so this component only reads that height and renders within it. Command names
- * are padded to the widest match so descriptions align in a single column, and
- * rows are truncated to `columns - 1` to keep the terminal's final column clear.
+ * so this component only reads that height and renders exactly that many rows:
+ * matching commands fill from the top and any remaining rows are painted blank,
+ * keeping the panel a stable height so the composer never shifts as the query
+ * narrows. Command names are padded to the widest match so descriptions align in
+ * a single column, and rows are truncated to `columns - 1` to keep the
+ * terminal's final column clear.
  */
 export function SlashCommandMenu() {
   const isOpen = useAtomValue(commandMenuOpenAtom);
@@ -37,6 +40,7 @@ export function SlashCommandMenu() {
     return (
       <Box flexDirection="column">
         <Text color={theme.colors.muted}>{truncate(`${PLAIN_MARKER}${NO_MATCHES_LABEL}`, columns)}</Text>
+        {blankRows(menuRows - 1)}
       </Box>
     );
   }
@@ -66,8 +70,22 @@ export function SlashCommandMenu() {
           </Text>
         );
       })}
+      {blankRows(menuRows - visible.length)}
     </Box>
   );
+}
+
+/**
+ * Blank filler rows that keep the panel at its fixed `commandMenuRowsAtom` height
+ * as matches narrow, so the composer below never shifts. Each row paints a single
+ * space so the terminal reserves the line rather than collapsing it.
+ */
+function blankRows(count: number) {
+  if (count <= 0) {
+    return null;
+  }
+
+  return Array.from({ length: count }, (_unused, index) => <Text key={`blank-${index}`}> </Text>);
 }
 
 /** Keeps a row one column short of the edge; Ink drops final-column glyphs on some terminals. */

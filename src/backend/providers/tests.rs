@@ -1,12 +1,10 @@
 use super::*;
 use crate::config::{CUSTOM_BASE_URL_VAR, CUSTOM_MODEL_VAR};
-use crate::paths::KQODE_DB_PATH_VAR;
 use crate::test_env;
 use std::env;
 use std::sync::MutexGuard;
 
 struct EnvGuard {
-    db_path: Option<std::ffi::OsString>,
     custom_key: Option<std::ffi::OsString>,
     custom_model: Option<std::ffi::OsString>,
     custom_base_url: Option<std::ffi::OsString>,
@@ -14,16 +12,14 @@ struct EnvGuard {
 }
 
 impl EnvGuard {
-    fn new(db_path: &std::path::Path, lock: MutexGuard<'static, ()>) -> Self {
+    fn new(lock: MutexGuard<'static, ()>) -> Self {
         let guard = Self {
-            db_path: env::var_os(KQODE_DB_PATH_VAR),
             custom_key: env::var_os(CUSTOM_API_KEY_VAR),
             custom_model: env::var_os(CUSTOM_MODEL_VAR),
             custom_base_url: env::var_os(CUSTOM_BASE_URL_VAR),
             _lock: lock,
         };
         unsafe {
-            env::set_var(KQODE_DB_PATH_VAR, db_path);
             env::remove_var(CUSTOM_API_KEY_VAR);
             env::remove_var(CUSTOM_MODEL_VAR);
             env::remove_var(CUSTOM_BASE_URL_VAR);
@@ -34,7 +30,6 @@ impl EnvGuard {
 
 impl Drop for EnvGuard {
     fn drop(&mut self) {
-        restore_env(KQODE_DB_PATH_VAR, self.db_path.as_ref());
         restore_env(CUSTOM_API_KEY_VAR, self.custom_key.as_ref());
         restore_env(CUSTOM_MODEL_VAR, self.custom_model.as_ref());
         restore_env(CUSTOM_BASE_URL_VAR, self.custom_base_url.as_ref());
@@ -54,8 +49,8 @@ fn restore_env(name: &str, value: Option<&std::ffi::OsString>) {
 fn bootstrap() -> (tempfile::TempDir, Store, EnvGuard) {
     let lock = test_env::lock();
     let dir = tempfile::tempdir().expect("temp dir");
-    let guard = EnvGuard::new(&dir.path().join("kqode.db"), lock);
-    let store = Store::open_or_bootstrap().expect("bootstrap");
+    let guard = EnvGuard::new(lock);
+    let store = Store::open_or_bootstrap_at(dir.path().join("kqode.db")).expect("bootstrap");
     (dir, store, guard)
 }
 
@@ -103,18 +98,14 @@ fn provider_list_empty_store_without_env_marks_kimi_not_configured() {
 
 #[test]
 fn provider_list_without_store_reports_degraded_persistence() {
-    let lock = test_env::lock();
-    let dir = tempfile::tempdir().expect("temp dir");
-    let _guard = EnvGuard::new(&dir.path().join("unused.db"), lock);
+    let _guard = EnvGuard::new(test_env::lock());
     let result = provider_list(None);
     assert!(!result.persistence_available);
 }
 
 #[test]
 fn provider_list_without_store_reports_kimi_keychain_status() {
-    let lock = test_env::lock();
-    let dir = tempfile::tempdir().expect("temp dir");
-    let _guard = EnvGuard::new(&dir.path().join("unused.db"), lock);
+    let _guard = EnvGuard::new(test_env::lock());
     crate::secrets::clear_key(ProviderId::Kimi).unwrap();
     crate::secrets::set_key(
         ProviderId::Kimi,

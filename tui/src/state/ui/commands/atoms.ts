@@ -1,5 +1,5 @@
 import { atom } from 'jotai';
-import { MAX_COMMAND_MENU_ROWS } from '@constants/ui.ts';
+import { COMMAND_MENU_PANEL_ROWS } from '@constants/ui.ts';
 import { clamp } from '@libs/math/clamp.ts';
 import { filterCommands } from '@libs/commands/filterCommands.ts';
 import { composerStateAtom } from '@state/ui/composer/index.ts';
@@ -41,17 +41,17 @@ export const highlightedCommandAtom = atom<CommandDefinition | undefined>((get) 
 });
 
 /**
- * Rows the menu wants to render: the capped match count, one row for the
- * "No matching commands" state, or zero when closed. U4 clamps this to the space
- * actually free above the composer.
+ * Rows the menu wants to render: the fixed panel height while open (matching
+ * commands fill from the top, remaining rows stay blank, and the "No matching
+ * commands" state occupies the top row), or zero when closed. U4 clamps this to
+ * the space actually free above the composer.
  */
 export const commandMenuDesiredRowsAtom = atom((get) => {
   if (!get(commandMenuOpenAtom)) {
     return 0;
   }
 
-  const matches = get(commandMenuMatchesAtom);
-  return matches.length === 0 ? 1 : Math.min(matches.length, MAX_COMMAND_MENU_ROWS);
+  return COMMAND_MENU_PANEL_ROWS;
 });
 
 /** Moves the highlight by `delta`, clamped to the current match range. */

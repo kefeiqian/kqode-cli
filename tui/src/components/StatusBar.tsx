@@ -1,6 +1,6 @@
 import { Box, Text } from 'ink';
-import { useAtomValue, useSetAtom } from 'jotai';
-import { useEffect, useState } from 'react';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { useEffect } from 'react';
 import { activeModelLabelAtom, refreshActiveModelAtom } from '@state/global/index.ts';
 import { turnInFlightAtom } from '@state/promptQueue/index.ts';
 import {
@@ -8,6 +8,7 @@ import {
   armedActionAtom,
   columnsAtom,
   copyModeActiveAtom,
+  loadingFrameAtom,
   setTransientStatusHintAtom,
   startupStatusHintAtom,
   Surface,
@@ -103,7 +104,10 @@ function useActiveModelRefresh() {
 }
 
 function useLoadingFrame(isLoading: boolean): number {
-  const [frame, setFrame] = useState(0);
+  // Backed by the shared `loadingFrameAtom` (not local state) so the prompt
+  // composer can subscribe and re-assert the terminal caret on each tick — see
+  // the atom's doc comment. The StatusBar is the single interval driver.
+  const [frame, setFrame] = useAtom(loadingFrameAtom);
 
   useEffect(() => {
     if (!isLoading) {
@@ -118,7 +122,7 @@ function useLoadingFrame(isLoading: boolean): number {
     return () => {
       clearInterval(timer);
     };
-  }, [isLoading]);
+  }, [isLoading, setFrame]);
 
   return frame;
 }

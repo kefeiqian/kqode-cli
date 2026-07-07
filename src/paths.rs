@@ -2,17 +2,13 @@
 //!
 //! Centralizes home-directory resolution so `debug_log`, the SQLite store, and
 //! future callers agree on where `~/.kqode` lives. Hand-rolled (no `dirs`
-//! crate) to keep the dependency surface small, mirroring the env-override
-//! seam `debug_log` already uses for its log directory.
+//! crate) to keep the dependency surface small.
 
 use std::env;
 use std::path::PathBuf;
 
 /// Per-user KQode home directory name (`~/.kqode`). Mirrors the TUI's `KQODE_HOME_DIRNAME`.
 pub const KQODE_HOME_DIRNAME: &str = ".kqode";
-
-/// Env var overriding the SQLite database file path (tests point it at a temp file).
-pub const KQODE_DB_PATH_VAR: &str = "KQODE_DB_PATH";
 
 /// SQLite database filename under the KQode home.
 const DB_FILENAME: &str = "kqode.db";
@@ -37,18 +33,13 @@ pub fn kqode_home() -> Option<PathBuf> {
     Some(home_dir()?.join(KQODE_HOME_DIRNAME))
 }
 
-/// Resolves the SQLite database file path.
+/// Resolves the SQLite database file path: `<kqode_home>/kqode.db`.
 ///
-/// `KQODE_DB_PATH` wins verbatim when set to a non-empty value; otherwise the
-/// DB lives at `<kqode_home>/kqode.db`. Returns `None` only when no override is
-/// set and the home cannot be resolved.
+/// Returns `None` when the home cannot be resolved. Tests bootstrap the store
+/// at an explicit temp path via `Store::open_or_bootstrap_at` rather than
+/// overriding this resolver.
 #[must_use]
 pub fn db_path() -> Option<PathBuf> {
-    if let Ok(path) = env::var(KQODE_DB_PATH_VAR)
-        && !path.trim().is_empty()
-    {
-        return Some(PathBuf::from(path));
-    }
     Some(kqode_home()?.join(DB_FILENAME))
 }
 

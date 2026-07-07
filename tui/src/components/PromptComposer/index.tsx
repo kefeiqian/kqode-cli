@@ -11,6 +11,7 @@ import {
 } from '@components/PromptComposer/promptTextView.ts';
 import { usePromptComposerInput } from '@components/PromptComposer/usePromptComposerInput.ts';
 import { usePasteInput } from '@components/PromptComposer/usePasteInput.ts';
+import { useComposerCaretVisibility } from '@components/PromptComposer/useComposerCaretVisibility.ts';
 import { DEFAULT_COMPOSER_VISIBLE_LINES } from '@constants/ui.ts';
 import {
   clearTranscriptAtom,
@@ -92,14 +93,6 @@ export function PromptComposer({
           )
       : (prompt: string) => onSubmit(prompt);
   const resolvedIsActive = isActive ?? (!atomInputLocked && !copyModeActive);
-  // The caret tracks the prompt whenever the composer owns the screen — even
-  // while startup input is locked. Without this, during backend loading the
-  // composer sets no cursor position, and on the Windows fullscreen repaint
-  // path Ink leaves the hardware cursor at the end of the last output row (the
-  // status bar / model label) instead of hiding it. Copy Mode is the one
-  // deliberate exception: it releases the cursor to the terminal for native
-  // selection.
-  const caretTracksPrompt = isActive ?? !copyModeActive;
   const resolvedMaxVisibleLines = maxVisibleLines ?? atomLayout.composerVisibleRows ?? DEFAULT_COMPOSER_VISIBLE_LINES;
   const resolvedCursorTop = cursorTop ?? atomComposerTop;
   const resolvedVisibleRowsChange = onVisibleRowsChange ?? setComposerRows;
@@ -135,6 +128,10 @@ export function PromptComposer({
     commandActions
   });
   usePasteInput({ maxBytes });
+  // Keeps the terminal caret in sync with focus: re-asserts it on chrome
+  // repaints (so it never drops off the prompt), and hides it while input is
+  // locked during backend loading. See the hook for the full rationale.
+  useComposerCaretVisibility();
 
   const inputColumns = Math.max(1, resolvedColumns - PROMPT_PREFIX.length);
   const composerWindow = resolveComposerWindow({
@@ -167,8 +164,14 @@ export function PromptComposer({
     scrollCursorIntoView();
   }, [state.cursorIndex, state.text, scrollCursorIntoView]);
 
+  // Show the caret only when the composer is active. While input is locked
+  // (backend loading) resolvedIsActive is false, so no position is set and the
+  // terminal cursor stays hidden — useComposerCaretVisibility hides it
+  // explicitly because Ink won't — and the caret returns once the backend is
+  // ready. Copy Mode also releases the caret to the terminal for native
+  // selection.
   if (
-    caretTracksPrompt &&
+    resolvedIsActive &&
     composerMetrics.hasMeasured &&
     composerWindow.cursorVisible &&
     !caretSuppressed

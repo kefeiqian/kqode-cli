@@ -1,5 +1,6 @@
 export * from '@state/ui/atoms.ts';
 export * from '@state/ui/body.ts';
+export * from '@state/ui/composerCaret.ts';
 export * from '@state/ui/copyMode.ts';
 export * from '@state/ui/dimensions.ts';
 export * from '@state/ui/gitStatus.ts';

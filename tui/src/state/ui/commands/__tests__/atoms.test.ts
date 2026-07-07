@@ -10,6 +10,7 @@ import {
   moveCommandHighlightAtom,
   resetCommandHighlightAtom
 } from '@state/ui/commands/index.ts';
+import { COMMAND_MENU_PANEL_ROWS } from '@constants/ui.ts';
 import { CommandId } from '@libs/commands/registry.ts';
 import { composerStateAtom } from '@state/ui/composer/index.ts';
 import { BACKEND_LOADING_HINT, startupStatusHintAtom } from '@state/ui/statusHint.ts';
@@ -34,7 +35,7 @@ describe('command menu atoms', () => {
       CommandId.Model
     ]);
     expect(store.get(highlightedCommandAtom)?.id).toBe(CommandId.Clear);
-    expect(store.get(commandMenuDesiredRowsAtom)).toBe(5);
+    expect(store.get(commandMenuDesiredRowsAtom)).toBe(COMMAND_MENU_PANEL_ROWS);
   });
 
   it('narrows matches as the query grows', () => {
@@ -47,14 +48,14 @@ describe('command menu atoms', () => {
     expect(store.get(highlightedCommandAtom)?.id).toBe(CommandId.Clear);
   });
 
-  it('stays open with no matches and shows a single row', () => {
+  it('stays open with no matches and keeps the fixed panel height', () => {
     const store = createStore();
     setText(store, '/zzz');
 
     expect(store.get(commandMenuOpenAtom)).toBe(true);
     expect(store.get(commandMenuMatchesAtom)).toEqual([]);
     expect(store.get(highlightedCommandAtom)).toBeUndefined();
-    expect(store.get(commandMenuDesiredRowsAtom)).toBe(1);
+    expect(store.get(commandMenuDesiredRowsAtom)).toBe(COMMAND_MENU_PANEL_ROWS);
   });
 
   it('is closed for non-slash text', () => {

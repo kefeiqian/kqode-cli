@@ -9,8 +9,8 @@ mod sanitize;
 mod selection;
 
 use crate::protocol::{
-    MODEL_LIST_STATUS_EMPTY, MODEL_LIST_STATUS_FAILED, MODEL_LIST_STATUS_LOADED, ModelListResult,
-    SetKeyResult,
+    MODEL_LIST_STATUS_EMPTY, MODEL_LIST_STATUS_FAILED, MODEL_LIST_STATUS_LOADED, ModelInfoWire,
+    ModelListResult, SetKeyResult,
 };
 use crate::provider::registry::{ProviderEndpoint, provider_descriptor};
 use crate::provider::{ProviderId, ValidationOutcome, validate_base_url};
@@ -79,8 +79,20 @@ pub async fn set_provider_key(store: Option<Store>, work: SetKeyWork) -> SetKeyR
 }
 
 /// Loads a provider's model catalog using the currently resolvable key.
+///
+/// A Custom provider whose model is pinned in the workspace `.env`
+/// (`CUSTOM_MODEL`) short-circuits to a single-model catalog and skips the
+/// network fetch: the user has already chosen the model, and many
+/// OpenAI-compatible endpoints don't expose a browsable `/models` catalog
+/// anyway. Keychain-configured Custom logins (no `.env` model) and preset
+/// providers still fetch the full catalog.
 #[must_use]
 pub async fn list_models(store: Option<Store>, provider: ProviderId) -> ModelListResult {
+    if provider == ProviderId::Custom
+        && let Some(model_id) = crate::config::custom_env_model()
+    {
+        return custom_env_model_result(&model_id);
+    }
     let Some(key) = crate::secrets::resolve_key(provider) else {
         return model_failed();
     };
@@ -97,6 +109,21 @@ pub async fn list_models(store: Option<Store>, provider: ProviderId) -> ModelLis
             models: Vec::new(),
         },
         _ => model_failed(),
+    }
+}
+
+/// Builds the single-model catalog for a Custom provider whose model is pinned
+/// in `.env` (`CUSTOM_MODEL`).
+///
+/// The id is scrubbed on this display boundary exactly like a fetched catalog
+/// entry; `owned_by` is `None` because no provider metadata is fetched.
+fn custom_env_model_result(model_id: &str) -> ModelListResult {
+    ModelListResult {
+        status: MODEL_LIST_STATUS_LOADED,
+        models: vec![ModelInfoWire {
+            id: sanitize::sanitize_model_id(model_id),
+            owned_by: None,
+        }],
     }
 }
 

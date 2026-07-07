@@ -18,6 +18,7 @@ import {
   BACKEND_LOADING_HINT,
   columnsTestOverrideAtom,
   copyModeActiveAtom,
+  loadingFrameAtom,
   setTransientStatusHintAtom,
   startupStatusHintAtom
 } from '@state/ui/index.ts';
@@ -124,6 +125,18 @@ describe('StatusBar', () => {
     const output = lastFrame() ?? '';
     expect(output).toContain(BACKEND_LOADING_HINT.text);
     expect(output).not.toContain(NOT_CONFIGURED_MODEL_LABEL);
+  });
+
+  it('renders the loading dots from the shared loadingFrameAtom', () => {
+    // The composer subscribes to this same atom to re-assert the terminal caret
+    // on each spinner frame; the status bar must keep deriving its dots from it.
+    const store = makeStore();
+    store.set(startupStatusHintAtom, BACKEND_LOADING_HINT);
+    store.set(loadingFrameAtom, 2);
+
+    const { lastFrame } = renderWithJotai(<StatusBar />, store);
+
+    expect(lastFrame() ?? '').toContain(`${BACKEND_LOADING_HINT.text}..`);
   });
 });
 

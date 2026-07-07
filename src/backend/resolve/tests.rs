@@ -3,7 +3,6 @@ use crate::config::{
     CUSTOM_API_KEY_VAR, CUSTOM_BASE_URL_VAR, CUSTOM_MODEL_VAR, DEFAULT_KIMI_BASE_URL,
     DEFAULT_KIMI_MODEL,
 };
-use crate::paths::KQODE_DB_PATH_VAR;
 use crate::secrets::{ApiKey, clear_key, set_key};
 use crate::store::{ActiveSelection, ProviderSettings};
 use crate::test_env;
@@ -15,7 +14,6 @@ static KEYRING_MOCK: Once = Once::new();
 
 struct IsolatedState {
     dir: tempfile::TempDir,
-    db_path: Option<OsString>,
     custom_key: Option<OsString>,
     custom_model: Option<OsString>,
     custom_base_url: Option<OsString>,
@@ -30,21 +28,17 @@ impl IsolatedState {
         });
         let state = Self {
             dir: tempfile::tempdir().expect("temp dir"),
-            db_path: env::var_os(KQODE_DB_PATH_VAR),
             custom_key: env::var_os(CUSTOM_API_KEY_VAR),
             custom_model: env::var_os(CUSTOM_MODEL_VAR),
             custom_base_url: env::var_os(CUSTOM_BASE_URL_VAR),
             _lock: lock,
         };
-        unsafe {
-            env::set_var(KQODE_DB_PATH_VAR, state.dir.path().join("kqode.db"));
-        }
         state.clear();
         state
     }
 
     fn store(&self) -> Store {
-        Store::open_or_bootstrap().expect("bootstrap")
+        Store::open_or_bootstrap_at(self.dir.path().join("kqode.db")).expect("bootstrap")
     }
 
     fn clear(&self) {
@@ -61,7 +55,6 @@ impl IsolatedState {
 impl Drop for IsolatedState {
     fn drop(&mut self) {
         self.clear();
-        restore(KQODE_DB_PATH_VAR, self.db_path.as_ref());
         restore(CUSTOM_API_KEY_VAR, self.custom_key.as_ref());
         restore(CUSTOM_MODEL_VAR, self.custom_model.as_ref());
         restore(CUSTOM_BASE_URL_VAR, self.custom_base_url.as_ref());

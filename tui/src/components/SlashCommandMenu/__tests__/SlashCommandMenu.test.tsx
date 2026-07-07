@@ -1,6 +1,7 @@
 import { createStore } from 'jotai';
 import { describe, expect, it } from 'vitest';
 import { SlashCommandMenu } from '@components/SlashCommandMenu/index.tsx';
+import { COMMAND_MENU_PANEL_ROWS } from '@constants/ui.ts';
 import { composerStateAtom } from '@state/ui/composer/index.ts';
 import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/dimensions.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
@@ -45,6 +46,21 @@ describe('SlashCommandMenu', () => {
     const { lastFrame } = renderWithJotai(<SlashCommandMenu />, makeStore('hello'));
 
     expect((lastFrame() ?? '').trim()).toBe('');
+  });
+
+  it('keeps a fixed panel height by padding blank rows below a narrowed match', () => {
+    const { lastFrame } = renderWithJotai(<SlashCommandMenu />, makeStore('/mo'));
+    const lines = (lastFrame() ?? '').split('\n');
+
+    // Only `/model` matches, but the panel keeps its fixed height so the
+    // composer below never shifts as the query narrows.
+    expect(lines.length).toBe(COMMAND_MENU_PANEL_ROWS);
+    // The sole match sits on the top row; the rest are blank fillers.
+    expect(lines[0]).toContain('/model');
+    expect(lines[0]).toContain('\u276F');
+    for (const line of lines.slice(1)) {
+      expect(line.trim()).toBe('');
+    }
   });
 
   it('truncates rows to keep the terminal final column clear', () => {

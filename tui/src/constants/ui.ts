@@ -48,11 +48,13 @@ export const CARET_SCROLL_SETTLE_MS = 100;
 // --- Slash commands ---
 
 /**
- * Maximum command rows shown in the autocomplete menu before it stops growing.
- * Inert with the three built-in commands today; exercised once the deferred
- * markdown/config command source adds more.
+ * Fixed number of rows the slash-command panel occupies while open. The panel
+ * always renders this many rows: matching commands fill from the top and any
+ * remaining rows are left blank, so the panel keeps a stable height instead of
+ * shrinking as the query narrows the matches. Also serves as the scroll-window
+ * size once the command set grows beyond this many entries.
  */
-export const MAX_COMMAND_MENU_ROWS = 8;
+export const COMMAND_MENU_PANEL_ROWS = 6;
 
 // --- Two-step key confirmations ---
 
