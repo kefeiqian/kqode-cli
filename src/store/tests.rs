@@ -90,6 +90,14 @@ fn seed_raw_history_row(
     .unwrap();
 }
 
+fn remove_db_with_sidecars(path: &Path) {
+    for suffix in ["", "-wal", "-shm"] {
+        let mut os_path = path.as_os_str().to_owned();
+        os_path.push(suffix);
+        let _ = std::fs::remove_file(PathBuf::from(os_path));
+    }
+}
+
 #[test]
 fn fresh_path_bootstraps_to_latest_with_all_tables() {
     let (_dir, path) = temp_db();
@@ -153,7 +161,7 @@ fn divergent_applied_migration_surfaces_a_store_error() {
         .unwrap();
     }
     let err = Store::open_or_bootstrap_at(path).unwrap_err();
-    match err {
+    match err.root_cause() {
         StoreError::MigrationHistory(err) => {
             assert!(matches!(err.kind(), Kind::DivergentVersion(_, _)));
         }
@@ -170,13 +178,80 @@ fn db_ahead_of_embedded_migrations_refuses_to_bootstrap() {
         seed_history_row(&conn, 2, "future_schema", 1);
     }
     let err = Store::open_or_bootstrap_at(path.clone()).unwrap_err();
-    match err {
+    match err.root_cause() {
         StoreError::MigrationHistory(err) => {
             assert!(matches!(err.kind(), Kind::MissingVersion(_)));
         }
         other => panic!("expected missing migration history, got {other:?}"),
     }
+    let message = err.to_string().to_lowercase();
+    assert!(message.contains("upgrade"));
+    assert!(
+        !message.contains("delete"),
+        "DB-ahead remedy must not instruct deletion: {message}"
+    );
     assert!(path.exists(), "a DB-ahead failure must never auto-delete");
+}
+
+#[test]
+fn legacy_user_version_one_db_gets_reset_message_and_can_rebootstrap_after_delete() {
+    let (_dir, path) = temp_db();
+    {
+        let conn = Connection::open(&path).unwrap();
+        conn.execute_batch(include_str!("../../migrations/V1__initial_schema.sql"))
+            .unwrap();
+        conn.pragma_update(None, "user_version", 1).unwrap();
+    }
+    let err = Store::open_or_bootstrap_at(path.clone()).unwrap_err();
+    match err.root_cause() {
+        StoreError::LegacyReset {
+            user_version,
+            table_count,
+        } => {
+            assert_eq!(*user_version, 1);
+            assert_eq!(*table_count, 4);
+        }
+        other => panic!("expected legacy reset error, got {other:?}"),
+    }
+    let message = err.to_string();
+    assert!(message.contains(STORE_FATAL_SENTINEL));
+    assert!(message.contains(&path.display().to_string()));
+    assert!(message.contains("-wal"));
+    assert!(message.contains("-shm"));
+    assert!(message.to_lowercase().contains("delete"));
+
+    remove_db_with_sidecars(&path);
+    let store = Store::open_or_bootstrap_at(path).expect("fresh bootstrap after reset");
+    let conn = store.connect().unwrap();
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(1));
+}
+
+#[test]
+fn dirty_app_table_without_history_gets_reset_message_not_table_exists() {
+    let (_dir, path) = temp_db();
+    {
+        let conn = Connection::open(&path).unwrap();
+        conn.execute_batch("CREATE TABLE provider_settings (id INTEGER);")
+            .unwrap();
+    }
+    let err = Store::open_or_bootstrap_at(path.clone()).unwrap_err();
+    match err.root_cause() {
+        StoreError::LegacyReset {
+            user_version,
+            table_count,
+        } => {
+            assert_eq!(*user_version, 0);
+            assert_eq!(*table_count, 1);
+        }
+        other => panic!("expected dirty reset error, got {other:?}"),
+    }
+    let message = err.to_string();
+    assert!(message.contains(&path.display().to_string()));
+    assert!(message.to_lowercase().contains("delete"));
+    assert!(
+        !message.contains("table provider_settings already exists"),
+        "dirty schema should be classified before refinery runs"
+    );
 }
 
 #[test]
@@ -194,7 +269,7 @@ fn malformed_history_applied_on_surfaces_store_error_without_panicking() {
         );
     }
     let err = Store::open_or_bootstrap_at(path).unwrap_err();
-    match err {
+    match err.root_cause() {
         StoreError::MigrationHistoryCorrupt(reason) => {
             assert!(reason.contains("invalid applied_on"));
         }
@@ -217,7 +292,7 @@ fn malformed_history_checksum_surfaces_store_error_without_panicking() {
         );
     }
     let err = Store::open_or_bootstrap_at(path).unwrap_err();
-    match err {
+    match err.root_cause() {
         StoreError::MigrationHistoryCorrupt(reason) => {
             assert!(reason.contains("invalid checksum"));
         }
@@ -251,7 +326,8 @@ fn missing_prior_migration_refuses_to_bootstrap() {
         seed_history_row(&conn, 0, "older_schema", 1);
     }
     let result = Store::open_or_bootstrap_at(path.clone());
-    assert!(matches!(result, Err(StoreError::MigrationHistory(_))));
+    let err = result.unwrap_err();
+    assert!(matches!(err.root_cause(), StoreError::MigrationHistory(_)));
     assert!(
         path.exists(),
         "a migration history failure must never auto-delete"
@@ -265,7 +341,8 @@ fn a_corrupt_file_surfaces_a_typed_error_without_panicking() {
     // fallible/degrade path a WAL-set failure would take.
     std::fs::write(&path, b"this is not a sqlite database").unwrap();
     let result = Store::open_or_bootstrap_at(path.clone());
-    assert!(result.is_err(), "corrupt DB degrades, not panics");
+    let err = result.expect_err("corrupt DB degrades, not panics");
+    assert!(err.to_string().contains(&path.display().to_string()));
     assert!(path.exists(), "a failed-to-open DB is never auto-deleted");
 }
 
@@ -277,7 +354,8 @@ fn an_uncreatable_parent_dir_surfaces_create_dir_error() {
     std::fs::write(&blocker, b"x").unwrap();
     let path = blocker.join("nested").join("kqode.db");
     let result = Store::open_or_bootstrap_at(path);
-    assert!(matches!(result, Err(StoreError::CreateDir(_))));
+    let err = result.unwrap_err();
+    assert!(matches!(err.root_cause(), StoreError::CreateDir(_)));
 }
 
 fn bootstrap() -> (tempfile::TempDir, Store) {

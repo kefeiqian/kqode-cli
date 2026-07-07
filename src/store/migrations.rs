@@ -25,14 +25,13 @@ mod embedded {
 ///
 /// # Errors
 /// Returns the underlying [`rusqlite::Error`] if the pragma read fails.
-#[cfg(test)]
 pub(super) fn user_version(conn: &Connection) -> rusqlite::Result<i64> {
     conn.query_row("PRAGMA user_version", [], |row| row.get(0))
 }
 
 /// Latest embedded migration version this binary knows how to produce.
 #[must_use]
-pub(super) fn latest_version() -> i64 {
+pub(crate) fn latest_version() -> i64 {
     runner()
         .get_migrations()
         .iter()
@@ -69,8 +68,40 @@ pub(super) fn applied_max_version(conn: &Connection) -> rusqlite::Result<Option<
 /// - [`StoreError::Migrate`] if refinery cannot assert history or apply the
 ///   embedded migration chain.
 pub(super) fn migrate(conn: &mut Connection) -> Result<(), StoreError> {
+    detect_pre_refinery_schema(conn)?;
     validate_history_rows(conn)?;
     runner().run(conn).map(|_| ()).map_err(map_refinery_error)
+}
+
+fn detect_pre_refinery_schema(conn: &Connection) -> Result<(), StoreError> {
+    let user_version = user_version(conn).map_err(StoreError::Sanity)?;
+    let table_count = app_table_count(conn).map_err(StoreError::Sanity)?;
+    if user_version == 1 || table_count > 0 && !history_has_rows(conn)? {
+        return Err(StoreError::LegacyReset {
+            user_version,
+            table_count,
+        });
+    }
+    Ok(())
+}
+
+fn app_table_count(conn: &Connection) -> rusqlite::Result<i64> {
+    conn.query_row(
+        "SELECT COUNT(*) FROM sqlite_master
+         WHERE type = 'table'
+           AND name IN ('provider_settings', 'active_selection', 'sessions', 'turns')",
+        [],
+        |row| row.get(0),
+    )
+}
+
+fn history_has_rows(conn: &Connection) -> Result<bool, StoreError> {
+    if !history_table_exists(conn).map_err(StoreError::Sanity)? {
+        return Ok(false);
+    }
+    let sql = format!("SELECT EXISTS(SELECT 1 FROM {REFINERY_SCHEMA_HISTORY_TABLE})");
+    conn.query_row(&sql, [], |row| row.get(0))
+        .map_err(StoreError::Sanity)
 }
 
 fn validate_history_rows(conn: &Connection) -> Result<(), StoreError> {

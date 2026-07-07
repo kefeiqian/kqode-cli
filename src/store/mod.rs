@@ -1,10 +1,7 @@
 //! SQLite index store: bootstrap, pragmas, and a per-operation connection factory.
 //!
-//! The store is a rebuildable index over the JSONL transcript truth, so every
-//! failure here is **non-fatal**: [`Store::open_or_bootstrap`] returns a typed
-//! [`StoreError`] and the caller degrades to session-only rather than crashing,
-//! and a DB that fails to open or migrate is **never auto-deleted** (a transient
-//! lock or a WAL-on-network-FS failure can look like corruption).
+//! The store is a rebuildable index over the JSONL transcript truth. A DB that
+//! fails to open or migrate is **never auto-deleted**.
 //!
 //! `rusqlite::Connection` is `Send` but `!Sync`, so callers open a fresh
 //! connection per operation via [`Store::connect`] instead of sharing one
@@ -21,7 +18,7 @@ use std::time::Duration;
 
 use rusqlite::Connection;
 
-pub use error::StoreError;
+pub use error::{STORE_FATAL_SENTINEL, StoreError};
 pub use providers::{ActiveSelection, ProviderSettings};
 
 /// Modest busy-timeout: retry a locked write briefly, well under the TS client
@@ -47,7 +44,7 @@ pub struct Store {
 }
 
 impl Store {
-    /// Opens the DB, applies pragmas, runs embedded refinery migrations, and sanity-checks it.
+    /// Opens the DB, applies pragmas, runs migrations, and sanity-checks it.
     ///
     /// Intended to be called once at backend init (around `announce_ready`), off
     /// the request path.
@@ -60,8 +57,7 @@ impl Store {
         Self::open_or_bootstrap_at(path)
     }
 
-    /// [`Store::open_or_bootstrap`] against an explicit DB path (tests point this
-    /// at a `tempfile` directory; accounts for the `-wal`/`-shm` sidecars).
+    /// [`Store::open_or_bootstrap`] against an explicit DB path.
     ///
     /// # Errors
     /// See [`Store::open_or_bootstrap`].
@@ -73,13 +69,16 @@ impl Store {
             std::fs::create_dir_all(parent).map_err(StoreError::CreateDir)?;
             set_private_dir_permissions(parent);
         }
-        let mut conn = open_connection(&path).map_err(StoreError::Open)?;
-        ensure_wal(&conn).map_err(StoreError::Open)?;
-        migrations::migrate(&mut conn)?;
-        sanity_check(&conn)?;
-        drop(conn);
-        set_private_db_permissions(&path);
-        Ok(Self { path })
+        let result = (|| {
+            let mut conn = open_connection(&path).map_err(StoreError::Open)?;
+            ensure_wal(&conn).map_err(StoreError::Open)?;
+            migrations::migrate(&mut conn)?;
+            sanity_check(&conn)?;
+            drop(conn);
+            set_private_db_permissions(&path);
+            Ok::<Self, StoreError>(Self { path: path.clone() })
+        })();
+        result.map_err(|err| err.with_path(path))
     }
 
     /// Opens a fresh connection for a single operation, with WAL + `busy_timeout`
