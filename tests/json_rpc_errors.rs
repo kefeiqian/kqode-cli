@@ -15,6 +15,8 @@ use serde_json::json;
 
 use rpc::{backend_output, request_frame, response_frames};
 
+const STORE_FAILURE_EXIT_CODE: i32 = 75;
+
 fn response_frame(id: i64) -> Vec<u8> {
     let body = json!({
         "jsonrpc": "2.0",
@@ -27,8 +29,11 @@ fn response_frame(id: i64) -> Vec<u8> {
 }
 
 fn backend_output_without_closing_stdin(input: &[u8]) -> Output {
+    let home = tempfile::tempdir().expect("backend test home");
     let mut child = Command::new(env!("CARGO_BIN_EXE_kqode"))
         .arg(BACKEND_MODE_ARG)
+        .env("HOME", home.path())
+        .env("USERPROFILE", home.path())
         // Keep the test-spawned backend from writing under the real
         // `~/.kqode/logs` (the dev build defaults debug logging on).
         .env("KQODE_DEBUG", "0")
@@ -94,6 +99,7 @@ fn malformed_transport_exits_with_visible_error() {
     let output = backend_output(b"Content-Length: 8\r\n\r\nnot json");
 
     assert!(!output.status.success(), "{output:?}");
+    assert_ne!(output.status.code(), Some(STORE_FAILURE_EXIT_CODE));
     assert!(
         !output.stderr.is_empty(),
         "fatal transport errors should be visible"
@@ -105,5 +111,6 @@ fn unexpected_json_rpc_response_exits_with_visible_error() {
     let output = backend_output_without_closing_stdin(&response_frame(1));
 
     assert!(!output.status.success(), "{output:?}");
+    assert_ne!(output.status.code(), Some(STORE_FAILURE_EXIT_CODE));
     assert!(!output.stderr.is_empty());
 }
