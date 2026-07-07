@@ -21,6 +21,10 @@ When changing content, reset only the changed content bullets to unchecked. If t
 
 Across the project, prefer focused source files that stay at or below roughly 200 lines. Split modules/components/helpers before a file grows beyond that size unless there is a clear, review-documented reason to keep it larger.
 
+## Agent skills
+
+For every agent skill `SKILL.md`, keep the frontmatter `description` field under 1024 characters. Prefer concise trigger wording and move detailed behavior, examples, and edge cases into the skill body or referenced files.
+
 ## Build, test, and lint
 
 This repository is a Rust-first project. Use these commands from the repository root:

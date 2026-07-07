@@ -90,7 +90,7 @@ function nextCodePointEnd(text: string, cursorIndex: number): number {
 }
 ```
 
-拿 `a😀b` 走一遍。它一共 4 个码元，`😀` 占了中间的下标 1 和 2：
+以 `a😀b` 为例，它一共 4 个码元，`😀` 占了中间的下标 1 和 2：
 
 | 下标 | 码元 | 属于哪个字符 |
 | --- | --- | --- |
@@ -122,11 +122,19 @@ valid stop: ^   ^   x   ^   ^
 
 退格（`deleteBackward`）走的也是 `previousCodePointStart`，所以在 `😀` 后面按一下退格会整个表情一起删掉。
 
-这套判断只做到码点这一层。带肤色的 emoji、ZWJ（[Zero Width Joiner](https://en.wikipedia.org/wiki/Zero-width_joiner)）组合序列（比如 👨‍👩‍👧）、字母加组合附加符号，本质都是几个码点拼成的一个视觉字符（字素簇，grapheme cluster），按码点走还是会拆开它们。真要按字素移动，得引入专门的字素分割逻辑，代价大得多；眼下先保证最常见的代理对不被切碎。
+不过这里还有一层边界要分清：**码点边界不等于用户眼里的字符边界**。用户看到的一个“字符”，在 Unicode 里叫字素簇（[grapheme cluster](https://unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries)）。字素簇可能只含一个码点，也可能由好几个码点拼出来；`previousCodePointStart` 和 `nextCodePointEnd` 只保证不把一个非 BMP 码点的代理对切碎，并不知道哪些相邻码点应该合在一起显示。
+
+常见的组合有几种：
+
+- **带肤色的 emoji**：比如 `👋🏽`，实际是“挥手”码点加一个肤色修饰符。按码点退格，第一次可能只删掉肤色，屏幕上从 `👋🏽` 变成 `👋`；文本还是合法 Unicode，但用户会觉得“一个表情没有一次删干净”。
+- **ZWJ（[Zero Width Joiner](https://en.wikipedia.org/wiki/Zero-width_joiner)）组合序列**：比如 `👨‍👩‍👧`，中间的 ZWJ 不显示宽度，只负责告诉渲染器把两侧的 emoji 连成一个家庭图形。按码点移动时，光标仍然可能落在 `👨`、ZWJ、`👩`、ZWJ、`👧` 之间；删掉其中一个码点，家庭图形就会拆成几段。
+- **字母加组合附加符号**：比如 `á` 可以写成 `a` 加 `U+0301` 组合重音，而不是单个预组合字符 `á`。按码点移动会把光标放到 `a` 和重音之间；删掉重音后剩 `a`，删掉底字后还可能留下一个“悬空”的重音。
+
+所以，当前实现解决的是最容易造成硬损坏的问题：不要把代理对拆成落单的高代理或低代理，避免出现 `�`。它还没有做到真正的字素级编辑。真要让左右移动、退格、删除都按字素簇工作，就得引入 Unicode 字素分割逻辑，把每个 cluster 的 UTF-16 起止下标算出来，再让 reducer 在这些边界之间跳。这里会多出依赖、兼容性、性能和测试成本；对 U2 的输入框来说，先兜住最常见的代理对问题更划算。
 
 ## 提交校验：空值与超限
 
-提交时先跑 `validateComposerSubmit`，分成三种结果：
+提交 prompt 时先跑 `validateComposerSubmit`，分成三种结果：
 
 ```ts
 export function validateComposerSubmit(text: string, maxBytes = PROMPT_MAX_BYTES): SubmitValidation {
@@ -145,11 +153,11 @@ export function validateComposerSubmit(text: string, maxBytes = PROMPT_MAX_BYTES
 - **超限**：`64 KiB` 是按 **UTF-8 字节数**算的（`TextEncoder`），不是字符数，因为下游后端和存储关心的是字节。超限时给出明确的字节数错误。
 - **通过**：返回 trim 前的原文（保留用户输入的首尾空格由后续决定）。
 
-为什么限制 64 KiB？既要允许粘贴一大段代码/日志，又要防止有人把一个几 MB 的文件粘进来把 UI 和后端撑爆。64 KiB 是个宽松但有上限的折中。后续会用 @ 语法直接引用大文件，而不建议整段粘进来。
+为什么限制 64 KiB？既要允许粘贴一大段代码/日志，又要防止有人把一个几 MB 的文件粘进来把 UI 和后端撑爆。后续会用 @ 语法直接引用大文件，而不建议整段粘进来。
 
 ## 净化输入：printableInput
 
-从终端读到的原始输入，除了你敲进去的字，还可能夹着**控制字符**。想弄明白它们，得回到 ASCII：字符表最前面的 `U+0000`–`U+001F` 这 32 个码点，再加上单独的 DEL（`U+007F`），都不是给人看的字形，而是发给终端、打印机这类设备的“指令”。它们统称 **C0 控制字符**（[C0 and C1 control codes](https://en.wikipedia.org/wiki/C0_and_C1_control_codes)），常打交道的有这么几个：
+从终端读到的原始输入，除了你敲进去的字，还可能夹着**控制字符**。想弄明白它们，得回到 ASCII：字符表最前面的 `U+0000`–`U+001F` 这 32 个码点，再加上单独的 DEL（`U+007F`），都不是给人看的字形，而是发给终端、打印机这类设备的“指令”。它们统称 **C0 控制字符**（[C0 and C1 control codes](https://en.wikipedia.org/wiki/C0_and_C1_control_codes)），常见的如下：
 
 | 码点 | 字符 | 作用 |
 | --- | --- | --- |
@@ -163,7 +171,7 @@ export function validateComposerSubmit(text: string, maxBytes = PROMPT_MAX_BYTES
 
 （`U+0080`–`U+009F` 还有一组 C1 控制字符，这里用不上，日常终端输入也基本碰不到。）
 
-这些字节为什么会混进输入？因为按方向键、功能键，或者粘贴文本时，终端送来的不是“上箭头”这几个字，而是一串以 ESC 打头的转义序列，比如上箭头就是 `ESC [ A`。这些原始字节一旦直接进了文本缓冲区，轻则显示成乱码，重则把光标控制、颜色转义一起塞进你的 prompt。`printableInput` 在插入前先把它们过滤掉：
+这些字节为什么会混进输入？因为按方向键、功能键，或者粘贴文本时，终端送来的不是“上箭头”这几个字，而是一串以 ESC 打头的转义序列，比如上箭头就是 `ESC [ A`。这些原始字节一旦直接进了文本缓冲区，轻则显示成乱码，重则把光标控制、颜色转义一起塞进 prompt。`printableInput` 在插入前先把它们过滤掉：
 
 ```ts
 export function printableInput(input: string): string {
@@ -171,7 +179,7 @@ export function printableInput(input: string): string {
 }
 ```
 
-正则 `[\u0000-\u001f\u007f]` 匹配的正是这 32 个 C0 控制字符，外加紧跟在可打印区后面的 DEL（`U+007F`），`replace` 再把它们全换成空串。范围里连 Tab、换行、回车都一并算上，任何原始控制字节都别想溜进缓冲区。除 DEL 外，空格（`U+0020`）以上的可打印内容（字母、数字、中文、emoji）都原样保留。真正的功能键（回车、退格、方向键）在 [`components/PromptComposer.tsx`](https://github.com/kefeiqian/KQode/blob/dd15b678392eacc2ffcee88884eba18ae52c1236/tui/src/components/PromptComposer.tsx) 的 `useInput` 里已经被单独处理。
+正则 `[\u0000-\u001f\u007f]` 匹配的正是这 32 个 C0 控制字符，外加紧跟在可打印区后面的 DEL（`U+007F`），`replace` 再把它们全换成空串。范围里包括了 Tab、换行、回车等。除 DEL 外，空格（`U+0020`）以上的可打印内容（字母、数字、中文、emoji）都原样保留。真正的功能键（回车、退格、方向键）在 [`components/PromptComposer.tsx`](https://github.com/kefeiqian/KQode/blob/dd15b678392eacc2ffcee88884eba18ae52c1236/tui/src/components/PromptComposer.tsx) 的 `useInput` 里已经被单独处理。
 
 ## 延伸阅读
 
