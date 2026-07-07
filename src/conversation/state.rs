@@ -9,9 +9,8 @@ use crate::chat::CancellationToken;
 use crate::config::KimiConfig;
 
 use super::transcript::{Transcript, TurnResult, TurnState};
-use super::{Command, ConversationEvent, TurnJob};
+use super::{Command, ConversationEvent, NEEDS_CONFIGURATION_MESSAGE, TurnJob};
 
-const NEEDS_CONFIGURATION_MESSAGE: &str = "Configure a provider before sending messages.";
 const PANIC_ERROR_KIND: &str = "panic";
 
 pub(super) type EventSink = Arc<dyn Fn(ConversationEvent) + Send + Sync + 'static>;

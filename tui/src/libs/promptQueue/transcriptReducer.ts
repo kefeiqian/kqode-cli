@@ -1,7 +1,4 @@
-import {
-  SETTLED_KIND_NEEDS_CONFIGURATION,
-  TURN_STATE_ACTIVE
-} from '@contracts/backend/index.ts';
+import { TURN_STATE_ACTIVE } from '@contracts/backend/index.ts';
 import type { TranscriptEvent } from '@contracts/backend/index.ts';
 import type { QueueItem } from '@libs/promptQueue/promptQueue.ts';
 import { turnResultToBackendResult } from '@libs/promptQueue/promptQueue.ts';
@@ -18,7 +15,7 @@ export type TranscriptReducerState = {
 /** Result of reducing one backend transcript event. */
 export type TranscriptReduceResult = {
   state: TranscriptReducerState;
-  effect?: { type: 'needsConfiguration' | 'auth'; turnText: string };
+  effect?: { type: 'auth'; turnText: string };
 };
 
 /** Reduces one backend event into the queue-shaped transcript read-model. */
@@ -133,9 +130,6 @@ function settleTurn(
     event.turnId,
     (current) => ({ ...current, state: 'settled', result: turnResultToBackendResult(event.result) })
   );
-  if (event.result.kind === SETTLED_KIND_NEEDS_CONFIGURATION) {
-    return { state: nextState, effect: { type: 'needsConfiguration', turnText: item.text } };
-  }
   if (event.result.kind === 'error' && event.result.errorKind === 'auth') {
     return { state: nextState, effect: { type: 'auth', turnText: item.text } };
   }

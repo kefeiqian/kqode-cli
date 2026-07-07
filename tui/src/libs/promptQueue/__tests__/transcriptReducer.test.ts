@@ -3,6 +3,7 @@ import { BodyEntryKind } from '@constants/bodyEntry.ts';
 import {
   SETTLED_KIND_CANCELLED,
   SETTLED_KIND_COMPLETED,
+  SETTLED_KIND_NEEDS_CONFIGURATION,
   TURN_STATE_ACTIVE,
   TURN_STATE_PENDING
 } from '@contracts/backend/index.ts';
@@ -105,5 +106,28 @@ describe('reduceTranscriptEvent', () => {
     ]);
 
     expect(state.queue[0]?.result).toEqual({ kind: BodyEntryKind.Muted, text: 'Cancelled' });
+  });
+
+  it('keeps needsConfiguration in the transcript as system guidance', () => {
+    const state = reduceTranscriptEvent(
+      base(),
+      {
+        type: 'settled',
+        turnId: 'turn-1',
+        result: {
+          kind: SETTLED_KIND_NEEDS_CONFIGURATION,
+          text: null,
+          finishReason: null,
+          errorKind: 'needsConfiguration',
+          message: 'Use /login to add a provider.'
+        }
+      },
+      0
+    ).state;
+
+    expect(state.queue[0]?.result).toEqual({
+      kind: BodyEntryKind.System,
+      text: 'Use /login to add a provider.'
+    });
   });
 });

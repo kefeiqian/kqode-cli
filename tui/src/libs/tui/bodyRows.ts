@@ -159,6 +159,8 @@ function colorForEntry(kind: BodyEntry['kind']): string {
       return theme.colors.warning;
     case BodyEntryKind.Success:
       return theme.colors.accentGreen;
+    case BodyEntryKind.System:
+      return theme.colors.warning;
     case BodyEntryKind.User:
       return theme.colors.foreground;
     case BodyEntryKind.Assistant:

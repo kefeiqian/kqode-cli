@@ -3,8 +3,10 @@ import path from 'node:path';
 import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '@/App.tsx';
-import type { BackendClient, StreamSubmitParams, TranscriptEvent } from '@contracts/backend/index.ts';
-import { SETTLED_KIND_COMPLETED } from '@contracts/backend/index.ts';
+import type { BackendClient, StreamSubmitParams, TranscriptEvent, TurnResult } from '@contracts/backend/index.ts';
+import { SETTLED_KIND_COMPLETED, SETTLED_KIND_NEEDS_CONFIGURATION } from '@contracts/backend/index.ts';
+import { BodyEntryKind } from '@constants/bodyEntry.ts';
+import { PROVIDER_NOT_CONFIGURED_MESSAGE } from '@libs/promptQueue/promptQueue.ts';
 import { activeSurfaceAtom, columnsTestOverrideAtom, rowsTestOverrideAtom, Surface } from '@state/ui/index.ts';
 import { backendClientAtom, productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
 import {
@@ -68,6 +70,22 @@ function eventBackend(reply: (text: string) => string = (text) => `reply: ${text
   } };
 }
 
+function settledBackend(result: TurnResult) {
+  let handler: ((event: TranscriptEvent) => void) | undefined;
+  const submit = vi.fn(async ({ turnId }: StreamSubmitParams) => {
+    handler?.({ type: 'settled', turnId, result });
+  });
+  return {
+    submit,
+    onTranscriptEvent: (next: (event: TranscriptEvent) => void) => {
+      handler = next;
+      return () => {
+        handler = undefined;
+      };
+    }
+  };
+}
+
 async function waitForFrame(getFrame: () => string | undefined, predicate: (frame: string) => boolean) {
   for (let attempt = 0; attempt < 200; attempt += 1) {
     const frame = getFrame() ?? '';
@@ -128,21 +146,9 @@ describe('App submit and event-fed output', () => {
   });
 
   it('renders auth errors and reroutes to login with the prompt restored', async () => {
-    let handler: ((event: TranscriptEvent) => void) | undefined;
-    const submit = vi.fn(async ({ turnId }: StreamSubmitParams) => {
-      handler?.({
-        type: 'settled',
-        turnId,
-        result: { kind: 'error', text: null, finishReason: null, errorKind: 'auth', message: 'bad key' }
-      });
-    });
-    const { stdin, store } = renderApp({
-      submit,
-      onTranscriptEvent: (next) => {
-        handler = next;
-        return () => undefined;
-      }
-    });
+    const { stdin, store } = renderApp(
+      settledBackend({ kind: 'error', text: null, finishReason: null, errorKind: 'auth', message: 'bad key' })
+    );
 
     await typePrompt(stdin, 'needs a good key');
 
@@ -151,5 +157,31 @@ describe('App submit and event-fed output', () => {
       (state) => state === `${Surface.Login}:needs a good key`
     );
     expect(store.get(promptQueueAtom).at(-1)?.result?.text).toContain('bad key');
+  });
+
+  it('renders missing provider configuration as inline system guidance', async () => {
+    const { lastFrame, stdin, store } = renderApp(
+      settledBackend({
+        kind: SETTLED_KIND_NEEDS_CONFIGURATION,
+        text: null,
+        finishReason: null,
+        errorKind: 'needsConfiguration',
+        message: PROVIDER_NOT_CONFIGURED_MESSAGE
+      })
+    );
+
+    await typePrompt(stdin, 'hello without config');
+
+    const frame = await waitForFrame(lastFrame, (output) =>
+      output.includes('No provider configured. Use /login to add a provider')
+    );
+    expect(frame).not.toContain('SYSTEM:');
+    expect(frame).toContain('❯ hello without config');
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Home);
+    expect(store.get(restoreComposerDraftAtom)).toBe('');
+    expect(store.get(promptQueueAtom).at(-1)?.result).toEqual({
+      kind: BodyEntryKind.System,
+      text: PROVIDER_NOT_CONFIGURED_MESSAGE
+    });
   });
 });

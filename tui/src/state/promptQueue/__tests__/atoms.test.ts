@@ -10,10 +10,18 @@ import {
   restoreComposerDraftAtom,
   transcriptEventAtom
 } from '@state/promptQueue/index.ts';
-import { BACKEND_UNAVAILABLE_MESSAGE } from '@libs/promptQueue/promptQueue.ts';
+import {
+  BACKEND_UNAVAILABLE_MESSAGE,
+  PROVIDER_NOT_CONFIGURED_MESSAGE
+} from '@libs/promptQueue/promptQueue.ts';
+import { BodyEntryKind } from '@constants/bodyEntry.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { activeSurfaceAtom, bodyScrollOffsetRowsAtom, submittedPromptEntriesAtom, Surface } from '@state/ui/index.ts';
-import type { BackendClient, TranscriptEvent } from '@contracts/backend/index.ts';
+import {
+  SETTLED_KIND_NEEDS_CONFIGURATION,
+  type BackendClient,
+  type TranscriptEvent
+} from '@contracts/backend/index.ts';
 
 function clientWithSubmit(submit: BackendClient['submit']): BackendClient {
   return {
@@ -34,7 +42,13 @@ function clientWithSubmit(submit: BackendClient['submit']): BackendClient {
 const needsConfiguration = (turnId: string): TranscriptEvent => ({
   type: 'settled',
   turnId,
-  result: { kind: 'needsConfiguration', text: null, finishReason: null, errorKind: null, message: null }
+  result: {
+    kind: SETTLED_KIND_NEEDS_CONFIGURATION,
+    text: null,
+    finishReason: null,
+    errorKind: null,
+    message: PROVIDER_NOT_CONFIGURED_MESSAGE
+  }
 });
 
 describe('enqueuePromptAtom', () => {
@@ -61,7 +75,7 @@ describe('enqueuePromptAtom', () => {
     expect(store.get(submittedPromptEntriesAtom)[0]).toMatchObject({ kind: 'user', text: 'hello' });
   });
 
-  it('routes needsConfiguration settled events to login and restores the prompt', async () => {
+  it('renders needsConfiguration settled events inline without opening login', async () => {
     const store = createStore();
     store.set(newTurnIdAtom, { newTurnId: () => 'turn-1' });
     store.set(backendClientAtom, clientWithSubmit(async () => undefined));
@@ -69,12 +83,15 @@ describe('enqueuePromptAtom', () => {
     await store.set(enqueuePromptAtom, 'configure me');
     store.set(transcriptEventAtom, needsConfiguration('turn-1'));
 
-    expect(store.get(activeSurfaceAtom)).toBe(Surface.Login);
-    expect(store.get(restoreComposerDraftAtom)).toBe('configure me');
-    expect(store.get(promptQueueAtom)).toEqual([]);
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Home);
+    expect(store.get(restoreComposerDraftAtom)).toBe('');
+    expect(store.get(promptQueueAtom)).toHaveLength(1);
+    expect(store.get(submittedPromptEntriesAtom)).toContainEqual(
+      expect.objectContaining({ kind: BodyEntryKind.System, text: PROVIDER_NOT_CONFIGURED_MESSAGE })
+    );
   });
 
-  it('opens login once when multiple turns settle as unconfigured', async () => {
+  it('renders repeated unconfigured turns inline without stealing focus', async () => {
     const store = createStore();
     let nextId = 0;
     store.set(newTurnIdAtom, { newTurnId: () => `turn-${++nextId}` });
@@ -85,8 +102,13 @@ describe('enqueuePromptAtom', () => {
     store.set(transcriptEventAtom, needsConfiguration('turn-1'));
     store.set(transcriptEventAtom, needsConfiguration('turn-2'));
 
-    expect(store.get(activeSurfaceAtom)).toBe(Surface.Login);
-    expect(store.get(restoreComposerDraftAtom)).toBe('first');
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Home);
+    expect(store.get(restoreComposerDraftAtom)).toBe('');
+    expect(
+      store
+        .get(submittedPromptEntriesAtom)
+        .filter((entry) => entry.kind === BodyEntryKind.System)
+    ).toHaveLength(2);
   });
 
   it('routes auth errors to login, restores the prompt, and records the error', async () => {

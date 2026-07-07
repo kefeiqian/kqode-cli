@@ -5,7 +5,7 @@ use super::test_support::{
     Action, WAIT, enqueue, expect_activated, expect_enqueued, expect_settled, harness,
 };
 use super::transcript::{SettledKind, TurnResult, TurnState};
-use super::{Command, ConversationEvent};
+use super::{Command, ConversationEvent, NEEDS_CONFIGURATION_MESSAGE};
 
 #[test]
 fn idle_submit_streams_and_settles() {
@@ -97,6 +97,31 @@ fn error_and_panic_still_promote_next_turn() {
     let b = started.recv_timeout(WAIT).unwrap();
     b.actions.send(Action::Panic).unwrap();
     expect_settled(&events, "B", SettledKind::Error);
+    handle.shutdown_and_join();
+}
+
+#[test]
+fn missing_config_settles_with_login_guidance_without_starting_runner() {
+    let (handle, events, started) = harness();
+    let sender = handle.sender();
+    sender
+        .send(Command::Enqueue {
+            turn_id: "A".to_owned(),
+            prompt: "prompt A".to_owned(),
+            config: None,
+        })
+        .unwrap();
+    expect_enqueued(&events, "A", TurnState::Active);
+
+    match events.recv_timeout(WAIT).unwrap() {
+        ConversationEvent::Settled { turn_id, result } => {
+            assert_eq!(turn_id, "A");
+            assert_eq!(result.kind, SettledKind::NeedsConfiguration);
+            assert_eq!(result.message.as_deref(), Some(NEEDS_CONFIGURATION_MESSAGE));
+        }
+        event => panic!("expected missing-config settle, got {event:?}"),
+    }
+    assert!(started.recv_timeout(Duration::from_millis(50)).is_err());
     handle.shutdown_and_join();
 }
 

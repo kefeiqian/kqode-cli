@@ -45,6 +45,14 @@ describe('resolveBodyRows hard line breaks', () => {
     expect(texts.length).toBeGreaterThan(1);
     expect(texts.every((line) => line.length <= WIDE_COLUMNS)).toBe(true);
   });
+
+  it('renders system guidance without an inline label', () => {
+    const texts = rowTexts(BodyEntryKind.System, 'Use /login to add a provider.');
+
+    expect(texts).toContain('Use /login to add a provider.');
+    expect(texts.some((line) => line.startsWith('ERROR:'))).toBe(false);
+    expect(texts.some((line) => line.startsWith('SYSTEM:'))).toBe(false);
+  });
 });
 
 describe('resolveBodyRows memoization', () => {

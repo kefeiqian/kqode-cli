@@ -1,7 +1,8 @@
 import { BackendClientError } from '@contracts/backend/index.ts';
 import {
   SETTLED_KIND_CANCELLED,
-  SETTLED_KIND_COMPLETED
+  SETTLED_KIND_COMPLETED,
+  SETTLED_KIND_NEEDS_CONFIGURATION
 } from '@contracts/backend/index.ts';
 import type { TurnResult } from '@contracts/backend/index.ts';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
@@ -14,6 +15,7 @@ export type BackendResult = {
   kind:
     | typeof BodyEntryKind.Assistant
     | typeof BodyEntryKind.Success
+    | typeof BodyEntryKind.System
     | typeof BodyEntryKind.Error
     | typeof BodyEntryKind.Muted;
   text: string;
@@ -21,6 +23,8 @@ export type BackendResult = {
 
 /** Shown when a prompt is submitted with no backend client wired into the seam. */
 export const BACKEND_UNAVAILABLE_MESSAGE = 'Rust backend unavailable';
+export const PROVIDER_NOT_CONFIGURED_MESSAGE =
+  'No provider configured. Use /login to add a provider before sending messages.';
 
 export type QueueItem = {
   id: number;
@@ -105,6 +109,12 @@ export function turnResultToBackendResult(result: TurnResult): BackendResult | u
   }
   if (result.kind === SETTLED_KIND_CANCELLED) {
     return { kind: BodyEntryKind.Muted, text: 'Cancelled' };
+  }
+  if (result.kind === SETTLED_KIND_NEEDS_CONFIGURATION) {
+    return {
+      kind: BodyEntryKind.System,
+      text: sanitizeDisplayText(result.message ?? PROVIDER_NOT_CONFIGURED_MESSAGE)
+    };
   }
   return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(result.message ?? 'Turn failed') };
 }

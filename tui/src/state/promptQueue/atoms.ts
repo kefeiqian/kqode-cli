@@ -39,7 +39,6 @@ export {
   turnGenerationByIdAtom,
   turnInFlightAtom
 };
-const AUTH_ERROR_KIND = 'auth';
 const localTurnIdPrefix = 'local-turn';
 let fallbackTurnCounter = 0;
 const deltaCoalescers = new Map<string, ReturnType<typeof createDeltaCoalescer>>();
@@ -134,7 +133,7 @@ function applyTranscriptEvent(get: Getter, set: Setter, event: TranscriptEvent):
     void set(refreshGitStatusAtom);
   }
   if (result.effect !== undefined) {
-    rerouteToLogin(get, set, result.effect.turnText, result.effect.type === AUTH_ERROR_KIND);
+    rerouteToLogin(get, set, result.effect.turnText);
   }
 }
 function coalesceDelta(
@@ -149,15 +148,10 @@ function coalesceDelta(
   deltaCoalescers.set(event.turnId, coalescer);
   coalescer.push(event.delta);
 }
-function rerouteToLogin(get: Getter, set: Setter, draft: string, keepSettled: boolean): void {
+function rerouteToLogin(get: Getter, set: Setter, draft: string): void {
   if (get(restoreComposerDraftAtom) === '') {
     set(restoreComposerDraftAtom, draft);
     set(openLoginSurfaceAtom);
-  }
-  if (!keepSettled) {
-    set(promptQueueAtom, []);
-    set(clientOnlyRowsAtom, []);
-    set(streamingTextByIdAtom, new Map());
   }
 }
 function bumpGeneration(set: Setter): void {
