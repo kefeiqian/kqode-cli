@@ -12,9 +12,9 @@ import { exeSuffix, parseArgs, resolveProductVersion } from './scriptUtils.ts';
  * direct-download release archive plus checksums under `tui/dist/release/`.
  *
  * Produces `kqode-<target>.tar.gz` (POSIX) or `kqode-<target>.zip` (Windows)
- * containing only the executable, a per-archive `kqode-<target>.sha256`, and an
- * aggregate `checksums.txt`. Each CI runner runs this for its own target; the
- * release job concatenates the per-target `.sha256` files. The standalone
+ * containing the executable plus third-party notices, a per-archive
+ * `kqode-<target>.sha256`, and an aggregate `checksums.txt`. Each CI runner runs
+ * this for its own target; the release job concatenates the per-target `.sha256` files. The standalone
  * executable is NOT built here — run `cargo xtask package` first (the
  * `cargo xtask package-release` wrapper does) or pass `--exe=<path>`. Override
  * with `--version=`, `--exe=`, or `--out=`.
@@ -22,6 +22,7 @@ import { exeSuffix, parseArgs, resolveProductVersion } from './scriptUtils.ts';
 
 const tuiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = path.resolve(tuiRoot, '..');
+const RELEASE_NOTICE_FILES = ['THIRD_PARTY_NOTICES.md'] as const;
 
 /** Maps Node's `process.platform` to the release-archive OS segment. */
 const RELEASE_OS: Record<string, string> = {
@@ -56,7 +57,7 @@ function resolveHostTarget(): HostTarget {
 
 /**
  * Archives the executable at `exePath` as `host.archive`, guaranteeing the
- * archive holds exactly one entry named `host.binaryName` at its root.
+ * archive holds the executable and notices at its root.
  *
  * Uses `tar` (bsdtar/GNU tar), present on every supported runner: gzip for
  * POSIX targets and, on Windows, bsdtar's `-a` zip autodetection.
@@ -66,15 +67,19 @@ function createArchive(host: HostTarget, exePath: string, releaseDir: string): s
   try {
     const staged = path.join(stageDir, host.binaryName);
     fs.copyFileSync(exePath, staged);
+    for (const notice of RELEASE_NOTICE_FILES) {
+      fs.copyFileSync(path.join(repoRoot, notice), path.join(stageDir, notice));
+    }
     if (process.platform !== 'win32') {
       fs.chmodSync(staged, 0o755);
     }
 
     const archivePath = path.join(releaseDir, host.archive);
+    const archiveEntries = [host.binaryName, ...RELEASE_NOTICE_FILES];
     const tarArgs =
       host.ext === 'zip'
-        ? ['-a', '-cf', archivePath, '-C', stageDir, host.binaryName]
-        : ['-czf', archivePath, '-C', stageDir, host.binaryName];
+        ? ['-a', '-cf', archivePath, '-C', stageDir, ...archiveEntries]
+        : ['-czf', archivePath, '-C', stageDir, ...archiveEntries];
 
     const result = spawnSync('tar', tarArgs, { stdio: ['ignore', 'inherit', 'inherit'] });
     if (result.error) {

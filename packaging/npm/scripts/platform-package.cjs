@@ -10,6 +10,8 @@ const LICENSE = 'MIT OR Apache-2.0';
 
 /** LICENSE files copied into every platform package (must exist in the launcher package). */
 const LICENSE_FILES = ['LICENSE-APACHE', 'LICENSE-MIT'];
+const NOTICE_FILES = ['THIRD_PARTY_NOTICES.md'];
+const PACKAGE_SUPPORT_FILES = [...LICENSE_FILES, ...NOTICE_FILES, 'README.md'];
 
 /**
  * Builds the `package.json` object for `@kqode/kqode-cli-<platform>-<arch>`.
@@ -31,7 +33,7 @@ function platformPackageManifest({ name, version, platform, arch, binaryName }) 
     bugs: { url: BUGS_URL },
     os: [platform],
     cpu: [arch],
-    files: [binaryName, ...LICENSE_FILES, 'README.md'],
+    files: [binaryName, ...PACKAGE_SUPPORT_FILES],
     preferUnplugged: true,
     engines: { node: '>=18' }
   };
@@ -54,4 +56,4 @@ function platformPackageReadme({ name, platform, arch }) {
   ].join('\n');
 }
 
-module.exports = { platformPackageManifest, platformPackageReadme, LICENSE_FILES };
+module.exports = { platformPackageManifest, platformPackageReadme, LICENSE_FILES, NOTICE_FILES, PACKAGE_SUPPORT_FILES };
