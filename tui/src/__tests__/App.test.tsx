@@ -75,7 +75,7 @@ describe('App', () => {
     await flushInput();
 
     const outputRows = (lastFrame() ?? '').split('\n');
-    // The UI fills the full terminal height (FULLSCREEN_GUARD_ROWS = 0).
+    // The UI reserves the configured physical guard rows below the Ink canvas.
     expect(outputRows).toHaveLength(18 - FULLSCREEN_GUARD_ROWS);
     expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
   });
@@ -204,7 +204,7 @@ describe('App', () => {
 
     expect(store.get(helpVisibleAtom)).toBe(true);
     const helpFrame = lastFrame() ?? '';
-    expect(helpFrame).toContain('↑/↓ scroll · esc close');
+    expect(helpFrame).toContain('↑/↓ scroll · q/esc close');
     expect(helpFrame).toContain('COMMANDS');
     expect(helpFrame).not.toContain('/ commands | @ mention | ? help');
 
@@ -214,7 +214,7 @@ describe('App', () => {
     expect(store.get(helpVisibleAtom)).toBe(false);
     const homeFrame = lastFrame() ?? '';
     expect(homeFrame).toContain('/ commands | @ mention | ? help');
-    expect(homeFrame).not.toContain('↑/↓ scroll · esc close');
+    expect(homeFrame).not.toContain('↑/↓ scroll · q/esc close');
   });
 
   it('disarms Ctrl+C when Esc closes an active surface', async () => {

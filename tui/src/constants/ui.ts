@@ -15,19 +15,18 @@ export const DEFAULT_COMPOSER_VISIBLE_LINES = 3;
 // --- Prompt composer ---
 
 export const PROMPT_PREFIX = '> ';
+export const SAFE_CHROME_COLUMN_GUARD = 1;
+export const FULLSCREEN_GUARD_ROWS = 1;
 
-// The app fills the terminal exactly (FULLSCREEN_GUARD_ROWS = 0), so Ink treats
-// each frame as fullscreen, omits its trailing newline, and shifts the cursor
-// baseline up one row. This offset adds that row back so the measured composer
-// top maps onto the editable row. (It was 0 while the app rendered just under
-// fullscreen, where Ink appends the trailing newline and the baseline already
-// lands on the output's bottom row.) NOTE: below the MIN_ROWS floor the layout
-// makes content overflow the terminal and this can be off by one — but the
-// too-small gate replaces the home screen before that, so it is a test-only
-// degenerate case.
-export const INK_CURSOR_ROW_ORIGIN_OFFSET = 1;
+// The app reserves a physical guard row below the Ink canvas, so Ink stays on
+// its incremental non-fullscreen path and keeps its normal cursor baseline.
+export const INK_CURSOR_ROW_ORIGIN_OFFSET = inkCursorRowOriginOffset(FULLSCREEN_GUARD_ROWS);
 export const COMPOSER_BACKGROUND_PADDING_ROWS = 2;
 export const COMPOSER_BACKGROUND_TOP_PADDING_ROWS = 1;
+
+function inkCursorRowOriginOffset(guardRows: number): number {
+  return guardRows === 0 ? 1 : 0;
+}
 
 /**
  * Divisor bounding the composer's visible box to a fraction of the terminal

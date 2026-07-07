@@ -17,12 +17,15 @@ import { handleRightClickPaste } from '@components/HomeScreen/rightClickPaste.ts
 import { resolveWheelTarget } from '@components/HomeScreen/wheelRouting.ts';
 import { useCaretScrollSuppression } from '@components/HomeScreen/useCaretScrollSuppression.ts';
 import { resolveClickResult } from '@libs/composer/composerWindow.ts';
+import { isInsideSafeChromeBounds } from '@libs/tui/safeCanvas.ts';
 import { BODY_CWD_GAP_ROWS } from '@libs/tui/layout.ts';
 import {
   bottomSpacerRowsAtom,
+  composerInputColumnsAtom,
   composerCanScrollAtom,
   composerTopAtom,
   layoutAtom,
+  safeChromeColumnsAtom,
   scrollBodyByRowsAtom,
   scrollComposerByRowsAtom
 } from '@state/ui/index.ts';
@@ -44,9 +47,6 @@ export function HomeScreenView() {
   const { stdout } = useStdout();
   const columns = useAtomValue(columnsAtom);
   const rows = useAtomValue(rowsAtom);
-  const layout = useAtomValue(layoutAtom);
-  const composerTop = useAtomValue(composerTopAtom);
-  const composerCanScroll = useAtomValue(composerCanScrollAtom);
   const copyModeActive = useAtomValue(copyModeActiveAtom);
   const scrollBodyByRows = useSetAtom(scrollBodyByRowsAtom);
   const scrollComposerByRows = useSetAtom(scrollComposerByRowsAtom);
@@ -71,16 +71,23 @@ export function HomeScreenView() {
 
     const wheel = parseMouseWheelEvent(input);
     if (wheel !== null) {
-      notifyScroll();
+      const currentRows = store.get(rowsAtom);
+      const currentSafeChromeColumns = store.get(safeChromeColumnsAtom);
       const target = resolveWheelTarget({
         mouseRow: wheel.row,
-        composerTop,
-        rows,
-        composerCanScroll
+        mouseColumn: wheel.column,
+        composerTop: store.get(composerTopAtom),
+        rows: currentRows,
+        columns: currentSafeChromeColumns,
+        composerCanScroll: store.get(composerCanScrollAtom)
       });
+      if (target === 'none') {
+        return;
+      }
+      notifyScroll();
       if (target === 'composer') {
         // A body-sized notch is near-full-page in a small composer; clamp it.
-        const step = Math.max(1, Math.min(MOUSE_WHEEL_SCROLL_ROWS, layout.composerVisibleRows - 1));
+        const step = Math.max(1, Math.min(MOUSE_WHEEL_SCROLL_ROWS, store.get(layoutAtom).composerVisibleRows - 1));
         scrollComposerByRows(wheel.direction === 'up' ? step : -step);
       } else {
         scrollBodyByRows(
@@ -92,6 +99,12 @@ export function HomeScreenView() {
 
     const click = parseMouseClickEvent(input);
     if (click !== null) {
+      const currentRows = store.get(rowsAtom);
+      const currentSafeChromeColumns = store.get(safeChromeColumnsAtom);
+      const currentComposerTop = store.get(composerTopAtom);
+      if (!isInsideSafeChromeBounds({ row: click.row, column: click.column, rows: currentRows, columns: currentSafeChromeColumns })) {
+        return;
+      }
       // Map the click to a cursor index + the scroll offset that keeps the
       // visible window fixed (clicking repositions the caret without scrolling).
       // Text rows start one row below composerTop (the top half-line cap); the
@@ -99,11 +112,11 @@ export function HomeScreenView() {
       const composerState = store.get(composerStateAtom);
       const result = resolveClickResult({
         text: composerState.text,
-        columns: Math.max(1, columns - PROMPT_PREFIX.length),
-        maxVisibleLines: layout.composerVisibleRows,
+        columns: store.get(composerInputColumnsAtom),
+        maxVisibleLines: store.get(layoutAtom).composerVisibleRows,
         cursorIndex: composerState.cursorIndex,
         offset: store.get(composerScrollOffsetRowsAtom),
-        visibleRow: click.row - 1 - (composerTop + COMPOSER_BACKGROUND_TOP_PADDING_ROWS),
+        visibleRow: click.row - 1 - (currentComposerTop + COMPOSER_BACKGROUND_TOP_PADDING_ROWS),
         column: click.column - 1 - PROMPT_PREFIX.length
       });
       if (result !== null) {
@@ -118,13 +131,13 @@ export function HomeScreenView() {
 
     if (key.pageUp) {
       notifyScroll();
-      scrollBodyByRows(Math.max(1, layout.bodyRows - 2));
+      scrollBodyByRows(Math.max(1, store.get(layoutAtom).bodyRows - 2));
       return;
     }
 
     if (key.pageDown) {
       notifyScroll();
-      scrollBodyByRows(-Math.max(1, layout.bodyRows - 2));
+      scrollBodyByRows(-Math.max(1, store.get(layoutAtom).bodyRows - 2));
       return;
     }
 

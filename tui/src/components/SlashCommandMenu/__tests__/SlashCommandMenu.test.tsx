@@ -63,7 +63,7 @@ describe('SlashCommandMenu', () => {
     }
   });
 
-  it('truncates rows to keep the terminal final column clear', () => {
+  it('truncates rows to the shared safe chrome width', () => {
     const { lastFrame } = renderWithJotai(<SlashCommandMenu />, makeStore('/', 20));
 
     for (const line of (lastFrame() ?? '').split('\n')) {

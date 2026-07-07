@@ -248,7 +248,7 @@ describe('HomeScreen', () => {
       'dummy-react-app'
     );
 
-    const { lastFrame } = renderHomeScreen({ workspaceCwd: longWorkspace, columns: 60, rows: 15 });
+    const { lastFrame } = renderHomeScreen({ workspaceCwd: longWorkspace, columns: 61, rows: 16 });
     const output = lastFrame() ?? '';
     // The cwd wraps across rows; rejoining the trimmed rows must reproduce the
     // full home-relative path, proving it soft-wrapped rather than truncated.
@@ -262,7 +262,7 @@ describe('HomeScreen', () => {
     expect(flattened).toContain(
       path.join(displayCwd, 'target', 'kqode-test-workspaces', 'workspace', 'dummy-react-app')
     );
-    expect(output.split('\n')).toHaveLength(15);
+    expect(output.split('\n')).toHaveLength(16);
     expect(output.split('\n').at(-1)).toContain('/ commands | @ mention | ? help');
   });
 
@@ -271,7 +271,7 @@ describe('HomeScreen', () => {
       kind: 'assistant' as const,
       text: `entry ${index + 1}`
     }));
-    const { lastFrame } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 15 });
+    const { lastFrame } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 16 });
     const outputRows = (lastFrame() ?? '').split('\n');
     const cwdRow = outputRows.findIndex((row) => row.includes(projectsKQode));
 
@@ -297,8 +297,8 @@ describe('HomeScreen', () => {
     expect(openOutput.split('\n').at(-1)).toContain('/ commands | @ mention | ? help');
   });
 
-  it('keeps cwd, composer, and status hints visible with the model label hidden until resolved at the minimum 60x15', async () => {
-    const { lastFrame, stdin } = renderHomeScreen({ columns: 60, rows: 15 });
+  it('keeps cwd, composer, and status hints visible with the model label hidden until resolved at the minimum 61x16', async () => {
+    const { lastFrame, stdin } = renderHomeScreen({ columns: 61, rows: 16 });
 
     const output = lastFrame() ?? '';
 
@@ -308,7 +308,7 @@ describe('HomeScreen', () => {
     // The model label is hidden until the backend resolves it.
     expect(output).not.toContain(NOT_CONFIGURED_MODEL_LABEL);
     const outputRows = output.split('\n');
-    expect(outputRows).toHaveLength(15);
+    expect(outputRows).toHaveLength(16);
     expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
 
     const typed = 'a long prompt that wraps across several visible composer rows';
@@ -328,14 +328,14 @@ describe('HomeScreen', () => {
 
     expect(wrappedOutput).not.toContain('...');
     expect(composerFlattened).toContain(typed);
-    expect(wrappedRows).toHaveLength(15);
+    expect(wrappedRows).toHaveLength(16);
     expect(wrappedRows.at(-2)).toContain('▀');
     expect(wrappedRows.at(-1)).toContain('/ commands | @ mention | ? help');
   });
 
   it('soft-wraps long prompts instead of truncating them with an ellipsis', async () => {
     const longPrompt = 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const { lastFrame, stdin } = renderHomeScreen({ bodyEntries: [], columns: 60, rows: 15 });
+    const { lastFrame, stdin } = renderHomeScreen({ bodyEntries: [], columns: 61, rows: 16 });
 
     stdin.write(longPrompt);
     await flushInput();
@@ -355,7 +355,7 @@ describe('HomeScreen', () => {
   });
 
   it('adds submitted prompts to the body when Enter is pressed', async () => {
-    const { lastFrame, stdin } = renderHomeScreen({ columns: 80, rows: 15 });
+    const { lastFrame, stdin } = renderHomeScreen({ columns: 80, rows: 16 });
 
     stdin.write('show this in the body');
     await flushInput();
@@ -368,7 +368,7 @@ describe('HomeScreen', () => {
   });
 
   it('keeps submitted multiline prompts on separate indented body rows', async () => {
-    const { lastFrame, stdin } = renderHomeScreen({ columns: 80, rows: 15 });
+    const { lastFrame, stdin } = renderHomeScreen({ columns: 80, rows: 16 });
 
     stdin.write('1');
     await flushInput();
@@ -391,7 +391,7 @@ describe('HomeScreen', () => {
       kind: 'assistant' as const,
       text: `entry ${index + 1}`
     }));
-    const { lastFrame, stdin } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 15 });
+    const { lastFrame, stdin } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 16 });
 
     expect(lastFrame() ?? '').toContain('entry 10');
 
@@ -437,7 +437,7 @@ describe('HomeScreen', () => {
     const { lastFrame, stdin, stdout, store } = renderHomeScreen({
       bodyEntries: entries,
       columns: 100,
-      rows: 15
+      rows: 16
     });
     const write = vi.spyOn(stdout, 'write');
     Object.defineProperty(stdout, 'isTTY', { configurable: true, value: true });
@@ -477,7 +477,7 @@ describe('HomeScreen', () => {
   });
 
   it('exits Copy Mode on printable keys without inserting into the composer', async () => {
-    const { lastFrame, stdin, store } = renderHomeScreen({ columns: 100, rows: 15 });
+    const { lastFrame, stdin, store } = renderHomeScreen({ columns: 100, rows: 16 });
     await flushInput();
 
     stdin.write('\u0012');
@@ -498,7 +498,7 @@ describe('HomeScreen', () => {
       kind: 'assistant' as const,
       text: `entry ${index + 1}`
     }));
-    const { lastFrame, stdin } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 15 });
+    const { lastFrame, stdin } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 16 });
 
     stdin.write('\u001B[<64;1;1M');
     await flushInput();
@@ -515,7 +515,7 @@ describe('HomeScreen', () => {
   });
 
   it('pastes clipboard text into the composer on right-click', async () => {
-    const { lastFrame, stdin, store } = renderHomeScreen({ columns: 80, rows: 15 });
+    const { lastFrame, stdin, store } = renderHomeScreen({ columns: 80, rows: 16 });
     store.set(clipboardClientAtom, {
       readText: vi.fn().mockResolvedValue('right\r\npaste'),
       writeText: vi.fn()
@@ -529,7 +529,7 @@ describe('HomeScreen', () => {
   });
 
   it('shows a paste-failed hint when right-click clipboard read is unavailable', async () => {
-    const { stdin, store } = renderHomeScreen({ columns: 80, rows: 15 });
+    const { stdin, store } = renderHomeScreen({ columns: 80, rows: 16 });
     store.set(clipboardClientAtom, { readText: vi.fn().mockResolvedValue(null), writeText: vi.fn() });
 
     stdin.write('\u001B[<2;5;13M');
@@ -540,7 +540,7 @@ describe('HomeScreen', () => {
   });
 
   it('silently ignores an empty clipboard on right-click paste', async () => {
-    const { stdin, store } = renderHomeScreen({ columns: 80, rows: 15 });
+    const { stdin, store } = renderHomeScreen({ columns: 80, rows: 16 });
     store.set(clipboardClientAtom, { readText: vi.fn().mockResolvedValue(''), writeText: vi.fn() });
 
     stdin.write('\u001B[<2;5;13M');
@@ -550,8 +550,8 @@ describe('HomeScreen', () => {
     expect(store.get(transientStatusHintAtom)).toBeUndefined();
   });
 
-  it('fits over-limit validation feedback inside the 60x15 row budget', async () => {
-    const { lastFrame, stdin } = renderHomeScreen({ columns: 60, rows: 15 });
+  it('fits over-limit validation feedback inside the 61x16 row budget', async () => {
+    const { lastFrame, stdin } = renderHomeScreen({ columns: 61, rows: 16 });
 
     stdin.write('a'.repeat(PROMPT_MAX_BYTES + 1));
     await flushInput();
@@ -563,7 +563,7 @@ describe('HomeScreen', () => {
     expect(errorOutput).toContain('ERROR: Prompt is 65537 bytes; maximum is');
     expect(errorOutput).toContain('65536 bytes.');
     const errorRows = errorOutput.split('\n');
-    expect(errorRows).toHaveLength(15);
+    expect(errorRows).toHaveLength(16);
     expect(errorRows.at(-1)).toContain('/ commands | @ mention | ? help');
   });
 });

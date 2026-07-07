@@ -8,8 +8,8 @@ import {
 } from '@libs/terminal/mouse.ts';
 
 describe('parseMouseWheelEvent', () => {
-  it('parses wheel-up with its 1-based pointer row', () => {
-    expect(parseMouseWheelEvent('\u001B[<64;1;1M')).toEqual({ direction: 'up', row: 1 });
+  it('parses wheel-up with its 1-based pointer position', () => {
+    expect(parseMouseWheelEvent('\u001B[<64;1;1M')).toEqual({ direction: 'up', row: 1, column: 1 });
   });
 
   describe('parseMouseRightClickEvent', () => {
@@ -25,12 +25,12 @@ describe('parseMouseWheelEvent', () => {
   });
 
   it('parses wheel-down with the row from the third SGR field', () => {
-    expect(parseMouseWheelEvent('\u001B[<65;10;7M')).toEqual({ direction: 'down', row: 7 });
+    expect(parseMouseWheelEvent('\u001B[<65;10;7M')).toEqual({ direction: 'down', row: 7, column: 10 });
   });
 
   it('decodes wheel buttons carrying modifier bits as plain up/down', () => {
     // 64 + 16 (Ctrl modifier bit) still resolves to wheel-up via the modulo.
-    expect(parseMouseWheelEvent('\u001B[<80;3;4M')).toEqual({ direction: 'up', row: 4 });
+    expect(parseMouseWheelEvent('\u001B[<80;3;4M')).toEqual({ direction: 'up', row: 4, column: 3 });
   });
 
   it('ignores release events and non-wheel buttons', () => {

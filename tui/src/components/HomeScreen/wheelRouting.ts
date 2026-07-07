@@ -1,4 +1,6 @@
-export type WheelTarget = 'composer' | 'body';
+import { isInsideSafeChromeBounds } from '@libs/tui/safeCanvas.ts';
+
+export type WheelTarget = 'composer' | 'body' | 'none';
 
 /**
  * Whether the wheel pointer (1-based SGR `mouseRow`) sits over the composer
@@ -17,17 +19,22 @@ export function isPointerOverComposer(
 
 /**
  * Routes a wheel notch to the pane under the pointer. The composer wins only
- * when the pointer is over it AND it can actually scroll; every other case —
- * header/spacer/cwd/status rows, a non-scrollable composer, or an
- * out-of-range row — defaults to the body, so no notch is ever dropped.
+ * when the pointer is over it AND it can actually scroll. Pointer positions
+ * outside the safe canvas are ignored so guard-space input does not affect
+ * body or composer state; other in-canvas rows default to the body.
  */
 export function resolveWheelTarget(params: {
   mouseRow: number;
+  mouseColumn: number;
   composerTop: number;
   rows: number;
+  columns: number;
   composerCanScroll: boolean;
 }): WheelTarget {
-  const { mouseRow, composerTop, rows, composerCanScroll } = params;
+  const { mouseRow, mouseColumn, composerTop, rows, columns, composerCanScroll } = params;
+  if (!isInsideSafeChromeBounds({ row: mouseRow, column: mouseColumn, rows, columns })) {
+    return 'none';
+  }
   return composerCanScroll && isPointerOverComposer(mouseRow, composerTop, rows)
     ? 'composer'
     : 'body';

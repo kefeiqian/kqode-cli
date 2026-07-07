@@ -1,5 +1,20 @@
 import { atom } from 'jotai';
-import { DEFAULT_COLUMNS, DEFAULT_ROWS, MIN_COLUMNS, MIN_ROWS } from '@constants/ui.ts';
+import {
+  DEFAULT_COLUMNS,
+  DEFAULT_ROWS,
+  FULLSCREEN_GUARD_ROWS,
+  MIN_COLUMNS,
+  MIN_ROWS,
+  PROMPT_PREFIX,
+  SAFE_CHROME_COLUMN_GUARD
+} from '@constants/ui.ts';
+import {
+  resolveComposerInputColumns,
+  resolveSafeColumns,
+  resolveSafeRows
+} from '@libs/tui/safeCanvas.ts';
+
+export { FULLSCREEN_GUARD_ROWS } from '@constants/ui.ts';
 
 // Test-only seams that pin a deterministic viewport ahead of the live terminal
 // size. Only read when `__TEST__` (see `src/globals.d.ts`): the `prod` build
@@ -17,23 +32,10 @@ export const columnsAtom = atom((get) => {
 });
 
 /**
- * Rows reserved below the UI. Now `0`: the UI fills the full terminal height so
- * no blank row sits at the bottom (tighter, edge-to-edge layout).
- *
- * The trade-off: filling the terminal *exactly* makes Ink treat every frame as
- * fullscreen and, on terminals that do not coalesce the clear, forces a
- * whole-screen clear (`ESC[2J ESC[3J`) and full repaint on **every** keystroke
- * (WezTerm blinks; Windows Terminal does not). Fullscreen frames also make Ink
- * omit its trailing newline and shift the cursor baseline up one row, which
- * {@link INK_CURSOR_ROW_ORIGIN_OFFSET} adds back. Raise this to `1` to restore
- * the incremental, non-fullscreen path (one blank row, no per-keystroke clear).
- */
-export const FULLSCREEN_GUARD_ROWS = 0;
-
-/**
  * Rows the UI renders into. Production subtracts {@link FULLSCREEN_GUARD_ROWS}
- * from the live terminal height (now `0`, so the UI fills the full height); test
- * overrides pin the canvas directly and bypass the reservation.
+ * from the live terminal height. Test overrides pin the rendered canvas
+ * directly and bypass the reservation, while raw `window*Atom` updates exercise
+ * the production guard subtraction.
  */
 export const rowsAtom = atom((get) => {
   const override = __TEST__ ? get(rowsTestOverrideAtom) : undefined;
@@ -42,14 +44,22 @@ export const rowsAtom = atom((get) => {
   }
 
   const windowRows = get(windowRowsAtom) ?? DEFAULT_ROWS;
-  return Math.max(MIN_ROWS, windowRows - FULLSCREEN_GUARD_ROWS);
+  return resolveSafeRows(windowRows, FULLSCREEN_GUARD_ROWS, MIN_ROWS);
 });
+
+export const safeChromeColumnsAtom = atom((get) =>
+  resolveSafeColumns(get(columnsAtom), SAFE_CHROME_COLUMN_GUARD)
+);
+
+export const composerInputColumnsAtom = atom((get) =>
+  resolveComposerInputColumns(get(safeChromeColumnsAtom), PROMPT_PREFIX.length)
+);
 
 /** Smallest real terminal height that can render the home screen without overflowing the canvas. */
 export const MIN_USABLE_TERMINAL_ROWS = MIN_ROWS + FULLSCREEN_GUARD_ROWS;
 
-/** Smallest real terminal width that can render the home screen usably (no guard-column reservation). */
-export const MIN_USABLE_TERMINAL_COLUMNS = MIN_COLUMNS;
+/** Smallest real terminal width that can render the safe chrome width usably. */
+export const MIN_USABLE_TERMINAL_COLUMNS = MIN_COLUMNS + SAFE_CHROME_COLUMN_GUARD;
 
 /**
  * True when the real terminal is too small to render the home screen usably —

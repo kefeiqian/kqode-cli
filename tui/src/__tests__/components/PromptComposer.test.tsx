@@ -47,6 +47,7 @@ describe('PromptComposer', () => {
 
   it.each([
     ['Shift+Enter', '\u001B[13;2u'],
+    ['Shift+Enter xterm modifyOtherKeys', '\u001B[27;2;13~'],
     ['Alt+Enter', '\u001B[13;3u'],
     ['Ctrl+Enter', '\u001B[13;5u'],
     ['Ctrl+Shift+Enter', '\u001B[13;6u']
@@ -149,24 +150,24 @@ describe('PromptComposer', () => {
   });
 
   it('places the terminal cursor on the active composer row instead of the cwd row', () => {
-    // y = composerTop(7) + background-top-pad(1) + cursor-row + INK_CURSOR_ROW_ORIGIN_OFFSET(1, fullscreen)
-    expect(resolveComposerCursorPosition('', 38, 7)).toEqual({ x: 2, y: 9 });
-    expect(resolveComposerCursorPosition('123', 38, 7)).toEqual({ x: 5, y: 9 });
+    // y = composerTop(7) + background-top-pad(1) + cursor-row + INK_CURSOR_ROW_ORIGIN_OFFSET(0, non-fullscreen)
+    expect(resolveComposerCursorPosition('', 38, 7)).toEqual({ x: 2, y: 8 });
+    expect(resolveComposerCursorPosition('123', 38, 7)).toEqual({ x: 5, y: 8 });
   });
 
   it('places the terminal cursor on the active authored multiline composer row', () => {
-    expect(resolveComposerCursorPosition('first\nsecond', 38, 7)).toEqual({ x: 8, y: 10 });
+    expect(resolveComposerCursorPosition('first\nsecond', 38, 7)).toEqual({ x: 8, y: 9 });
   });
 
   it('places the terminal cursor on the active soft-wrapped composer row', () => {
     const visibleText = formatVisiblePrompt('abcdefghijklmnop', 8, 3);
 
     expect(visibleText).toBe('abcdefgh\nijklmnop');
-    expect(resolveComposerCursorPosition(visibleText, 8, 7)).toEqual({ x: 10, y: 10 });
+    expect(resolveComposerCursorPosition(visibleText, 8, 7)).toEqual({ x: 10, y: 9 });
   });
 
   it('places the terminal cursor at an authored middle position', () => {
-    expect(resolveComposerCursorPosition('abcd', 38, 7, 2)).toEqual({ x: 4, y: 9 });
+    expect(resolveComposerCursorPosition('abcd', 38, 7, 2)).toEqual({ x: 4, y: 8 });
   });
 
   it('submits exact non-empty text with leading and trailing spaces, then clears', async () => {

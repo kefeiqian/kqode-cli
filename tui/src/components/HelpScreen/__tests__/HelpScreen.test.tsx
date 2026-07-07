@@ -22,7 +22,7 @@ describe('HelpScreen', () => {
     expect(frame).toContain('COMMANDS');
     expect(frame).toContain('/help');
     expect(frame).toContain('GLOBAL');
-    expect(frame).toContain('↑/↓ scroll · esc close');
+    expect(frame).toContain('↑/↓ scroll · q/esc close');
   });
 
   it('closes the viewer when Esc is pressed', async () => {
@@ -30,6 +30,15 @@ describe('HelpScreen', () => {
 
     stdin.write('\u001B');
     await new Promise((resolve) => setTimeout(resolve, 80));
+
+    expect(store.get(helpVisibleAtom)).toBe(false);
+  });
+
+  it('closes the viewer when q is pressed', async () => {
+    const { store, stdin } = renderHelp();
+
+    stdin.write('q');
+    await flushInput();
 
     expect(store.get(helpVisibleAtom)).toBe(false);
   });
@@ -69,7 +78,7 @@ describe('HelpScreen', () => {
     const { lastFrame } = renderHelp({ columns: 100, rows: 60 });
     const frame = lastFrame() ?? '';
 
-    expect(frame).toContain('↑/↓ scroll · esc close');
+    expect(frame).toContain('↑/↓ scroll · q/esc close');
     expect(frame).not.toContain('more ↓');
     expect(frame).not.toMatch(/\btop\b/);
   });

@@ -4,6 +4,7 @@ import { isPointerOverComposer, resolveWheelTarget } from '@components/HomeScree
 // rows = 24; composer block top at 0-based row 18; status row = 23.
 const composerTop = 18;
 const rows = 24;
+const columns = 80;
 
 describe('isPointerOverComposer', () => {
   it('is true from the composer top row down to just above the status row', () => {
@@ -25,19 +26,20 @@ describe('resolveWheelTarget', () => {
   const over = { mouseRow: composerTop + 2, composerTop, rows };
 
   it('routes to the composer when over it and it can scroll', () => {
-    expect(resolveWheelTarget({ ...over, composerCanScroll: true })).toBe('composer');
+    expect(resolveWheelTarget({ ...over, mouseColumn: 20, columns, composerCanScroll: true })).toBe('composer');
   });
 
   it('falls through to the body when over a composer that cannot scroll', () => {
-    expect(resolveWheelTarget({ ...over, composerCanScroll: false })).toBe('body');
+    expect(resolveWheelTarget({ ...over, mouseColumn: 20, columns, composerCanScroll: false })).toBe('body');
   });
 
   it('defaults to the body for header/spacer/cwd and status rows', () => {
-    expect(resolveWheelTarget({ mouseRow: 2, composerTop, rows, composerCanScroll: true })).toBe('body');
-    expect(resolveWheelTarget({ mouseRow: rows, composerTop, rows, composerCanScroll: true })).toBe('body');
+    expect(resolveWheelTarget({ mouseRow: 2, mouseColumn: 20, composerTop, rows, columns, composerCanScroll: true })).toBe('body');
+    expect(resolveWheelTarget({ mouseRow: rows, mouseColumn: 20, composerTop, rows, columns, composerCanScroll: true })).toBe('body');
   });
 
-  it('defaults to the body for an out-of-range pointer row', () => {
-    expect(resolveWheelTarget({ mouseRow: 9999, composerTop, rows, composerCanScroll: true })).toBe('body');
+  it('ignores pointer positions outside the safe canvas', () => {
+    expect(resolveWheelTarget({ mouseRow: 9999, mouseColumn: 20, composerTop, rows, columns, composerCanScroll: true })).toBe('none');
+    expect(resolveWheelTarget({ mouseRow: 2, mouseColumn: columns + 1, composerTop, rows, columns, composerCanScroll: true })).toBe('none');
   });
 });

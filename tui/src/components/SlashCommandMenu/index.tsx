@@ -6,7 +6,7 @@ import {
   commandMenuMatchesAtom,
   commandMenuOpenAtom
 } from '@state/ui/commands/index.ts';
-import { columnsAtom } from '@state/ui/index.ts';
+import { safeChromeColumnsAtom } from '@state/ui/index.ts';
 import { commandMenuRowsAtom } from '@state/ui/index.ts';
 import { theme } from '@theme/themeConfig.ts';
 
@@ -22,15 +22,14 @@ const NAME_DESCRIPTION_GAP = '  ';
  * matching commands fill from the top and any remaining rows are painted blank,
  * keeping the panel a stable height so the composer never shifts as the query
  * narrows. Command names are padded to the widest match so descriptions align in
- * a single column, and rows are truncated to `columns - 1` to keep the
- * terminal's final column clear.
+ * a single column, and rows are truncated to the shared safe chrome width.
  */
 export function SlashCommandMenu() {
   const isOpen = useAtomValue(commandMenuOpenAtom);
   const matches = useAtomValue(commandMenuMatchesAtom);
   const highlightIndex = useAtomValue(commandMenuHighlightIndexAtom);
   const menuRows = useAtomValue(commandMenuRowsAtom);
-  const columns = useAtomValue(columnsAtom);
+  const columns = useAtomValue(safeChromeColumnsAtom);
 
   if (!isOpen || menuRows === 0) {
     return null;
@@ -88,7 +87,7 @@ function blankRows(count: number) {
   return Array.from({ length: count }, (_unused, index) => <Text key={`blank-${index}`}> </Text>);
 }
 
-/** Keeps a row one column short of the edge; Ink drops final-column glyphs on some terminals. */
+/** Keeps a row inside the shared safe chrome width. */
 function truncate(text: string, columns: number): string {
-  return text.slice(0, Math.max(0, columns - 1));
+  return text.slice(0, Math.max(0, columns));
 }

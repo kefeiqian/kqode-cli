@@ -3,11 +3,13 @@ export const DISABLE_SGR_MOUSE_TRACKING = '\u001B[?1006l\u001B[?1000l';
 
 type MouseWheelDirection = 'up' | 'down';
 
-/** A parsed SGR mouse-wheel press with its 1-based pointer row. */
+/** A parsed SGR mouse-wheel press with its 1-based pointer position. */
 export type MouseWheelEvent = {
   direction: MouseWheelDirection;
   /** 1-based terminal row (SGR Y coordinate) the pointer was on. */
   row: number;
+  /** 1-based terminal column (SGR X coordinate) the pointer was on. */
+  column: number;
 };
 
 /** A parsed SGR left-button press with its 1-based pointer position. */
@@ -52,7 +54,11 @@ export function parseMouseWheelEvent(input: string): MouseWheelEvent | null {
     return null;
   }
 
-  return { direction, row: Number.parseInt(match.groups.row, 10) };
+  return {
+    direction,
+    row: Number.parseInt(match.groups.row, 10),
+    column: Number.parseInt(match.groups.column, 10)
+  };
 }
 
 /** Back-compat helper: the wheel direction only. Prefer {@link parseMouseWheelEvent}. */

@@ -9,6 +9,17 @@ describe('printableInput', () => {
   it('strips control characters from pasted input while retaining printable text', () => {
     expect(printableInput('hello\nworld\t!')).toBe('helloworld!');
   });
+
+  it('ignores terminal key escape sequences instead of inserting their printable tail', () => {
+    expect(printableInput('\u001B[27;2;65~')).toBe('');
+    expect(printableInput('[27;2;65~')).toBe('');
+    expect(printableInput('\u001BOA')).toBe('');
+  });
+
+  it('keeps normal shifted printable characters', () => {
+    expect(printableInput('A')).toBe('A');
+    expect(printableInput('!')).toBe('!');
+  });
 });
 
 describe('validateComposerSubmit', () => {

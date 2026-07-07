@@ -29,8 +29,8 @@ import {
   composerScrollOffsetRowsAtom,
   composerStateAtom
 } from '@state/ui/composer/index.ts';
-import { composerRowsAtom, composerTopAtom, layoutAtom, scrollComposerCursorIntoViewAtom } from '@state/ui/index.ts';
-import { columnsAtom, copyModeActiveAtom, inputLockedAtom } from '@state/ui/index.ts';
+import { composerInputColumnsAtom, composerRowsAtom, composerTopAtom, layoutAtom, scrollComposerCursorIntoViewAtom } from '@state/ui/index.ts';
+import { copyModeActiveAtom, inputLockedAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
 
 type PromptComposerProps = {
   columns?: number;
@@ -62,7 +62,8 @@ export function PromptComposer({
   // only draws the cursor on a frame where setCursorPosition ran (its cursorDirty
   // flag resets each render).
   const caretSuppressed = useAtomValue(caretSuppressedWhileScrollingAtom);
-  const atomColumns = useAtomValue(columnsAtom);
+  const atomColumns = useAtomValue(safeChromeColumnsAtom);
+  const atomInputColumns = useAtomValue(composerInputColumnsAtom);
   const atomInputLocked = useAtomValue(inputLockedAtom);
   const copyModeActive = useAtomValue(copyModeActiveAtom);
   const atomLayout = useAtomValue(layoutAtom);
@@ -133,7 +134,7 @@ export function PromptComposer({
   // locked during backend loading. See the hook for the full rationale.
   useComposerCaretVisibility();
 
-  const inputColumns = Math.max(1, resolvedColumns - PROMPT_PREFIX.length);
+  const inputColumns = columns === undefined ? atomInputColumns : Math.max(1, resolvedColumns - PROMPT_PREFIX.length);
   const composerWindow = resolveComposerWindow({
     text: state.text,
     columns: inputColumns,

@@ -6,9 +6,9 @@ import { turnInFlightAtom } from '@state/promptQueue/index.ts';
 import {
   activeSurfaceAtom,
   armedActionAtom,
-  columnsAtom,
   copyModeActiveAtom,
   loadingFrameAtom,
+  safeChromeColumnsAtom,
   setTransientStatusHintAtom,
   startupStatusHintAtom,
   Surface,
@@ -28,7 +28,7 @@ import {
 import { theme } from '@theme/themeConfig.ts';
 
 export function StatusBar() {
-  const columns = useAtomValue(columnsAtom);
+  const columns = useAtomValue(safeChromeColumnsAtom);
   const modelLabel = useAtomValue(activeModelLabelAtom);
   const startupStatusHint = useAtomValue(startupStatusHintAtom);
   const transientStatusHint = useAtomValue(transientStatusHintAtom);
@@ -57,10 +57,8 @@ export function StatusBar() {
   const renderedModelLabel = truncateStatusModelLabel(modelLabel, columns, leftHints.length);
 
   return (
-    // Fill the terminal's final column for a tight right edge. Ink erases to
-    // end-of-line after each row, and some terminals (WezTerm) drop a glyph in
-    // the last column — Windows Terminal renders it fine, so the model label is
-    // allowed to reach the edge. Restore paddingRight={1} if a terminal clips it.
+    // Stay inside the shared safe chrome width so the status label does not
+    // depend on terminals rendering a glyph in the physical final column.
     <Box width={columns}>
       <Text color={theme.colors.muted} wrap="truncate">
         {leftHints}

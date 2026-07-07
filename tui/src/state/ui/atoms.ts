@@ -12,7 +12,12 @@ import {
 import { clamp } from '@libs/math/clamp.ts';
 import { workspaceCwdAtom } from '@state/global/index.ts';
 import { bodyEntriesAtom } from '@state/ui/body.ts';
-import { columnsAtom, rowsAtom } from '@state/ui/dimensions.ts';
+import {
+  columnsAtom,
+  composerInputColumnsAtom,
+  rowsAtom,
+  safeChromeColumnsAtom
+} from '@state/ui/dimensions.ts';
 import { gitStatusLabelAtom } from '@state/ui/gitStatus.ts';
 import { commandMenuDesiredRowsAtom, commandMenuOpenAtom } from '@state/ui/commands/index.ts';
 import { PROMPT_PREFIX } from '@constants/ui.ts';
@@ -43,7 +48,7 @@ export const cwdRowsAtom = atom((get) => {
   if (get(commandMenuOpenAtom)) {
     return 0;
   }
-  return countCwdRows(get(workspaceCwdAtom), get(gitStatusLabelAtom), get(columnsAtom));
+  return countCwdRows(get(workspaceCwdAtom), get(gitStatusLabelAtom), get(safeChromeColumnsAtom));
 });
 
 export const displayedBodyEntriesAtom = atom((get) => {
@@ -141,7 +146,7 @@ export const scrollBodyByRowsAtom = atom(null, (get, set, deltaRows: number) => 
  * `minOffset`/`maxOffset` drive the wheel router and the scroll clamp.
  */
 const composerWindowAtom = atom((get) => {
-  const inputColumns = Math.max(1, get(columnsAtom) - PROMPT_PREFIX.length);
+  const inputColumns = get(composerInputColumnsAtom);
   const { text, cursorIndex } = get(composerStateAtom);
   return resolveComposerWindow({
     text,
@@ -171,7 +176,7 @@ export const scrollComposerByRowsAtom = atom(null, (get, set, deltaRows: number)
  * after a click keeps the current view.
  */
 export const scrollComposerCursorIntoViewAtom = atom(null, (get, set) => {
-  const inputColumns = Math.max(1, get(columnsAtom) - PROMPT_PREFIX.length);
+  const inputColumns = get(composerInputColumnsAtom);
   const { text, cursorIndex } = get(composerStateAtom);
   set(
     composerScrollOffsetRowsAtom,

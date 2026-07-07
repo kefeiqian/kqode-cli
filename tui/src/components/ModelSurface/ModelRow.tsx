@@ -80,5 +80,5 @@ function isHighlighted(row: ModelSurfaceRow, highlight: ModelHighlightIdentity |
 }
 
 function truncate(text: string, columns: number) {
-  return text.slice(0, Math.max(0, columns - 1));
+  return text.slice(0, Math.max(0, columns));
 }

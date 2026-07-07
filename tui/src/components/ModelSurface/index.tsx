@@ -4,7 +4,7 @@ import { useEffect, useMemo } from 'react';
 import { ModelRows } from '@components/ModelSurface/ModelRows.tsx';
 import { useModelBackend } from '@components/ModelSurface/useModelBackend.ts';
 import { useModelInput } from '@components/ModelSurface/useModelInput.ts';
-import { columnsAtom, rowsAtom } from '@state/ui/index.ts';
+import { columnsAtom, rowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
 import { closeActiveSurfaceAtom } from '@state/ui/surface/index.ts';
 import {
   modelHighlightAtom,
@@ -22,6 +22,7 @@ const MODEL_FOOTER_HINT = '↑/↓ choose · enter select/retry · esc close';
 /** Fullscreen `/model` picker across connected providers. */
 export function ModelSurface() {
   const columns = useAtomValue(columnsAtom);
+  const safeChromeColumns = useAtomValue(safeChromeColumnsAtom);
   const rows = useAtomValue(rowsAtom);
   const windowOffset = useAtomValue(modelWindowOffsetAtom);
   const allRows = useAtomValue(modelRowsAtom);
@@ -47,8 +48,8 @@ export function ModelSurface() {
       <Text color={theme.colors.accentBlue}>/model</Text>
       <Text color={theme.colors.muted}>Choose the active model for future turns.</Text>
       <Text> </Text>
-      <ModelRows columns={columns} highlight={highlight} rows={visibleRows} visibleRows={bodyRows} />
-      <ModelFooter columns={columns} offset={windowOffset} total={allRows.length} visible={bodyRows} />
+      <ModelRows columns={safeChromeColumns} highlight={highlight} rows={visibleRows} visibleRows={bodyRows} />
+      <ModelFooter columns={safeChromeColumns} offset={windowOffset} total={allRows.length} visible={bodyRows} />
     </Box>
   );
 }

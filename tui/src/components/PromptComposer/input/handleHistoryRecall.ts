@@ -1,8 +1,7 @@
 import type { ComposerKeyHandler } from '@components/PromptComposer/input/types.ts';
-import { PROMPT_PREFIX } from '@constants/ui.ts';
 import { resolveVerticalCursorIndex } from '@libs/composer/composerWindow.ts';
 import { overLimitMessage } from '@libs/composer/promptText.ts';
-import { columnsAtom } from '@state/ui/index.ts';
+import { composerInputColumnsAtom } from '@state/ui/index.ts';
 import { commandMenuDismissedAtom, commandMenuOpenAtom } from '@state/ui/commands/index.ts';
 import {
   composerScrollOffsetRowsAtom,
@@ -25,7 +24,7 @@ export const handleHistoryRecall: ComposerKeyHandler = (context) => {
   }
 
   const direction = key.upArrow ? 'up' : 'down';
-  const columns = Math.max(1, store.get(columnsAtom) - PROMPT_PREFIX.length);
+  const columns = store.get(composerInputColumnsAtom);
   const state = store.get(composerStateAtom);
   const target = resolveVerticalCursorIndex(state.text, columns, state.cursorIndex, direction);
   if (target !== null) {
