@@ -7,8 +7,11 @@ use kqode::protocol::{BACKEND_MODE_ARG, BACKEND_READY_METHOD};
 use serde_json::{Value, json};
 
 pub fn backend_output(input: &[u8]) -> Output {
+    let home = tempfile::tempdir().expect("backend test home");
     let mut child = Command::new(env!("CARGO_BIN_EXE_kqode"))
         .arg(BACKEND_MODE_ARG)
+        .env("HOME", home.path())
+        .env("USERPROFILE", home.path())
         // Force the no-key path so integration tests are deterministic and never
         // issue a live provider call, even when a developer's `.env` has a real
         // key (dotenvy does not override an already-set variable).

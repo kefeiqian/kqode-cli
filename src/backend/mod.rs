@@ -13,28 +13,42 @@ use crate::protocol::{
     TURN_ENQUEUED_METHOD, TURN_SETTLED_METHOD, TokenDeltaParams, TurnCancelParams,
     TurnCancelResult,
 };
-use crate::store::Store;
+use crate::store::{Store, StoreError};
 
 mod git_status;
 mod login;
 mod message;
 mod providers;
 mod resolve;
+#[cfg(test)]
+mod tests;
+
+/// Process exit code used when the backend cannot open or migrate the store.
+pub const STORE_FAILURE_EXIT_CODE: u8 = 75;
 
 #[derive(Debug)]
 pub enum BackendError {
+    Store(StoreError),
     Transport(String),
 }
 
 impl fmt::Display for BackendError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Store(error) => write!(formatter, "{error}"),
             Self::Transport(message) => formatter.write_str(message),
         }
     }
 }
 
-impl Error for BackendError {}
+impl Error for BackendError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Store(error) => Some(error),
+            Self::Transport(_) => None,
+        }
+    }
+}
 
 /// Runs the internal JSON-RPC stdio backend until stdin closes.
 ///
@@ -59,18 +73,28 @@ pub fn run_stdio() -> Result<(), BackendError> {
     // Hold the guard for the whole session so buffered log lines flush on exit;
     // `None` when debug logging is disabled.
     let _log_guard = debug_log::init(&session_id);
-    let store = Store::open_or_bootstrap().ok();
+    let store = Store::open_or_bootstrap().map_err(BackendError::Store)?;
     let (connection, io_threads) = Connection::stdio();
-    announce_ready(&connection, &session_id)?;
-    let coordinator = Coordinator::start(json_rpc_event_sink(&connection));
-    let loop_result = run_loop(connection, store.as_ref(), coordinator.sender());
-    coordinator.shutdown_and_join();
+    let loop_result = run_stdio_with(connection, Ok(store), &session_id);
     match loop_result {
         Ok(()) => io_threads.join().map_err(|error| {
             BackendError::Transport(format!("JSON-RPC transport failed: {error}"))
         }),
         Err(error) => Err(error),
     }
+}
+
+fn run_stdio_with(
+    connection: Connection,
+    store: Result<Store, StoreError>,
+    session_id: &str,
+) -> Result<(), BackendError> {
+    let store = store.map_err(BackendError::Store)?;
+    announce_ready(&connection, session_id)?;
+    let coordinator = Coordinator::start(json_rpc_event_sink(&connection));
+    let loop_result = run_loop(connection, Some(&store), coordinator.sender());
+    coordinator.shutdown_and_join();
+    loop_result
 }
 
 /// Emits the one-shot backend-ready notification over `connection`, carrying the
@@ -286,35 +310,4 @@ fn handle_provider_clear_key(request: Request, store: Option<&Store>) -> Respons
         }
     };
     Response::new_ok(request.id, providers::clear_provider_key(store, params))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use lsp_server::{Connection, RequestId};
-
-    #[test]
-    fn set_key_rejects_bad_custom_url_immediately_without_worker() {
-        let (backend, client) = Connection::memory();
-        let (coordinator, _receiver) = std::sync::mpsc::channel();
-        let request = Request {
-            id: RequestId::from(1),
-            method: crate::protocol::PROVIDER_SET_KEY_METHOD.to_owned(),
-            params: serde_json::json!({
-                "providerId": "custom",
-                "baseUrl": "http://example.test/v1",
-                "apiKey": "sk-pre-network",
-                "label": null
-            }),
-        };
-
-        let response =
-            handle_request(request, &backend, None, &coordinator).expect("immediate error");
-
-        assert_eq!(response.error.unwrap().code, JSON_RPC_INVALID_PARAMS);
-        assert!(
-            client.receiver.try_recv().is_err(),
-            "no deferred worker sent a response"
-        );
-    }
 }
