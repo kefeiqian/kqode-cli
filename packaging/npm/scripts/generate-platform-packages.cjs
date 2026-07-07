@@ -9,7 +9,7 @@ const { spawnSync } = require('node:child_process');
 
 const { SUPPORTED_TARGETS, binaryName, platformPackageName } = require('../kqode/lib/resolve.cjs');
 const { releaseTargetName, archiveExt } = require('./release-target.cjs');
-const { platformPackageManifest, platformPackageReadme, PACKAGE_SUPPORT_FILES } = require('./platform-package.cjs');
+const { platformPackageManifest, platformPackageReadme, LICENSE_FILES, NOTICE_FILES } = require('./platform-package.cjs');
 
 /** The committed launcher package, source of the default version and the LICENSE files. */
 const packageRoot = path.join(__dirname, '..', 'kqode');
@@ -117,7 +117,7 @@ function buildPackage({ platform, arch, version, archivesDir, outDir }) {
   const manifest = platformPackageManifest({ name, version, platform, arch, binaryName: bin });
   fs.writeFileSync(path.join(pkgDir, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`);
   fs.writeFileSync(path.join(pkgDir, 'README.md'), platformPackageReadme({ name, platform, arch }));
-  for (const file of PACKAGE_SUPPORT_FILES) {
+  for (const file of [...LICENSE_FILES, ...NOTICE_FILES]) {
     fs.copyFileSync(path.join(packageRoot, file), path.join(pkgDir, file));
   }
   return { name, dir: pkgDir };
