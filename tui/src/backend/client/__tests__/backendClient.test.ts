@@ -337,6 +337,27 @@ describe('createBackendClient (fake backend)', () => {
     client.dispose();
   });
 
+  it('uses a generic signal-exit message without raw stderr attribution', async () => {
+    const fake = makeFakeBackend(() => undefined, {
+      signalReady: false,
+      stderrText: 'panic: unrelated'
+    });
+    const client = createBackendClient({ launch: async () => fake.launched, startupTimeoutMs: 200 });
+
+    const start = client.ensureStarted();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fake.emitExit({ code: null, signal: 'SIGTERM' });
+
+    await expect(start).rejects.toMatchObject({
+      kind: BackendErrorKind.Launch,
+      message: expect.stringContaining('signal SIGTERM')
+    });
+    await expect(start).rejects.toMatchObject({
+      message: expect.not.stringContaining('panic: unrelated')
+    });
+    client.dispose();
+  });
+
   it('fails fast when the startup transport closes before readiness', async () => {
     const fake = makeFakeBackend(() => undefined, {
       signalReady: false
@@ -353,6 +374,28 @@ describe('createBackendClient (fake backend)', () => {
     await expect(start).rejects.toMatchObject({
       kind: BackendErrorKind.Launch,
       message: 'backend connection closed before it reported readiness'
+    });
+    client.dispose();
+  });
+
+  it('surfaces store-fatal stderr if the transport closes before the process exit event', async () => {
+    const stderrText = 'KQODE_STORE_FATAL: delete /tmp/kqode.db and restart';
+    const fake = makeFakeBackend(() => undefined, {
+      signalReady: false,
+      stderrText
+    });
+    const client = createBackendClient({
+      launch: async () => fake.launched,
+      startupTimeoutMs: 5_000
+    });
+
+    const start = client.ensureStarted();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fake.closeServer();
+
+    await expect(start).rejects.toMatchObject({
+      kind: BackendErrorKind.Launch,
+      message: stderrText
     });
     client.dispose();
   });

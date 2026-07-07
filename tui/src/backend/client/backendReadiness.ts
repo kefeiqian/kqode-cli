@@ -92,7 +92,10 @@ function startupFailureMessage(
   exit: BackendExit | undefined
 ): string {
   const stderr = backend.stderrText().trim();
-  if (exit?.code === STORE_FAILURE_EXIT_CODE && stderr.startsWith(STORE_FATAL_SENTINEL)) {
+  if (
+    stderr.startsWith(STORE_FATAL_SENTINEL) &&
+    (exit === undefined || exit.code === STORE_FAILURE_EXIT_CODE)
+  ) {
     return stderr;
   }
   if (exit !== undefined) {

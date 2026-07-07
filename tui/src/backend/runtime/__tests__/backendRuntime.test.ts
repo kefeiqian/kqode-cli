@@ -120,6 +120,28 @@ describe('startBackendRuntime', () => {
     expect(store.get(startupStatusHintAtom)).toBeUndefined();
   });
 
+  it('does not refresh git status after startup resolves post-disposal', async () => {
+    const store = createStore();
+    let resolveStart: (() => void) | undefined;
+    const client = fakeClient({
+      ensureStarted: vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveStart = resolve;
+          })
+      ),
+      gitStatus: vi.fn().mockResolvedValue('main')
+    });
+
+    const dispose = startBackendRuntime(store, client, fakeLogger());
+    dispose();
+    resolveStart?.();
+    await flushMicrotasks();
+
+    expect(client.gitStatus).not.toHaveBeenCalled();
+    expect(store.get(startupStatusHintAtom)).toBeUndefined();
+  });
+
   it('settles a visible error entry for a submit after a failed start (no silent drop)', async () => {
     const store = createStore();
     const failure = new BackendClientError(BackendErrorKind.Launch, 'backend unavailable');

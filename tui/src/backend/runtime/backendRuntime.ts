@@ -50,6 +50,9 @@ export function startBackendRuntime(
   void client
     .ensureStarted()
     .then(() => {
+      if (disposed) {
+        return;
+      }
       // Backend is ready: fetch the initial git label off the render path.
       void store.set(refreshGitStatusAtom);
     })
