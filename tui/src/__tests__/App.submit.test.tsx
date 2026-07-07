@@ -30,7 +30,7 @@ function renderApp(backendClient: Partial<BackendClient>, columns = 80, rows = 4
     clearConversation: async () => undefined,
     cancelTurn: async () => undefined,
     gitStatus: async () => null,
-    listProviders: async () => ({ persistenceAvailable: true, providers: [] }),
+    listProviders: async () => ({ providers: [] }),
     getActiveSelection: async () => ({ providerId: null, modelId: null }),
     setActiveSelection: async () => undefined,
     clearProviderKey: async () => undefined,
