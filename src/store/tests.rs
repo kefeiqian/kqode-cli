@@ -382,6 +382,10 @@ fn directory_db_path_keeps_filesystem_remedy_not_reset_remedy() {
         !message.to_lowercase().contains("delete"),
         "non-resettable open failures should not use reset remedy: {message}"
     );
+    assert!(
+        path.is_dir(),
+        "a failed-to-open DB path is never auto-deleted"
+    );
 }
 
 #[test]
