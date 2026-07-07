@@ -167,6 +167,12 @@ fn divergent_applied_migration_surfaces_a_store_error() {
         }
         other => panic!("expected divergent migration history, got {other:?}"),
     }
+    let message = err.to_string().to_lowercase();
+    assert!(message.contains("upgrade"));
+    assert!(
+        !message.contains("delete"),
+        "divergent-history remedy must not instruct deletion: {message}"
+    );
 }
 
 #[test]
@@ -275,6 +281,10 @@ fn malformed_history_applied_on_surfaces_store_error_without_panicking() {
         }
         other => panic!("expected malformed history error, got {other:?}"),
     }
+    let message = err.to_string().to_lowercase();
+    assert!(message.contains("delete"));
+    assert!(message.contains("-wal"));
+    assert!(message.contains("-shm"));
 }
 
 #[test]
@@ -298,6 +308,10 @@ fn malformed_history_checksum_surfaces_store_error_without_panicking() {
         }
         other => panic!("expected malformed history error, got {other:?}"),
     }
+    let message = err.to_string().to_lowercase();
+    assert!(message.contains("delete"));
+    assert!(message.contains("-wal"));
+    assert!(message.contains("-shm"));
 }
 
 #[test]
@@ -328,6 +342,10 @@ fn missing_prior_migration_refuses_to_bootstrap() {
     let result = Store::open_or_bootstrap_at(path.clone());
     let err = result.unwrap_err();
     assert!(matches!(err.root_cause(), StoreError::MigrationHistory(_)));
+    let message = err.to_string().to_lowercase();
+    assert!(message.contains("delete"));
+    assert!(message.contains("-wal"));
+    assert!(message.contains("-shm"));
     assert!(
         path.exists(),
         "a migration history failure must never auto-delete"
@@ -342,7 +360,11 @@ fn a_corrupt_file_surfaces_a_typed_error_without_panicking() {
     std::fs::write(&path, b"this is not a sqlite database").unwrap();
     let result = Store::open_or_bootstrap_at(path.clone());
     let err = result.expect_err("corrupt DB degrades, not panics");
-    assert!(err.to_string().contains(&path.display().to_string()));
+    let message = err.to_string().to_lowercase();
+    assert!(message.contains(&path.display().to_string().to_lowercase()));
+    assert!(message.contains("delete"));
+    assert!(message.contains("-wal"));
+    assert!(message.contains("-shm"));
     assert!(path.exists(), "a failed-to-open DB is never auto-deleted");
 }
 
@@ -356,6 +378,10 @@ fn an_uncreatable_parent_dir_surfaces_create_dir_error() {
     let result = Store::open_or_bootstrap_at(path);
     let err = result.unwrap_err();
     assert!(matches!(err.root_cause(), StoreError::CreateDir(_)));
+    let message = err.to_string();
+    assert!(message.starts_with(STORE_FATAL_SENTINEL));
+    assert!(message.contains("kqode.db"));
+    assert!(message.contains("Fix filesystem permissions"));
 }
 
 fn bootstrap() -> (tempfile::TempDir, Store) {

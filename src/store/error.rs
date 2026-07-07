@@ -120,6 +120,7 @@ impl StoreError {
         match self.root_cause() {
             Self::NoPath => "Set a valid home directory and restart KQode.".to_owned(),
             Self::WithPath { .. } => unreachable!("root_cause removes path wrappers"),
+            Self::Open(err) if is_resettable_open_error(err) => reset_remedy(path),
             Self::CreateDir(_) | Self::Open(_) => {
                 "Fix filesystem permissions or move the KQode home directory, then restart."
                     .to_owned()
@@ -160,6 +161,18 @@ fn is_upgrade_only_history_error(err: &refinery::Error) -> bool {
         }
         _ => false,
     }
+}
+
+fn is_resettable_open_error(err: &rusqlite::Error) -> bool {
+    matches!(
+        err,
+        rusqlite::Error::SqliteFailure(inner, message)
+            if inner.code == rusqlite::ErrorCode::DatabaseCorrupt
+                || inner.code == rusqlite::ErrorCode::NotADatabase
+                || message
+                    .as_deref()
+                    .is_some_and(|message| message.contains("not a database"))
+    )
 }
 
 fn reset_remedy(path: &Path) -> String {

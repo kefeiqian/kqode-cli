@@ -62,14 +62,14 @@ impl Store {
     /// # Errors
     /// See [`Store::open_or_bootstrap`].
     pub fn open_or_bootstrap_at(path: PathBuf) -> Result<Self, StoreError> {
-        if let Some(parent) = path
-            .parent()
-            .filter(|parent| !parent.as_os_str().is_empty())
-        {
-            std::fs::create_dir_all(parent).map_err(StoreError::CreateDir)?;
-            set_private_dir_permissions(parent);
-        }
         let result = (|| {
+            if let Some(parent) = path
+                .parent()
+                .filter(|parent| !parent.as_os_str().is_empty())
+            {
+                std::fs::create_dir_all(parent).map_err(StoreError::CreateDir)?;
+                set_private_dir_permissions(parent);
+            }
             let mut conn = open_connection(&path).map_err(StoreError::Open)?;
             ensure_wal(&conn).map_err(StoreError::Open)?;
             migrations::migrate(&mut conn)?;
