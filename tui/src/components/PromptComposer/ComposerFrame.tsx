@@ -57,7 +57,14 @@ function ComposerTextRow({
   const rowColumns = Math.max(0, columns - prefix.length);
 
   return (
-    <Box backgroundColor={backgroundColor(shouldRenderBackground)}>
+    // Pin the row to the safe content width. Without an explicit width Ink's
+    // default `alignItems: stretch` grows this background box to the raw parent
+    // width, painting `inputBackground` one column past the safe-width half-lines
+    // into the reserved final column. That stray cell shows as a block past the
+    // composer's right edge on the initial paint until the first keystroke's
+    // incremental `ESC[K` erases it. Pinning the width keeps every composer row
+    // at the safe width so the reserved column stays a background gutter.
+    <Box backgroundColor={backgroundColor(shouldRenderBackground)} width={columns}>
       <Text
         backgroundColor={backgroundColor(shouldRenderBackground)}
         color={rowIndex === 0 ? theme.colors.accentBlue : theme.colors.foreground}

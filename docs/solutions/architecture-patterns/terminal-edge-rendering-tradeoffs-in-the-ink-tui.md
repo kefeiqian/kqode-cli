@@ -11,6 +11,7 @@ symptoms:
   - "WezTerm blinks/flashes on every keystroke while Windows Terminal does not"
   - "Right-aligned status text clipped on WezTerm (GPT-5.5 rendered as GPT-5.)"
   - "An empty dark block appears at the right of the composer bar after typing"
+  - "A one-column block sits past the composer's right edge at launch and clears on the first keystroke (background Box stretched into the reserved column)"
   - "Prompt cursor lands one row above the composer after changing layout math"
 applies_when:
   - "Building a fullscreen Ink (v7) TUI that enters the alternate screen manually"
@@ -120,7 +121,15 @@ are untouched and keep their last column.
 A `<Box width={columns} backgroundColor>` paints its background as a solid
 rectangle that reaches the last column even on WezTerm (the root background box
 in `tui/src/components/HomeScreen/HomeScreenView.tsx` keeps raw columns and fills
-the reserved final column behind the safe-width body rows). A bare full-width `<Text>` can lose its last
+the reserved final column behind the safe-width body rows). That width must be
+**explicit**: a background `<Box>` with no `width` inherits Ink's default
+`alignItems: stretch` and grows to the raw parent width, painting its background
+into the reserved final column. A safe-width composer text row with no explicit
+`width` therefore stretched one column past the safe-width half-lines and showed
+a stray `inputBackground` block past the composer's right edge on the initial
+paint until the first keystroke's incremental `ESC[K` erased it — fixed by
+pinning `width={columns}` on the row (`tui/src/components/PromptComposer/ComposerFrame.tsx`).
+A bare full-width `<Text>` can lose its last
 glyph on WezTerm (this is why right-aligned `GPT-5.5` clipped to `GPT-5.` in the
 status bar). Mirroring the Box-with-explicit-width pattern fixes static
 full-width rows — but it does **not** defeat the incremental `ESC[K` clip on a
