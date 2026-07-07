@@ -1,7 +1,13 @@
 //! SQLite index store: bootstrap, pragmas, and a per-operation connection factory.
 //!
 //! The store is a rebuildable index over the JSONL transcript truth. A DB that
-//! fails to open or migrate is **never auto-deleted**.
+//! fails to open, lock, migrate, or pass sanity checks is **fatal at backend
+//! startup** and is **never auto-deleted**. Recovery is an explicit reset of the
+//! DB file and its WAL/SHM sidecars, after which the index rebuilds from JSONL.
+//!
+//! Schema versioning is owned by compile-time-embedded `refinery` migrations and
+//! `refinery_schema_history`; SQLite `PRAGMA user_version` remains `0` except
+//! when detecting legacy pre-refinery databases that need a one-time reset.
 //!
 //! `rusqlite::Connection` is `Send` but `!Sync`, so callers open a fresh
 //! connection per operation via [`Store::connect`] instead of sharing one
@@ -23,8 +29,7 @@ use rusqlite::Connection;
 pub use error::{STORE_FATAL_SENTINEL, StoreError};
 pub use providers::{ActiveSelection, ProviderSettings};
 
-/// Modest busy-timeout: retry a locked write briefly, well under the TS client
-/// request ceiling, then surface `SQLITE_BUSY` (bootstrap degrades, never crashes).
+/// Modest busy-timeout: retry a locked write briefly, then fail startup.
 const BUSY_TIMEOUT_MS: u64 = 500;
 
 /// WAL conversion retries for a concurrent first-boot's brief exclusive lock.

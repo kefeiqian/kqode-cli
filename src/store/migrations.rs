@@ -5,6 +5,11 @@
 //! Never edit or reorder a shipped migration: recovery from a bad migration is a
 //! new forward-fix migration, not a down-migration (the DB is a rebuildable
 //! index over the JSONL truth, per AGENTS.md).
+//!
+//! Migrations must stay fully transactional under refinery's grouped rusqlite
+//! transaction: no `VACUUM`, journal-mode/foreign-key toggles, or other
+//! implicit-commit statements. Pre-refinery `user_version = 1` databases are
+//! intentionally refused with a reset instruction rather than auto-baselined.
 
 use refinery::error::Kind;
 use rusqlite::Connection;
