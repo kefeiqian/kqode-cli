@@ -36,7 +36,7 @@ pub(super) fn reset_remedy(path: &Path) -> String {
     )
 }
 
-fn sidecar_path(path: &Path, suffix: &str) -> PathBuf {
+pub(super) fn sidecar_path(path: &Path, suffix: &str) -> PathBuf {
     let mut os_path = path.as_os_str().to_owned();
     os_path.push(suffix);
     PathBuf::from(os_path)

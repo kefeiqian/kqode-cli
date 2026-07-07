@@ -191,10 +191,8 @@ fn set_private_dir_permissions(_dir: &Path) {}
 fn set_private_db_permissions(path: &Path) {
     use std::os::unix::fs::PermissionsExt;
     for suffix in ["", "-wal", "-shm"] {
-        let mut os_path = path.as_os_str().to_owned();
-        os_path.push(suffix);
         let _ = std::fs::set_permissions(
-            PathBuf::from(os_path),
+            recovery::sidecar_path(path, suffix),
             std::fs::Permissions::from_mode(0o600),
         );
     }

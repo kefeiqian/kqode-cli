@@ -96,9 +96,7 @@ fn seed_raw_history_row(
 
 fn remove_db_with_sidecars(path: &Path) {
     for suffix in ["", "-wal", "-shm"] {
-        let mut os_path = path.as_os_str().to_owned();
-        os_path.push(suffix);
-        let _ = std::fs::remove_file(PathBuf::from(os_path));
+        let _ = std::fs::remove_file(recovery::sidecar_path(path, suffix));
     }
 }
 

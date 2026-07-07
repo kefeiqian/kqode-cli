@@ -5,6 +5,7 @@ import type { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { BackendErrorKind } from '@contracts/backend/index.ts';
+import { withTempHome } from '@backend/testUtils/tempHome.ts';
 import {
   launchSourceBackend,
   spawnBackend,
@@ -89,40 +90,6 @@ function safeRemove(dir: string): void {
   } catch {
     /* ignore */
   }
-}
-
-async function withTempHome<T>(run: () => Promise<T>): Promise<T> {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-home-'));
-  const oldHome = process.env.HOME;
-  const oldUserProfile = process.env.USERPROFILE;
-  const oldCargoHome = process.env.CARGO_HOME;
-  const oldRustupHome = process.env.RUSTUP_HOME;
-  process.env.HOME = home;
-  process.env.USERPROFILE = home;
-  if (oldHome !== undefined) {
-    process.env.CARGO_HOME = oldCargoHome ?? path.join(oldHome, '.cargo');
-    process.env.RUSTUP_HOME = oldRustupHome ?? path.join(oldHome, '.rustup');
-  }
-  try {
-    return await run();
-  } finally {
-    restoreEnv('HOME', oldHome);
-    restoreEnv('USERPROFILE', oldUserProfile);
-    restoreEnv('CARGO_HOME', oldCargoHome);
-    restoreEnv('RUSTUP_HOME', oldRustupHome);
-    safeRemove(home);
-  }
-}
-
-function restoreEnv(
-  name: 'HOME' | 'USERPROFILE' | 'CARGO_HOME' | 'RUSTUP_HOME',
-  value: string | undefined
-): void {
-  if (value === undefined) {
-    delete process.env[name];
-    return;
-  }
-  process.env[name] = value;
 }
 
 describe('spawnBackend', () => {

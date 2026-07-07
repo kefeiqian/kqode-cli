@@ -10,6 +10,7 @@ import {
   StreamMessageReader,
   StreamMessageWriter
 } from 'vscode-jsonrpc/node';
+import { withTempHome } from '@backend/testUtils/tempHome.ts';
 import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.ts';
 import { type LaunchedBackend } from '@backend/process/backendProcess.ts';
 import {
@@ -123,50 +124,6 @@ afterEach(() => {
   }
   openServers = [];
 });
-
-async function withTempHome<T>(run: () => Promise<T>): Promise<T> {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-home-'));
-  const oldHome = process.env.HOME;
-  const oldUserProfile = process.env.USERPROFILE;
-  const oldCargoHome = process.env.CARGO_HOME;
-  const oldRustupHome = process.env.RUSTUP_HOME;
-  const oldCustomApiKey = process.env.CUSTOM_API_KEY;
-  const oldDebug = process.env.KQODE_DEBUG;
-  process.env.HOME = home;
-  process.env.USERPROFILE = home;
-  process.env.CUSTOM_API_KEY = '';
-  process.env.KQODE_DEBUG = '0';
-  if (oldHome !== undefined) {
-    process.env.CARGO_HOME = oldCargoHome ?? path.join(oldHome, '.cargo');
-    process.env.RUSTUP_HOME = oldRustupHome ?? path.join(oldHome, '.rustup');
-  }
-  try {
-    return await run();
-  } finally {
-    restoreEnv('HOME', oldHome);
-    restoreEnv('USERPROFILE', oldUserProfile);
-    restoreEnv('CARGO_HOME', oldCargoHome);
-    restoreEnv('RUSTUP_HOME', oldRustupHome);
-    restoreEnv('CUSTOM_API_KEY', oldCustomApiKey);
-    restoreEnv('KQODE_DEBUG', oldDebug);
-    try {
-      fs.rmSync(home, { recursive: true, force: true });
-    } catch {
-      /* temp cleanup is best-effort */
-    }
-  }
-}
-
-function restoreEnv(
-  name: 'HOME' | 'USERPROFILE' | 'CARGO_HOME' | 'RUSTUP_HOME' | 'CUSTOM_API_KEY' | 'KQODE_DEBUG',
-  value: string | undefined
-): void {
-  if (value === undefined) {
-    delete process.env[name];
-    return;
-  }
-  process.env[name] = value;
-}
 
 describe('createBackendClient (fake backend)', () => {
   it('can prelaunch the backend before the first submit', async () => {
@@ -599,33 +556,36 @@ describe('createSourceBackendClient (integration)', () => {
       // finds no CUSTOM_API_KEY and deterministically returns needsConfiguration —
       // regardless of a developer's real `.env` at the repo root.
       const workspaceCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-src-client-'));
-      await withTempHome(async () => {
-        const client = createSourceBackendClient({ repoRoot, workspaceCwd });
-        try {
-          await client.setActiveSelection('custom', 'test-model');
-          const settled = new Promise((resolve) =>
-            client.onTranscriptEvent((event) => {
-              if (event.type === 'settled') {
-                resolve(event);
-              }
-            })
-          );
-          await client.submit({ turnId: 'turn-1', text: 'hello' });
-          await expect(settled).resolves.toMatchObject({
-            type: 'settled',
-            result: { kind: 'needsConfiguration' }
-          });
-        } finally {
-          client.dispose();
-          // Best-effort: on Windows the just-killed backend may still hold the cwd
-          // handle briefly; the OS reclaims the temp dir regardless.
+      await withTempHome(
+        async () => {
+          const client = createSourceBackendClient({ repoRoot, workspaceCwd });
           try {
-            fs.rmSync(workspaceCwd, { recursive: true, force: true });
-          } catch {
-            /* temp cleanup is best-effort */
+            await client.setActiveSelection('custom', 'test-model');
+            const settled = new Promise((resolve) =>
+              client.onTranscriptEvent((event) => {
+                if (event.type === 'settled') {
+                  resolve(event);
+                }
+              })
+            );
+            await client.submit({ turnId: 'turn-1', text: 'hello' });
+            await expect(settled).resolves.toMatchObject({
+              type: 'settled',
+              result: { kind: 'needsConfiguration' }
+            });
+          } finally {
+            client.dispose();
+            // Best-effort: on Windows the just-killed backend may still hold the cwd
+            // handle briefly; the OS reclaims the temp dir regardless.
+            try {
+              fs.rmSync(workspaceCwd, { recursive: true, force: true });
+            } catch {
+              /* temp cleanup is best-effort */
+            }
           }
-        }
-      });
+        },
+        { env: { CUSTOM_API_KEY: '', KQODE_DEBUG: '0' } }
+      );
     },
     INTEGRATION_TIMEOUT_MS
   );
