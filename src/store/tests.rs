@@ -66,10 +66,26 @@ fn create_refinery_history(conn: &Connection) {
 }
 
 fn seed_history_row(conn: &Connection, version: i64, name: &str, checksum: u64) {
+    seed_raw_history_row(
+        conn,
+        version,
+        name,
+        "2026-07-07T00:00:00Z",
+        &checksum.to_string(),
+    );
+}
+
+fn seed_raw_history_row(
+    conn: &Connection,
+    version: i64,
+    name: &str,
+    applied_on: &str,
+    checksum: &str,
+) {
     conn.execute(
         "INSERT INTO refinery_schema_history (version, name, applied_on, checksum)
-         VALUES (?1, ?2, '2026-07-07T00:00:00Z', ?3)",
-        (version, name, checksum.to_string()),
+         VALUES (?1, ?2, ?3, ?4)",
+        (version, name, applied_on, checksum),
     )
     .unwrap();
 }
@@ -161,6 +177,69 @@ fn db_ahead_of_embedded_migrations_refuses_to_bootstrap() {
         other => panic!("expected missing migration history, got {other:?}"),
     }
     assert!(path.exists(), "a DB-ahead failure must never auto-delete");
+}
+
+#[test]
+fn malformed_history_applied_on_surfaces_store_error_without_panicking() {
+    let (_dir, path) = temp_db();
+    {
+        let conn = Connection::open(&path).unwrap();
+        create_refinery_history(&conn);
+        seed_raw_history_row(
+            &conn,
+            1,
+            "initial_schema",
+            "not-rfc3339",
+            &migrations::v1_checksum().to_string(),
+        );
+    }
+    let err = Store::open_or_bootstrap_at(path).unwrap_err();
+    match err {
+        StoreError::MigrationHistoryCorrupt(reason) => {
+            assert!(reason.contains("invalid applied_on"));
+        }
+        other => panic!("expected malformed history error, got {other:?}"),
+    }
+}
+
+#[test]
+fn malformed_history_checksum_surfaces_store_error_without_panicking() {
+    let (_dir, path) = temp_db();
+    {
+        let conn = Connection::open(&path).unwrap();
+        create_refinery_history(&conn);
+        seed_raw_history_row(
+            &conn,
+            1,
+            "initial_schema",
+            "2026-07-07T00:00:00Z",
+            "not-a-u64",
+        );
+    }
+    let err = Store::open_or_bootstrap_at(path).unwrap_err();
+    match err {
+        StoreError::MigrationHistoryCorrupt(reason) => {
+            assert!(reason.contains("invalid checksum"));
+        }
+        other => panic!("expected malformed history error, got {other:?}"),
+    }
+}
+
+#[test]
+fn sanity_check_reports_history_version_mismatch() {
+    let (_dir, path) = temp_db();
+    let store = Store::open_or_bootstrap_at(path).unwrap();
+    let conn = store.connect().unwrap();
+    conn.execute("DELETE FROM refinery_schema_history", [])
+        .unwrap();
+    let err = sanity_check(&conn).unwrap_err();
+    assert!(matches!(
+        err,
+        StoreError::SchemaHistoryMismatch {
+            found: None,
+            known: 1
+        }
+    ));
 }
 
 #[test]

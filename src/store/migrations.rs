@@ -8,6 +8,7 @@
 
 use refinery::error::Kind;
 use rusqlite::Connection;
+use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 use super::StoreError;
 
@@ -68,7 +69,51 @@ pub(super) fn applied_max_version(conn: &Connection) -> rusqlite::Result<Option<
 /// - [`StoreError::Migrate`] if refinery cannot assert history or apply the
 ///   embedded migration chain.
 pub(super) fn migrate(conn: &mut Connection) -> Result<(), StoreError> {
+    validate_history_rows(conn)?;
     runner().run(conn).map(|_| ()).map_err(map_refinery_error)
+}
+
+fn validate_history_rows(conn: &Connection) -> Result<(), StoreError> {
+    if !history_table_exists(conn).map_err(StoreError::Sanity)? {
+        return Ok(());
+    }
+
+    let sql = format!(
+        "SELECT version, applied_on, checksum FROM {REFINERY_SCHEMA_HISTORY_TABLE} ORDER BY version"
+    );
+    let mut stmt = conn.prepare(&sql).map_err(malformed_history)?;
+    let mut rows = stmt.query([]).map_err(malformed_history)?;
+    while let Some(row) = rows.next().map_err(malformed_history)? {
+        let version = row.get::<_, i64>(0).map_err(malformed_history)?;
+        let applied_on = row.get::<_, String>(1).map_err(malformed_history)?;
+        OffsetDateTime::parse(&applied_on, &Rfc3339).map_err(|err| {
+            StoreError::MigrationHistoryCorrupt(format!(
+                "version {version} has invalid applied_on {applied_on:?}: {err}"
+            ))
+        })?;
+
+        let checksum = row.get::<_, String>(2).map_err(malformed_history)?;
+        checksum.parse::<u64>().map_err(|err| {
+            StoreError::MigrationHistoryCorrupt(format!(
+                "version {version} has invalid checksum {checksum:?}: {err}"
+            ))
+        })?;
+    }
+    Ok(())
+}
+
+fn history_table_exists(conn: &Connection) -> rusqlite::Result<bool> {
+    conn.query_row(
+        "SELECT EXISTS(
+            SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1
+        )",
+        [REFINERY_SCHEMA_HISTORY_TABLE],
+        |row| row.get(0),
+    )
+}
+
+fn malformed_history(err: rusqlite::Error) -> StoreError {
+    StoreError::MigrationHistoryCorrupt(err.to_string())
 }
 
 fn runner() -> refinery::Runner {

@@ -13,6 +13,8 @@ pub enum StoreError {
     /// refinery detected applied migrations that are missing or divergent from
     /// the embedded migration chain.
     MigrationHistory(refinery::Error),
+    /// refinery history rows are malformed and would make refinery panic while reading them.
+    MigrationHistoryCorrupt(String),
     /// The post-open/-migrate sanity read failed (corruption can surface here).
     Sanity(rusqlite::Error),
     /// The post-migrate refinery history version does not match this binary.
@@ -28,6 +30,9 @@ impl std::fmt::Display for StoreError {
             Self::Migrate(err) => write!(f, "could not migrate the database: {err}"),
             Self::MigrationHistory(err) => {
                 write!(f, "database migration history is invalid: {err}")
+            }
+            Self::MigrationHistoryCorrupt(reason) => {
+                write!(f, "database migration history is malformed: {reason}")
             }
             Self::Sanity(err) => write!(f, "database sanity read failed: {err}"),
             Self::SchemaHistoryMismatch { found, known } => write!(
