@@ -2,9 +2,9 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import type { Readable, Writable } from 'node:stream';
 import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.ts';
 import { buildBackend, resolveBackendBinaryPath } from '@backend/process/backendBuild.ts';
-import { BACKEND_MODE_ARG } from '@constants/backend.ts';
+import { BACKEND_MODE_ARG, BACKEND_STDERR_CAP_BYTES } from '@constants/backend.ts';
 import { buildHardenedEnv } from '@backend/process/processEnv.ts';
-import { killProcessTree } from '@backend/process/processUtils.ts';
+import { CappedBuffer, killProcessTree } from '@backend/process/processUtils.ts';
 
 /** How a launched backend process ended. */
 export type BackendExit = { code: number | null; signal: NodeJS.Signals | null };
@@ -21,6 +21,7 @@ export type LaunchedBackend = {
   readonly stdin: Writable;
   readonly stdout: Readable;
   readonly stderr: Readable;
+  stderrText(): string;
   onExit(listener: (exit: BackendExit) => void): void;
   dispose(): void;
 };
@@ -65,13 +66,31 @@ export async function spawnBackend({
     throw new BackendClientError(BackendErrorKind.Launch, 'backend process is missing stdio pipes');
   }
 
+  const stderrBuffer = new CappedBuffer(BACKEND_STDERR_CAP_BYTES);
+  stderr.on('data', (chunk: Buffer) => stderrBuffer.append(chunk));
+  let exit: BackendExit | undefined;
+  const exitListeners: Array<(exit: BackendExit) => void> = [];
+  child.once('close', (code, signal) => {
+    exit = { code, signal };
+    for (const listener of exitListeners.splice(0)) {
+      listener(exit);
+    }
+  });
+
   return {
     pid: child.pid,
     stdin,
     stdout,
     stderr,
+    stderrText() {
+      return stderrBuffer.toString();
+    },
     onExit(listener) {
-      child.once('exit', (code, signal) => listener({ code, signal }));
+      if (exit !== undefined) {
+        listener(exit);
+        return;
+      }
+      exitListeners.push(listener);
     },
     dispose() {
       killProcessTree(child.pid);

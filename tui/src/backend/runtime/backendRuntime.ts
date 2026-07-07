@@ -3,6 +3,7 @@ import type { BackendClient } from '@contracts/backend/index.ts';
 import type { SessionLogger } from '@backend/log/sessionLogger.ts';
 import { backendClientAtom } from '@state/global/backend.ts';
 import { resetTranscriptMirrorAtom, transcriptEventAtom } from '@state/promptQueue/atoms.ts';
+import { appendClientOnlyErrorAtom } from '@state/promptQueue/clientOnlyRows.ts';
 import { refreshGitStatusAtom } from '@state/ui/gitStatus.ts';
 import { BACKEND_LOADING_HINT, startupStatusHintAtom } from '@state/ui/statusHint.ts';
 
@@ -51,13 +52,15 @@ export function startBackendRuntime(
       // Backend is ready: fetch the initial git label off the render path.
       void store.set(refreshGitStatusAtom);
     })
-    .catch(() => {
+    .catch((error: unknown) => {
       // Startup failed without readiness: flush buffered startup events to an
       // orphan session so the spawn/build failure is still captured. The
       // Dead-state client stays in the seam so the next submit retries via
       // ensureSession() and settles a visible error rather than dropping it.
       logger.openOrphan();
-      logger.log({ event: 'backendStartFailed' });
+      const message = startupFailureMessage(error);
+      logger.log({ event: 'backendStartFailed', message });
+      store.set(appendClientOnlyErrorAtom, message);
     })
     .finally(() => {
       store.set(startupStatusHintAtom, undefined);
@@ -70,4 +73,11 @@ export function startBackendRuntime(
     logger.close();
     store.set(backendClientAtom, undefined);
   };
+}
+
+function startupFailureMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
 }

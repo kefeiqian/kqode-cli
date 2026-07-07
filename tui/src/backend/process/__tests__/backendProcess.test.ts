@@ -91,6 +91,40 @@ function safeRemove(dir: string): void {
   }
 }
 
+async function withTempHome<T>(run: () => Promise<T>): Promise<T> {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-home-'));
+  const oldHome = process.env.HOME;
+  const oldUserProfile = process.env.USERPROFILE;
+  const oldCargoHome = process.env.CARGO_HOME;
+  const oldRustupHome = process.env.RUSTUP_HOME;
+  process.env.HOME = home;
+  process.env.USERPROFILE = home;
+  if (oldHome !== undefined) {
+    process.env.CARGO_HOME = oldCargoHome ?? path.join(oldHome, '.cargo');
+    process.env.RUSTUP_HOME = oldRustupHome ?? path.join(oldHome, '.rustup');
+  }
+  try {
+    return await run();
+  } finally {
+    restoreEnv('HOME', oldHome);
+    restoreEnv('USERPROFILE', oldUserProfile);
+    restoreEnv('CARGO_HOME', oldCargoHome);
+    restoreEnv('RUSTUP_HOME', oldRustupHome);
+    safeRemove(home);
+  }
+}
+
+function restoreEnv(
+  name: 'HOME' | 'USERPROFILE' | 'CARGO_HOME' | 'RUSTUP_HOME',
+  value: string | undefined
+): void {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+  process.env[name] = value;
+}
+
 describe('spawnBackend', () => {
   it('rejects with a launch error when the backend executable is missing', async () => {
     await expect(
@@ -109,15 +143,17 @@ describe('launchSourceBackend (integration)', () => {
       // A temp workspace with no `.env` in its ancestry makes the backend find
       // no CUSTOM_API_KEY; submit still returns an accepted-only ack.
       const workspaceCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-launch-'));
-      const backend = await launchSourceBackend({ repoRoot, workspaceCwd });
-      try {
-        const result = await submitThroughLauncher(backend, 'hi from a temp workspace');
-        expect(result.turnId).toBe('turn-1');
-        expect('status' in result).toBe(false);
-      } finally {
-        backend.dispose();
-        safeRemove(workspaceCwd);
-      }
+      await withTempHome(async () => {
+        const backend = await launchSourceBackend({ repoRoot, workspaceCwd });
+        try {
+          const result = await submitThroughLauncher(backend, 'hi from a temp workspace');
+          expect(result.turnId).toBe('turn-1');
+          expect('status' in result).toBe(false);
+        } finally {
+          backend.dispose();
+          safeRemove(workspaceCwd);
+        }
+      });
     },
     INTEGRATION_TIMEOUT_MS
   );
@@ -126,15 +162,17 @@ describe('launchSourceBackend (integration)', () => {
     'launches from a distinct workspace directory and still answers submit',
     async () => {
       const workspaceCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-launch-alt-'));
-      const backend = await launchSourceBackend({ repoRoot, workspaceCwd });
-      try {
-        const result = await submitThroughLauncher(backend, 'café ☕');
-        expect(result.turnId).toBe('turn-1');
-        expect('status' in result).toBe(false);
-      } finally {
-        backend.dispose();
-        safeRemove(workspaceCwd);
-      }
+      await withTempHome(async () => {
+        const backend = await launchSourceBackend({ repoRoot, workspaceCwd });
+        try {
+          const result = await submitThroughLauncher(backend, 'café ☕');
+          expect(result.turnId).toBe('turn-1');
+          expect('status' in result).toBe(false);
+        } finally {
+          backend.dispose();
+          safeRemove(workspaceCwd);
+        }
+      });
     },
     INTEGRATION_TIMEOUT_MS
   );

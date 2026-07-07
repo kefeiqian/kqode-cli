@@ -43,7 +43,9 @@ describe('startBackendRuntime', () => {
     expect(store.get(startupStatusHintAtom)).toEqual(BACKEND_LOADING_HINT);
 
     // The runtime registers a readiness listener; firing it opens the session.
-    const onReadyListener = vi.mocked(client.onReady).mock.calls[0][0];
+    const onReadyListener = (client.onReady as unknown as {
+      mock: { calls: Array<[(sessionId: string) => void]> };
+    }).mock.calls[0][0];
     onReadyListener('sess-42');
     expect(logger.openSession).toHaveBeenCalledWith('sess-42');
     expect(logger.log).toHaveBeenCalledWith({ event: 'backendReady', sessionId: 'sess-42' });
@@ -75,12 +77,18 @@ describe('startBackendRuntime', () => {
     // Startup failed without readiness: buffered events flush to an orphan session.
     expect(logger.openOrphan).toHaveBeenCalledTimes(1);
     expect(logger.openSession).not.toHaveBeenCalled();
-    expect(logger.log).toHaveBeenCalledWith({ event: 'backendStartFailed' });
+    expect(logger.log).toHaveBeenCalledWith({
+      event: 'backendStartFailed',
+      message: 'launch failed'
+    });
     // A failed start must not silently drop the seam: the client stays so the
     // next submit retries via ensureSession() instead of vanishing.
     expect(client.dispose).not.toHaveBeenCalled();
     expect(store.get(backendClientAtom)).toBe(client);
     expect(store.get(startupStatusHintAtom)).toBeUndefined();
+    expect(store.get(submittedPromptEntriesAtom)).toContainEqual(
+      expect.objectContaining({ kind: 'error', text: 'launch failed' })
+    );
 
     dispose();
     expect(client.dispose).toHaveBeenCalledTimes(1);

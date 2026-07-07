@@ -46,7 +46,7 @@ const INTEGRATION_TIMEOUT_MS = 180_000;
 type FakeBackend = {
   launched: LaunchedBackend;
   disposed: () => boolean;
-  emitExit: () => void;
+  emitExit: (exit?: { code: number | null; signal: NodeJS.Signals | null }) => void;
   closeServer: () => void;
 };
 
@@ -70,9 +70,9 @@ function ack(server: MessageConnection): void {
 
 function makeFakeBackend(
   configure: (server: MessageConnection) => void,
-  options: { signalReady?: boolean } = {}
+  options: { signalReady?: boolean; stderrText?: string } = {}
 ): FakeBackend {
-  const { signalReady = true } = options;
+  const { signalReady = true, stderrText = '' } = options;
   const backendStdout = new PassThrough();
   const backendStdin = new PassThrough();
   const exitListeners: Array<(exit: { code: number | null; signal: NodeJS.Signals | null }) => void> = [];
@@ -95,6 +95,7 @@ function makeFakeBackend(
       stdin: backendStdin,
       stdout: backendStdout,
       stderr: new PassThrough(),
+      stderrText: () => stderrText,
       onExit: (listener) => {
         exitListeners.push(listener);
       },
@@ -103,9 +104,9 @@ function makeFakeBackend(
       }
     },
     disposed: () => disposed,
-    emitExit: () => {
+    emitExit: (exit = { code: 1, signal: null }) => {
       for (const listener of exitListeners) {
-        listener({ code: 1, signal: null });
+        listener(exit);
       }
     },
     closeServer: () => {
@@ -122,6 +123,50 @@ afterEach(() => {
   }
   openServers = [];
 });
+
+async function withTempHome<T>(run: () => Promise<T>): Promise<T> {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-home-'));
+  const oldHome = process.env.HOME;
+  const oldUserProfile = process.env.USERPROFILE;
+  const oldCargoHome = process.env.CARGO_HOME;
+  const oldRustupHome = process.env.RUSTUP_HOME;
+  const oldCustomApiKey = process.env.CUSTOM_API_KEY;
+  const oldDebug = process.env.KQODE_DEBUG;
+  process.env.HOME = home;
+  process.env.USERPROFILE = home;
+  process.env.CUSTOM_API_KEY = '';
+  process.env.KQODE_DEBUG = '0';
+  if (oldHome !== undefined) {
+    process.env.CARGO_HOME = oldCargoHome ?? path.join(oldHome, '.cargo');
+    process.env.RUSTUP_HOME = oldRustupHome ?? path.join(oldHome, '.rustup');
+  }
+  try {
+    return await run();
+  } finally {
+    restoreEnv('HOME', oldHome);
+    restoreEnv('USERPROFILE', oldUserProfile);
+    restoreEnv('CARGO_HOME', oldCargoHome);
+    restoreEnv('RUSTUP_HOME', oldRustupHome);
+    restoreEnv('CUSTOM_API_KEY', oldCustomApiKey);
+    restoreEnv('KQODE_DEBUG', oldDebug);
+    try {
+      fs.rmSync(home, { recursive: true, force: true });
+    } catch {
+      /* temp cleanup is best-effort */
+    }
+  }
+}
+
+function restoreEnv(
+  name: 'HOME' | 'USERPROFILE' | 'CARGO_HOME' | 'RUSTUP_HOME' | 'CUSTOM_API_KEY' | 'KQODE_DEBUG',
+  value: string | undefined
+): void {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+  process.env[name] = value;
+}
 
 describe('createBackendClient (fake backend)', () => {
   it('can prelaunch the backend before the first submit', async () => {
@@ -251,6 +296,44 @@ describe('createBackendClient (fake backend)', () => {
     });
     expect(client.getState()).toBe(BackendLifecycleState.Dead);
     expect(fake.disposed()).toBe(true);
+    client.dispose();
+  });
+
+  it('surfaces store-fatal stderr when the backend exits before readiness', async () => {
+    const stderrText = 'KQODE_STORE_FATAL: delete /tmp/kqode.db and restart';
+    const fake = makeFakeBackend(() => undefined, { signalReady: false, stderrText });
+    const client = createBackendClient({ launch: async () => fake.launched, startupTimeoutMs: 200 });
+
+    const start = client.ensureStarted();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fake.emitExit({ code: 75, signal: null });
+
+    await expect(start).rejects.toMatchObject({
+      kind: BackendErrorKind.Launch,
+      message: stderrText
+    });
+    expect(client.getState()).toBe(BackendLifecycleState.Dead);
+    client.dispose();
+  });
+
+  it('uses a generic startup crash message without the store sentinel attribution', async () => {
+    const fake = makeFakeBackend(() => undefined, {
+      signalReady: false,
+      stderrText: 'panic: unrelated'
+    });
+    const client = createBackendClient({ launch: async () => fake.launched, startupTimeoutMs: 200 });
+
+    const start = client.ensureStarted();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fake.emitExit();
+
+    await expect(start).rejects.toMatchObject({
+      kind: BackendErrorKind.Launch,
+      message: expect.stringContaining('backend exited before it reported readiness')
+    });
+    await expect(start).rejects.toMatchObject({
+      message: expect.not.stringContaining('delete /tmp/kqode.db')
+    });
     client.dispose();
   });
 
@@ -453,30 +536,33 @@ describe('createSourceBackendClient (integration)', () => {
       // finds no CUSTOM_API_KEY and deterministically returns needsConfiguration —
       // regardless of a developer's real `.env` at the repo root.
       const workspaceCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-src-client-'));
-      const client = createSourceBackendClient({ repoRoot, workspaceCwd });
-      try {
-        const settled = new Promise((resolve) =>
-          client.onTranscriptEvent((event) => {
-            if (event.type === 'settled') {
-              resolve(event);
-            }
-          })
-        );
-        await client.submit({ turnId: 'turn-1', text: 'hello' });
-        await expect(settled).resolves.toMatchObject({
-          type: 'settled',
-          result: { kind: 'needsConfiguration' }
-        });
-      } finally {
-        client.dispose();
-        // Best-effort: on Windows the just-killed backend may still hold the cwd
-        // handle briefly; the OS reclaims the temp dir regardless.
+      await withTempHome(async () => {
+        const client = createSourceBackendClient({ repoRoot, workspaceCwd });
         try {
-          fs.rmSync(workspaceCwd, { recursive: true, force: true });
-        } catch {
-          /* temp cleanup is best-effort */
+          await client.setActiveSelection('custom', 'test-model');
+          const settled = new Promise((resolve) =>
+            client.onTranscriptEvent((event) => {
+              if (event.type === 'settled') {
+                resolve(event);
+              }
+            })
+          );
+          await client.submit({ turnId: 'turn-1', text: 'hello' });
+          await expect(settled).resolves.toMatchObject({
+            type: 'settled',
+            result: { kind: 'needsConfiguration' }
+          });
+        } finally {
+          client.dispose();
+          // Best-effort: on Windows the just-killed backend may still hold the cwd
+          // handle briefly; the OS reclaims the temp dir regardless.
+          try {
+            fs.rmSync(workspaceCwd, { recursive: true, force: true });
+          } catch {
+            /* temp cleanup is best-effort */
+          }
         }
-      }
+      });
     },
     INTEGRATION_TIMEOUT_MS
   );

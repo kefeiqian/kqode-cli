@@ -39,6 +39,15 @@ export const VALIDATION_REQUEST_TIMEOUT_MS = 20_000;
 /** Captured Cargo stderr is capped so a noisy build cannot exhaust memory. */
 export const BUILD_STDERR_CAP_BYTES = 16 * 1024;
 
+/** Captured backend stderr is capped so a crashing backend cannot exhaust memory. */
+export const BACKEND_STDERR_CAP_BYTES = 16 * 1024;
+
+/** Backend process exit code for fail-closed store startup failures. */
+export const STORE_FAILURE_EXIT_CODE = 75;
+
+/** Stable stderr prefix emitted by store startup failures. */
+export const STORE_FATAL_SENTINEL = 'KQODE_STORE_FATAL:';
+
 /**
  * Trailing-edge flush ceiling for streamed assistant tokens: the transcript
  * re-renders at most once per this many ms (~15fps) rather than once per token.

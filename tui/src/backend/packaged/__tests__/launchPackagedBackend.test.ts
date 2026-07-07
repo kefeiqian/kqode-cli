@@ -16,6 +16,7 @@ function fakeLaunched(): LaunchedBackend {
     stdin: new PassThrough(),
     stdout: new PassThrough(),
     stderr: new PassThrough(),
+    stderrText: () => '',
     onExit: () => undefined,
     dispose: () => undefined
   };
