@@ -10,6 +10,7 @@
 //! connection per operation via [`Store::connect`] instead of sharing one
 //! handle behind a mutex (WAL + `busy_timeout` make this cheap and safe).
 
+mod error;
 mod migrations;
 mod providers;
 #[cfg(test)]
@@ -20,7 +21,7 @@ use std::time::Duration;
 
 use rusqlite::Connection;
 
-pub use migrations::LATEST_USER_VERSION;
+pub use error::StoreError;
 pub use providers::{ActiveSelection, ProviderSettings};
 
 /// Modest busy-timeout: retry a locked write briefly, well under the TS client
@@ -35,44 +36,6 @@ const WAL_SET_MAX_RETRIES: u32 = 5;
 /// Linear backoff base between WAL-conversion retries (attempt N waits N×this).
 const WAL_SET_RETRY_MS: u64 = 20;
 
-/// A failure opening or migrating the store. Every variant is recoverable:
-/// the caller degrades to session-only. The DB is never auto-deleted.
-#[derive(Debug)]
-pub enum StoreError {
-    /// The DB path could not be resolved (no home dir).
-    NoPath,
-    /// The DB's parent directory could not be created.
-    CreateDir(std::io::Error),
-    /// Opening the connection or applying pragmas (e.g. a WAL-set failure) failed.
-    Open(rusqlite::Error),
-    /// A migration step failed; it was rolled back, leaving schema + version untouched.
-    Migrate(rusqlite::Error),
-    /// The on-disk `user_version` is newer than this binary knows; degrade to
-    /// session-only with no reads or writes (forward-only, additive-only).
-    NewerSchema { found: i64, known: i64 },
-    /// The post-open/-migrate sanity read failed (corruption can surface here).
-    Sanity(rusqlite::Error),
-}
-
-impl std::fmt::Display for StoreError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::NoPath => write!(f, "could not resolve the KQode database path"),
-            Self::CreateDir(err) => write!(f, "could not create the database directory: {err}"),
-            Self::Open(err) => write!(f, "could not open the database: {err}"),
-            Self::Migrate(err) => write!(f, "could not migrate the database: {err}"),
-            Self::NewerSchema { found, known } => write!(
-                f,
-                "database schema version {found} is newer than supported {known}; \
-                 running session-only"
-            ),
-            Self::Sanity(err) => write!(f, "database sanity read failed: {err}"),
-        }
-    }
-}
-
-impl std::error::Error for StoreError {}
-
 /// A handle to the migrated SQLite index.
 ///
 /// Holds only the resolved path; callers open a fresh [`Connection`] per
@@ -84,17 +47,14 @@ pub struct Store {
 }
 
 impl Store {
-    /// Opens (creating if absent) the DB at the resolved path, applies pragmas,
-    /// migrates to [`LATEST_USER_VERSION`], and runs one sanity read.
+    /// Opens the DB, applies pragmas, runs embedded refinery migrations, and sanity-checks it.
     ///
     /// Intended to be called once at backend init (around `announce_ready`), off
     /// the request path.
     ///
     /// # Errors
-    /// Returns a [`StoreError`] (never panics) when the path can't be resolved,
-    /// the parent dir can't be created, the connection/pragmas fail, a migration
-    /// fails (rolled back), the schema is newer than known, or the sanity read
-    /// fails. Callers degrade to session-only on any error.
+    /// Returns a [`StoreError`] when path resolution, directory creation,
+    /// pragmas, migration, schema-history validation, or sanity reads fail.
     pub fn open_or_bootstrap() -> Result<Self, StoreError> {
         let path = crate::paths::db_path().ok_or(StoreError::NoPath)?;
         Self::open_or_bootstrap_at(path)
@@ -181,14 +141,33 @@ fn is_busy(err: &rusqlite::Error) -> bool {
     )
 }
 
-/// One trivial read proving the DB is queryable after open + migrate;
-/// corruption can surface here rather than at `open()`.
+/// One trivial read proving the DB is queryable after open + migrate, plus a
+/// refinery history check proving the embedded latest version was applied.
 fn sanity_check(conn: &Connection) -> Result<(), StoreError> {
+    let mut attempt = 0;
+    loop {
+        match run_sanity_check(conn) {
+            Ok(found) if found == Some(migrations::latest_version()) => return Ok(()),
+            Ok(found) => {
+                return Err(StoreError::SchemaHistoryMismatch {
+                    found,
+                    known: migrations::latest_version(),
+                });
+            }
+            Err(err) if attempt < WAL_SET_MAX_RETRIES && is_busy(&err) => {
+                attempt += 1;
+                std::thread::sleep(Duration::from_millis(u64::from(attempt) * WAL_SET_RETRY_MS));
+            }
+            Err(err) => return Err(StoreError::Sanity(err)),
+        }
+    }
+}
+
+fn run_sanity_check(conn: &Connection) -> rusqlite::Result<Option<i64>> {
     conn.query_row("SELECT count(*) FROM active_selection", [], |row| {
         row.get::<_, i64>(0)
-    })
-    .map(|_| ())
-    .map_err(StoreError::Sanity)
+    })?;
+    migrations::applied_max_version(conn)
 }
 
 /// Best-effort `0700` on the KQode home dir (Unix). Windows inherits the

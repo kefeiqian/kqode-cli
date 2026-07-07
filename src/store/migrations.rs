@@ -1,120 +1,94 @@
-//! Ordered, forward-only, additive-only schema migrations.
+//! Ordered, forward-only, additive-only schema migrations embedded with refinery.
 //!
-//! Each step and its `user_version` bump run inside one `BEGIN IMMEDIATE …
-//! COMMIT`, so a failing step rolls back leaving the schema and version
-//! untouched. The runner uses double-checked locking: it reads `user_version`
-//! cheaply first and, if behind, re-reads it *inside* the write transaction
-//! before applying — a concurrent instance may have migrated while we waited on
-//! the lock, which serializes concurrent first-boot across workspaces.
-//!
-//! Never edit or reorder a shipped step: recovery from a bad migration is a new
-//! forward-fix step, not a down-migration (the DB is a rebuildable index over
-//! the JSONL truth, per AGENTS.md).
+//! Each schema version lives in a `V{n}__*.sql` file under the crate-level
+//! `migrations/` directory and is embedded into the binary at compile time.
+//! Never edit or reorder a shipped migration: recovery from a bad migration is a
+//! new forward-fix migration, not a down-migration (the DB is a rebuildable
+//! index over the JSONL truth, per AGENTS.md).
 
-use rusqlite::{Connection, TransactionBehavior};
+use refinery::error::Kind;
+use rusqlite::Connection;
 
 use super::StoreError;
 
-/// Latest schema version this binary knows how to produce.
-pub const LATEST_USER_VERSION: i64 = 1;
+/// refinery's default schema-history table name.
+pub(super) const REFINERY_SCHEMA_HISTORY_TABLE: &str = "refinery_schema_history";
 
-/// One forward-only migration step: apply `sql`, then stamp `version`.
-struct Step {
-    version: i64,
-    sql: &'static str,
+mod embedded {
+    use refinery::embed_migrations;
+
+    embed_migrations!("migrations");
 }
-
-/// Ordered migration steps. Append only — never edit or reorder a shipped step.
-const STEPS: &[Step] = &[Step {
-    version: 1,
-    sql: STEP_1_INITIAL_SCHEMA,
-}];
-
-/// Step 1: provider settings + the single active selection, plus the
-/// **provisional** `sessions`/`turns` spine (reshaped by the session
-/// milestone; permissive, no hard FKs, rebuildable from JSONL). No key
-/// material is ever stored — `provider_settings` holds only a non-secret
-/// `key_present` bit.
-const STEP_1_INITIAL_SCHEMA: &str = "\
-CREATE TABLE provider_settings (
-    provider_id       TEXT PRIMARY KEY NOT NULL,
-    base_url          TEXT NOT NULL,
-    label             TEXT,
-    key_present       INTEGER NOT NULL DEFAULT 0,
-    last_connected_at INTEGER,
-    created_at        INTEGER NOT NULL,
-    updated_at        INTEGER NOT NULL
-);
-CREATE TABLE active_selection (
-    id          INTEGER PRIMARY KEY CHECK (id = 1),
-    provider_id TEXT NOT NULL,
-    model_id    TEXT NOT NULL,
-    updated_at  INTEGER NOT NULL
-);
-CREATE TABLE sessions (
-    id            TEXT PRIMARY KEY NOT NULL,
-    created_at    INTEGER NOT NULL,
-    workspace_cwd TEXT NOT NULL,
-    jsonl_path    TEXT NOT NULL
-);
-CREATE TABLE turns (
-    id         TEXT PRIMARY KEY NOT NULL,
-    session_id TEXT NOT NULL,
-    seq        INTEGER NOT NULL,
-    created_at INTEGER NOT NULL
-);";
 
 /// Reads the DB's `user_version` header value.
 ///
 /// # Errors
 /// Returns the underlying [`rusqlite::Error`] if the pragma read fails.
+#[cfg(test)]
 pub(super) fn user_version(conn: &Connection) -> rusqlite::Result<i64> {
     conn.query_row("PRAGMA user_version", [], |row| row.get(0))
 }
 
-/// Migrates `conn` forward to [`LATEST_USER_VERSION`].
-///
-/// # Errors
-/// - [`StoreError::NewerSchema`] if the DB is at a version newer than known
-///   (caller degrades to session-only; the DB is never modified or deleted).
-/// - [`StoreError::Migrate`] if reading the version or applying a step fails
-///   (the step's transaction rolls back, leaving schema + version untouched).
-pub(super) fn migrate(conn: &mut Connection) -> Result<(), StoreError> {
-    let current = user_version(conn).map_err(StoreError::Migrate)?;
-    if current > LATEST_USER_VERSION {
-        return Err(StoreError::NewerSchema {
-            found: current,
-            known: LATEST_USER_VERSION,
-        });
-    }
-    for step in STEPS {
-        apply_step(conn, step.version, step.sql)?;
-    }
-    Ok(())
+/// Latest embedded migration version this binary knows how to produce.
+#[must_use]
+pub(super) fn latest_version() -> i64 {
+    runner()
+        .get_migrations()
+        .iter()
+        .map(|migration| migration.version() as i64)
+        .max()
+        .unwrap_or(0)
 }
 
-/// Applies one step transactionally with double-checked locking.
-///
-/// `BEGIN IMMEDIATE` takes the write lock up front (serializing concurrent
-/// boots); the version is re-read inside the lock so a step already applied by
-/// a racing instance is skipped without a duplicate `CREATE TABLE`.
+/// The pinned checksum for the shipped V1 migration.
+#[cfg(test)]
+pub(super) fn v1_checksum() -> u64 {
+    runner()
+        .get_migrations()
+        .iter()
+        .find(|migration| migration.version() == 1)
+        .expect("V1 migration is embedded")
+        .checksum()
+}
+
+/// Reads the max applied refinery migration version.
 ///
 /// # Errors
-/// Returns [`StoreError::Migrate`] if the transaction, the batch, the version
-/// bump, or the commit fails; the transaction is rolled back on drop so no
-/// partial schema survives.
-pub(super) fn apply_step(conn: &mut Connection, version: i64, sql: &str) -> Result<(), StoreError> {
-    let tx = conn
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(StoreError::Migrate)?;
-    if user_version(&tx).map_err(StoreError::Migrate)? >= version {
-        // Already applied (by us on a prior loop, or a concurrent instance).
-        tx.commit().map_err(StoreError::Migrate)?;
-        return Ok(());
+/// Returns the underlying [`rusqlite::Error`] if the history read fails.
+pub(super) fn applied_max_version(conn: &Connection) -> rusqlite::Result<Option<i64>> {
+    let sql = format!("SELECT MAX(version) FROM {REFINERY_SCHEMA_HISTORY_TABLE}");
+    conn.query_row(&sql, [], |row| row.get(0))
+}
+
+/// Migrates `conn` forward to the latest embedded refinery migration.
+///
+/// # Errors
+/// - [`StoreError::MigrationHistory`] if refinery detects missing or divergent
+///   applied migrations via schema-history validation.
+/// - [`StoreError::Migrate`] if refinery cannot assert history or apply the
+///   embedded migration chain.
+pub(super) fn migrate(conn: &mut Connection) -> Result<(), StoreError> {
+    runner().run(conn).map(|_| ()).map_err(map_refinery_error)
+}
+
+fn runner() -> refinery::Runner {
+    // refinery's rusqlite driver commits migration SQL and its history insert in
+    // separate transactions when ungrouped. Grouping keeps the embedded chain
+    // atomic while the migration set is still small.
+    embedded::migrations::runner()
+        .set_abort_missing(true)
+        .set_abort_divergent(true)
+        .set_grouped(true)
+}
+
+fn map_refinery_error(err: refinery::Error) -> StoreError {
+    let is_history_mismatch = matches!(
+        err.kind(),
+        Kind::DivergentVersion(_, _) | Kind::MissingVersion(_)
+    );
+    if is_history_mismatch {
+        StoreError::MigrationHistory(err)
+    } else {
+        StoreError::Migrate(err)
     }
-    tx.execute_batch(sql).map_err(StoreError::Migrate)?;
-    // `user_version` cannot be bound as a parameter; `version` is our constant.
-    tx.pragma_update(None, "user_version", version)
-        .map_err(StoreError::Migrate)?;
-    tx.commit().map_err(StoreError::Migrate)
 }

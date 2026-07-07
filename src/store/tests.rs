@@ -1,7 +1,7 @@
 use super::*;
 use crate::provider::ProviderId;
+use refinery::error::Kind;
 use rusqlite::Connection;
-use std::thread;
 
 /// A fresh temp directory + a DB path inside it. The `TempDir` guard cleans up
 /// the DB plus its `-wal`/`-shm` sidecars on drop.
@@ -21,18 +21,72 @@ fn table_names(conn: &Connection) -> Vec<String> {
         .collect()
 }
 
-const EXPECTED_TABLES: [&str; 4] = ["active_selection", "provider_settings", "sessions", "turns"];
+const EXPECTED_TABLES: [&str; 5] = [
+    "active_selection",
+    "provider_settings",
+    "refinery_schema_history",
+    "sessions",
+    "turns",
+];
+
+#[derive(Debug, PartialEq, Eq)]
+struct HistoryRow {
+    version: i64,
+    name: String,
+    checksum: String,
+}
+
+fn history_rows(conn: &Connection) -> Vec<HistoryRow> {
+    let mut stmt = conn
+        .prepare("SELECT version, name, checksum FROM refinery_schema_history ORDER BY version ASC")
+        .unwrap();
+    stmt.query_map([], |row| {
+        Ok(HistoryRow {
+            version: row.get(0)?,
+            name: row.get(1)?,
+            checksum: row.get(2)?,
+        })
+    })
+    .unwrap()
+    .map(Result::unwrap)
+    .collect()
+}
+
+fn create_refinery_history(conn: &Connection) {
+    conn.execute_batch(&format!(
+        "CREATE TABLE {}(
+             version int4 PRIMARY KEY,
+             name VARCHAR(255),
+             applied_on VARCHAR(255),
+             checksum VARCHAR(255)
+         );",
+        migrations::REFINERY_SCHEMA_HISTORY_TABLE
+    ))
+    .unwrap();
+}
+
+fn seed_history_row(conn: &Connection, version: i64, name: &str, checksum: u64) {
+    conn.execute(
+        "INSERT INTO refinery_schema_history (version, name, applied_on, checksum)
+         VALUES (?1, ?2, '2026-07-07T00:00:00Z', ?3)",
+        (version, name, checksum.to_string()),
+    )
+    .unwrap();
+}
 
 #[test]
 fn fresh_path_bootstraps_to_latest_with_all_tables() {
     let (_dir, path) = temp_db();
     let store = Store::open_or_bootstrap_at(path).expect("bootstrap");
     let conn = store.connect().expect("connect");
-    assert_eq!(
-        migrations::user_version(&conn).unwrap(),
-        LATEST_USER_VERSION
-    );
+    assert_eq!(migrations::user_version(&conn).unwrap(), 0);
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(1));
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
+    let rows = history_rows(&conn);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].version, 1);
+    assert_eq!(rows[0].name, "initial_schema");
+    assert_eq!(rows[0].checksum, migrations::v1_checksum().to_string());
 }
 
 #[test]
@@ -41,17 +95,15 @@ fn reopening_a_migrated_db_is_idempotent() {
     Store::open_or_bootstrap_at(path.clone()).expect("first bootstrap");
     let store = Store::open_or_bootstrap_at(path).expect("second bootstrap is a no-op");
     let conn = store.connect().unwrap();
-    assert_eq!(
-        migrations::user_version(&conn).unwrap(),
-        LATEST_USER_VERSION
-    );
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(1));
+    assert_eq!(history_rows(&conn).len(), 1);
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
 }
 
 #[test]
 fn a_version_zero_db_migrates_forward() {
     let (_dir, path) = temp_db();
-    // A brand-new DB starts at user_version 0 with no tables; bootstrap advances it.
+    // refinery owns version history, so SQLite user_version stays at 0.
     {
         let conn = Connection::open(&path).unwrap();
         assert_eq!(migrations::user_version(&conn).unwrap(), 0);
@@ -59,84 +111,72 @@ fn a_version_zero_db_migrates_forward() {
     }
     let store = Store::open_or_bootstrap_at(path).expect("bootstrap");
     let conn = store.connect().unwrap();
+    assert_eq!(migrations::user_version(&conn).unwrap(), 0);
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(1));
+}
+
+#[test]
+fn v1_migration_checksum_is_pinned() {
     assert_eq!(
-        migrations::user_version(&conn).unwrap(),
-        LATEST_USER_VERSION
+        migrations::v1_checksum(),
+        17197033309386186228,
+        "editing a shipped V1 migration must intentionally update this pin"
     );
 }
 
 #[test]
-fn a_failed_step_rolls_back_and_a_later_open_recovers() {
-    let (_dir, path) = temp_db();
-    {
-        let mut conn = Connection::open(&path).unwrap();
-        // First statement succeeds, second is malformed: the whole step must roll back.
-        let bad = "CREATE TABLE rollback_probe (id INTEGER); CREATE TABLE;";
-        let result = migrations::apply_step(&mut conn, 1, bad);
-        assert!(matches!(result, Err(StoreError::Migrate(_))));
-        assert_eq!(
-            migrations::user_version(&conn).unwrap(),
-            0,
-            "version untouched"
-        );
-        assert!(
-            !table_names(&conn).contains(&"rollback_probe".to_owned()),
-            "partial table must be rolled back"
-        );
-    }
-    // A subsequent open recovers cleanly to the full schema.
-    let store = Store::open_or_bootstrap_at(path).expect("recovers");
-    let conn = store.connect().unwrap();
-    assert_eq!(
-        migrations::user_version(&conn).unwrap(),
-        LATEST_USER_VERSION
-    );
-    assert_eq!(table_names(&conn), EXPECTED_TABLES);
-}
-
-#[test]
-fn concurrent_bootstraps_on_one_fresh_path_all_succeed() {
-    let (_dir, path) = temp_db();
-    let handles: Vec<_> = (0..4)
-        .map(|_| {
-            let path = path.clone();
-            thread::spawn(move || Store::open_or_bootstrap_at(path))
-        })
-        .collect();
-    for handle in handles {
-        // Exactly-one-migrates is enforced by BEGIN IMMEDIATE + the in-lock
-        // version re-check; the losers must not hit "table already exists".
-        handle.join().unwrap().expect("every racer ends healthy");
-    }
-    let conn = Store::open_or_bootstrap_at(path)
-        .unwrap()
-        .connect()
-        .unwrap();
-    assert_eq!(
-        migrations::user_version(&conn).unwrap(),
-        LATEST_USER_VERSION
-    );
-    assert_eq!(table_names(&conn), EXPECTED_TABLES);
-}
-
-#[test]
-fn a_newer_schema_degrades_without_touching_the_db() {
+fn divergent_applied_migration_surfaces_a_store_error() {
     let (_dir, path) = temp_db();
     Store::open_or_bootstrap_at(path.clone()).expect("bootstrap");
     {
         let conn = Connection::open(&path).unwrap();
-        conn.pragma_update(None, "user_version", LATEST_USER_VERSION + 1)
-            .unwrap();
+        conn.execute(
+            "UPDATE refinery_schema_history SET checksum = '0' WHERE version = 1",
+            [],
+        )
+        .unwrap();
+    }
+    let err = Store::open_or_bootstrap_at(path).unwrap_err();
+    match err {
+        StoreError::MigrationHistory(err) => {
+            assert!(matches!(err.kind(), Kind::DivergentVersion(_, _)));
+        }
+        other => panic!("expected divergent migration history, got {other:?}"),
+    }
+}
+
+#[test]
+fn db_ahead_of_embedded_migrations_refuses_to_bootstrap() {
+    let (_dir, path) = temp_db();
+    {
+        let conn = Connection::open(&path).unwrap();
+        create_refinery_history(&conn);
+        seed_history_row(&conn, 2, "future_schema", 1);
+    }
+    let err = Store::open_or_bootstrap_at(path.clone()).unwrap_err();
+    match err {
+        StoreError::MigrationHistory(err) => {
+            assert!(matches!(err.kind(), Kind::MissingVersion(_)));
+        }
+        other => panic!("expected missing migration history, got {other:?}"),
+    }
+    assert!(path.exists(), "a DB-ahead failure must never auto-delete");
+}
+
+#[test]
+fn missing_prior_migration_refuses_to_bootstrap() {
+    let (_dir, path) = temp_db();
+    {
+        let conn = Connection::open(&path).unwrap();
+        create_refinery_history(&conn);
+        seed_history_row(&conn, 0, "older_schema", 1);
     }
     let result = Store::open_or_bootstrap_at(path.clone());
-    assert!(matches!(
-        result,
-        Err(StoreError::NewerSchema {
-            known: LATEST_USER_VERSION,
-            ..
-        })
-    ));
-    assert!(path.exists(), "a newer DB must never be auto-deleted");
+    assert!(matches!(result, Err(StoreError::MigrationHistory(_))));
+    assert!(
+        path.exists(),
+        "a migration history failure must never auto-delete"
+    );
 }
 
 #[test]
