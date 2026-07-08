@@ -12,6 +12,19 @@
 //! `rusqlite::Connection` is `Send` but `!Sync`, so callers open a fresh
 //! connection per operation via [`Store::connect`] instead of sharing one
 //! handle behind a mutex (WAL + `busy_timeout` make this cheap and safe).
+//!
+//! ## Multiple instances
+//!
+//! Several `kqode` processes for one OS user share this single user-global DB
+//! and may read and write it concurrently. WAL admits many concurrent readers
+//! plus one writer; `busy_timeout` makes a contended writer wait (up to a few
+//! seconds at runtime) rather than fail; and the advisory bootstrap `lock`
+//! (`<db>.lock`) serializes only the migrate phase so racing first-boots
+//! converge instead of colliding. This
+//! assumes a **local filesystem** — WAL's `-wal`/`-shm` sidecars and shared
+//! memory are unreliable over network mounts (NFS/SMB). Writes are small and
+//! infrequent and the DB is a rebuildable index over JSONL, so worst-case
+//! contention or a lost write stays recoverable.
 
 mod error;
 mod lock;
@@ -29,8 +42,19 @@ use rusqlite::Connection;
 pub use error::{STORE_FATAL_SENTINEL, StoreError};
 pub use providers::{ActiveSelection, ProviderSettings};
 
-/// Modest busy-timeout: retry a locked write briefly, then fail startup.
-const BUSY_TIMEOUT_MS: u64 = 500;
+/// Bootstrap busy-timeout: at startup wait only briefly for a locked DB, then
+/// fail fast with a store-fatal error instead of hanging the backend spawn.
+const BOOTSTRAP_BUSY_TIMEOUT_MS: u64 = 500;
+
+/// Runtime busy-timeout: per-operation connections wait up to this long for a
+/// concurrent writer (WAL has a single write slot) before returning
+/// `SQLITE_BUSY` to the caller. Generous on purpose — these writes are tiny and
+/// infrequent, contention is transient (another instance mid-write, a WAL
+/// checkpoint, or Windows AV/search-indexer briefly locking the `-wal`/`-shm`
+/// sidecars), and a spuriously failed user operation is worse than a short wait.
+/// This is a ceiling, not a cost: with no contention a write takes the lock
+/// immediately regardless of the value.
+const RUNTIME_BUSY_TIMEOUT_MS: u64 = 5_000;
 
 /// WAL conversion retries for a concurrent first-boot's brief exclusive lock.
 const WAL_SET_MAX_RETRIES: u32 = 5;
@@ -76,7 +100,8 @@ impl Store {
                 set_private_dir_permissions(parent);
             }
             let _lock = lock::acquire(&path)?;
-            let mut conn = open_connection(&path).map_err(StoreError::Open)?;
+            let mut conn =
+                open_connection(&path, BOOTSTRAP_BUSY_TIMEOUT_MS).map_err(StoreError::Open)?;
             ensure_wal(&conn).map_err(StoreError::Open)?;
             migrations::migrate(&mut conn)?;
             sanity_check(&conn)?;
@@ -87,13 +112,14 @@ impl Store {
         result.map_err(|err| err.with_path(path))
     }
 
-    /// Opens a fresh connection for a single operation, with WAL + `busy_timeout`
-    /// applied so every connection behaves consistently.
+    /// Opens a fresh connection for a single runtime operation, with WAL and the
+    /// generous [`RUNTIME_BUSY_TIMEOUT_MS`] applied so a concurrent writer is
+    /// waited out rather than failing the operation.
     ///
     /// # Errors
     /// Returns the underlying [`rusqlite::Error`] if the connection can't open.
     pub fn connect(&self) -> rusqlite::Result<Connection> {
-        open_connection(&self.path)
+        open_connection(&self.path, RUNTIME_BUSY_TIMEOUT_MS)
     }
 
     /// The resolved on-disk path of the database file.
@@ -105,15 +131,17 @@ impl Store {
 
 /// Opens a connection and applies the per-connection pragmas.
 ///
-/// `busy_timeout` is installed first so writes wait briefly for a concurrent
-/// holder instead of failing immediately; `synchronous=NORMAL` is the safe WAL
-/// companion (only a power-loss can drop the last commit, and the index is
-/// rebuildable). `journal_mode` is **not** set here — WAL is a persistent DB
-/// property converted once at bootstrap (see [`ensure_wal`]) and inherited by
-/// every later connection, which avoids a per-connection conversion race.
-fn open_connection(path: &Path) -> rusqlite::Result<Connection> {
+/// `busy_timeout` (`busy_timeout_ms`) is installed first so a write waits for a
+/// concurrent holder instead of failing immediately — bootstrap passes a short
+/// fail-fast value, runtime operations a generous one; `synchronous=NORMAL` is
+/// the safe WAL companion (only a power-loss can drop the last commit, and the
+/// index is rebuildable). `journal_mode` is **not** set here — WAL is a
+/// persistent DB property converted once at bootstrap (see [`ensure_wal`]) and
+/// inherited by every later connection, which avoids a per-connection
+/// conversion race.
+fn open_connection(path: &Path, busy_timeout_ms: u64) -> rusqlite::Result<Connection> {
     let conn = Connection::open(path)?;
-    conn.busy_timeout(Duration::from_millis(BUSY_TIMEOUT_MS))?;
+    conn.busy_timeout(Duration::from_millis(busy_timeout_ms))?;
     conn.execute_batch("PRAGMA synchronous=NORMAL;")?;
     Ok(conn)
 }

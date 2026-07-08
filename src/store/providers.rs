@@ -4,6 +4,11 @@
 //! fingerprint. The only credential-adjacent column is a non-secret
 //! `key_present` bit that keeps status derivation off the keychain hot path.
 //! Secrets live in the OS keychain (added in a later unit), never in SQLite.
+//!
+//! The active selection is a single global row, so concurrent `kqode` instances
+//! share one `(provider, model)`: switching it in one process becomes visible to
+//! the others on their next read (last writer wins), which is expected, not
+//! corruption.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
