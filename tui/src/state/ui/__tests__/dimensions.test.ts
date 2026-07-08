@@ -46,10 +46,10 @@ describe('terminalTooSmallAtom', () => {
     expect(store.get(terminalTooSmallAtom)).toBe(true);
   });
 
-  it('subtracts the production row guard only from live window rows', () => {
+  it('uses the full live window height when no production row guard is reserved', () => {
     const store = createStore();
     store.set(windowRowsAtom, MIN_USABLE_TERMINAL_ROWS);
-    expect(store.get(rowsAtom)).toBe(MIN_ROWS);
+    expect(store.get(rowsAtom)).toBe(MIN_USABLE_TERMINAL_ROWS);
 
     store.set(rowsTestOverrideAtom, MIN_ROWS);
     expect(store.get(rowsAtom)).toBe(MIN_ROWS);

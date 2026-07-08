@@ -49,11 +49,14 @@ rendering trade-off on Windows** that these reservations existed to sidestep.
 This session first built terminal-conditional handling, then — per an explicit
 product decision to **prioritize Windows Terminal** — removed all of it in favor
 of unconditional edge-to-edge rendering. That decision was superseded on
-2026-07-07 by the TUI ink-safe rendering plan: KQode now prioritizes
-artifact-free Ink rendering, reserves a physical guard row, and uses a shared
+2026-07-07 by the TUI ink-safe rendering plan: KQode temporarily prioritized
+artifact-free Ink rendering, reserved a physical guard row, and used a shared
 safe content width for all rendered glyph content — bottom chrome plus
 body/transcript (extended to the body on 2026-07-07 after a store-fatal error
-message reproduced the last-column glyph drop in the body).
+message reproduced the last-column glyph drop in the body). On 2026-07-08 that
+decision was intentionally reversed: WezTerm-on-Windows was dropped from the
+support matrix, so KQode returned to edge-to-edge height (`FULLSCREEN_GUARD_ROWS = 0`,
+`INK_CURSOR_ROW_ORIGIN_OFFSET = 1`) while keeping the shared safe content width.
 This doc captures the mechanism so the decision history and knobs are
 understood, not rediscovered.
 
@@ -144,12 +147,14 @@ On Windows you cannot have both on WezTerm:
 | Fullscreen (`FULLSCREEN_GUARD_ROWS = 0`) | WezTerm blinks per keystroke; WT fine | Yes (full repaint, no `ESC[K`) |
 | Non-fullscreen (guard row `= 1`) | No blink | No — incremental `ESC[K` clips the last column of rewritten rows on WezTerm |
 
-**Current decision: prioritize stability.** Render one physical row under the
-terminal (`FULLSCREEN_GUARD_ROWS = 1`, `INK_CURSOR_ROW_ORIGIN_OFFSET = 0`) and
-reserve a safe content column for all rendered glyph content. Composer, cwd,
+**Current decision: prioritize edge-to-edge height.** Render through the
+terminal's physical last row (`FULLSCREEN_GUARD_ROWS = 0`,
+`INK_CURSOR_ROW_ORIGIN_OFFSET = 1`) and reserve a safe content column for all
+rendered glyph content. Composer, cwd,
 status, slash-menu, fullscreen footer, and body/transcript text all use the safe
 width; only background boxes keep raw columns and fill the reserved final column
-as a gutter.
+as a gutter. This assumes WezTerm-on-Windows is out of scope; Windows Terminal
+remains the Windows priority terminal.
 
 ## Why This Matters
 
@@ -187,13 +192,13 @@ Guard row and cursor offset move together (`tui/src/state/ui/dimensions.ts`,
 `tui/src/constants/ui.ts`):
 
 ```ts
-// Stability-first (current): reserve one row to stay non-fullscreen.
-export const FULLSCREEN_GUARD_ROWS = 1;        // dimensions.ts
-export const INK_CURSOR_ROW_ORIGIN_OFFSET = 0; // constants/ui.ts
+// Edge-to-edge (current): fill the terminal's full height.
+export const FULLSCREEN_GUARD_ROWS = 0;        // dimensions.ts
+export const INK_CURSOR_ROW_ORIGIN_OFFSET = 1; // constants/ui.ts
 
-// Historical edge-to-edge knob: fills full height, Ink renders fullscreen frames.
-// export const FULLSCREEN_GUARD_ROWS = 0;
-// export const INK_CURSOR_ROW_ORIGIN_OFFSET = 1;
+// Historical stability-first knob: reserve one row to stay non-fullscreen.
+// export const FULLSCREEN_GUARD_ROWS = 1;
+// export const INK_CURSOR_ROW_ORIGIN_OFFSET = 0;
 ```
 
 Status bar using the safe chrome width (`tui/src/components/StatusBar.tsx`):

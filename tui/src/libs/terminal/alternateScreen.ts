@@ -5,9 +5,9 @@
  * The alternate buffer has no scrollback region, so while the TUI owns the
  * screen the terminal's native scrollbar has no prior history to scroll into —
  * the user stays pinned to the live UI instead of drifting into pre-launch
- * output. This is independent of Ink's "fullscreen" detection: KQode reserves
- * a guard row in the alt buffer so Ink stays on its incremental,
- * non-fullscreen path while the TUI is active.
+ * output. This is independent of Ink's "fullscreen" detection: the TUI now
+ * fills the full viewport height while active, reclaiming the physical last
+ * row instead of reserving a bottom guard row.
  */
 export const ENTER_ALTERNATE_SCREEN_SEQUENCE = '\u001B[?1049h';
 

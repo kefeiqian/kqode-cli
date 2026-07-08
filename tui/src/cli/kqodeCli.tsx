@@ -24,9 +24,9 @@ async function launchTui({ entryUrl, loadPackagedAsset }: RunKqodeCliOptions): P
     <Provider store={store}>
       <App />
     </Provider>,
-    // Rewrite only changed lines instead of repainting the whole screen each
-    // frame. Paired with FULLSCREEN_GUARD_ROWS reserving a physical guard row,
-    // this keeps Ink on its incremental non-fullscreen path.
+    // Keep Ink's incremental diffing on. With FULLSCREEN_GUARD_ROWS at 0 the
+    // frame now fills the full viewport height; Windows Terminal presents the
+    // fullscreen repaint path atomically, so we can reclaim the last row.
     // exitOnCtrlC is off so Ctrl+C flows to the global two-step-exit handler
     // (useGlobalKeys) instead of quitting on the first press.
     { incrementalRendering: true, exitOnCtrlC: false }

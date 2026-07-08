@@ -32,10 +32,10 @@ export const columnsAtom = atom((get) => {
 });
 
 /**
- * Rows the UI renders into. Production subtracts {@link FULLSCREEN_GUARD_ROWS}
- * from the live terminal height. Test overrides pin the rendered canvas
- * directly and bypass the reservation, while raw `window*Atom` updates exercise
- * the production guard subtraction.
+ * Rows the UI renders into. With `FULLSCREEN_GUARD_ROWS = 0` production now
+ * uses the full live terminal height. Test overrides still pin the rendered
+ * canvas directly, while raw `window*Atom` updates exercise the production
+ * fullscreen path.
  */
 export const rowsAtom = atom((get) => {
   const override = __TEST__ ? get(rowsTestOverrideAtom) : undefined;

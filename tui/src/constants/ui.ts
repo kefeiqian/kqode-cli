@@ -16,10 +16,11 @@ export const DEFAULT_COMPOSER_VISIBLE_LINES = 3;
 
 export const PROMPT_PREFIX = '> ';
 export const SAFE_CHROME_COLUMN_GUARD = 1;
-export const FULLSCREEN_GUARD_ROWS = 1;
+export const FULLSCREEN_GUARD_ROWS = 0;
 
-// The app reserves a physical guard row below the Ink canvas, so Ink stays on
-// its incremental non-fullscreen path and keeps its normal cursor baseline.
+// The app now renders edge-to-edge to the physical last row. Filling the full
+// viewport moves Ink to its fullscreen cursor baseline, so the paired
+// INK_CURSOR_ROW_ORIGIN_OFFSET recomputes to 1 below.
 export const INK_CURSOR_ROW_ORIGIN_OFFSET = inkCursorRowOriginOffset(FULLSCREEN_GUARD_ROWS);
 export const COMPOSER_BACKGROUND_PADDING_ROWS = 2;
 export const COMPOSER_BACKGROUND_TOP_PADDING_ROWS = 1;
