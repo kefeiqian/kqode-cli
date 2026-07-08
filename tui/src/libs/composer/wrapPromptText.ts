@@ -1,3 +1,5 @@
+import { measureGraphemes } from '@libs/text/displayWidth.ts';
+
 /** One wrapped visual row of the prompt, with its source index range. */
 export type WrappedPromptRow = {
   text: string;
@@ -17,9 +19,12 @@ let cachedRows: WrappedPromptRow[] | undefined;
 
 /**
  * Splits `text` into visual rows: authored newlines start new rows, and each
- * logical line is chunked every `columns` characters. An empty prompt yields a
- * single empty row. Pass the prompt's input width (terminal columns minus the
- * prompt prefix) so wrapping matches what the composer renders.
+ * logical line is wrapped so no row's display width exceeds `columns`. An empty
+ * prompt yields a single empty row. Pass the prompt's input width (terminal
+ * columns minus the prompt prefix) so wrapping matches what the composer renders.
+ *
+ * Width is measured in terminal columns, so a wide glyph (CJK, fullwidth, emoji)
+ * counts as two — a run of them wraps at half the character count, matching Ink.
  *
  * The last `(text, columns)` result is memoized, so the repeated wraps of the
  * current prompt within a keystroke reuse one computation.
@@ -56,18 +61,7 @@ function computeWrappedPromptRows(text: string, safeColumns: number): WrappedPro
     const rawLine = text.slice(lineStart, lineEnd);
     const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
 
-    if (line.length === 0) {
-      rows.push({ text: '', start: lineStart, end: lineStart });
-    } else {
-      for (let offset = 0; offset < line.length; offset += safeColumns) {
-        const endOffset = Math.min(offset + safeColumns, line.length);
-        rows.push({
-          text: line.slice(offset, endOffset),
-          start: lineStart + offset,
-          end: lineStart + endOffset
-        });
-      }
-    }
+    appendLineRows(rows, line, lineStart, safeColumns);
 
     if (newlineIndex < 0) {
       break;
@@ -78,3 +72,52 @@ function computeWrappedPromptRows(text: string, safeColumns: number): WrappedPro
 
   return rows;
 }
+
+/**
+ * Appends the wrapped rows of a single logical `line` (no newlines) so each
+ * row's display width stays within `safeColumns`. A wide grapheme that cannot
+ * fit the remaining columns starts the next row rather than being split, matching
+ * how terminals shift a double-width glyph past a one-column gap. `lineStart` is
+ * the line's offset within the source text and anchors each row's index range.
+ */
+function appendLineRows(
+  rows: WrappedPromptRow[],
+  line: string,
+  lineStart: number,
+  safeColumns: number
+): void {
+  if (line.length === 0) {
+    rows.push({ text: '', start: lineStart, end: lineStart });
+    return;
+  }
+
+  let rowStart = 0;
+  let offset = 0;
+  let rowWidth = 0;
+
+  for (const { segment, width } of measureGraphemes(line)) {
+    if (rowWidth + width > safeColumns && offset > rowStart) {
+      rows.push(rowSlice(line, lineStart, rowStart, offset));
+      rowStart = offset;
+      rowWidth = 0;
+    }
+    rowWidth += width;
+    offset += segment.length;
+  }
+
+  rows.push(rowSlice(line, lineStart, rowStart, offset));
+}
+
+function rowSlice(
+  line: string,
+  lineStart: number,
+  start: number,
+  end: number
+): WrappedPromptRow {
+  return {
+    text: line.slice(start, end),
+    start: lineStart + start,
+    end: lineStart + end
+  };
+}
+

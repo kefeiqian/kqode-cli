@@ -16,6 +16,13 @@ import { scrollComposerByRowsAtom, submittedPromptEntriesAtom } from '@state/ui/
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
+const SGR_PATTERN = /\u001B\[[0-9;]*m/g;
+
+/** Drops SGR color/background escapes so a rendered line can be measured. */
+function stripSgr(text: string): string {
+  return text.replace(SGR_PATTERN, '');
+}
+
 describe('PromptComposer', () => {
   it('preserves long prompt content while rendering a wrapped visible view', () => {
     expect(formatVisiblePrompt('abcdefghijklmnop', 8, 3)).toBe('abcdefgh\nijklmnop');
@@ -43,6 +50,18 @@ describe('PromptComposer', () => {
     await flushInput();
 
     expect(lastFrame() ?? '').toContain('> 1\n  2\n  3');
+  });
+
+  it('wraps wide CJK input by display width across composer rows', async () => {
+    // Input width is 4 columns (6 − prefix). '去儿童' is 6 display columns, so it
+    // must wrap after '去儿'; the old char-count logic kept all 3 glyphs on one
+    // row (3 ≤ 4) and let the over-wide row overflow.
+    const { lastFrame, stdin } = renderWithJotai(<PromptComposer columns={6} />);
+
+    stdin.write('去儿童');
+    await flushInput();
+
+    expect(stripSgr(lastFrame() ?? '')).toContain('> 去儿\n  童');
   });
 
   it.each([

@@ -2,8 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { countWrappedPromptRows, wrapPromptText } from '@libs/composer/wrapPromptText.ts';
 
 describe('wrapPromptText', () => {
-  it('wraps a long logical line every `columns` characters', () => {
+  it('wraps a long logical line every `columns` display columns', () => {
     expect(wrapPromptText('abcdefghij', 4).map((row) => row.text)).toEqual(['abcd', 'efgh', 'ij']);
+  });
+
+  it('wraps wide CJK glyphs by display width, not character count', () => {
+    // Each CJK glyph is two columns, so only two fit per 4-column row.
+    expect(wrapPromptText('去儿童', 4).map((row) => row.text)).toEqual(['去儿', '童']);
+  });
+
+  it('shifts a wide glyph to the next row past a one-column gap', () => {
+    // At an odd width a two-column glyph cannot share the trailing column.
+    expect(wrapPromptText('去儿童', 3).map((row) => row.text)).toEqual(['去', '儿', '童']);
+  });
+
+  it('tracks source indices across mixed-width rows', () => {
+    expect(wrapPromptText('a去b', 3)).toEqual([
+      { text: 'a去', start: 0, end: 2 },
+      { text: 'b', start: 2, end: 3 }
+    ]);
   });
 
   it('keeps authored newlines as separate rows', () => {
