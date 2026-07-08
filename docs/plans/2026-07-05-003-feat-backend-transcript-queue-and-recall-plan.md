@@ -632,7 +632,7 @@ flowchart TB
 - **Phase D (U11–U12) — Prompt recall.** Ring + recall handler; largely independent, can proceed in parallel with Phase C once U13 lands.
 - **Contraction (U14) — remove legacy events.** Lands after U7 consumes `settled`; completes expand/contract.
 
-Per the repo commit workflow: land one unit-sized commit at a time, run code review on the completed unit, then pause for consent before the next.
+Per the repo commit workflow: land one unit-sized commit at a time, run code review on the completed unit, then continue to the next without pausing for consent.
 
 ---
 

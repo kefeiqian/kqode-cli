@@ -369,7 +369,7 @@ Source mode and packaged mode share the same JSON-RPC contract. Source mode laun
 ## Implementation Units
 Each implementation unit is intended to be landed as one atomic commit-sized change. If implementation reveals a unit is too large to review as one commit, split the unit without renumbering existing U-IDs.
 
-After each commit-sized unit lands, run code review on the completed unit, then pause for user review and wait for explicit consent before starting the next unit.
+After each commit-sized unit lands, run code review on the completed unit, then continue with the next unit without pausing for user review or consent.
 
 > Reconciliation note (2026-07-01): Units were re-aligned with delivered work. The standalone executable moved from U11 to **U9**; new as-built units **U10** (TUI state/backend architecture hardening) and **U11** (terminal control and rendering robustness) capture added features; the deferred SQLite session store and `/resume` picker were moved into the LLM provider/streaming-chat plan (`2026-06-30-001-feat-llm-provider-streaming-chat-plan.md`) as units **U9** and **U10**. This was a deliberate, user-directed reconciliation rather than a routine split. The exit-summary card, Gemini-style theming, and LLM provider streaming chat are tracked in their own plans and are intentionally out of scope here.
 >

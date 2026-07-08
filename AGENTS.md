@@ -133,4 +133,4 @@ Provider credentials and the active `(provider, model)` selection are **user-glo
 
 ## Commit workflow
 
-Implement plan work one commit-sized unit at a time. After each commit, run code review on the completed unit, then pause for user review and wait for explicit consent before starting the next commit.
+Implement plan work one commit-sized unit at a time. After each commit, run code review on the completed unit, then continue with the next commit without pausing for user review or consent.
