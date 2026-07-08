@@ -5,11 +5,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::thread::{self, JoinHandle};
 
-use crate::chat::CancellationToken;
+use crate::chat::{CancellationToken, CompactionState, HistoryRound};
 use crate::config::KimiConfig;
 
 use super::persistence::ConversationPersistence;
-use super::transcript::{Transcript, TurnResult, TurnState};
+use super::transcript::{SettledKind, Transcript, TurnResult, TurnState};
 use super::{Command, ConversationEvent, ConversationStatus, NEEDS_CONFIGURATION_MESSAGE, TurnJob};
 
 const PANIC_ERROR_KIND: &str = "panic";
@@ -182,10 +182,14 @@ impl LoopState {
         let command_tx = self.command_tx.clone();
         let runner = Arc::clone(&self.turn_runner);
         let prompt = self.active_prompt(&turn_id);
+        let history = self.completed_history();
+        let compaction = CompactionState::default();
         self.active_thread = Some(thread::spawn(move || {
             let panic_result = panic::catch_unwind(AssertUnwindSafe(|| {
                 runner(TurnJob {
                     turn_id: turn_id.clone(),
+                    history,
+                    compaction,
                     prompt,
                     config,
                     cancel,
@@ -208,6 +212,28 @@ impl LoopState {
             .find(|turn| turn.turn_id == turn_id)
             .map(|turn| turn.prompt.clone())
             .unwrap_or_default()
+    }
+
+    /// Snapshots the prior completed rounds (user prompt + assistant reply) in
+    /// sequence order for assembly into the outgoing request. Non-completed
+    /// rounds (cancelled/errored/needs-configuration) are excluded, and the
+    /// durable transcript is only read, never mutated.
+    fn completed_history(&self) -> Vec<HistoryRound> {
+        self.transcript
+            .turns()
+            .iter()
+            .filter_map(|turn| {
+                if turn.state != TurnState::Settled {
+                    return None;
+                }
+                let result = turn.result.as_ref()?;
+                if result.kind != SettledKind::Completed {
+                    return None;
+                }
+                let assistant = result.text.clone()?;
+                Some(HistoryRound::new(turn.seq, turn.prompt.clone(), assistant))
+            })
+            .collect()
     }
 
     fn clear(&mut self) {

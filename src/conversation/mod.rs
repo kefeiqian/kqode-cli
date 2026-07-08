@@ -16,13 +16,15 @@ mod tests;
 
 use std::sync::mpsc::Sender;
 
-use crate::chat::{CancellationToken, TurnStreamEvent, run_streaming_turn};
+use crate::chat::{
+    CancellationToken, CompactionState, HistoryRound, TurnStreamEvent, run_streaming_turn,
+};
 use crate::config::KimiConfig;
 
+use crate::store::StoredSession;
 pub use coordinator::{Coordinator, CoordinatorHandle};
 pub use persistence::{ConversationPersistence, NoopConversationPersistence, SessionPersistence};
 pub use transcript::{SettledKind, Transcript, TurnResult, TurnState};
-use crate::store::StoredSession;
 
 const NEEDS_CONFIGURATION_MESSAGE: &str =
     "No provider configured. Use /login to add a provider before sending messages.";
@@ -89,6 +91,8 @@ pub struct ConversationStatus {
 /// A unit of work passed to an injected turn runner.
 pub struct TurnJob {
     pub turn_id: String,
+    pub history: Vec<HistoryRound>,
+    pub compaction: CompactionState,
     pub prompt: String,
     pub config: KimiConfig,
     pub cancel: CancellationToken,
@@ -101,6 +105,8 @@ fn default_runner() -> impl Fn(TurnJob) + Send + Sync + 'static {
         let turn_id = job.turn_id.clone();
         run_streaming_turn(
             job.turn_id,
+            job.history,
+            job.compaction,
             job.prompt,
             job.config,
             job.cancel,

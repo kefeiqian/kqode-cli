@@ -12,11 +12,11 @@ use std::time::Duration;
 use futures_util::StreamExt;
 use tracing::Instrument;
 
-use crate::chat::system_prompt::system_message;
+use crate::chat::request::{CompactionState, HistoryRound, assemble};
 use crate::chat::{CancellationToken, TurnStreamEvent};
 use crate::config::KimiConfig;
 use crate::debug_log;
-use crate::provider::{ChatMessage, KimiProvider, ProviderError, ProviderRequest, StreamEvent};
+use crate::provider::{KimiProvider, ProviderError, ProviderRequest, StreamEvent};
 
 /// Maximum time to wait for the next streamed chunk before failing the turn.
 const NEXT_CHUNK_TIMEOUT: Duration = Duration::from_secs(120);
@@ -37,6 +37,8 @@ const CANCEL_POLL_INTERVAL: Duration = Duration::from_millis(50);
 /// logging is enabled the assembled request and the response/error are recorded.
 pub fn spawn_streaming_turn<E>(
     turn_id: String,
+    history: Vec<HistoryRound>,
+    compaction: CompactionState,
     user_text: String,
     config: KimiConfig,
     cancel: CancellationToken,
@@ -44,13 +46,19 @@ pub fn spawn_streaming_turn<E>(
 ) where
     E: Fn(TurnStreamEvent) + Send + 'static,
 {
-    thread::spawn(move || run_streaming_turn(turn_id, user_text, config, cancel, emit));
+    thread::spawn(move || {
+        run_streaming_turn(
+            turn_id, history, compaction, user_text, config, cancel, emit,
+        );
+    });
 }
 
 /// Runs one streaming turn on the current thread and reports every update to
 /// `emit`.
 pub fn run_streaming_turn<E>(
     turn_id: String,
+    history: Vec<HistoryRound>,
+    compaction: CompactionState,
     user_text: String,
     config: KimiConfig,
     cancel: CancellationToken,
@@ -72,28 +80,30 @@ pub fn run_streaming_turn<E>(
     };
 
     runtime.block_on(
-        stream_turn(&turn_id, user_text, config, cancel, &emit)
-            .instrument(debug_log::turn_span(&turn_id)),
+        stream_turn(
+            &turn_id, history, compaction, user_text, config, cancel, &emit,
+        )
+        .instrument(debug_log::turn_span(&turn_id)),
     );
 }
 
 async fn stream_turn<E: Fn(TurnStreamEvent)>(
     _turn_id: &str,
+    history: Vec<HistoryRound>,
+    compaction: CompactionState,
     user_text: String,
     config: KimiConfig,
     cancel: CancellationToken,
     emit: &E,
 ) {
     let model = config.model.clone();
+    let messages = assemble(&history, &compaction, &model, &user_text);
     let provider = match KimiProvider::new(config) {
         Ok(provider) => provider,
         Err(error) => return fail(&error, emit),
     };
 
-    let request = ProviderRequest {
-        messages: vec![system_message(&model), ChatMessage::user(user_text)],
-        model,
-    };
+    let request = ProviderRequest { messages, model };
     let record_transcript = debug_log::transcript_enabled();
     if record_transcript {
         debug_log::log_request(&request.model, &request.messages);

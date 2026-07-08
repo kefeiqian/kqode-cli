@@ -57,6 +57,15 @@ impl ChatMessage {
             content: content.into(),
         }
     }
+
+    /// Builds an assistant-role message.
+    #[must_use]
+    pub fn assistant(content: impl Into<String>) -> Self {
+        Self {
+            role: Role::Assistant,
+            content: content.into(),
+        }
+    }
 }
 
 /// A normalized, vendor-independent chat-completion request.
