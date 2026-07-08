@@ -1,4 +1,5 @@
 use super::*;
+use crate::conversation::session_log::SessionLogEvent;
 use crate::provider::ProviderId;
 use refinery::error::Kind;
 use rusqlite::Connection;
@@ -106,13 +107,15 @@ fn fresh_path_bootstraps_to_latest_with_all_tables() {
     let store = Store::open_or_bootstrap_at(path).expect("bootstrap");
     let conn = store.connect().expect("connect");
     assert_eq!(migrations::user_version(&conn).unwrap(), 0);
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(1));
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(2));
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
     let rows = history_rows(&conn);
-    assert_eq!(rows.len(), 1);
+    assert_eq!(rows.len(), 2);
     assert_eq!(rows[0].version, 1);
     assert_eq!(rows[0].name, "initial_schema");
     assert_eq!(rows[0].checksum, migrations::v1_checksum().to_string());
+    assert_eq!(rows[1].version, 2);
+    assert_eq!(rows[1].name, "session_resume_index");
 }
 
 #[test]
@@ -168,8 +171,8 @@ fn concurrent_bootstraps_across_processes_all_succeed() {
 
     let store = Store::open_or_bootstrap_at(path).unwrap();
     let conn = store.connect().unwrap();
-    assert_eq!(history_rows(&conn).len(), 1);
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(1));
+    assert_eq!(history_rows(&conn).len(), 2);
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(2));
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
 }
 
@@ -210,8 +213,8 @@ fn reopening_a_migrated_db_is_idempotent() {
     Store::open_or_bootstrap_at(path.clone()).expect("first bootstrap");
     let store = Store::open_or_bootstrap_at(path).expect("second bootstrap is a no-op");
     let conn = store.connect().unwrap();
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(1));
-    assert_eq!(history_rows(&conn).len(), 1);
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(2));
+    assert_eq!(history_rows(&conn).len(), 2);
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
 }
 
@@ -227,7 +230,7 @@ fn a_version_zero_db_migrates_forward() {
     let store = Store::open_or_bootstrap_at(path).expect("bootstrap");
     let conn = store.connect().unwrap();
     assert_eq!(migrations::user_version(&conn).unwrap(), 0);
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(1));
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(2));
 }
 
 #[test]
@@ -272,7 +275,7 @@ fn db_ahead_of_embedded_migrations_refuses_to_bootstrap() {
     {
         let conn = Connection::open(&path).unwrap();
         create_refinery_history(&conn);
-        seed_history_row(&conn, 2, "future_schema", 1);
+        seed_history_row(&conn, 3, "future_schema", 1);
     }
     let err = Store::open_or_bootstrap_at(path.clone()).unwrap_err();
     match err.root_cause() {
@@ -320,7 +323,7 @@ fn legacy_user_version_one_db_gets_reset_message_and_can_rebootstrap_after_delet
     remove_db_with_sidecars(&path);
     let store = Store::open_or_bootstrap_at(path).expect("fresh bootstrap after reset");
     let conn = store.connect().unwrap();
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(1));
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(2));
 }
 
 #[test]
@@ -417,9 +420,156 @@ fn sanity_check_reports_history_version_mismatch() {
         err,
         StoreError::SchemaHistoryMismatch {
             found: None,
-            known: 1
+            known: 2
         }
     ));
+}
+
+#[test]
+fn sessions_table_includes_resume_index_columns() {
+    let (_dir, store) = bootstrap();
+    let conn = store.connect().unwrap();
+    assert_eq!(
+        column_names(&conn, "sessions"),
+        vec![
+            "id",
+            "created_at",
+            "workspace_cwd",
+            "jsonl_path",
+            "modified_at",
+            "canonical_workspace_cwd",
+            "first_prompt_summary",
+        ]
+    );
+}
+
+#[test]
+fn session_store_round_trips_and_lists_only_visible_rows() {
+    let (_dir, store) = bootstrap();
+    let hidden = StoredSession {
+        id: "sess-hidden".to_owned(),
+        created_at: 10,
+        modified_at: 10,
+        workspace_cwd: "C:\\workspace-a".to_owned(),
+        canonical_workspace_cwd: "C:\\workspace-a".to_owned(),
+        session_log_path: "C:\\session-a.jsonl".to_owned(),
+        first_prompt_summary: None,
+    };
+    let visible = StoredSession {
+        id: "sess-visible".to_owned(),
+        created_at: 20,
+        modified_at: 30,
+        workspace_cwd: "C:\\workspace-b".to_owned(),
+        canonical_workspace_cwd: "C:\\workspace-b".to_owned(),
+        session_log_path: "C:\\session-b.jsonl".to_owned(),
+        first_prompt_summary: Some("first prompt".to_owned()),
+    };
+
+    store.upsert_session(&hidden).unwrap();
+    store.upsert_session(&visible).unwrap();
+
+    assert_eq!(store.session("sess-hidden").unwrap(), Some(hidden));
+    assert_eq!(
+        store.session("sess-visible").unwrap(),
+        Some(visible.clone())
+    );
+    assert_eq!(store.list_resumable_sessions().unwrap(), vec![visible]);
+}
+
+#[test]
+fn resumable_sessions_are_sorted_by_modified_then_created_then_id() {
+    let (_dir, store) = bootstrap();
+    let oldest = StoredSession {
+        id: "sess-a".to_owned(),
+        created_at: 10,
+        modified_at: 100,
+        workspace_cwd: "C:\\workspace-a".to_owned(),
+        canonical_workspace_cwd: "C:\\workspace-a".to_owned(),
+        session_log_path: "C:\\session-a.jsonl".to_owned(),
+        first_prompt_summary: Some("alpha".to_owned()),
+    };
+    let newer_created = StoredSession {
+        id: "sess-b".to_owned(),
+        created_at: 20,
+        modified_at: 100,
+        workspace_cwd: "C:\\workspace-b".to_owned(),
+        canonical_workspace_cwd: "C:\\workspace-b".to_owned(),
+        session_log_path: "C:\\session-b.jsonl".to_owned(),
+        first_prompt_summary: Some("beta".to_owned()),
+    };
+    let newest_modified = StoredSession {
+        id: "sess-c".to_owned(),
+        created_at: 5,
+        modified_at: 200,
+        workspace_cwd: "C:\\workspace-c".to_owned(),
+        canonical_workspace_cwd: "C:\\workspace-c".to_owned(),
+        session_log_path: "C:\\session-c.jsonl".to_owned(),
+        first_prompt_summary: Some("gamma".to_owned()),
+    };
+
+    store.upsert_session(&oldest).unwrap();
+    store.upsert_session(&newer_created).unwrap();
+    store.upsert_session(&newest_modified).unwrap();
+
+    assert_eq!(
+        store
+            .list_resumable_sessions()
+            .unwrap()
+            .into_iter()
+            .map(|session| session.id)
+            .collect::<Vec<_>>(),
+        vec!["sess-c", "sess-b", "sess-a"]
+    );
+}
+
+#[test]
+fn bootstrap_reindexes_sessions_from_saved_logs_after_db_reset() {
+    let (dir, path) = temp_db();
+    let sessions_dir = dir.path().join("sessions");
+    std::fs::create_dir_all(&sessions_dir).unwrap();
+    let log_path = sessions_dir.join("sess-1.jsonl");
+    let log = [
+        SessionLogEvent::SessionStarted {
+            session_id: "sess-1".to_owned(),
+            created_at_ms: 10,
+            workspace_cwd: "C:\\workspace".to_owned(),
+            canonical_workspace_cwd: "C:\\workspace".to_owned(),
+        },
+        SessionLogEvent::TurnEnqueued {
+            turn_id: "turn-1".to_owned(),
+            seq: 0,
+            prompt: "hello world".to_owned(),
+            at_ms: 11,
+        },
+        SessionLogEvent::TurnSettled {
+            turn_id: "turn-1".to_owned(),
+            settled_kind: "completed".to_owned(),
+            text: Some("done".to_owned()),
+            finish_reason: None,
+            error_kind: None,
+            message: None,
+            at_ms: 12,
+        },
+    ]
+    .into_iter()
+    .map(|event| serde_json::to_string(&event).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n");
+    std::fs::write(&log_path, format!("{log}\n")).unwrap();
+
+    let store = Store::open_or_bootstrap_at(path).unwrap();
+    assert_eq!(
+        store.list_resumable_sessions().unwrap(),
+        vec![StoredSession {
+            id: "sess-1".to_owned(),
+            created_at: 10,
+            modified_at: 12,
+            workspace_cwd: "C:\\workspace".to_owned(),
+            canonical_workspace_cwd: "C:\\workspace".to_owned(),
+            session_log_path: log_path.display().to_string(),
+            first_prompt_summary: Some("hello world".to_owned()),
+        }]
+    );
 }
 
 #[test]

@@ -24,7 +24,14 @@ function clientWithSubmit(submit: BackendClient['submit']): BackendClient {
     setActiveSelection: async () => undefined,
     clearProviderKey: async () => undefined,
     setProviderKey: async () => ({ outcome: 'unreachable', selectedModel: null }),
-    listModels: async () => ({ status: 'failed', models: [] })
+    listModels: async () => ({ status: 'failed', models: [] }),
+    listSessions: async () => ({ sessions: [] }),
+    resumeSession: async () => ({
+      sessionId: 'sess-1',
+      workspaceCwd: 'C:\\workspace',
+      canonicalWorkspaceCwd: 'C:\\workspace',
+      turns: []
+    })
   };
 }
 

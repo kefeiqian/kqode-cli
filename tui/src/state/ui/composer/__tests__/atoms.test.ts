@@ -44,6 +44,30 @@ describe('composerAtoms', () => {
     expect(deleted.cursorIndex).toBe(2);
     expect(store.get(composerStateAtom).text).toBe('abXcY');
   });
+
+  it('moves and deletes by grapheme cluster for emoji and combining marks', () => {
+    const store = createStore();
+    const text = '👍🏽e\u0301x';
+    store.set(composerStateAtom, { text, cursorIndex: text.length, validationError: null });
+
+    store.set(moveComposerCursorBackwardAtom);
+    expect(store.get(composerStateAtom).cursorIndex).toBe(text.length - 1);
+
+    store.set(moveComposerCursorBackwardAtom);
+    expect(store.get(composerStateAtom).cursorIndex).toBe('👍🏽'.length);
+
+    store.set(moveComposerCursorBackwardAtom);
+    expect(store.get(composerStateAtom).cursorIndex).toBe(0);
+
+    store.set(moveComposerCursorForwardAtom);
+    expect(store.get(composerStateAtom).cursorIndex).toBe('👍🏽'.length);
+
+    store.set(deleteComposerBackwardAtom, {});
+    expect(store.get(composerStateAtom)).toMatchObject({
+      text: 'e\u0301x',
+      cursorIndex: 0
+    });
+  });
 });
 
 describe('composer scroll offset preservation', () => {
@@ -96,6 +120,18 @@ describe('composer vertical cursor movement', () => {
     expect(store.get(composerStateAtom).cursorIndex).toBe(1); // unchanged
     expect(store.get(composerScrollOffsetRowsAtom)).toBe(2); // preserved
   });
+
+  it('preserves the visual column across grapheme clusters', () => {
+    const store = createStore();
+    store.set(composerStateAtom, {
+      text: '👍🏽a\n👍🏽b',
+      cursorIndex: '👍🏽a'.length,
+      validationError: null
+    });
+
+    store.set(moveComposerCursorDownAtom, { columns: 40 });
+    expect(store.get(composerStateAtom).cursorIndex).toBe('👍🏽a\n👍🏽b'.length);
+  });
 });
 
 describe('composer click-to-position', () => {
@@ -110,6 +146,14 @@ describe('composer click-to-position', () => {
 
     store.set(setComposerCursorWithOffsetAtom, { index: 999, offset: 0 }); // clamps to text length
     expect(store.get(composerStateAtom).cursorIndex).toBe(5);
+  });
+
+  it('snaps clicked indices back to grapheme boundaries', () => {
+    const store = createStore();
+    store.set(composerStateAtom, { text: '👍🏽a', cursorIndex: 0, validationError: null });
+
+    store.set(setComposerCursorWithOffsetAtom, { index: 2, offset: 0 });
+    expect(store.get(composerStateAtom).cursorIndex).toBe(0);
   });
 });
 

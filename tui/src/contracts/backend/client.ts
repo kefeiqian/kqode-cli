@@ -13,6 +13,11 @@ import type {
   SetKeyParams,
   SetKeyResult
 } from '@contracts/backend/providerMessages.ts';
+import type {
+  SessionListResult,
+  SessionResumeParams,
+  SessionResumeResult
+} from '@contracts/backend/sessionMessages.ts';
 import type { TurnResult, TurnState } from '@contracts/backend/messages.ts';
 
 /** Backend failure categories surfaced to the TUI. */
@@ -77,4 +82,6 @@ export type BackendClient = {
   clearProviderKey(providerId: string): Promise<void>;
   setProviderKey(params: SetKeyParams): Promise<SetKeyResult>;
   listModels(providerId: string): Promise<ModelListResult>;
+  listSessions(): Promise<SessionListResult>;
+  resumeSession(params: SessionResumeParams): Promise<SessionResumeResult>;
 };

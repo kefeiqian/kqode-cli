@@ -7,7 +7,8 @@ export const Surface = {
   Home: 'home',
   Help: 'help',
   Login: 'login',
-  Model: 'model'
+  Model: 'model',
+  Resume: 'resume'
 } as const;
 
 export type Surface = (typeof Surface)[keyof typeof Surface];
@@ -65,4 +66,9 @@ export const openModelSurfaceAtom = atom(null, async (get, set) => {
       set(activeSurfaceAtom, Surface.Login);
     }
   }
+});
+
+/** Opens the fullscreen local session-resume picker. */
+export const openResumeSurfaceAtom = atom(null, (_get, set) => {
+  set(setActiveSurfaceAtom, Surface.Resume);
 });

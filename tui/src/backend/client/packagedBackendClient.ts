@@ -26,13 +26,14 @@ export function createPackagedBackendClient(
   options: PackagedBackendClientOptions
 ): BackendClientHandle {
   return createBackendClient({
-    launch: () =>
+    launch: (nextWorkspaceCwd) =>
       launchPackagedBackend({
         asset: options.asset,
         version: options.version,
-        workspaceCwd: options.workspaceCwd,
+        workspaceCwd: nextWorkspaceCwd ?? options.workspaceCwd,
         cacheBaseDir: options.cacheBaseDir
       }),
+    initialWorkspaceCwd: options.workspaceCwd,
     requestTimeoutMs: options.requestTimeoutMs
   });
 }

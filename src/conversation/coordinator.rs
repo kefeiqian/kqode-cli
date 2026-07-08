@@ -4,7 +4,7 @@ use std::sync::mpsc::{self, Sender};
 use std::thread::{self, JoinHandle};
 
 use super::state::LoopState;
-use super::{Command, ConversationEvent, TurnJob, default_runner};
+use super::{Command, ConversationEvent, ConversationPersistence, TurnJob, default_runner};
 
 /// Handle used by backend request handlers to command the coordinator.
 pub struct CoordinatorHandle {
@@ -40,15 +40,22 @@ pub struct Coordinator;
 
 impl Coordinator {
     #[must_use]
-    pub fn start<E>(event_sink: E) -> CoordinatorHandle
+    pub fn start<E>(
+        event_sink: E,
+        persistence: Box<dyn ConversationPersistence>,
+    ) -> CoordinatorHandle
     where
         E: Fn(ConversationEvent) + Send + Sync + 'static,
     {
-        Self::start_with_runner(event_sink, default_runner())
+        Self::start_with_runner(event_sink, default_runner(), persistence)
     }
 
     #[must_use]
-    pub fn start_with_runner<E, R>(event_sink: E, turn_runner: R) -> CoordinatorHandle
+    pub fn start_with_runner<E, R>(
+        event_sink: E,
+        turn_runner: R,
+        persistence: Box<dyn ConversationPersistence>,
+    ) -> CoordinatorHandle
     where
         E: Fn(ConversationEvent) + Send + Sync + 'static,
         R: Fn(TurnJob) + Send + Sync + 'static,
@@ -60,7 +67,13 @@ impl Coordinator {
         let shutdown_requested = Arc::new(AtomicBool::new(false));
         let loop_shutdown_requested = Arc::clone(&shutdown_requested);
         let join = thread::spawn(move || {
-            let mut loop_state = LoopState::new(loop_sender, sink, runner, loop_shutdown_requested);
+            let mut loop_state = LoopState::new(
+                loop_sender,
+                sink,
+                runner,
+                loop_shutdown_requested,
+                persistence,
+            );
             while let Ok(command) = receiver.recv() {
                 if loop_state.handle(command) {
                     break;

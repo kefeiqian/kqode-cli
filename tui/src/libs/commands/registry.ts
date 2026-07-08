@@ -12,7 +12,8 @@ export const CommandId = {
   Clear: 'clear',
   Exit: 'exit',
   Login: 'login',
-  Model: 'model'
+  Model: 'model',
+  Resume: 'resume'
 } as const;
 
 export type CommandId = (typeof CommandId)[keyof typeof CommandId];
@@ -23,7 +24,8 @@ export const CommandName = {
   Clear: '/clear',
   Exit: '/exit',
   Login: '/login',
-  Model: '/model'
+  Model: '/model',
+  Resume: '/resume'
 } as const;
 
 /** A single slash command: its id, the `/name` shown in the menu, and a short description. */
@@ -44,7 +46,8 @@ const BUILT_IN_COMMANDS: readonly CommandDefinition[] = [
   { id: CommandId.Clear, name: CommandName.Clear, description: 'Clear the conversation and scrollback' },
   { id: CommandId.Exit, name: CommandName.Exit, description: 'Exit KQode' },
   { id: CommandId.Login, name: CommandName.Login, description: 'Connect or update provider credentials' },
-  { id: CommandId.Model, name: CommandName.Model, description: 'Choose the active provider model' }
+  { id: CommandId.Model, name: CommandName.Model, description: 'Choose the active provider model' },
+  { id: CommandId.Resume, name: CommandName.Resume, description: 'Resume a saved local session' }
 ];
 
 export const COMMAND_REGISTRY: readonly CommandDefinition[] = [...BUILT_IN_COMMANDS].sort((a, b) =>

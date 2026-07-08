@@ -25,7 +25,8 @@ const commandActions: CommandActions = {
   clearTranscript: vi.fn(),
   showHelp: vi.fn(),
   openLogin: vi.fn(),
-  openModel: vi.fn()
+  openModel: vi.fn(),
+  openResume: vi.fn()
 };
 
 function clientWithCancel(cancelTurn: BackendClient['cancelTurn']): BackendClient {
@@ -40,7 +41,14 @@ function clientWithCancel(cancelTurn: BackendClient['cancelTurn']): BackendClien
     setActiveSelection: async () => undefined,
     clearProviderKey: async () => undefined,
     setProviderKey: async () => ({ outcome: 'unreachable', selectedModel: null }),
-    listModels: async () => ({ status: 'failed', models: [] })
+    listModels: async () => ({ status: 'failed', models: [] }),
+    listSessions: async () => ({ sessions: [] }),
+    resumeSession: async () => ({
+      sessionId: 'sess-1',
+      workspaceCwd: 'C:\\workspace',
+      canonicalWorkspaceCwd: 'C:\\workspace',
+      turns: []
+    })
   };
 }
 

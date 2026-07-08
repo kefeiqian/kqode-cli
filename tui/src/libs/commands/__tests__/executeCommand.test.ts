@@ -7,7 +7,8 @@ const makeActions = () => ({
   clearTranscript: vi.fn(),
   showHelp: vi.fn(),
   openLogin: vi.fn(),
-  openModel: vi.fn()
+  openModel: vi.fn(),
+  openResume: vi.fn()
 });
 
 describe('executeCommand', () => {
@@ -54,6 +55,18 @@ describe('executeCommand', () => {
     executeCommand(CommandId.Model, actions);
 
     expect(actions.openModel).toHaveBeenCalledTimes(1);
+    expect(actions.openLogin).not.toHaveBeenCalled();
+    expect(actions.exit).not.toHaveBeenCalled();
+    expect(actions.clearTranscript).not.toHaveBeenCalled();
+    expect(actions.showHelp).not.toHaveBeenCalled();
+  });
+
+  it('runs openResume only for the resume command without awaiting command lookup', () => {
+    const actions = makeActions();
+    executeCommand(CommandId.Resume, actions);
+
+    expect(actions.openResume).toHaveBeenCalledTimes(1);
+    expect(actions.openModel).not.toHaveBeenCalled();
     expect(actions.openLogin).not.toHaveBeenCalled();
     expect(actions.exit).not.toHaveBeenCalled();
     expect(actions.clearTranscript).not.toHaveBeenCalled();

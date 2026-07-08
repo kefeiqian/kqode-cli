@@ -18,12 +18,14 @@ export type BackendClientHandle = BackendClient & {
   getState(): BackendLifecycleState;
   onReady(listener: (sessionId: string) => void): void;
   ensureStarted(): Promise<void>;
+  relaunch(workspaceCwd: string): Promise<void>;
   dispose(): void;
 };
 
 /** Composition inputs for the generic backend client: an injected process launcher. */
 export type BackendClientOptions = {
-  launch: () => Promise<LaunchedBackend>;
+  launch: (workspaceCwd?: string) => Promise<LaunchedBackend>;
+  initialWorkspaceCwd?: string;
   requestTimeoutMs?: number;
   validationRequestTimeoutMs?: number;
   startupTimeoutMs?: number;

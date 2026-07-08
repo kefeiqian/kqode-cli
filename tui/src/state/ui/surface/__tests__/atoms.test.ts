@@ -8,6 +8,7 @@ import {
   closeActiveSurfaceAtom,
   openLoginSurfaceAtom,
   openModelSurfaceAtom,
+  openResumeSurfaceAtom,
   Surface
 } from '@state/ui/surface/index.ts';
 import { helpVisibleAtom, openHelpAtom } from '@state/ui/help/index.ts';
@@ -32,7 +33,14 @@ const clientWithProviders = (providers: ProviderStatusInfo[]): BackendClient => 
   setActiveSelection: async () => {},
   clearProviderKey: async () => {},
   setProviderKey: async () => ({ outcome: 'unreachable', selectedModel: null }),
-  listModels: async () => ({ status: 'failed', models: [] })
+  listModels: async () => ({ status: 'failed', models: [] }),
+  listSessions: async () => ({ sessions: [] }),
+  resumeSession: async () => ({
+    sessionId: 'sess-1',
+    workspaceCwd: 'C:\\workspace',
+    canonicalWorkspaceCwd: 'C:\\workspace',
+    turns: []
+  })
 });
 
 function deferredProviders() {
@@ -93,6 +101,14 @@ describe('surface atoms', () => {
     await store.set(openModelSurfaceAtom);
 
     expect(store.get(activeSurfaceAtom)).toBe(Surface.Login);
+  });
+
+  it('opens resume directly as its own fullscreen surface', () => {
+    const store = createStore();
+
+    store.set(openResumeSurfaceAtom);
+
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Resume);
   });
 
   it('does not let a stale model status read overwrite newer navigation', async () => {

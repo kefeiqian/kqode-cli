@@ -30,6 +30,10 @@ import {
   turnSettledNotification
 } from '@backend/protocol/messageProtocol.ts';
 import {
+  sessionListRequest,
+  sessionResumeRequest
+} from '@backend/protocol/sessionProtocol.ts';
+import {
   providerModelsRequest,
   providerSetKeyRequest
 } from '@backend/protocol/providerProtocol.ts';
@@ -165,6 +169,84 @@ describe('createBackendClient (fake backend)', () => {
     client.dispose();
   });
 
+  it('returns backend-owned session list rows', async () => {
+    const fake = makeFakeBackend((server) => {
+      server.onRequest(sessionListRequest, () => ({
+        sessions: [
+          {
+            sessionId: 'sess-1',
+            summary: 'hello',
+            status: 'Idle',
+            modifiedAt: 20,
+            createdAt: 10,
+            folder: 'C:\\workspace'
+          }
+        ]
+      }));
+    });
+    const client = createBackendClient({ launch: async () => fake.launched });
+
+    await expect(client.listSessions()).resolves.toEqual({
+      sessions: [
+        {
+          sessionId: 'sess-1',
+          summary: 'hello',
+          status: 'Idle',
+          modifiedAt: 20,
+          createdAt: 10,
+          folder: 'C:\\workspace'
+        }
+      ]
+    });
+    client.dispose();
+  });
+
+  it('returns resumed transcript payloads from the backend resume request', async () => {
+    const fake = makeFakeBackend((server) => {
+      server.onRequest(sessionResumeRequest, ({ sessionId }) => ({
+        sessionId,
+        workspaceCwd: 'C:\\workspace',
+        canonicalWorkspaceCwd: 'C:\\workspace',
+        turns: [
+          {
+            turnId: 'turn-1',
+            seq: 0,
+            prompt: 'hello',
+            result: {
+              kind: SETTLED_KIND_COMPLETED,
+              text: 'done',
+              finishReason: 'stop',
+              errorKind: null,
+              message: null
+            }
+          }
+        ]
+      }));
+    });
+    const client = createBackendClient({ launch: async () => fake.launched });
+
+    await expect(client.resumeSession({ sessionId: 'sess-1' })).resolves.toEqual({
+      sessionId: 'sess-1',
+      workspaceCwd: 'C:\\workspace',
+      canonicalWorkspaceCwd: 'C:\\workspace',
+      turns: [
+        {
+          turnId: 'turn-1',
+          seq: 0,
+          prompt: 'hello',
+          result: {
+            kind: SETTLED_KIND_COMPLETED,
+            text: 'done',
+            finishReason: 'stop',
+            errorKind: null,
+            message: null
+          }
+        }
+      ]
+    });
+    client.dispose();
+  });
+
   it('reattaches transcript events and fires onReady after respawn', async () => {
     const hung = makeFakeBackend((server) =>
       server.onRequest(messageSubmitRequest, () => new Promise<MessageSubmitResult>(() => undefined))
@@ -186,6 +268,25 @@ describe('createBackendClient (fake backend)', () => {
 
     expect(ready).toEqual(['test-session', 'test-session']);
     expect(events.some((event) => event.turnId === 'turn-2' && event.type === 'settled')).toBe(true);
+    client.dispose();
+  });
+
+  it('relaunches into a new workspace only after the replacement backend is ready', async () => {
+    const first = makeFakeBackend(ack);
+    const second = makeFakeBackend(ack);
+    const launch = vi
+      .fn(async (_workspaceCwd?: string) => first.launched)
+      .mockResolvedValueOnce(first.launched)
+      .mockResolvedValueOnce(second.launched);
+    const client = createBackendClient({ launch, initialWorkspaceCwd: 'C:\\one' });
+
+    await client.ensureStarted();
+    await client.relaunch('C:\\two');
+
+    expect(launch).toHaveBeenNthCalledWith(1, 'C:\\one');
+    expect(launch).toHaveBeenNthCalledWith(2, 'C:\\two');
+    expect(first.disposed()).toBe(true);
+    expect(client.getState()).toBe(BackendLifecycleState.Ready);
     client.dispose();
   });
 

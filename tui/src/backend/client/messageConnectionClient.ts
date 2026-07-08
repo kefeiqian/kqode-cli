@@ -21,6 +21,10 @@ import {
   selectionGetRequest,
   selectionSetRequest
 } from '@backend/protocol/providerProtocol.ts';
+import {
+  sessionListRequest,
+  sessionResumeRequest
+} from '@backend/protocol/sessionProtocol.ts';
 import { listModels, setProviderKey } from '@backend/client/validationRequests.ts';
 import {
   isFatalBackendError,
@@ -128,6 +132,12 @@ export function createMessageConnectionClient(
     },
     async listModels(providerId) {
       return listModels(connection, providerId, validationRequestTimeoutMs);
+    },
+    async listSessions() {
+      return request(connection.sendRequest(sessionListRequest), requestTimeoutMs);
+    },
+    async resumeSession(params) {
+      return request(connection.sendRequest(sessionResumeRequest, params), requestTimeoutMs);
     },
     failInFlight
   };

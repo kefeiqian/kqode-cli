@@ -4,6 +4,8 @@
 //! domain events that the backend maps to JSON-RPC notifications.
 
 pub mod coordinator;
+mod persistence;
+pub mod session_log;
 mod state;
 pub mod transcript;
 
@@ -18,7 +20,9 @@ use crate::chat::{CancellationToken, TurnStreamEvent, run_streaming_turn};
 use crate::config::KimiConfig;
 
 pub use coordinator::{Coordinator, CoordinatorHandle};
+pub use persistence::{ConversationPersistence, NoopConversationPersistence, SessionPersistence};
 pub use transcript::{SettledKind, Transcript, TurnResult, TurnState};
+use crate::store::StoredSession;
 
 const NEEDS_CONFIGURATION_MESSAGE: &str =
     "No provider configured. Use /login to add a provider before sending messages.";
@@ -41,6 +45,14 @@ pub enum Command {
     },
     Cancel {
         turn_id: String,
+    },
+    QueryStatus {
+        respond_to: Sender<ConversationStatus>,
+    },
+    ResumeSession {
+        session: StoredSession,
+        turns: Vec<transcript::TranscriptTurn>,
+        respond_to: Sender<()>,
     },
     Clear,
     Shutdown,
@@ -65,6 +77,13 @@ pub enum ConversationEvent {
         turn_id: String,
         result: TurnResult,
     },
+}
+
+/// Queryable coordinator status used by backend session handlers.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConversationStatus {
+    pub current_session_id: Option<String>,
+    pub has_unsettled_turns: bool,
 }
 
 /// A unit of work passed to an injected turn runner.

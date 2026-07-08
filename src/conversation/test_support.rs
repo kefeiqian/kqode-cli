@@ -4,6 +4,7 @@ use std::time::Duration;
 use crate::chat::CancellationToken;
 use crate::config::KimiConfig;
 
+use super::NoopConversationPersistence;
 use super::transcript::{SettledKind, TurnResult, TurnState};
 use super::{Command, ConversationEvent, Coordinator, CoordinatorHandle, TurnJob};
 
@@ -37,6 +38,7 @@ pub fn harness() -> (
     let handle = Coordinator::start_with_runner(
         move |event| event_tx.send(event).expect("event receiver alive"),
         move |job| run_fake_turn(job, &started_tx),
+        Box::new(NoopConversationPersistence),
     );
     (handle, event_rx, started_rx)
 }
@@ -80,7 +82,7 @@ fn config() -> KimiConfig {
     }
 }
 
-fn run_fake_turn(job: TurnJob, started_tx: &Sender<Started>) {
+pub(super) fn run_fake_turn(job: TurnJob, started_tx: &Sender<Started>) {
     let (action_tx, action_rx) = mpsc::channel();
     started_tx
         .send(Started {

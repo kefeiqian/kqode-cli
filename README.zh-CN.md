@@ -102,9 +102,10 @@ cargo xtask tui-dev        # 在一次性 fixture 工作区中运行 TUI
 
 `cargo xtask tui-dev` 会针对一份复制出来的 fixture 工作区运行 Ink TUI，因此显示的
 工作目录是一个真实的项目，而不是 KQode 仓库本身。目前 TUI 与一个本地 Rust
-JSON-RPC 后端通信，该后端只会对每个提交的 prompt 做确认（`ACK: message
-received`）；它尚未调用模型、运行工具或执行智能体循环，斜杠命令、提及（mention）
-与模型相关的交互目前都只是无实际作用的占位符。
+JSON-RPC 后端通信；该后端会对每个提交的 prompt 做确认，并将可恢复的本地会话
+历史持久化到 `~/.kqode/`。`/help`、`/clear`、`/login`、`/model` 与 `/resume`
+现已连接到真实的 TUI 界面或后端流程；它仍然尚未调用模型、运行工具或执行智能体
+循环，而提及（mention）支持目前仍是占位符。
 
 使用以下命令显式准备或重置该 fixture 工作区：
 

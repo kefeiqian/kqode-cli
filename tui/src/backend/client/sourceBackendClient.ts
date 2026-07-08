@@ -20,7 +20,9 @@ export type SourceBackendClientOptions = {
 export function createSourceBackendClient(options: SourceBackendClientOptions): BackendClientHandle {
   const { repoRoot, workspaceCwd, requestTimeoutMs, validationRequestTimeoutMs } = options;
   return createBackendClient({
-    launch: () => launchSourceBackend({ repoRoot, workspaceCwd }),
+    launch: (nextWorkspaceCwd) =>
+      launchSourceBackend({ repoRoot, workspaceCwd: nextWorkspaceCwd ?? workspaceCwd }),
+    initialWorkspaceCwd: workspaceCwd,
     requestTimeoutMs,
     validationRequestTimeoutMs
   });

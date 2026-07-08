@@ -8,9 +8,10 @@ import {
 } from '@state/ui/composer/index.ts';
 
 /**
- * Left/Right move the composer cursor by one code point; Up/Down move between
- * visual (wrapped) lines. The slash menu's Up/Down is handled earlier in the
- * dispatcher (handleMenuKey), so these only fire when the menu is closed.
+ * Left/Right move the composer cursor by one grapheme cluster; Up/Down move
+ * between visual (wrapped) lines. The slash menu's Up/Down is handled earlier
+ * in the dispatcher (handleMenuKey), so these only fire when the menu is
+ * closed.
  */
 export const handleCursorMove: ComposerKeyHandler = (context) => {
   const { key, store } = context;

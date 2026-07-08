@@ -50,7 +50,14 @@ export function fakeClient(options: {
         return Promise.resolve({ status: MODEL_LIST_STATUS_EMPTY, models: [] });
       }
       return Promise.resolve(result);
-    })
+    }),
+    listSessions: vi.fn<BackendClient['listSessions']>(async () => ({ sessions: [] })),
+    resumeSession: vi.fn<BackendClient['resumeSession']>(async () => ({
+      sessionId: 'sess-1',
+      workspaceCwd: 'C:\\workspace',
+      canonicalWorkspaceCwd: 'C:\\workspace',
+      turns: []
+    }))
   };
 }
 

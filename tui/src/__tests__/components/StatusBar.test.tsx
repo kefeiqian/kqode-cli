@@ -25,6 +25,8 @@ import {
 import { ArmedAction, COPY_MODE_HINT } from '@constants/ui.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
+const cwd = 'C:\\workspace';
+
 const makeStore = (): ReturnType<typeof createStore> => {
   const store = createStore();
   store.set(columnsTestOverrideAtom, 80);
@@ -153,7 +155,14 @@ function pendingClient(): BackendClient {
     setActiveSelection: async () => {},
     clearProviderKey: async () => {},
     setProviderKey: async () => ({ outcome: 'connected', selectedModel: null }),
-    listModels: async () => ({ status: 'loaded', models: [] })
+    listModels: async () => ({ status: 'loaded', models: [] }),
+    listSessions: async () => ({ sessions: [] }),
+    resumeSession: async () => ({
+      sessionId: 'sess-1',
+      workspaceCwd: cwd,
+      canonicalWorkspaceCwd: cwd,
+      turns: []
+    })
   };
 }
 
@@ -190,6 +199,13 @@ function clientWith({
     setActiveSelection: async () => {},
     clearProviderKey: async () => {},
     setProviderKey: async () => ({ outcome: 'connected', selectedModel: null }),
-    listModels: async () => ({ status: 'loaded', models: [] })
+    listModels: async () => ({ status: 'loaded', models: [] }),
+    listSessions: async () => ({ sessions: [] }),
+    resumeSession: async () => ({
+      sessionId: 'sess-1',
+      workspaceCwd: cwd,
+      canonicalWorkspaceCwd: cwd,
+      turns: []
+    })
   };
 }

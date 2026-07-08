@@ -92,20 +92,20 @@ function appendLineRows(
   }
 
   let rowStart = 0;
-  let offset = 0;
+  let rowEnd = 0;
   let rowWidth = 0;
 
-  for (const { segment, width } of measureGraphemes(line)) {
-    if (rowWidth + width > safeColumns && offset > rowStart) {
-      rows.push(rowSlice(line, lineStart, rowStart, offset));
-      rowStart = offset;
+  for (const grapheme of measureGraphemes(line)) {
+    if (rowWidth + grapheme.width > safeColumns && rowEnd > rowStart) {
+      rows.push(rowSlice(line, lineStart, rowStart, rowEnd));
+      rowStart = grapheme.start;
       rowWidth = 0;
     }
-    rowWidth += width;
-    offset += segment.length;
+    rowWidth += grapheme.width;
+    rowEnd = grapheme.end;
   }
 
-  rows.push(rowSlice(line, lineStart, rowStart, offset));
+  rows.push(rowSlice(line, lineStart, rowStart, rowEnd));
 }
 
 function rowSlice(
@@ -120,4 +120,3 @@ function rowSlice(
     end: lineStart + end
   };
 }
-

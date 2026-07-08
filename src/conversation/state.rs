@@ -8,8 +8,9 @@ use std::thread::{self, JoinHandle};
 use crate::chat::CancellationToken;
 use crate::config::KimiConfig;
 
+use super::persistence::ConversationPersistence;
 use super::transcript::{Transcript, TurnResult, TurnState};
-use super::{Command, ConversationEvent, NEEDS_CONFIGURATION_MESSAGE, TurnJob};
+use super::{Command, ConversationEvent, ConversationStatus, NEEDS_CONFIGURATION_MESSAGE, TurnJob};
 
 const PANIC_ERROR_KIND: &str = "panic";
 
@@ -30,6 +31,7 @@ pub(super) struct LoopState {
     turn_runner: TurnRunner,
     shutting_down: bool,
     shutdown_requested: Arc<AtomicBool>,
+    persistence: Box<dyn ConversationPersistence>,
 }
 
 impl LoopState {
@@ -38,6 +40,7 @@ impl LoopState {
         event_sink: EventSink,
         turn_runner: TurnRunner,
         shutdown_requested: Arc<AtomicBool>,
+        persistence: Box<dyn ConversationPersistence>,
     ) -> Self {
         Self {
             transcript: Transcript::default(),
@@ -50,6 +53,7 @@ impl LoopState {
             turn_runner,
             shutting_down: false,
             shutdown_requested,
+            persistence,
         }
     }
 
@@ -70,6 +74,21 @@ impl LoopState {
                     cancel.cancel();
                 }
             }
+            Command::QueryStatus { respond_to } => {
+                let _ = respond_to.send(ConversationStatus {
+                    current_session_id: self.persistence.current_session_id(),
+                    has_unsettled_turns: self.transcript.has_unsettled(),
+                });
+            }
+            Command::ResumeSession {
+                session,
+                turns,
+                respond_to,
+            } => {
+                self.persistence.attach_session(session);
+                self.transcript.replace_with(turns);
+                let _ = respond_to.send(());
+            }
             Command::Clear => self.clear(),
             Command::Shutdown => self.shutdown(),
             Command::Cancel { .. } => {}
@@ -88,6 +107,17 @@ impl LoopState {
         };
         let seq = self.transcript.push(turn_id.clone(), prompt, state);
         self.configs.insert(turn_id.clone(), config);
+        if let Err(message) =
+            self.persistence
+                .on_enqueue(&turn_id, seq, &self.active_prompt(&turn_id))
+        {
+            self.transcript.remove_turn(&turn_id);
+            (self.event_sink)(ConversationEvent::Settled {
+                turn_id,
+                result: TurnResult::error("sessionPersistence", message),
+            });
+            return;
+        }
         (self.event_sink)(ConversationEvent::Enqueued {
             turn_id: turn_id.clone(),
             seq,
@@ -123,6 +153,9 @@ impl LoopState {
         self.active_cancel = None;
         if let Some(thread) = self.active_thread.take() {
             let _ = thread.join();
+        }
+        if let Err(message) = self.persistence.on_settle(&turn_id, &result) {
+            eprintln!("KQODE_SESSION_PERSISTENCE_ERROR: {message}");
         }
         (self.event_sink)(ConversationEvent::Settled { turn_id, result });
         if self.is_shutting_down() {
@@ -185,6 +218,9 @@ impl LoopState {
         }
         if let Some(cancel) = &self.active_cancel {
             cancel.cancel();
+        }
+        if let Err(message) = self.persistence.on_clear(self.transcript.turns()) {
+            eprintln!("KQODE_SESSION_PERSISTENCE_ERROR: {message}");
         }
         self.configs.clear();
         self.transcript.drop_pending();

@@ -5,7 +5,36 @@ use super::test_support::{
     Action, WAIT, enqueue, expect_activated, expect_enqueued, expect_settled, harness,
 };
 use super::transcript::{SettledKind, TurnResult, TurnState};
-use super::{Command, ConversationEvent, NEEDS_CONFIGURATION_MESSAGE};
+use super::{Command, ConversationEvent, ConversationPersistence, Coordinator, NEEDS_CONFIGURATION_MESSAGE, TurnJob};
+
+struct FailSecondEnqueuePersistence {
+    fail_after_first: bool,
+}
+
+impl ConversationPersistence for FailSecondEnqueuePersistence {
+    fn on_enqueue(&mut self, _turn_id: &str, _seq: u64, _prompt: &str) -> Result<(), String> {
+        if self.fail_after_first {
+            Err("session persistence down".to_owned())
+        } else {
+            self.fail_after_first = true;
+            Ok(())
+        }
+    }
+
+    fn on_settle(&mut self, _turn_id: &str, _result: &TurnResult) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn on_clear(&mut self, _turns: &[super::transcript::TranscriptTurn]) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn current_session_id(&self) -> Option<String> {
+        None
+    }
+
+    fn attach_session(&mut self, _session: crate::store::StoredSession) {}
+}
 
 #[test]
 fn idle_submit_streams_and_settles() {
@@ -229,5 +258,35 @@ fn clear_empties_settled_history_and_starts_fresh() {
     let b = started.recv_timeout(WAIT).unwrap();
     b.actions.send(Action::Complete("b")).unwrap();
     expect_settled(&events, "B", SettledKind::Completed);
+    handle.shutdown_and_join();
+}
+
+#[test]
+fn queued_turn_with_persistence_failure_does_not_activate_later() {
+    let (event_tx, event_rx) = mpsc::channel();
+    let (started_tx, started_rx) = mpsc::channel();
+    let handle = Coordinator::start_with_runner(
+        move |event| event_tx.send(event).expect("event receiver alive"),
+        move |job: TurnJob| super::test_support::run_fake_turn(job, &started_tx),
+        Box::new(FailSecondEnqueuePersistence {
+            fail_after_first: false,
+        }),
+    );
+    let sender = handle.sender();
+    enqueue(&sender, "A");
+    expect_enqueued(&event_rx, "A", TurnState::Active);
+    let a = started_rx.recv_timeout(WAIT).unwrap();
+    enqueue(&sender, "B");
+    match event_rx.recv_timeout(WAIT).unwrap() {
+        ConversationEvent::Settled { turn_id, result } => {
+            assert_eq!(turn_id, "B");
+            assert_eq!(result.kind, SettledKind::Error);
+            assert_eq!(result.error_kind.as_deref(), Some("sessionPersistence"));
+        }
+        other => panic!("expected queued failure settle, got {other:?}"),
+    }
+    a.actions.send(Action::Complete("a")).unwrap();
+    expect_settled(&event_rx, "A", SettledKind::Completed);
+    assert!(started_rx.recv_timeout(Duration::from_millis(200)).is_err());
     handle.shutdown_and_join();
 }

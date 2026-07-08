@@ -1,5 +1,6 @@
 use std::{
     io::Write,
+    path::Path,
     process::{Command, Output, Stdio},
 };
 
@@ -8,10 +9,15 @@ use serde_json::{Value, json};
 
 pub fn backend_output(input: &[u8]) -> Output {
     let home = tempfile::tempdir().expect("backend test home");
+    backend_output_in(home.path(), Path::new("."), input)
+}
+
+pub fn backend_output_in(home: &Path, cwd: &Path, input: &[u8]) -> Output {
     let mut child = Command::new(env!("CARGO_BIN_EXE_kqode"))
         .arg(BACKEND_MODE_ARG)
-        .env("HOME", home.path())
-        .env("USERPROFILE", home.path())
+        .current_dir(cwd)
+        .env("HOME", home)
+        .env("USERPROFILE", home)
         // Force the no-key path so integration tests are deterministic and never
         // issue a live provider call, even when a developer's `.env` has a real
         // key (dotenvy does not override an already-set variable).

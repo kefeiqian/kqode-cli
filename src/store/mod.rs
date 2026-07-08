@@ -31,6 +31,7 @@ mod lock;
 mod migrations;
 mod providers;
 mod recovery;
+mod sessions;
 #[cfg(test)]
 mod tests;
 
@@ -41,6 +42,7 @@ use rusqlite::Connection;
 
 pub use error::{STORE_FATAL_SENTINEL, StoreError};
 pub use providers::{ActiveSelection, ProviderSettings};
+pub use sessions::StoredSession;
 
 /// Bootstrap busy-timeout: at startup wait only briefly for a locked DB, then
 /// fail fast with a store-fatal error instead of hanging the backend spawn.
@@ -107,7 +109,9 @@ impl Store {
             sanity_check(&conn)?;
             drop(conn);
             set_private_db_permissions(&path);
-            Ok::<Self, StoreError>(Self { path: path.clone() })
+            let store = Self { path: path.clone() };
+            store.reindex_sessions_from_logs().map_err(StoreError::Sanity)?;
+            Ok::<Self, StoreError>(store)
         })();
         result.map_err(|err| err.with_path(path))
     }

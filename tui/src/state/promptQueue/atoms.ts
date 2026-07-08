@@ -3,6 +3,7 @@ import type { Getter, Setter } from 'jotai';
 import { STREAM_RENDER_FLUSH_MS } from '@constants/backend.ts';
 import { SETTLED_KIND_COMPLETED } from '@contracts/backend/index.ts';
 import type { TranscriptEvent } from '@contracts/backend/index.ts';
+import type { SessionResumeResult } from '@contracts/backend/index.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { bodyScrollOffsetRowsAtom } from '@state/ui/index.ts';
 import { openLoginSurfaceAtom } from '@state/ui/surface/index.ts';
@@ -10,6 +11,7 @@ import { refreshGitStatusAtom } from '@state/ui/index.ts';
 import { createDeltaCoalescer } from '@libs/promptQueue/streamCoalescer.ts';
 import { BACKEND_UNAVAILABLE_MESSAGE, backendErrorMessage } from '@libs/promptQueue/promptQueue.ts';
 import type { QueueItem } from '@libs/promptQueue/promptQueue.ts';
+import { hydrateResumeTranscript } from '@state/promptQueue/hydrateResumeTranscript.ts';
 import { reduceTranscriptEvent } from '@libs/promptQueue/transcriptReducer.ts';
 import { appendClientOnlyError, sequencedText } from '@state/promptQueue/clientOnlyRows.ts';
 import {
@@ -117,6 +119,23 @@ export const resetTranscriptMirrorAtom = atom(null, (get, set) => {
   set(streamingTextByIdAtom, new Map());
   set(turnGenerationByIdAtom, new Map());
 });
+/** Rehydrates the backend-owned transcript mirror from a resumed session payload. */
+export const hydrateResumedTranscriptAtom = atom(
+  null,
+  (get, set, resumed: SessionResumeResult) => {
+    clearAllCoalescers();
+    const nextGeneration = get(conversationGenerationAtom) + 1;
+    const hydrated = hydrateResumeTranscript(resumed.turns, nextGeneration);
+    set(conversationGenerationAtom, nextGeneration);
+    set(promptQueueAtom, hydrated.queue);
+    set(clientOnlyRowsAtom, []);
+    set(streamingTextByIdAtom, hydrated.streamingTextById);
+    set(turnGenerationByIdAtom, hydrated.generationByTurnId);
+    set(settledTurnIdsAtom, hydrated.settledTurnIds);
+    set(nextQueueItemIdAtom, hydrated.nextQueueItemId);
+    set(bodyScrollOffsetRowsAtom, 0);
+  }
+);
 function applyTranscriptEvent(get: Getter, set: Setter, event: TranscriptEvent): void {
   const result = reduceTranscriptEvent(
     get(transcriptReducerStateAtom),

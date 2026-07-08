@@ -96,6 +96,12 @@ describe('resolveVerticalCursorIndex', () => {
     expect(resolveVerticalCursorIndex('abcdefghij', 4, 2, 'down')).toBe(6);
     expect(resolveVerticalCursorIndex('abcdefghij', 4, 6, 'up')).toBe(2);
   });
+
+  it('preserves grapheme-aligned visual columns across wrapped rows', () => {
+    expect(resolveVerticalCursorIndex('👍🏽a👍🏽b', 3, '👍🏽'.length, 'down')).toBe(
+      '👍🏽a'.length + '👍🏽'.length
+    );
+  });
 });
 
 describe('resolveClickResult', () => {
@@ -110,6 +116,14 @@ describe('resolveClickResult', () => {
   it('clamps the column to the clicked row length (and floors at 0)', () => {
     expect(resolveClickResult({ ...base, visibleRow: 2, column: 99 })?.index).toBe(11);
     expect(resolveClickResult({ ...base, visibleRow: 0, column: -5 })?.index).toBe(0);
+  });
+
+  it('never places the click cursor inside a grapheme cluster', () => {
+    const grapheme = { text: '👍🏽a', columns: 40, maxVisibleLines: 3, cursorIndex: 0, offset: 0 };
+    expect(resolveClickResult({ ...grapheme, visibleRow: 0, column: 1 })?.index).toBe(0);
+    expect(resolveClickResult({ ...grapheme, visibleRow: 0, column: 2 })?.index).toBe(
+      '👍🏽'.length
+    );
   });
 
   it('returns null for rows outside the visible window', () => {

@@ -9,7 +9,8 @@ describe('filterCommands', () => {
       CommandId.Exit,
       CommandId.Help,
       CommandId.Login,
-      CommandId.Model
+      CommandId.Model,
+      CommandId.Resume
     ]);
   });
 
@@ -38,7 +39,8 @@ describe('COMMAND_REGISTRY', () => {
       CommandId.Exit,
       CommandId.Help,
       CommandId.Login,
-      CommandId.Model
+      CommandId.Model,
+      CommandId.Resume
     ]);
 
     expect(COMMAND_REGISTRY.map((command) => command.name)).toEqual([...COMMAND_REGISTRY]

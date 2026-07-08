@@ -64,6 +64,13 @@ export function fakeClient(options: {
     listModels: vi.fn<BackendClient['listModels']>(async () => ({
       status: MODEL_LIST_STATUS_LOADED,
       models: []
+    })),
+    listSessions: vi.fn<BackendClient['listSessions']>(async () => ({ sessions: [] })),
+    resumeSession: vi.fn<BackendClient['resumeSession']>(async () => ({
+      sessionId: 'sess-1',
+      workspaceCwd: cwd,
+      canonicalWorkspaceCwd: cwd,
+      turns: []
     }))
   };
 }

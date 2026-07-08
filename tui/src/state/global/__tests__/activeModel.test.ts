@@ -160,7 +160,14 @@ function clientWith({
     setActiveSelection: async () => {},
     clearProviderKey: async () => {},
     setProviderKey: async () => ({ outcome: 'connected', selectedModel: null }),
-    listModels: async () => ({ status: 'loaded', models: [] })
+    listModels: async () => ({ status: 'loaded', models: [] }),
+    listSessions: async () => ({ sessions: [] }),
+    resumeSession: async () => ({
+      sessionId: 'sess-1',
+      workspaceCwd: 'C:\\workspace',
+      canonicalWorkspaceCwd: 'C:\\workspace',
+      turns: []
+    })
   };
 }
 
@@ -185,6 +192,13 @@ function mutableLoginClient(): BackendClient {
       active = { providerId: params.providerId, modelId: 'moonshot-v1' };
       return { outcome: 'connected', selectedModel: 'moonshot-v1' };
     },
-    listModels: async () => ({ status: 'loaded', models: [] })
+    listModels: async () => ({ status: 'loaded', models: [] }),
+    listSessions: async () => ({ sessions: [] }),
+    resumeSession: async () => ({
+      sessionId: 'sess-1',
+      workspaceCwd: 'C:\\workspace',
+      canonicalWorkspaceCwd: 'C:\\workspace',
+      turns: []
+    })
   };
 }

@@ -102,6 +102,13 @@ pub struct Transcript {
 }
 
 impl Transcript {
+    /// Replaces the transcript with restored settled turns and advances the
+    /// next sequence to `max(seq)+1` so resumed sessions keep monotonic order.
+    pub fn replace_with(&mut self, turns: Vec<TranscriptTurn>) {
+        self.next_seq = turns.iter().map(|turn| turn.seq).max().map_or(0, |seq| seq + 1);
+        self.turns = turns;
+    }
+
     /// Appends a turn using `state` as its initial queue state.
     pub fn push(&mut self, turn_id: String, prompt: String, state: TurnState) -> u64 {
         let seq = self.next_seq;
@@ -156,6 +163,13 @@ impl Transcript {
         Some(turn.turn_id.clone())
     }
 
+    /// Removes a turn by id regardless of state.
+    pub fn remove_turn(&mut self, turn_id: &str) -> bool {
+        let original_len = self.turns.len();
+        self.turns.retain(|turn| turn.turn_id != turn_id);
+        self.turns.len() != original_len
+    }
+
     pub fn drop_pending(&mut self) {
         self.turns.retain(|turn| turn.state != TurnState::Pending);
     }
@@ -165,6 +179,11 @@ impl Transcript {
     /// in place until it settles (so its runner thread is still joined).
     pub fn drop_settled(&mut self) {
         self.turns.retain(|turn| turn.state != TurnState::Settled);
+    }
+
+    #[must_use]
+    pub fn has_unsettled(&self) -> bool {
+        self.turns.iter().any(|turn| turn.state != TurnState::Settled)
     }
 
     #[must_use]

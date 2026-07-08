@@ -19,6 +19,9 @@ import type {
   ActiveSelectionResult,
   ModelListResult,
   ProviderListResult,
+  SessionListResult,
+  SessionResumeParams,
+  SessionResumeResult,
   SetKeyParams,
   SetKeyResult,
   StreamSubmitParams,
@@ -37,6 +40,7 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
   const validationRequestTimeoutMs = options.validationRequestTimeoutMs;
   const startupTimeoutMs = options.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS;
   const { launch } = options;
+  let workspaceCwd = options.initialWorkspaceCwd;
   let state: BackendLifecycleState = BackendLifecycleState.Idle;
   let session: BackendSession | null = null;
   let starting: Promise<BackendSession> | null = null;
@@ -69,58 +73,65 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     }
     teardown(BackendLifecycleState.Dead);
   };
-  const start = async (): Promise<BackendSession> => {
-    state = BackendLifecycleState.Starting;
+  const launchSession = async (
+    nextWorkspaceCwd: string | undefined
+  ): Promise<{ opened: BackendSession; sessionId: string }> => {
     let backend: LaunchedBackend;
     try {
-      backend = await launch();
+      backend = await launch(nextWorkspaceCwd);
     } catch (error) {
-      state = BackendLifecycleState.Dead;
       throw toLaunchError(error);
     }
-    if (state !== BackendLifecycleState.Starting) {
-      backend.dispose();
-      throw abortedError();
-    }
-    let connection: MessageConnection;
-    let sessionId: string;
-    try {
-      ({ connection, sessionId } = await openReadyConnection({
+    const { connection, sessionId } = await openReadyConnection({
+      backend,
+      startupTimeoutMs,
+      onFatal: markDead
+    });
+    const innerClient = createMessageConnectionClient(connection, {
+      requestTimeoutMs,
+      validationRequestTimeoutMs
+    });
+    return {
+      opened: {
         backend,
-        startupTimeoutMs,
-        onFatal: markDead
-      }));
+        connection,
+        client: innerClient
+      },
+      sessionId
+    };
+  };
+  const attachTranscriptListener = (innerClient: MessageConnectionBackendClient): void => {
+    detachTranscriptEvents = innerClient.onTranscriptEvent((event) => {
+      for (const listener of transcriptListeners) {
+        listener(event);
+      }
+    });
+  };
+  const announceReady = (sessionId: string): void => {
+    for (const listener of readyListeners) {
+      listener(sessionId);
+    }
+  };
+  const start = async (): Promise<BackendSession> => {
+    state = BackendLifecycleState.Starting;
+    try {
+      const { opened, sessionId } = await launchSession(workspaceCwd);
+      if (state !== BackendLifecycleState.Starting) {
+        opened.connection.dispose();
+        opened.backend.dispose();
+        throw abortedError();
+      }
+      attachTranscriptListener(opened.client);
+      session = opened;
+      state = BackendLifecycleState.Ready;
+      announceReady(sessionId);
+      return opened;
     } catch (error) {
       if (state === BackendLifecycleState.Starting) {
         state = BackendLifecycleState.Dead;
       }
       throw error;
     }
-    if (state !== BackendLifecycleState.Starting) {
-      connection.dispose();
-      backend.dispose();
-      throw abortedError();
-    }
-    const innerClient = createMessageConnectionClient(connection, {
-      requestTimeoutMs,
-      validationRequestTimeoutMs
-    });
-    detachTranscriptEvents = innerClient.onTranscriptEvent((event) => {
-      for (const listener of transcriptListeners) {
-        listener(event);
-      }
-    });
-    const opened: BackendSession = {
-      backend,
-      connection,
-      client: innerClient
-    };
-    session = opened;
-    state = BackendLifecycleState.Ready;
-    for (const listener of readyListeners) {
-      listener(sessionId);
-    }
-    return opened;
   };
   const ensureSession = (): Promise<BackendSession> => {
     if (disposed) {
@@ -160,6 +171,37 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
       };
     },
     ensureStarted: async (): Promise<void> => void (await ensureSession()),
+    async relaunch(nextWorkspaceCwd: string): Promise<void> {
+      if (disposed) {
+        throw disposedError();
+      }
+      if (state !== BackendLifecycleState.Ready || session === null) {
+        workspaceCwd = nextWorkspaceCwd;
+        await ensureSession();
+        return;
+      }
+      const previousSession = session;
+      const previousWorkspaceCwd = workspaceCwd;
+      state = BackendLifecycleState.Starting;
+      try {
+        const { opened, sessionId } = await launchSession(nextWorkspaceCwd);
+        previousSession.client.failInFlight('backend connection closed before the turn completed');
+        previousSession.connection.dispose();
+        previousSession.backend.dispose();
+        detachTranscriptEvents?.();
+        detachTranscriptEvents = undefined;
+        attachTranscriptListener(opened.client);
+        session = opened;
+        workspaceCwd = nextWorkspaceCwd;
+        state = BackendLifecycleState.Ready;
+        announceReady(sessionId);
+      } catch (error) {
+        session = previousSession;
+        workspaceCwd = previousWorkspaceCwd;
+        state = BackendLifecycleState.Ready;
+        throw error;
+      }
+    },
     submit: async (params: StreamSubmitParams): Promise<void> =>
       void (await withClient((client) => client.submit(params))),
     clearConversation: async (): Promise<void> =>
@@ -179,6 +221,12 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     },
     async listModels(providerId: string): Promise<ModelListResult> {
       return withClient((client) => client.listModels(providerId));
+    },
+    async listSessions(): Promise<SessionListResult> {
+      return withClient((client) => client.listSessions());
+    },
+    async resumeSession(params: SessionResumeParams): Promise<SessionResumeResult> {
+      return withClient((client) => client.resumeSession(params));
     },
     dispose() {
       disposed = true;

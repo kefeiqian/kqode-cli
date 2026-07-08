@@ -37,7 +37,7 @@ const KEYBINDING_SECTIONS: readonly HelpSection[] = [
       { keys: 'shift+enter', description: 'Insert a newline' },
       { keys: '\\ then enter', description: 'Insert a newline' },
       { keys: '← / →', description: 'Move the cursor' },
-      { keys: 'backspace', description: 'Delete the previous character' },
+      { keys: 'backspace', description: 'Delete the previous visible character' },
       { keys: 'ctrl+v / alt+v / right-click', description: 'Paste from the system clipboard' }
     ]
   },

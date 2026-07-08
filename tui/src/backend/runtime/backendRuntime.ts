@@ -13,6 +13,7 @@ type Store = ReturnType<typeof createStore>;
 export type RuntimeBackendClient = BackendClient & {
   onReady(listener: (sessionId: string) => void): void;
   ensureStarted(): Promise<void>;
+  relaunch(workspaceCwd: string): Promise<void>;
   dispose(): void;
 };
 

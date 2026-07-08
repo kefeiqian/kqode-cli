@@ -5,6 +5,7 @@ import { HelpScreen } from '@components/HelpScreen/index.tsx';
 import { HomeScreen } from '@components/HomeScreen/index.tsx';
 import { LoginSurface } from '@components/LoginSurface/index.tsx';
 import { ModelSurface } from '@components/ModelSurface/index.tsx';
+import { ResumeSurface } from '@components/ResumeSurface/index.tsx';
 import { TerminalTooSmall } from '@components/TerminalTooSmall.tsx';
 import { useGlobalKeys } from '@/useGlobalKeys.ts';
 import {
@@ -52,5 +53,7 @@ export function App() {
       return <LoginSurface />;
     case Surface.Model:
       return <ModelSurface />;
+    case Surface.Resume:
+      return <ResumeSurface />;
   }
 }

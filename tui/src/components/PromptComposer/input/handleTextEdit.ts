@@ -7,10 +7,11 @@ import {
 } from '@state/ui/composer/index.ts';
 
 /**
- * Lowest-priority text editing: Backspace/Delete removes a code point, Tab is a
- * consumed no-op (it never inserts a literal tab), and printable input is
- * inserted. Editing the text re-opens/re-filters the menu by clearing the Esc
- * dismissal and resetting the highlight. Unhandled keys fall through as a no-op.
+ * Lowest-priority text editing: Backspace/Delete removes the previous grapheme
+ * cluster, Tab is a consumed no-op (it never inserts a literal tab), and
+ * printable input is inserted. Editing the text re-opens/re-filters the menu by
+ * clearing the Esc dismissal and resetting the highlight. Unhandled keys fall
+ * through as a no-op.
  */
 export const handleTextEdit: ComposerKeyHandler = (context) => {
   const { input, key, maxBytes, store } = context;

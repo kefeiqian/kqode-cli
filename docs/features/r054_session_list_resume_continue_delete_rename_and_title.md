@@ -16,6 +16,7 @@ Within the `Sessions and replay` area, its focus is durable event logs, session 
 - Connect the behavior to the responsible KQode core surface: Rust kqode-session.
 - Record enough trace data for the behavior to be explained after the run.
 - Keep first-scope behavior local-first unless the requirement explicitly says deferred.
+- First shipped slice: local-only `/resume` backed by append-only JSONL session logs plus a SQLite index, with a single global session table and no remote/local tabs.
 
 ## Implementation notes
 

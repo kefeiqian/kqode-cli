@@ -2,10 +2,12 @@ use serde::{Deserialize, Serialize};
 
 mod providers;
 mod queue;
+mod sessions;
 #[cfg(test)]
 mod tests;
 pub use providers::*;
 pub use queue::*;
+pub use sessions::*;
 
 /// Hidden argument that starts the internal JSON-RPC backend loop.
 pub const BACKEND_MODE_ARG: &str = "--__kqode-json-rpc-backend";
@@ -43,6 +45,8 @@ pub enum RpcMethod {
     ProviderClearKey,
     ProviderSetKey,
     ProviderModels,
+    SessionList,
+    SessionResume,
 }
 
 impl RpcMethod {
@@ -58,6 +62,8 @@ impl RpcMethod {
             Self::ProviderClearKey => PROVIDER_CLEAR_KEY_METHOD,
             Self::ProviderSetKey => PROVIDER_SET_KEY_METHOD,
             Self::ProviderModels => PROVIDER_MODELS_METHOD,
+            Self::SessionList => SESSION_LIST_METHOD,
+            Self::SessionResume => SESSION_RESUME_METHOD,
         }
     }
 
@@ -76,6 +82,8 @@ impl RpcMethod {
             Self::ProviderClearKey,
             Self::ProviderSetKey,
             Self::ProviderModels,
+            Self::SessionList,
+            Self::SessionResume,
         ]
         .into_iter()
         .find(|candidate| candidate.as_str() == method)

@@ -267,6 +267,24 @@ describe('PromptComposer', () => {
     expect(lastFrame() ?? '').toContain('> abXcY');
   });
 
+  it('uses arrows and backspace without splitting grapheme clusters', async () => {
+    const onSubmit = vi.fn();
+    const { lastFrame, stdin } = renderWithJotai(
+      <PromptComposer columns={40} onSubmit={onSubmit} />
+    );
+
+    stdin.write('👍🏽e\u0301x');
+    await flushInput();
+    stdin.write('\u001B[D');
+    await flushInput();
+    stdin.write('\u001B[D');
+    await flushInput();
+    stdin.write('\b');
+    await flushInput();
+
+    expect(lastFrame() ?? '').toContain('> e\u0301x');
+  });
+
   it('ignores mouse tracking sequences instead of inserting them into the prompt', async () => {
     const onSubmit = vi.fn();
     const { lastFrame, stdin } = renderWithJotai(

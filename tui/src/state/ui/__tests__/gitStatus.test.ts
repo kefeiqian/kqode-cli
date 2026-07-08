@@ -16,7 +16,14 @@ function clientWithGitStatus(gitStatus: BackendClient['gitStatus']): BackendClie
     setActiveSelection: async () => {},
     clearProviderKey: async () => {},
     setProviderKey: async () => ({ outcome: 'unreachable', selectedModel: null }),
-    listModels: async () => ({ status: 'failed', models: [] })
+    listModels: async () => ({ status: 'failed', models: [] }),
+    listSessions: async () => ({ sessions: [] }),
+    resumeSession: async () => ({
+      sessionId: 'sess-1',
+      workspaceCwd: 'C:\\workspace',
+      canonicalWorkspaceCwd: 'C:\\workspace',
+      turns: []
+    })
   };
 }
 

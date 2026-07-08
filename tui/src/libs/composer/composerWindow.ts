@@ -1,6 +1,11 @@
 import { clamp } from '@libs/math/clamp.ts';
 import { wrapPromptText } from '@libs/composer/wrapPromptText.ts';
 import type { WrappedPromptRow } from '@libs/composer/wrapPromptText.ts';
+import {
+  clampToGraphemeBoundary,
+  displayWidthBeforeIndex,
+  indexAtDisplayColumn
+} from '@libs/text/displayWidth.ts';
 
 export type ComposerWindowParams = {
   text: string;
@@ -40,7 +45,7 @@ export function resolveComposerWindow(params: ComposerWindowParams): ComposerWin
   const { text, columns, maxVisibleLines, cursorIndex, offset = 0 } = params;
   const safeMaxVisibleLines = Math.max(1, maxVisibleLines);
   const rows = wrapPromptText(text, columns);
-  const safeCursorIndex = clamp(cursorIndex, 0, text.length);
+  const safeCursorIndex = clampToGraphemeBoundary(text, clamp(cursorIndex, 0, text.length));
   // Cursor-follow baseline (slide up only when the cursor would fall below the
   // last visible row); the signed offset then shifts the window from there.
   const { visibleStart, lastStart, baseStart, cursorRowIndex } = resolveWindowBounds(
@@ -73,7 +78,7 @@ export function resolveScrollIntoViewOffset(params: ComposerWindowParams): numbe
   const { text, columns, maxVisibleLines, cursorIndex, offset = 0 } = params;
   const safeMaxVisibleLines = Math.max(1, maxVisibleLines);
   const rows = wrapPromptText(text, columns);
-  const safeCursorIndex = clamp(cursorIndex, 0, text.length);
+  const safeCursorIndex = clampToGraphemeBoundary(text, clamp(cursorIndex, 0, text.length));
   const { visibleStart, baseStart, cursorRowIndex } = resolveWindowBounds(
     rows,
     safeMaxVisibleLines,
@@ -107,7 +112,7 @@ export function resolveClickResult(
   }
 
   const rows = wrapPromptText(text, columns);
-  const safeCursorIndex = clamp(cursorIndex, 0, text.length);
+  const safeCursorIndex = clampToGraphemeBoundary(text, clamp(cursorIndex, 0, text.length));
   const { visibleStart, lastStart } = resolveWindowBounds(
     rows,
     safeMaxVisibleLines,
@@ -120,7 +125,7 @@ export function resolveClickResult(
   }
 
   const row = rows[targetRowIndex];
-  const index = row.start + Math.min(Math.max(0, column), row.end - row.start);
+  const index = row.start + indexAtDisplayColumn(row.text, column);
   // Keep the window fixed: reproduce the current visibleStart against the NEW
   // cursor's follow baseline. Resolve the cursor row the same way
   // resolveComposerWindow does — at a soft-wrap boundary `index === row.start ===
@@ -169,16 +174,19 @@ export function resolveVerticalCursorIndex(
   direction: VerticalDirection
 ): number | null {
   const rows = wrapPromptText(text, columns);
-  const safeCursorIndex = clamp(cursorIndex, 0, text.length);
+  const safeCursorIndex = clampToGraphemeBoundary(text, clamp(cursorIndex, 0, text.length));
   const currentRow = resolveCursorRowIndex(rows, safeCursorIndex);
   const targetRow = currentRow + (direction === 'up' ? -1 : 1);
   if (targetRow < 0 || targetRow >= rows.length) {
     return null;
   }
 
-  const column = safeCursorIndex - rows[currentRow].start;
+  const column = displayWidthBeforeIndex(
+    rows[currentRow].text,
+    safeCursorIndex - rows[currentRow].start
+  );
   const target = rows[targetRow];
-  return target.start + Math.min(column, target.end - target.start);
+  return target.start + indexAtDisplayColumn(target.text, column);
 }
 
 function resolveVisibleCursorIndex(rows: WrappedPromptRow[], cursorIndex: number): number {
@@ -186,7 +194,7 @@ function resolveVisibleCursorIndex(rows: WrappedPromptRow[], cursorIndex: number
 
   for (const row of rows) {
     if (cursorIndex >= row.start && cursorIndex <= row.end) {
-      return visibleCursorIndex + Math.min(row.text.length, cursorIndex - row.start);
+      return visibleCursorIndex + clampToGraphemeBoundary(row.text, cursorIndex - row.start);
     }
 
     visibleCursorIndex += row.text.length + 1;

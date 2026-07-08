@@ -38,6 +38,13 @@ function renderApp(backendClient: Partial<BackendClient>, columns = 80, rows = 4
     clearProviderKey: async () => undefined,
     setProviderKey: async () => ({ outcome: 'unreachable', selectedModel: null }),
     listModels: async () => ({ status: 'failed', models: [] }),
+    listSessions: async () => ({ sessions: [] }),
+    resumeSession: async () => ({
+      sessionId: 'sess-1',
+      workspaceCwd,
+      canonicalWorkspaceCwd: workspaceCwd,
+      turns: []
+    }),
     ...backendClient
   };
   store.set(backendClientAtom, client);

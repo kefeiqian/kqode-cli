@@ -4,7 +4,9 @@ use std::sync::mpsc::Sender;
 
 use lsp_server::{Connection, Message, Notification, Request, Response};
 
-use crate::conversation::{Command, ConversationEvent, Coordinator, SettledKind, TurnResult};
+use crate::conversation::{
+    Command, ConversationEvent, Coordinator, SessionPersistence, SettledKind, TurnResult,
+};
 use crate::debug_log;
 use crate::protocol::{
     ActivatedParams, BACKEND_READY_METHOD, BackendReadyParams, ClearKeyParams,
@@ -20,6 +22,7 @@ mod login;
 mod message;
 mod providers;
 mod resolve;
+mod sessions;
 #[cfg(test)]
 mod tests;
 
@@ -87,7 +90,10 @@ fn run_stdio_with(
     session_id: &str,
 ) -> Result<(), BackendError> {
     announce_ready(&connection, session_id)?;
-    let coordinator = Coordinator::start(json_rpc_event_sink(&connection));
+    let coordinator = Coordinator::start(
+        json_rpc_event_sink(&connection),
+        Box::new(SessionPersistence::new(store.clone())),
+    );
     let loop_result = run_loop(connection, store, coordinator.sender());
     coordinator.shutdown_and_join();
     loop_result
@@ -195,6 +201,10 @@ fn handle_request(
         }
         Some(RpcMethod::ProviderModels) => {
             login::handle_provider_models(request, connection, store)
+        }
+        Some(RpcMethod::SessionList) => Some(sessions::list_sessions(request, store, coordinator)),
+        Some(RpcMethod::SessionResume) => {
+            Some(sessions::resume_session(request, store, coordinator))
         }
         None => Some(Response::new_err(
             request.id,
