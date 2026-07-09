@@ -170,7 +170,7 @@ describe('PromptComposer history recall', () => {
     expect(store.get(highlightedCommandAtom)?.name).toBe('/clear');
 
     await writeAndFlush(stdin, DOWN);
-    expect(store.get(highlightedCommandAtom)?.name).toBe('/exit');
+    expect(store.get(highlightedCommandAtom)?.name).toBe('/connect');
     expect(store.get(composerStateAtom).text).toBe('/');
 
     store.set(composerStateAtom, { text: '', cursorIndex: 0, validationError: null });

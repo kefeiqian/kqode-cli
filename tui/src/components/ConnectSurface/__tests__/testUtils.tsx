@@ -1,6 +1,6 @@
 import { createStore } from 'jotai';
 import { vi } from 'vitest';
-import { LoginSurface } from '@components/LoginSurface/index.tsx';
+import { ConnectSurface } from '@components/ConnectSurface/index.tsx';
 import type { BackendClient, ProviderStatusInfo, SetKeyOutcome } from '@contracts/backend/index.ts';
 import {
   MODEL_LIST_STATUS_LOADED,
@@ -10,7 +10,7 @@ import {
 } from '@contracts/backend/index.ts';
 import { backendClientAtom, workspaceCwdAtom } from '@state/global/index.ts';
 import { activeSurfaceAtom, columnsTestOverrideAtom, rowsTestOverrideAtom, Surface } from '@state/ui/index.ts';
-import { PROVIDER_ID_CUSTOM, PROVIDER_ID_KIMI } from '@state/ui/login/index.ts';
+import { PROVIDER_ID_CUSTOM, PROVIDER_ID_KIMI } from '@state/ui/connect/index.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 import { memoryBackendStub } from '@test/backendMemoryStub.ts';
 import { themeBackendStub } from '@test/backendThemeStub.ts';
@@ -79,14 +79,14 @@ export function fakeClient(options: {
   };
 }
 
-export function renderLogin(client: BackendClient = fakeClient()) {
+export function renderConnect(client: BackendClient = fakeClient()) {
   const store = createStore();
-  store.set(activeSurfaceAtom, Surface.Login);
+  store.set(activeSurfaceAtom, Surface.Connect);
   store.set(backendClientAtom, client);
   store.set(workspaceCwdAtom, cwd);
   store.set(columnsTestOverrideAtom, 100);
   store.set(rowsTestOverrideAtom, 24);
-  return { client, store, ...renderWithJotai(<LoginSurface />, store) };
+  return { client, store, ...renderWithJotai(<ConnectSurface />, store) };
 }
 
 export async function waitForFrame(lastFrame: () => string | undefined, text: string) {

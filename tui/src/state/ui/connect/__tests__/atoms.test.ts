@@ -6,23 +6,23 @@ import {
   PROVIDER_STATUS_NOT_CONFIGURED
 } from '@contracts/backend/providerMessages.ts';
 import {
-  LoginStep,
+  ConnectStep,
   chooseSelectedProviderAtom,
   customBaseUrlAtom,
   customLabelAtom,
-  loginProvidersAtom,
-  loginSelectedIndexAtom,
-  loginStepAtom,
-  moveLoginSelectionAtom,
+  connectProvidersAtom,
+  connectSelectedIndexAtom,
+  connectStepAtom,
+  moveConnectSelectionAtom,
   PROVIDER_ID_CUSTOM,
   PROVIDER_ID_KIMI,
-  resetLoginSurfaceAtom
-} from '@state/ui/login/index.ts';
+  resetConnectSurfaceAtom
+} from '@state/ui/connect/index.ts';
 
-describe('login atoms', () => {
+describe('Connect atoms', () => {
   it('moves selection and chooses the expected provider step', () => {
     const store = createStore();
-    store.set(loginProvidersAtom, [
+    store.set(connectProvidersAtom, [
       {
         providerId: PROVIDER_ID_KIMI,
         label: 'Kimi',
@@ -41,28 +41,28 @@ describe('login atoms', () => {
       }
     ]);
 
-    store.set(moveLoginSelectionAtom, 1);
-    expect(store.get(loginSelectedIndexAtom)).toBe(1);
+    store.set(moveConnectSelectionAtom, 1);
+    expect(store.get(connectSelectedIndexAtom)).toBe(1);
 
     store.set(chooseSelectedProviderAtom);
-    expect(store.get(loginStepAtom)).toBe(LoginStep.ConnectedActions);
+    expect(store.get(connectStepAtom)).toBe(ConnectStep.ConnectedActions);
     expect(store.get(customBaseUrlAtom)).toBe('https://api.example.test/v1');
     expect(store.get(customLabelAtom)).toBe('Custom');
   });
 
   it('resets only non-secret UI state and exposes no API key atom', () => {
     const store = createStore();
-    const secret = 'sk-should-not-be-in-login-atoms';
+    const secret = 'sk-should-not-be-in-Connect-atoms';
 
     store.set(customBaseUrlAtom, 'https://api.example.test/v1');
     store.set(customLabelAtom, 'Work');
-    store.set(resetLoginSurfaceAtom);
+    store.set(resetConnectSurfaceAtom);
 
     const values = [
       store.get(customBaseUrlAtom),
       store.get(customLabelAtom),
-      store.get(loginStepAtom),
-      store.get(loginSelectedIndexAtom)
+      store.get(connectStepAtom),
+      store.get(connectSelectedIndexAtom)
     ];
     expect(JSON.stringify(values)).not.toContain(secret);
   });

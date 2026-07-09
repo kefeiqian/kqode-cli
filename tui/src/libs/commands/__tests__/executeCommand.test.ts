@@ -11,7 +11,7 @@ const makeActions = () => ({
   exit: vi.fn(),
   clearTranscript: vi.fn(),
   showHelp: vi.fn(),
-  openLogin: vi.fn(),
+  openConnect: vi.fn(),
   openModel: vi.fn(),
   openResume: vi.fn(),
   openMemory: vi.fn(),
@@ -89,11 +89,11 @@ describe('executeCommand', () => {
     expect(actions.clearTranscript).not.toHaveBeenCalled();
   });
 
-  it('runs openLogin only for the login command', () => {
+  it('runs openConnect only for the Connect command', () => {
     const actions = makeActions();
-    executeCommand(CommandId.Login, actions);
+    executeCommand(CommandId.Connect, actions);
 
-    expect(actions.openLogin).toHaveBeenCalledTimes(1);
+    expect(actions.openConnect).toHaveBeenCalledTimes(1);
     expect(actions.openModel).not.toHaveBeenCalled();
     expect(actions.exit).not.toHaveBeenCalled();
     expect(actions.clearTranscript).not.toHaveBeenCalled();
@@ -105,7 +105,7 @@ describe('executeCommand', () => {
     executeCommand(CommandId.Model, actions);
 
     expect(actions.openModel).toHaveBeenCalledTimes(1);
-    expect(actions.openLogin).not.toHaveBeenCalled();
+    expect(actions.openConnect).not.toHaveBeenCalled();
     expect(actions.exit).not.toHaveBeenCalled();
     expect(actions.clearTranscript).not.toHaveBeenCalled();
     expect(actions.showHelp).not.toHaveBeenCalled();
@@ -117,7 +117,7 @@ describe('executeCommand', () => {
 
     expect(actions.openResume).toHaveBeenCalledTimes(1);
     expect(actions.openModel).not.toHaveBeenCalled();
-    expect(actions.openLogin).not.toHaveBeenCalled();
+    expect(actions.openConnect).not.toHaveBeenCalled();
     expect(actions.exit).not.toHaveBeenCalled();
     expect(actions.clearTranscript).not.toHaveBeenCalled();
     expect(actions.showHelp).not.toHaveBeenCalled();
@@ -130,7 +130,7 @@ describe('executeCommand', () => {
     expect(actions.openMemory).toHaveBeenCalledWith(CommandMemoryMode.Active);
     expect(actions.openResume).not.toHaveBeenCalled();
     expect(actions.openModel).not.toHaveBeenCalled();
-    expect(actions.openLogin).not.toHaveBeenCalled();
+    expect(actions.openConnect).not.toHaveBeenCalled();
     expect(actions.exit).not.toHaveBeenCalled();
   });
 

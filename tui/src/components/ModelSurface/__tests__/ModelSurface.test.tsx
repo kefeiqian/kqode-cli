@@ -65,7 +65,7 @@ describe('ModelSurface', () => {
     });
     const { lastFrame } = renderModel(client);
 
-    const frame = await waitForFrame(lastFrame, '(not connected — /login to add)');
+    const frame = await waitForFrame(lastFrame, '(not connected — /connect to add)');
     expect(frame).toContain('Kimi (via keychain)');
     expect(frame).toContain('k1');
     expect(frame).toContain('Custom');
@@ -136,9 +136,9 @@ describe('ModelSurface', () => {
     expect(store.get(activeSurfaceAtom)).toBe(Surface.Home);
   });
 
-  it('redirects to login when opened without a connected provider', async () => {
+  it('redirects to Connect when opened without a connected provider', async () => {
     const client = fakeClient({ providers: [provider('kimi', 'Kimi', false)] });
     const { store } = renderModel(client);
-    await vi.waitFor(() => expect(store.get(activeSurfaceAtom)).toBe(Surface.Login));
+    await vi.waitFor(() => expect(store.get(activeSurfaceAtom)).toBe(Surface.Connect));
   });
 });

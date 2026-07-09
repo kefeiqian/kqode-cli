@@ -86,7 +86,7 @@ describe('enqueuePromptAtom', () => {
     expect(store.get(submittedPromptEntriesAtom)[0]).toMatchObject({ kind: 'user', text: 'hello' });
   });
 
-  it('renders needsConfiguration settled events inline without opening login', async () => {
+  it('renders needsConfiguration settled events inline without opening Connect', async () => {
     const store = createStore();
     store.set(newTurnIdAtom, { newTurnId: () => 'turn-1' });
     store.set(backendClientAtom, clientWithSubmit(async () => undefined));
@@ -122,7 +122,7 @@ describe('enqueuePromptAtom', () => {
     ).toHaveLength(2);
   });
 
-  it('routes auth errors to login, restores the prompt, and records the error', async () => {
+  it('routes auth errors to Connect, restores the prompt, and records the error', async () => {
     const store = createStore();
     store.set(newTurnIdAtom, { newTurnId: () => 'turn-1' });
     store.set(backendClientAtom, clientWithSubmit(async () => undefined));
@@ -134,7 +134,7 @@ describe('enqueuePromptAtom', () => {
       result: { kind: 'error', text: null, finishReason: null, errorKind: 'auth', message: 'key rejected' }
     });
 
-    expect(store.get(activeSurfaceAtom)).toBe(Surface.Login);
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Connect);
     expect(store.get(restoreComposerDraftAtom)).toBe('retry after key');
     expect(store.get(submittedPromptEntriesAtom).at(-1)?.text).toContain('key rejected');
   });

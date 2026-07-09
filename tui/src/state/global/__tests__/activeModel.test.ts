@@ -111,9 +111,9 @@ describe('activeModel atoms', () => {
     expect(store.get(activeModelLabelAtom)).toBe(NOT_CONFIGURED_HERE_MODEL_LABEL);
   });
 
-  it('refreshes to the auto-selected model after a successful login connects a provider', async () => {
+  it('refreshes to the auto-selected model after a successful Connect connects a provider', async () => {
     const store = createStore();
-    const client = mutableLoginClient();
+    const client = mutableConnectClient();
     store.set(backendClientAtom, client);
 
     await store.set(refreshActiveModelAtom);
@@ -174,7 +174,7 @@ function clientWith({
   };
 }
 
-function mutableLoginClient(): BackendClient {
+function mutableConnectClient(): BackendClient {
   const connectedProvider = provider('kimi', 'Kimi');
   let providers: ProviderStatusInfo[] = [];
   let active = { providerId: null, modelId: null } as Awaited<ReturnType<BackendClient['getActiveSelection']>>;

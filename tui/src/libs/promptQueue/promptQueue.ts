@@ -24,7 +24,7 @@ export type BackendResult = {
 /** Shown when a prompt is submitted with no backend client wired into the seam. */
 export const BACKEND_UNAVAILABLE_MESSAGE = 'Rust backend unavailable';
 export const PROVIDER_NOT_CONFIGURED_MESSAGE =
-  'No provider configured. Use /login to add a provider before sending messages.';
+  'No provider configured. Use /connect to add a provider before sending messages.';
 
 export type QueueItem = {
   id: number;

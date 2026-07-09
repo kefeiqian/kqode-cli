@@ -12,7 +12,7 @@ import type {
   ProviderStatusInfo
 } from '@contracts/backend/providerMessages.ts';
 import { backendClientAtom } from '@state/global/index.ts';
-import { openLoginSurfaceAtom } from '@state/ui/index.ts';
+import { openConnectSurfaceAtom } from '@state/ui/index.ts';
 import {
   MODEL_LOAD_STATUS_LOADING,
   resetModelSurfaceAtom,
@@ -24,7 +24,7 @@ import {
 /** Backend effects for `/model`: initial parallel loads, retry, and set-active. */
 export function useModelBackend(onSelected: () => void) {
   const client = useAtomValue(backendClientAtom);
-  const openLogin = useSetAtom(openLoginSurfaceAtom);
+  const openConnect = useSetAtom(openConnectSurfaceAtom);
   const resetModel = useSetAtom(resetModelSurfaceAtom);
   const setProvidersLoading = useSetAtom(setModelProvidersLoadingAtom);
   const setActiveSelection = useSetAtom(setModelActiveSelectionAtom);
@@ -54,7 +54,7 @@ export function useModelBackend(onSelected: () => void) {
   const refreshModels = useCallback(async () => {
     resetModel();
     if (client === undefined) {
-      openLogin();
+      openConnect();
       return;
     }
     const version = requestVersion.current + 1;
@@ -70,7 +70,7 @@ export function useModelBackend(onSelected: () => void) {
       }
       const connected = providerList.providers.filter((provider) => provider.status === PROVIDER_STATUS_CONNECTED);
       if (connected.length === 0) {
-        openLogin();
+        openConnect();
         return;
       }
       setProvidersLoading(providerList.providers);
@@ -78,10 +78,10 @@ export function useModelBackend(onSelected: () => void) {
       connected.forEach((provider) => void loadProviderModels(provider.providerId, version));
     } catch {
       if (requestVersion.current === version) {
-        openLogin();
+        openConnect();
       }
     }
-  }, [client, loadProviderModels, openLogin, resetModel, setActiveSelection, setProvidersLoading]);
+  }, [client, loadProviderModels, openConnect, resetModel, setActiveSelection, setProvidersLoading]);
 
   const selectModel = useCallback(
     async (providerId: string, modelId: string) => {

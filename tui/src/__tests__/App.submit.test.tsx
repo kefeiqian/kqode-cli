@@ -156,7 +156,7 @@ describe('App submit and event-fed output', () => {
     expect(store.get(clientOnlyRowsAtom)).toHaveLength(1);
   });
 
-  it('renders auth errors and reroutes to login with the prompt restored', async () => {
+  it('renders auth errors and reroutes to Connect with the prompt restored', async () => {
     const { stdin, store } = renderApp(
       settledBackend({ kind: 'error', text: null, finishReason: null, errorKind: 'auth', message: 'bad key' })
     );
@@ -165,7 +165,7 @@ describe('App submit and event-fed output', () => {
 
     await waitForFrame(
       () => `${store.get(activeSurfaceAtom)}:${store.get(restoreComposerDraftAtom)}`,
-      (state) => state === `${Surface.Login}:needs a good key`
+      (state) => state === `${Surface.Connect}:needs a good key`
     );
     expect(store.get(promptQueueAtom).at(-1)?.result?.text).toContain('bad key');
   });
@@ -184,7 +184,7 @@ describe('App submit and event-fed output', () => {
     await typePrompt(stdin, 'hello without config');
 
     const frame = await waitForFrame(lastFrame, (output) =>
-      output.includes('No provider configured. Use /login to add a provider')
+      output.includes('No provider configured. Use /connect to add a provider')
     );
     expect(frame).not.toContain('SYSTEM:');
     expect(frame).toContain('❯ hello without config');

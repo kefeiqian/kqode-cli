@@ -6,7 +6,7 @@ import type { TranscriptEvent } from '@contracts/backend/index.ts';
 import type { SessionResumeResult } from '@contracts/backend/index.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { bodyScrollOffsetRowsAtom } from '@state/ui/index.ts';
-import { openLoginSurfaceAtom } from '@state/ui/surface/index.ts';
+import { openConnectSurfaceAtom } from '@state/ui/surface/index.ts';
 import { refreshGitStatusAtom } from '@state/ui/index.ts';
 import { createDeltaCoalescer } from '@libs/promptQueue/streamCoalescer.ts';
 import { BACKEND_UNAVAILABLE_MESSAGE, backendErrorMessage } from '@libs/promptQueue/promptQueue.ts';
@@ -152,7 +152,7 @@ function applyTranscriptEvent(get: Getter, set: Setter, event: TranscriptEvent):
     void set(refreshGitStatusAtom);
   }
   if (result.effect !== undefined) {
-    rerouteToLogin(get, set, result.effect.turnText);
+    rerouteToConnect(get, set, result.effect.turnText);
   }
 }
 function coalesceDelta(
@@ -167,10 +167,10 @@ function coalesceDelta(
   deltaCoalescers.set(event.turnId, coalescer);
   coalescer.push(event.delta);
 }
-function rerouteToLogin(get: Getter, set: Setter, draft: string): void {
+function rerouteToConnect(get: Getter, set: Setter, draft: string): void {
   if (get(restoreComposerDraftAtom) === '') {
     set(restoreComposerDraftAtom, draft);
-    set(openLoginSurfaceAtom);
+    set(openConnectSurfaceAtom);
   }
 }
 function bumpGeneration(set: Setter): void {

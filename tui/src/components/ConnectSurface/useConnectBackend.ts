@@ -1,39 +1,39 @@
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useCallback } from 'react';
-import { KIMI_BASE_URL, LoginStep, PROVIDER_ID_CUSTOM } from '@state/ui/login/index.ts';
+import { KIMI_BASE_URL, ConnectStep, PROVIDER_ID_CUSTOM } from '@state/ui/connect/index.ts';
 import {
   customBaseUrlErrorAtom,
   customLabelErrorAtom,
-  loginInFlightAtom,
-  loginLastOutcomeAtom,
-  loginProvidersAtom,
-  loginRequestErrorAtom,
-  loginSelectedIndexAtom,
-  loginStepAtom,
+  connectInFlightAtom,
+  connectLastOutcomeAtom,
+  connectProvidersAtom,
+  connectRequestErrorAtom,
+  connectSelectedIndexAtom,
+  connectStepAtom,
   selectedProviderAtom
-} from '@state/ui/login/index.ts';
+} from '@state/ui/connect/index.ts';
 import { closeActiveSurfaceAtom } from '@state/ui/index.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { validateBaseUrl, validateLabel } from '@libs/providers/index.ts';
 
-/** Backend side effects for `/login`, keeping key material out of atoms. */
-export function useLoginBackend(baseUrl: string, label: string) {
+/** Backend side effects for `/connect`, keeping key material out of atoms. */
+export function useConnectBackend(baseUrl: string, label: string) {
   const client = useAtomValue(backendClientAtom);
   const selectedProvider = useAtomValue(selectedProviderAtom);
-  const inFlight = useAtomValue(loginInFlightAtom);
-  const setProviders = useSetAtom(loginProvidersAtom);
-  const setSelectedIndex = useSetAtom(loginSelectedIndexAtom);
-  const setStep = useSetAtom(loginStepAtom);
-  const setInFlight = useSetAtom(loginInFlightAtom);
-  const setOutcome = useSetAtom(loginLastOutcomeAtom);
-  const setRequestError = useSetAtom(loginRequestErrorAtom);
+  const inFlight = useAtomValue(connectInFlightAtom);
+  const setProviders = useSetAtom(connectProvidersAtom);
+  const setSelectedIndex = useSetAtom(connectSelectedIndexAtom);
+  const setStep = useSetAtom(connectStepAtom);
+  const setInFlight = useSetAtom(connectInFlightAtom);
+  const setOutcome = useSetAtom(connectLastOutcomeAtom);
+  const setRequestError = useSetAtom(connectRequestErrorAtom);
   const setBaseUrlError = useSetAtom(customBaseUrlErrorAtom);
   const setLabelError = useSetAtom(customLabelErrorAtom);
   const closeActiveSurface = useSetAtom(closeActiveSurfaceAtom);
 
   const refreshProviders = useCallback(async () => {
     if (client === undefined) {
-      setRequestError('Backend unavailable — restart KQode and try /login again.');
+      setRequestError('Backend unavailable — restart KQode and try /connect again.');
       return;
     }
 
@@ -68,7 +68,7 @@ export function useLoginBackend(baseUrl: string, label: string) {
           closeActiveSurface();
         }
       } catch {
-        setRequestError('Login failed — ensure the OS keychain is available, then retry.');
+        setRequestError('Connect failed — ensure the OS keychain is available, then retry.');
       } finally {
         setInFlight(false);
       }
@@ -84,7 +84,7 @@ export function useLoginBackend(baseUrl: string, label: string) {
     try {
       await client.clearProviderKey(selectedProvider.providerId);
       await refreshProviders();
-      setStep(LoginStep.List);
+      setStep(ConnectStep.List);
     } catch {
       setRequestError('Clear failed — ensure the OS keychain is available, then retry.');
     } finally {
@@ -100,13 +100,13 @@ export function useLoginBackend(baseUrl: string, label: string) {
     const urlResult = validateBaseUrl(baseUrl);
     if (!urlResult.ok) {
       setBaseUrlError(urlResult.message);
-      setStep(LoginStep.CustomUrl);
+      setStep(ConnectStep.CustomUrl);
       return null;
     }
     const labelResult = validateLabel(label);
     if (!labelResult.ok) {
       setLabelError(labelResult.message);
-      setStep(LoginStep.CustomLabel);
+      setStep(ConnectStep.CustomLabel);
       return null;
     }
     return { providerId, baseUrl: urlResult.value, label: labelResult.value };

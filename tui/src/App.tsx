@@ -3,7 +3,7 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { useLayoutEffect } from 'react';
 import { HelpScreen } from '@components/HelpScreen/index.tsx';
 import { HomeScreen } from '@components/HomeScreen/index.tsx';
-import { LoginSurface } from '@components/LoginSurface/index.tsx';
+import { ConnectSurface } from '@components/ConnectSurface/index.tsx';
 import { ModelSurface } from '@components/ModelSurface/index.tsx';
 import { MemorySurface } from '@components/MemorySurface/index.tsx';
 import { ThemeSurface } from '@components/ThemeSurface/index.tsx';
@@ -35,7 +35,7 @@ export function App() {
     if (
       key.escape &&
       activeSurface !== Surface.Home &&
-      activeSurface !== Surface.Login &&
+      activeSurface !== Surface.Connect &&
       !(activeSurface === Surface.Memory && memoryConsumesEsc)
     ) {
       setArmedAction(null);
@@ -57,8 +57,8 @@ export function App() {
       return <HomeScreen />;
     case Surface.Help:
       return <HelpScreen />;
-    case Surface.Login:
-      return <LoginSurface />;
+    case Surface.Connect:
+      return <ConnectSurface />;
     case Surface.Model:
       return <ModelSurface />;
     case Surface.Memory:

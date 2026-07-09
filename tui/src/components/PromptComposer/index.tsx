@@ -19,7 +19,7 @@ import {
   restoreComposerDraftAtom
 } from '@state/promptQueue/index.ts';
 import { openHelpAtom } from '@state/ui/help/index.ts';
-import { openLoginSurfaceAtom, openMemorySurfaceAtom, openModelSurfaceAtom, openThemeSurfaceAtom } from '@state/ui/surface/index.ts';
+import { openConnectSurfaceAtom, openMemorySurfaceAtom, openModelSurfaceAtom, openThemeSurfaceAtom } from '@state/ui/surface/index.ts';
 import {
   MemoryMode,
   PendingMemoryItemAction,
@@ -87,7 +87,7 @@ export function PromptComposer({
   const { exit } = useApp();
   const clearTranscript = useSetAtom(clearTranscriptAtom);
   const openHelp = useSetAtom(openHelpAtom);
-  const openLogin = useSetAtom(openLoginSurfaceAtom);
+  const openConnect = useSetAtom(openConnectSurfaceAtom);
   const openModel = useSetAtom(openModelSurfaceAtom);
   const openResume = useSetAtom(openResumePanelAtom);
   const openMemory = useSetAtom(openMemorySurfaceAtom);
@@ -116,7 +116,7 @@ export function PromptComposer({
       exit,
       clearTranscript,
       showHelp: openHelp,
-      openLogin,
+      openConnect,
       openModel,
       openResume,
       openMemory: (mode?: CommandMemoryMode) =>
@@ -139,7 +139,7 @@ export function PromptComposer({
       exit,
       clearTranscript,
       openHelp,
-      openLogin,
+      openConnect,
       openModel,
       openResume,
       openMemory,

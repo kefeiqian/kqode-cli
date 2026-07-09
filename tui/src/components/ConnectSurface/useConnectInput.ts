@@ -5,9 +5,9 @@ import { printableInput } from '@libs/composer/promptText.ts';
 import { isMouseInput } from '@libs/terminal/mouse.ts';
 import { validateBaseUrl, validateLabel } from '@libs/providers/index.ts';
 import {
-  LoginStep,
+  ConnectStep,
   PROVIDER_ID_CUSTOM,
-  backLoginStepAtom,
+  backConnectStepAtom,
   chooseSelectedProviderAtom,
   clearConfirmAtom,
   connectedActionIndexAtom,
@@ -15,23 +15,23 @@ import {
   customBaseUrlErrorAtom,
   customLabelAtom,
   customLabelErrorAtom,
-  loginInFlightAtom,
-  loginStepAtom,
-  moveLoginSelectionAtom,
+  connectInFlightAtom,
+  connectStepAtom,
+  moveConnectSelectionAtom,
   selectedProviderAtom
-} from '@state/ui/login/index.ts';
+} from '@state/ui/connect/index.ts';
 import { closeActiveSurfaceAtom } from '@state/ui/index.ts';
 import {
   CONNECTED_ACTION_CLEAR_INDEX,
   CONNECTED_ACTION_REPLACE_INDEX
-} from '@components/LoginSurface/ConnectedActions.tsx';
+} from '@components/ConnectSurface/ConnectedActions.tsx';
 
 const SHIFT_TAB_INPUT = '\u001B[Z';
 
-/** Wires `/login` keybindings while `MaskedInput` owns secret text entry. */
-export function useLoginInput(clearProvider: () => Promise<void>) {
-  const step = useAtomValue(loginStepAtom);
-  const inFlight = useAtomValue(loginInFlightAtom);
+/** Wires `/connect` keybindings while `MaskedInput` owns secret text entry. */
+export function useConnectInput(clearProvider: () => Promise<void>) {
+  const step = useAtomValue(connectStepAtom);
+  const inFlight = useAtomValue(connectInFlightAtom);
   const selectedProvider = useAtomValue(selectedProviderAtom);
   const baseUrl = useAtomValue(customBaseUrlAtom);
   const label = useAtomValue(customLabelAtom);
@@ -45,16 +45,16 @@ export function useLoginInput(clearProvider: () => Promise<void>) {
   const actionIndexRef = useLatest(actionIndex);
   const confirmClearRef = useLatest(confirmClear);
 
-  const setStep = useSetAtom(loginStepAtom);
+  const setStep = useSetAtom(connectStepAtom);
   const setBaseUrl = useSetAtom(customBaseUrlAtom);
   const setLabel = useSetAtom(customLabelAtom);
   const setBaseUrlError = useSetAtom(customBaseUrlErrorAtom);
   const setLabelError = useSetAtom(customLabelErrorAtom);
   const setActionIndex = useSetAtom(connectedActionIndexAtom);
   const setConfirmClear = useSetAtom(clearConfirmAtom);
-  const moveSelection = useSetAtom(moveLoginSelectionAtom);
+  const moveSelection = useSetAtom(moveConnectSelectionAtom);
   const chooseSelectedProvider = useSetAtom(chooseSelectedProviderAtom);
-  const backStep = useSetAtom(backLoginStepAtom);
+  const backStep = useSetAtom(backConnectStepAtom);
   const closeActiveSurface = useSetAtom(closeActiveSurfaceAtom);
 
   useInput((input, key) => {
@@ -62,17 +62,17 @@ export function useLoginInput(clearProvider: () => Promise<void>) {
     if (inFlightRef.current || isMouseInput(input)) {
       return;
     }
-    if (currentStep === LoginStep.Key) {
+    if (currentStep === ConnectStep.Key) {
       if (selectedProviderRef.current?.providerId === PROVIDER_ID_CUSTOM && (key.upArrow || key.downArrow)) {
-        setStep(LoginStep.CustomLabel);
+        setStep(ConnectStep.CustomLabel);
       }
       return;
     }
-    if (currentStep === LoginStep.List) {
+    if (currentStep === ConnectStep.List) {
       handleListInput(input, key);
-    } else if (currentStep === LoginStep.ConnectedActions) {
+    } else if (currentStep === ConnectStep.ConnectedActions) {
       void handleConnectedInput(input, key);
-    } else if (currentStep === LoginStep.CustomUrl || currentStep === LoginStep.CustomLabel) {
+    } else if (currentStep === ConnectStep.CustomUrl || currentStep === ConnectStep.CustomLabel) {
       handleCustomInput(input, key);
     }
   });
@@ -109,11 +109,11 @@ export function useLoginInput(clearProvider: () => Promise<void>) {
           : CONNECTED_ACTION_REPLACE_INDEX
       );
     } else if (input.toLowerCase() === 'r') {
-      setStep(selectedProviderRef.current?.providerId === PROVIDER_ID_CUSTOM ? LoginStep.CustomUrl : LoginStep.Key);
+      setStep(selectedProviderRef.current?.providerId === PROVIDER_ID_CUSTOM ? ConnectStep.CustomUrl : ConnectStep.Key);
     } else if (input.toLowerCase() === 'c') {
       setConfirmClear(true);
     } else if (isReturn(input, key) && actionIndexRef.current === CONNECTED_ACTION_REPLACE_INDEX) {
-      setStep(selectedProviderRef.current?.providerId === PROVIDER_ID_CUSTOM ? LoginStep.CustomUrl : LoginStep.Key);
+      setStep(selectedProviderRef.current?.providerId === PROVIDER_ID_CUSTOM ? ConnectStep.CustomUrl : ConnectStep.Key);
     } else if (isReturn(input, key)) {
       setConfirmClear(true);
     }
@@ -124,7 +124,7 @@ export function useLoginInput(clearProvider: () => Promise<void>) {
       backStep();
       return;
     }
-    if (stepRef.current === LoginStep.CustomUrl) {
+    if (stepRef.current === ConnectStep.CustomUrl) {
       handleUrlInput(input, key);
     } else {
       handleLabelInput(input, key);
@@ -136,7 +136,7 @@ export function useLoginInput(clearProvider: () => Promise<void>) {
       const result = validateBaseUrl(baseUrlRef.current);
       setBaseUrlError(result.ok ? null : result.message);
       if (result.ok) {
-        setStep(LoginStep.CustomLabel);
+        setStep(ConnectStep.CustomLabel);
       }
       return;
     }
@@ -149,7 +149,7 @@ export function useLoginInput(clearProvider: () => Promise<void>) {
       const result = validateLabel(labelRef.current);
       setLabelError(result.ok ? null : result.message);
       if (result.ok) {
-        setStep(LoginStep.Key);
+        setStep(ConnectStep.Key);
       }
       return;
     }

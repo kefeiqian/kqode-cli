@@ -50,9 +50,9 @@ describe('resolveBodyRows hard line breaks', () => {
   });
 
   it('renders system guidance without an inline label', () => {
-    const texts = rowTexts(BodyEntryKind.System, 'Use /login to add a provider.');
+    const texts = rowTexts(BodyEntryKind.System, 'Use /connect to add a provider.');
 
-    expect(texts).toContain('Use /login to add a provider.');
+    expect(texts).toContain('Use /connect to add a provider.');
     expect(texts.some((line) => line.startsWith('ERROR:'))).toBe(false);
     expect(texts.some((line) => line.startsWith('SYSTEM:'))).toBe(false);
   });

@@ -31,9 +31,9 @@ describe('command menu atoms', () => {
     expect(store.get(commandMenuOpenAtom)).toBe(true);
     expect(store.get(commandMenuMatchesAtom).map((entry) => entry.kind === 'command' ? entry.command.id : entry.subcommand.id)).toEqual([
       CommandId.Clear,
+      CommandId.Connect,
       CommandId.Exit,
       CommandId.Help,
-      CommandId.Login,
       CommandId.Memory,
       CommandId.Model,
       CommandId.Resume,

@@ -9,7 +9,7 @@ import {
   activeSurfaceAtom,
   closeActiveSurfaceAtom,
   openMemorySurfaceAtom,
-  openLoginSurfaceAtom,
+  openConnectSurfaceAtom,
   openModelSurfaceAtom,
   Surface
 } from '@state/ui/surface/index.ts';
@@ -62,8 +62,8 @@ describe('surface atoms', () => {
 
     expect(store.get(activeSurfaceAtom)).toBe(Surface.Home);
 
-    store.set(openLoginSurfaceAtom);
-    expect(store.get(activeSurfaceAtom)).toBe(Surface.Login);
+    store.set(openConnectSurfaceAtom);
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Connect);
     expect(store.get(helpVisibleAtom)).toBe(false);
 
     store.set(openHelpAtom);
@@ -73,7 +73,7 @@ describe('surface atoms', () => {
 
   it('closes the active surface back to home for Esc handlers', () => {
     const store = createStore();
-    store.set(openLoginSurfaceAtom);
+    store.set(openConnectSurfaceAtom);
 
     store.set(closeActiveSurfaceAtom);
 
@@ -99,13 +99,13 @@ describe('surface atoms', () => {
     expect(store.get(activeSurfaceAtom)).toBe(Surface.Model);
   });
 
-  it('routes model to login when no provider is connected', async () => {
+  it('routes model to Connect when no provider is connected', async () => {
     const store = createStore();
     store.set(backendClientAtom, clientWithProviders([provider(PROVIDER_STATUS_NOT_CONFIGURED)]));
 
     await store.set(openModelSurfaceAtom);
 
-    expect(store.get(activeSurfaceAtom)).toBe(Surface.Login);
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Connect);
   });
 
   it('opens memory with an explicit initial mode and resets to active by default', () => {
@@ -129,10 +129,10 @@ describe('surface atoms', () => {
     });
 
     const openModel = store.set(openModelSurfaceAtom);
-    store.set(openLoginSurfaceAtom);
+    store.set(openConnectSurfaceAtom);
     pending.resolve([provider(PROVIDER_STATUS_CONNECTED)]);
     await openModel;
 
-    expect(store.get(activeSurfaceAtom)).toBe(Surface.Login);
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Connect);
   });
 });

@@ -7,7 +7,7 @@ import { MemoryMode, memoryModeAtom, resetMemorySubStateAtom } from '@state/ui/m
 export const Surface = {
   Home: 'home',
   Help: 'help',
-  Login: 'login',
+  Connect: 'connect',
   Model: 'model',
   Memory: 'memory',
   Theme: 'theme'
@@ -30,9 +30,9 @@ export const closeActiveSurfaceAtom = atom(null, (_get, set) => {
   set(setActiveSurfaceAtom, Surface.Home);
 });
 
-/** Opens the provider login surface. */
-export const openLoginSurfaceAtom = atom(null, (_get, set) => {
-  set(setActiveSurfaceAtom, Surface.Login);
+/** Opens the provider connect surface. */
+export const openConnectSurfaceAtom = atom(null, (_get, set) => {
+  set(setActiveSurfaceAtom, Surface.Connect);
 });
 
 /** Opens the fullscreen help surface. */
@@ -42,12 +42,12 @@ export const openHelpSurfaceAtom = atom(null, (_get, set) => {
 
 /**
  * Opens the model picker when at least one provider is connected; otherwise
- * routes to login so the model surface is never empty on first open.
+ * routes to Connect so the model surface is never empty on first open.
  */
 export const openModelSurfaceAtom = atom(null, async (get, set) => {
   const client = get(backendClientAtom);
   if (client === undefined) {
-    set(setActiveSurfaceAtom, Surface.Login);
+    set(setActiveSurfaceAtom, Surface.Connect);
     return;
   }
 
@@ -61,11 +61,11 @@ export const openModelSurfaceAtom = atom(null, async (get, set) => {
     }
     const nextSurface = providerList.providers.some((provider) => provider.status === PROVIDER_STATUS_CONNECTED)
       ? Surface.Model
-      : Surface.Login;
+      : Surface.Connect;
     set(activeSurfaceAtom, nextSurface);
   } catch {
     if (get(surfaceNavigationVersionAtom) === requestVersion) {
-      set(activeSurfaceAtom, Surface.Login);
+      set(activeSurfaceAtom, Surface.Connect);
     }
   }
 });

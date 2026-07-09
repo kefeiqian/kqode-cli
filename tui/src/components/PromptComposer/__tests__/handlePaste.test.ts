@@ -13,7 +13,7 @@ const noopActions = {
   exit: vi.fn(),
   clearTranscript: vi.fn(),
   showHelp: vi.fn(),
-  openLogin: vi.fn(),
+  openConnect: vi.fn(),
   openModel: vi.fn(),
   openResume: vi.fn(),
   openMemory: vi.fn(),

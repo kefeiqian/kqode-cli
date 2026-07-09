@@ -5,7 +5,7 @@ import {
 } from '@contracts/backend/providerMessages.ts';
 import type { CredentialSource, ProviderStatus } from '@contracts/backend/providerMessages.ts';
 
-/** Formats provider credential status for login/model surfaces. */
+/** Formats provider credential status for Connect/model surfaces. */
 export function statusLabel(
   status: ProviderStatus,
   credentialSource: CredentialSource | null

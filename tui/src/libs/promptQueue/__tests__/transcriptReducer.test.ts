@@ -119,7 +119,7 @@ describe('reduceTranscriptEvent', () => {
           text: null,
           finishReason: null,
           errorKind: 'needsConfiguration',
-          message: 'Use /login to add a provider.'
+          message: 'Use /connect to add a provider.'
         }
       },
       0
@@ -127,7 +127,7 @@ describe('reduceTranscriptEvent', () => {
 
     expect(state.queue[0]?.result).toEqual({
       kind: BodyEntryKind.System,
-      text: 'Use /login to add a provider.'
+      text: 'Use /connect to add a provider.'
     });
   });
 });

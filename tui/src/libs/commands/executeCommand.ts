@@ -13,7 +13,7 @@ export type CommandActions = {
   exit: () => void;
   clearTranscript: () => void;
   showHelp: () => void;
-  openLogin: () => void;
+  openConnect: () => void;
   openModel: () => void | Promise<void>;
   openResume: () => void | Promise<void>;
   openMemory: (mode?: CommandMemoryMode) => void | Promise<void>;
@@ -38,8 +38,8 @@ export function executeCommand(id: CommandId, actions: CommandActions): void {
     case CommandId.Help:
       actions.showHelp();
       return;
-    case CommandId.Login:
-      actions.openLogin();
+    case CommandId.Connect:
+      actions.openConnect();
       return;
     case CommandId.Model:
       void actions.openModel();

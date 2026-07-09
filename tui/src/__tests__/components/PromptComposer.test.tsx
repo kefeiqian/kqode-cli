@@ -358,7 +358,7 @@ describe('PromptComposer', () => {
 
     stdin.write('\u001B[B');
     await flushInput();
-    expect(store.get(highlightedCommandAtom)?.name).toBe('/exit');
+    expect(store.get(highlightedCommandAtom)?.name).toBe('/connect');
 
     stdin.write('\u001B[A');
     await flushInput();

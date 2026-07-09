@@ -1,7 +1,7 @@
 import { Box, Text } from 'ink';
 import { useAtomValue } from 'jotai';
-import { LoginStep } from '@state/ui/login/index.ts';
-import type { LoginStep as LoginStepValue } from '@state/ui/login/index.ts';
+import { ConnectStep } from '@state/ui/connect/index.ts';
+import type { ConnectStep as ConnectStepValue } from '@state/ui/connect/index.ts';
 import { activeThemeAtom } from '@state/global/index.ts';
 
 const CARET = '▌';
@@ -18,14 +18,14 @@ export function CustomForm({
   baseUrlError: string | null;
   label: string;
   labelError: string | null;
-  step: LoginStepValue;
+  step: ConnectStepValue;
 }) {
   const theme = useAtomValue(activeThemeAtom);
 
   return (
     <Box flexDirection="column">
       <FieldRow
-        active={step === LoginStep.CustomUrl}
+        active={step === ConnectStep.CustomUrl}
         label="Base URL"
         placeholder="https://api.example.com/v1"
         value={baseUrl}
@@ -33,7 +33,7 @@ export function CustomForm({
       <InlineError message={baseUrlError} />
       <Text color={theme.colors.muted}>Destination host: {destinationHost(baseUrl)}</Text>
       <FieldRow
-        active={step === LoginStep.CustomLabel}
+        active={step === ConnectStep.CustomLabel}
         label="Label"
         placeholder="optional"
         value={label}

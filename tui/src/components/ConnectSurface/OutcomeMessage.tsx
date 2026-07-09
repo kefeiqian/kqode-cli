@@ -10,7 +10,7 @@ import {
   SET_KEY_OUTCOME_UNREACHABLE
 } from '@contracts/backend/providerMessages.ts';
 import type { SetKeyOutcome } from '@contracts/backend/providerMessages.ts';
-import { PROVIDER_ID_CUSTOM } from '@state/ui/login/index.ts';
+import { PROVIDER_ID_CUSTOM } from '@state/ui/connect/index.ts';
 import { activeThemeAtom } from '@state/global/index.ts';
 import type { ThemeColors } from '@theme/themeConfig.ts';
 

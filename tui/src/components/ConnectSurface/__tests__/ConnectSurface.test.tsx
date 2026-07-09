@@ -13,22 +13,22 @@ import {
 } from '@contracts/backend/index.ts';
 import { activeSurfaceAtom, Surface } from '@state/ui/index.ts';
 import {
-  LoginStep,
+  ConnectStep,
   PROVIDER_ID_CUSTOM,
   PROVIDER_ID_KIMI,
   customBaseUrlAtom,
   customLabelAtom,
-  loginLastOutcomeAtom,
-  loginSelectedIndexAtom,
-  loginStepAtom
-} from '@state/ui/login/index.ts';
+  connectLastOutcomeAtom,
+  connectSelectedIndexAtom,
+  connectStepAtom
+} from '@state/ui/connect/index.ts';
 import { flushInput } from '@test/flushInput.ts';
-import { fakeClient, provider, renderLogin, waitForFrame, waitUntil } from '@components/LoginSurface/__tests__/testUtils.tsx';
+import { fakeClient, provider, renderConnect, waitForFrame, waitUntil } from '@components/ConnectSurface/__tests__/testUtils.tsx';
 
-describe('LoginSurface', () => {
+describe('ConnectSurface', () => {
   it('connects Kimi with a masked key and closes only on connected', async () => {
     const client = fakeClient({ outcome: SET_KEY_OUTCOME_CONNECTED });
-    const { store, stdin, lastFrame } = renderLogin(client);
+    const { store, stdin, lastFrame } = renderConnect(client);
     await waitForFrame(lastFrame, 'Kimi');
 
     stdin.write('\n');
@@ -44,7 +44,7 @@ describe('LoginSurface', () => {
 
   it('renders auth failure and stays open for a 401-style Kimi result', async () => {
     const client = fakeClient({ outcome: SET_KEY_OUTCOME_AUTH_FAILED });
-    const { store, stdin, lastFrame } = renderLogin(client);
+    const { store, stdin, lastFrame } = renderConnect(client);
     await waitForFrame(lastFrame, 'Kimi');
 
     stdin.write('\r');
@@ -55,7 +55,7 @@ describe('LoginSurface', () => {
     const frame = await waitForFrame(lastFrame, 'Authentication failed');
 
     expect(frame).toContain('fix the key or URL');
-    expect(store.get(activeSurfaceAtom)).toBe(Surface.Login);
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Connect);
   });
 
   it.each([
@@ -63,7 +63,7 @@ describe('LoginSurface', () => {
     [SET_KEY_OUTCOME_UNREACHABLE, 'Provider unreachable', 'wait & retry'],
     [SET_KEY_OUTCOME_EMPTY_CATALOG, 'Model catalog is empty', 'fix the key or URL']
   ] as const)('keeps the surface open for %s', async (outcome, headline, hint) => {
-    const { store, stdin, lastFrame } = renderLogin(fakeClient({ outcome }));
+    const { store, stdin, lastFrame } = renderConnect(fakeClient({ outcome }));
     await waitForFrame(lastFrame, 'Kimi');
 
     stdin.write('\r');
@@ -74,18 +74,18 @@ describe('LoginSurface', () => {
     const frame = await waitForFrame(lastFrame, headline);
 
     expect(frame).toContain(hint);
-    expect(store.get(activeSurfaceAtom)).toBe(Surface.Login);
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Connect);
   });
 
   it('renders Custom not-compatible as a terminal URL/key error', async () => {
     const client = fakeClient({ outcome: SET_KEY_OUTCOME_NOT_COMPATIBLE });
-    const { store, stdin, lastFrame } = renderLogin(client);
+    const { store, stdin, lastFrame } = renderConnect(client);
     await waitForFrame(lastFrame, 'Custom');
 
-    store.set(loginSelectedIndexAtom, 1);
+    store.set(connectSelectedIndexAtom, 1);
     store.set(customBaseUrlAtom, 'https://ok.test/v1');
     store.set(customLabelAtom, '');
-    store.set(loginStepAtom, LoginStep.Key);
+    store.set(connectStepAtom, ConnectStep.Key);
     await waitForFrame(lastFrame, 'API key');
     await flushInput();
     stdin.write('sk-custom');
@@ -104,7 +104,7 @@ describe('LoginSurface', () => {
         [provider(PROVIDER_ID_KIMI, 'Kimi', PROVIDER_STATUS_NOT_CONFIGURED)]
       ]
     });
-    const { stdin, lastFrame } = renderLogin(client);
+    const { stdin, lastFrame } = renderConnect(client);
     await waitForFrame(lastFrame, 'connected via keychain');
 
     stdin.write('\n');
@@ -119,11 +119,11 @@ describe('LoginSurface', () => {
   });
 
   it("renders a Custom-specific store failure instead of a keychain hint", async () => {
-    const { store, lastFrame } = renderLogin();
+    const { store, lastFrame } = renderConnect();
     await waitForFrame(lastFrame, 'Custom');
 
-    store.set(loginSelectedIndexAtom, 1);
-    store.set(loginLastOutcomeAtom, {
+    store.set(connectSelectedIndexAtom, 1);
+    store.set(connectLastOutcomeAtom, {
       outcome: SET_KEY_OUTCOME_STORE_FAILED,
       providerId: PROVIDER_ID_CUSTOM,
       selectedModel: null
@@ -135,7 +135,7 @@ describe('LoginSurface', () => {
 
 
   it('advances and backs through Custom fields without advancing invalid URLs', async () => {
-    const first = renderLogin();
+    const first = renderConnect();
     await waitForFrame(first.lastFrame, 'Custom');
 
     first.stdin.write('\u001B[B');
@@ -148,7 +148,7 @@ describe('LoginSurface', () => {
     let frame = await waitForFrame(first.lastFrame, 'base URL must use the https scheme');
     expect(frame).toContain('› Base URL');
 
-    const { stdin, lastFrame } = renderLogin();
+    const { stdin, lastFrame } = renderConnect();
     await waitForFrame(lastFrame, 'Custom');
     stdin.write('\u001B[B');
     await flushInput();
@@ -174,8 +174,8 @@ describe('LoginSurface', () => {
   });
 
   it('keeps typed key material out of Jotai atom snapshots before submit', async () => {
-    const secret = 'sk-local-only-login-secret';
-    const { store, stdin, lastFrame } = renderLogin();
+    const secret = 'sk-local-only-Connect-secret';
+    const { store, stdin, lastFrame } = renderConnect();
     await waitForFrame(lastFrame, 'Kimi');
 
     stdin.write('\r');

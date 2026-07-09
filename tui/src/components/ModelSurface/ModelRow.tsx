@@ -69,7 +69,7 @@ function statusLine(row: Extract<ModelSurfaceRow, { type: 'status' }>, marker: s
     return `${marker}    (no models)`;
   }
   if (row.status === MODEL_LOAD_STATUS_NOT_CONNECTED) {
-    return `${marker}    (not connected — /login to add)`;
+    return `${marker}    (not connected — /connect to add)`;
   }
   return `${marker}    ${row.status}`;
 }

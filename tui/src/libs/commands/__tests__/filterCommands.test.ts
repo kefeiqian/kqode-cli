@@ -10,9 +10,9 @@ describe('filterCommands', () => {
   it('returns all commands sorted alphabetically by name for an empty query', () => {
     expect(ids('')).toEqual([
       CommandId.Clear,
+      CommandId.Connect,
       CommandId.Exit,
       CommandId.Help,
-      CommandId.Login,
       CommandId.Memory,
       CommandId.Model,
       CommandId.Resume,
@@ -58,9 +58,9 @@ describe('COMMAND_REGISTRY', () => {
   it('contains exactly built-in commands sorted alphabetically with non-empty descriptions', () => {
     expect(COMMAND_REGISTRY.map((command) => command.id)).toEqual([
       CommandId.Clear,
+      CommandId.Connect,
       CommandId.Exit,
       CommandId.Help,
-      CommandId.Login,
       CommandId.Memory,
       CommandId.Model,
       CommandId.Resume,
