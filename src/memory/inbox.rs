@@ -5,11 +5,20 @@
 //! the state machine (candidate activation, richer rollback-conflict handling,
 //! and sensitive purge).
 
-use super::event_log::{self, InboxStatus, MemoryEvent, MemoryOp};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+use super::event_log::{self, InboxProposal, InboxStatus, MemoryEvent, MemoryOp};
+use super::extraction::ExtractionOutcome;
 use super::index::MemoryService;
 use super::index::{new_op_id, now_ms, store_err};
-use super::{MemoryError, MemoryItem, MemoryProvenance, MemorySource};
+use super::{
+    MemoryError, MemoryItem, MemoryProvenance, MemoryScope, MemorySource, SensitiveVerdict,
+    security,
+};
 use crate::store::StoredInboxEntry;
+
+/// Monotonic suffix so distinct extraction outcomes get distinct entry ids.
+static EXTRACTION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// A review action applied to an inbox entry.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -128,6 +137,92 @@ impl MemoryService {
         Ok((self.inbox_entry(entry_id)?, true))
     }
 
+    /// Records a validated extraction outcome as an inbox entry (proposal-only).
+    ///
+    /// The backend — not the worker — is the gate (KTD12): secret-shaped
+    /// proposals are dropped (no candidate, no file), `NoOp`/`BlockedSensitive`
+    /// record nothing, `Failed` records an auditable failed entry, and
+    /// candidate/active proposals create a metadata-only inbox row (no body in
+    /// the index, R18). Returns the created entry id, if any.
+    ///
+    /// # Errors
+    /// Returns [`MemoryError`] on event-log or index write failure.
+    pub fn record_extraction_outcome(
+        &self,
+        session_id: &str,
+        covered_through_seq: u64,
+        outcome: &ExtractionOutcome,
+    ) -> Result<Option<String>, MemoryError> {
+        let (status, proposal, reason) = match outcome {
+            ExtractionOutcome::NoOp | ExtractionOutcome::BlockedSensitive => return Ok(None),
+            ExtractionOutcome::Candidate(proposal) => {
+                (InboxStatus::Candidate, Some(proposal), None)
+            }
+            ExtractionOutcome::ActiveUpdate(proposal) => {
+                (InboxStatus::ActiveAudit, Some(proposal), None)
+            }
+            ExtractionOutcome::Failed(reason) => (InboxStatus::Failed, None, Some(reason.clone())),
+        };
+        if let Some(proposal) = proposal {
+            let secret = matches!(
+                security::scan_sensitive(&proposal.title),
+                SensitiveVerdict::Blocked(_)
+            ) || matches!(
+                security::scan_sensitive(&proposal.body),
+                SensitiveVerdict::Blocked(_)
+            );
+            if secret {
+                return Ok(None);
+            }
+        }
+        let now = now_ms();
+        let entry_id = extraction_entry_id(covered_through_seq);
+        let data = InboxProposal {
+            entry_id: entry_id.clone(),
+            status,
+            scope: proposal.map_or(MemoryScope::User, |proposal| proposal.scope),
+            scope_id: None,
+            target_item_id: None,
+            memory_type: proposal.map(|proposal| proposal.memory_type),
+            title: proposal.map(|proposal| proposal.title.clone()),
+            confidence: proposal.map(|proposal| proposal.confidence),
+            source_session_id: Some(session_id.to_owned()),
+            source_turn_start: None,
+            source_turn_end: Some(covered_through_seq),
+            operation_id: None,
+            base_hash: None,
+            result_hash: None,
+            reason,
+            at_ms: now,
+        };
+        self.append(&MemoryEvent::InboxProposed { data: data.clone() })?;
+        self.store()
+            .upsert_inbox_entry(&StoredInboxEntry::from_proposal(&data))
+            .map_err(store_err)?;
+        Ok(Some(entry_id))
+    }
+
+    /// Advances a session's extraction cursor, recording the durable event.
+    ///
+    /// # Errors
+    /// Returns [`MemoryError`] on event-log or index write failure.
+    pub fn advance_cursor(
+        &self,
+        session_id: &str,
+        last_extracted_seq: u64,
+    ) -> Result<(), MemoryError> {
+        let now = now_ms();
+        let seq = i64::try_from(last_extracted_seq).unwrap_or(i64::MAX);
+        self.append(&MemoryEvent::CursorAdvanced {
+            session_id: session_id.to_owned(),
+            last_extracted_seq: seq,
+            at_ms: now,
+        })?;
+        self.store()
+            .upsert_memory_cursor(session_id, seq, now)
+            .map_err(store_err)
+    }
+
     fn inbox_entry(&self, entry_id: &str) -> Result<StoredInboxEntry, MemoryError> {
         self.store()
             .inbox_entry(entry_id)
@@ -231,4 +326,10 @@ fn suppression_key(entry: &StoredInboxEntry) -> Option<String> {
         title.to_lowercase(),
     );
     Some(super::stable_hash_hex(identity.as_bytes()))
+}
+
+/// A unique inbox-entry id for one recorded extraction outcome.
+fn extraction_entry_id(covered_through_seq: u64) -> String {
+    let counter = EXTRACTION_COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("ext-{covered_through_seq}-{:x}-{counter}", now_ms())
 }

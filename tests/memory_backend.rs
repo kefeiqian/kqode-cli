@@ -4,7 +4,12 @@
 //! DB, covering add/show/edit/forget/list/reload plus the inbox review + undo
 //! flow, including cross-scope rejection and secret/oversized refusal.
 
+use kqode::conversation::session_log::{SessionLogEvent, append_event as append_session_event};
 use kqode::memory::event_log::{InboxProposal, MemoryEvent, append_event};
+use kqode::memory::extraction::{
+    ExtractionInput, ExtractionOutcome, MemoryProposal, RuleExtractor,
+};
+use kqode::memory::scheduler::{ExtractionRun, ExtractionScheduler, ExtractionTrigger};
 use kqode::memory::{
     InboxAction, InboxStatus, MemoryError, MemoryScope, MemoryService, MemoryType,
 };
@@ -396,4 +401,203 @@ fn inbox_reject_marks_rejected_and_records_a_suppression_key() {
         .expect("list")
         .len();
     assert_eq!(corrections_exist, 1);
+}
+
+// ---- Lifecycle extraction scheduler (U6) ----
+
+fn session_log_with(dir: &std::path::Path, events: &[SessionLogEvent]) -> std::path::PathBuf {
+    let path = dir.join("session.jsonl");
+    for event in events {
+        append_session_event(&path, event).expect("session log");
+    }
+    path
+}
+
+fn enqueued(turn: &str, seq: u64, prompt: &str) -> SessionLogEvent {
+    SessionLogEvent::TurnEnqueued {
+        turn_id: turn.to_owned(),
+        seq,
+        prompt: prompt.to_owned(),
+        at_ms: 0,
+    }
+}
+
+fn settled(turn: &str, kind: &str, text: Option<&str>) -> SessionLogEvent {
+    SessionLogEvent::TurnSettled {
+        turn_id: turn.to_owned(),
+        settled_kind: kind.to_owned(),
+        text: text.map(str::to_owned),
+        finish_reason: None,
+        error_kind: None,
+        message: None,
+        at_ms: 0,
+    }
+}
+
+fn candidate_rule() -> RuleExtractor<impl Fn(&ExtractionInput) -> ExtractionOutcome + Send + Sync> {
+    RuleExtractor(|input: &ExtractionInput| {
+        ExtractionOutcome::Candidate(MemoryProposal {
+            scope: MemoryScope::User,
+            memory_type: MemoryType::User,
+            title: "test command".to_owned(),
+            body: input
+                .rounds
+                .first()
+                .map_or(String::new(), |round| round.response.clone()),
+            confidence: 0.4,
+        })
+    })
+}
+
+#[test]
+fn extraction_records_a_candidate_and_advances_the_cursor() {
+    let fixture = setup();
+    let log = session_log_with(
+        fixture._dir.path(),
+        &[
+            enqueued("t0", 0, "how do I run tests?"),
+            settled("t0", "completed", Some("cargo test")),
+        ],
+    );
+    let scheduler = ExtractionScheduler::new();
+    let extractor = candidate_rule();
+
+    let run = scheduler.run_session(
+        &fixture.service,
+        "sess-1",
+        &log,
+        ExtractionTrigger::CleanExit,
+        &extractor,
+    );
+    assert!(matches!(
+        run,
+        ExtractionRun::Ran {
+            created_inbox: true,
+            covered_through_seq: 0,
+            ..
+        }
+    ));
+    assert_eq!(
+        fixture
+            .store
+            .list_inbox_entries(Some(InboxStatus::Candidate))
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(fixture.store.memory_cursor("sess-1").unwrap(), Some(0));
+
+    // A second trigger has nothing new after the cursor (coalesced by cursor).
+    let again = scheduler.run_session(
+        &fixture.service,
+        "sess-1",
+        &log,
+        ExtractionTrigger::Idle,
+        &extractor,
+    );
+    assert_eq!(again, ExtractionRun::NoEligibleTurns);
+}
+
+#[test]
+fn extraction_skips_unsettled_and_non_completed_turns() {
+    let fixture = setup();
+    let log = session_log_with(
+        fixture._dir.path(),
+        &[
+            enqueued("t0", 0, "p0"),
+            settled("t0", "cancelled", None),
+            enqueued("t1", 1, "p1"), // active: never settled
+            enqueued("t2", 2, "p2"),
+            settled("t2", "error", None),
+        ],
+    );
+    let scheduler = ExtractionScheduler::new();
+
+    let run = scheduler.run_session(
+        &fixture.service,
+        "sess-2",
+        &log,
+        ExtractionTrigger::Startup,
+        &candidate_rule(),
+    );
+    assert_eq!(
+        run,
+        ExtractionRun::NoEligibleTurns,
+        "cancelled/active/errored turns are not eligible"
+    );
+}
+
+#[test]
+fn failed_outcome_is_recorded_and_secret_proposal_is_dropped() {
+    let fixture = setup();
+    let log = session_log_with(
+        fixture._dir.path(),
+        &[
+            enqueued("t0", 0, "p"),
+            settled("t0", "completed", Some("r")),
+        ],
+    );
+    let scheduler = ExtractionScheduler::new();
+
+    let failed =
+        RuleExtractor(|_: &ExtractionInput| ExtractionOutcome::Failed("worker crashed".to_owned()));
+    let run = scheduler.run_session(
+        &fixture.service,
+        "s-fail",
+        &log,
+        ExtractionTrigger::Explicit,
+        &failed,
+    );
+    assert!(matches!(
+        run,
+        ExtractionRun::Ran {
+            created_inbox: true,
+            ..
+        }
+    ));
+    assert_eq!(
+        fixture
+            .store
+            .list_inbox_entries(Some(InboxStatus::Failed))
+            .unwrap()
+            .len(),
+        1
+    );
+
+    let secret = RuleExtractor(|_: &ExtractionInput| {
+        ExtractionOutcome::Candidate(MemoryProposal {
+            scope: MemoryScope::User,
+            memory_type: MemoryType::Reference,
+            title: "creds".to_owned(),
+            body: "token = a1b2c3d4e5f6g7h8i9j0k1".to_owned(),
+            confidence: 0.9,
+        })
+    });
+    let run2 = scheduler.run_session(
+        &fixture.service,
+        "s-secret",
+        &log,
+        ExtractionTrigger::Explicit,
+        &secret,
+    );
+    assert!(
+        matches!(
+            run2,
+            ExtractionRun::Ran {
+                created_inbox: false,
+                ..
+            }
+        ),
+        "a secret-shaped proposal creates no inbox entry"
+    );
+    assert!(
+        fixture
+            .store
+            .list_inbox_entries(Some(InboxStatus::Candidate))
+            .unwrap()
+            .is_empty(),
+        "no candidate is created for secret content"
+    );
+    // The cursor still advances so the blocked turn is not reprocessed.
+    assert_eq!(fixture.store.memory_cursor("s-secret").unwrap(), Some(0));
 }

@@ -9,22 +9,26 @@
 
 pub mod corpus;
 pub mod event_log;
+pub mod extraction;
 pub mod inbox;
 pub mod index;
 pub mod model;
 pub mod paths;
 pub mod prompt;
+pub mod scheduler;
 pub mod security;
 
 use std::fmt;
 use std::io;
 
 pub use event_log::{InboxProposal, InboxStatus, MemoryEvent, MemoryOp};
+pub use extraction::{ExtractionOutcome, Extractor, MemoryProposal, NoopExtractor};
 pub use inbox::InboxAction;
 pub use index::MemoryService;
 pub use model::{MemoryItem, MemoryProvenance, MemoryScope, MemorySource, MemoryType};
 pub use paths::ScopeRoots;
 pub use prompt::MemoryContext;
+pub use scheduler::{ExtractionScheduler, ExtractionTrigger};
 pub use security::{PromptSafety, SensitiveVerdict};
 
 /// Errors from memory model, path, corpus, and validation operations.
