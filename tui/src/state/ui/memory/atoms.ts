@@ -104,7 +104,13 @@ function statusForMode(items: MemoryItem[], inbox: MemoryInboxEntry[], mode: Mem
   return length === 0 ? MemoryStatus.Empty : MemoryStatus.Loaded;
 }
 
-export const resetMemorySurfaceAtom = atom(null, (_get, set) => {
+/**
+ * Resets only the loaded data and list cursor, leaving the transient open-time
+ * sub-state (add/edit form, pending pick action, forget confirmation) intact.
+ * The surface's mount-time `refresh()` uses this so a form/pick opened from the
+ * composer (set *before* the surface mounts) is not clobbered by the reload.
+ */
+export const resetMemoryDataAtom = atom(null, (_get, set) => {
   set(memoryItemsAtom, []);
   set(memoryInboxAtom, []);
   set(memoryStatusAtom, MemoryStatus.Loading);
@@ -112,9 +118,19 @@ export const resetMemorySurfaceAtom = atom(null, (_get, set) => {
   set(memoryHighlightIndexAtom, 0);
   set(memoryWindowOffsetAtom, 0);
   set(memoryDetailBodyAtom, null);
+});
+
+/** Clears every transient sub-state overlay (form, pending pick, forget confirm). */
+export const resetMemorySubStateAtom = atom(null, (_get, set) => {
   set(memoryFormAtom, null);
   set(pendingMemoryItemActionAtom, null);
   set(forgetConfirmAtom, null);
+});
+
+/** Full reset: loaded data plus every transient sub-state overlay. */
+export const resetMemorySurfaceAtom = atom(null, (_get, set) => {
+  set(resetMemoryDataAtom);
+  set(resetMemorySubStateAtom);
 });
 
 export const setMemoryDataAtom = atom(

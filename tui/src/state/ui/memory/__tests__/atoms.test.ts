@@ -19,6 +19,8 @@ import {
   moveMemoryHighlightAtom,
   openEditMemoryFormAtom,
   openAddMemoryFormAtom,
+  resetMemoryDataAtom,
+  resetMemorySubStateAtom,
   resetMemorySurfaceAtom,
   setMemoryFormBodyAtom,
   setMemoryFormErrorAtom,
@@ -113,6 +115,35 @@ describe('memory surface atoms', () => {
     expect(store.get(memoryModeAtom)).toBe(MemoryMode.Inbox);
     expect(store.get(memoryStatusAtom)).toBe(MemoryStatus.Loading);
     expect(store.get(memoryItemsAtom)).toEqual([]);
+  });
+
+  it('resetMemoryData clears loaded data but preserves open-time sub-state', () => {
+    // The surface's mount-time refresh() uses this reset; it must not wipe a
+    // form/pick the composer opened just before the surface mounted.
+    const store = createStore();
+    store.set(setMemoryDataAtom, { items: [item('a')], inbox: [entry('e')] });
+    store.set(openAddMemoryFormAtom);
+    store.set(forgetConfirmAtom, item('f'));
+
+    store.set(resetMemoryDataAtom);
+
+    expect(store.get(memoryItemsAtom)).toEqual([]);
+    expect(store.get(memoryStatusAtom)).toBe(MemoryStatus.Loading);
+    expect(store.get(memoryFormAtom)).not.toBeNull();
+    expect(store.get(forgetConfirmAtom)).not.toBeNull();
+  });
+
+  it('resetMemorySubState clears the form, pending action, and forget confirm', () => {
+    const store = createStore();
+    store.set(openAddMemoryFormAtom);
+    store.set(pendingMemoryItemActionAtom, PendingMemoryItemAction.Edit);
+    store.set(forgetConfirmAtom, item('f'));
+
+    store.set(resetMemorySubStateAtom);
+
+    expect(store.get(memoryFormAtom)).toBeNull();
+    expect(store.get(pendingMemoryItemActionAtom)).toBeNull();
+    expect(store.get(forgetConfirmAtom)).toBeNull();
   });
 
   it('opens, edits, errors, and resets the memory form', () => {

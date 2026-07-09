@@ -162,6 +162,24 @@ describe('MemorySurface', () => {
     expect(store.get(memoryFormAtom)).toBeNull();
   });
 
+  it('keeps a composer-opened add form through the mount-time refresh', async () => {
+    // Production order: the composer sets the form BEFORE the surface mounts, so
+    // the mount-time refresh() must not clobber the just-opened form (regression
+    // for /memory add|edit|forget collapsing to the plain list).
+    const store = createStore();
+    store.set(backendClientAtom, fakeClient({ items: [sampleItem()] }));
+    store.set(columnsTestOverrideAtom, 100);
+    store.set(rowsTestOverrideAtom, 14);
+    store.set(activeSurfaceAtom, Surface.Memory);
+    store.set(memoryModeAtom, MemoryMode.Active);
+    store.set(openAddMemoryFormAtom);
+
+    const { lastFrame } = renderWithJotai(<MemorySurface />, store);
+
+    expect(await waitForFrame(lastFrame, 'Add project memory')).toContain('Add project memory');
+    expect(store.get(memoryFormAtom)).not.toBeNull();
+  });
+
   it('blocks empty add titles and keeps Esc local to the form', async () => {
     const client = fakeClient({ items: [] });
     const { store, stdin, lastFrame } = renderMemory(client);

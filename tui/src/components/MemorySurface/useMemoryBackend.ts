@@ -4,7 +4,8 @@ import type { InboxAction, MemoryItem } from '@contracts/backend/index.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { backendErrorMessage } from '@libs/promptQueue/promptQueue.ts';
 import {
-  resetMemorySurfaceAtom,
+  resetMemoryDataAtom,
+  closeMemoryFormAtom,
   openEditMemoryFormAtom,
   setMemoryBusyAtom,
   setMemoryDataAtom,
@@ -20,7 +21,8 @@ import {
  */
 export function useMemoryBackend() {
   const client = useAtomValue(backendClientAtom);
-  const resetMemory = useSetAtom(resetMemorySurfaceAtom);
+  const resetMemoryData = useSetAtom(resetMemoryDataAtom);
+  const closeForm = useSetAtom(closeMemoryFormAtom);
   const setMemoryData = useSetAtom(setMemoryDataAtom);
   const setMemoryFailure = useSetAtom(setMemoryFailureAtom);
   const setMemoryBusy = useSetAtom(setMemoryBusyAtom);
@@ -29,7 +31,7 @@ export function useMemoryBackend() {
   const openEditMemoryForm = useSetAtom(openEditMemoryFormAtom);
 
   const refresh = useCallback(async () => {
-    resetMemory();
+    resetMemoryData();
     if (client === undefined) {
       setMemoryFailure('Rust backend unavailable');
       return;
@@ -43,7 +45,7 @@ export function useMemoryBackend() {
     } catch (error) {
       setMemoryFailure(backendErrorMessage(error));
     }
-  }, [client, resetMemory, setMemoryData, setMemoryFailure]);
+  }, [client, resetMemoryData, setMemoryData, setMemoryFailure]);
 
   const showDetail = useCallback(
     async (item: MemoryItem) => {
@@ -92,12 +94,13 @@ export function useMemoryBackend() {
       }
       try {
         await client.addMemory({ scope: 'repo', memoryType: 'project', title, body });
+        closeForm();
         await refresh();
       } catch (error) {
         setMemoryFormError({ submitError: backendErrorMessage(error) });
       }
     },
-    [client, refresh, setMemoryFormError]
+    [client, refresh, closeForm, setMemoryFormError]
   );
 
   const beginEdit = useCallback(
@@ -134,12 +137,13 @@ export function useMemoryBackend() {
           title,
           body
         });
+        closeForm();
         await refresh();
       } catch (error) {
         setMemoryFormError({ submitError: backendErrorMessage(error) });
       }
     },
-    [client, refresh, setMemoryFormError]
+    [client, refresh, closeForm, setMemoryFormError]
   );
 
   const applyInbox = useCallback(
