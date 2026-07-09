@@ -19,6 +19,7 @@ import {
   windowRowsAtom
 } from '@state/ui/index.ts';
 import { memorySurfaceConsumesEscAtom } from '@state/ui/memory/index.ts';
+import { modelSurfaceConsumesEscAtom } from '@state/ui/model/index.ts';
 
 export function App() {
   useGlobalKeys();
@@ -30,12 +31,14 @@ export function App() {
   const closeActiveSurface = useSetAtom(closeActiveSurfaceAtom);
   const setArmedAction = useSetAtom(armedActionAtom);
   const memoryConsumesEsc = useAtomValue(memorySurfaceConsumesEscAtom);
+  const modelConsumesEsc = useAtomValue(modelSurfaceConsumesEscAtom);
 
   useInput((_input, key) => {
     if (
       key.escape &&
       activeSurface !== Surface.Home &&
       activeSurface !== Surface.Connect &&
+      !(activeSurface === Surface.Model && modelConsumesEsc) &&
       !(activeSurface === Surface.Memory && memoryConsumesEsc)
     ) {
       setArmedAction(null);

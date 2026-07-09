@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   MODEL_LIST_STATUS_EMPTY,
   MODEL_LIST_STATUS_FAILED,
-  MODEL_LIST_STATUS_LOADED
+  MODEL_LIST_STATUS_LOADED,
+  SET_KEY_OUTCOME_AUTH_FAILED,
+  SET_KEY_OUTCOME_CONNECTED
 } from '@contracts/backend/index.ts';
 import { activeSurfaceAtom, Surface } from '@state/ui/index.ts';
-import { modelHighlightAtom, modelActiveSelectionAtom } from '@state/ui/model/index.ts';
+import { inlineConnectProviderIdAtom, modelHighlightAtom, modelActiveSelectionAtom } from '@state/ui/model/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { deferredList, fakeClient, provider, renderModel, waitForFrame, waitUntil } from './testUtils.tsx';
 
@@ -143,5 +145,68 @@ describe('ModelSurface', () => {
     const frame = await waitForFrame(lastFrame, '›    (not connected — enter to connect)');
     expect(frame).toContain('Kimi');
     expect(store.get(activeSurfaceAtom)).toBe(Surface.Model);
+  });
+
+  it('connects a preset provider inline and loads its models in place', async () => {
+    const disconnected = provider('kimi', 'Kimi', false);
+    const connected = {
+      ...provider('kimi', 'Kimi', true),
+      defaultModel: 'k1'
+    };
+    const client = fakeClient({
+      providers: [disconnected],
+      lists: { kimi: { status: MODEL_LIST_STATUS_LOADED, models: [{ id: 'k1', ownedBy: null }] } }
+    });
+    vi.mocked(client.listProviders)
+      .mockResolvedValueOnce({ providers: [disconnected] })
+      .mockResolvedValueOnce({ providers: [connected] });
+    vi.mocked(client.setProviderKey).mockResolvedValue({ outcome: SET_KEY_OUTCOME_CONNECTED, selectedModel: 'k1' });
+    const { stdin, lastFrame } = renderModel(client);
+    await waitForFrame(lastFrame, '›    (not connected — enter to connect)');
+
+    stdin.write('\r');
+    await waitForFrame(lastFrame, 'API key');
+    stdin.write('sk-inline-good');
+    await flushInput();
+    stdin.write('\r');
+
+    const frame = await waitForFrame(lastFrame, '›  ● k1');
+    expect(frame).toContain('Kimi (via keychain)');
+    expect(client.setProviderKey).toHaveBeenCalledWith(expect.objectContaining({ providerId: 'kimi', apiKey: 'sk-inline-good' }));
+    expect(client.listModels).toHaveBeenCalledWith('kimi');
+  });
+
+  it('keeps inline preset failures in the model flow for retry', async () => {
+    const client = fakeClient({ providers: [provider('kimi', 'Kimi', false)] });
+    vi.mocked(client.setProviderKey).mockResolvedValue({ outcome: SET_KEY_OUTCOME_AUTH_FAILED, selectedModel: null });
+    const { store, stdin, lastFrame } = renderModel(client);
+    await waitForFrame(lastFrame, 'not connected');
+
+    stdin.write('\r');
+    await waitForFrame(lastFrame, 'API key');
+    stdin.write('sk-inline-bad');
+    await flushInput();
+    stdin.write('\r');
+    const frame = await waitForFrame(lastFrame, 'Authentication failed');
+
+    expect(frame).toContain('API key');
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Model);
+    expect(client.listModels).not.toHaveBeenCalled();
+  });
+
+  it('lets Esc cancel inline entry without closing the model front door', async () => {
+    const client = fakeClient({ providers: [provider('kimi', 'Kimi', false)] });
+    const { store, stdin, lastFrame } = renderModel(client);
+    await waitForFrame(lastFrame, 'not connected');
+
+    stdin.write('\r');
+    await waitForFrame(lastFrame, 'API key');
+    stdin.write('\u001B');
+    await flushInput();
+    await waitUntil(() => store.get(inlineConnectProviderIdAtom) === null, 'inline cancel');
+
+    expect(lastFrame() ?? '').not.toContain('API key');
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Model);
+    expect(client.setProviderKey).not.toHaveBeenCalled();
   });
 });

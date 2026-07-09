@@ -1,13 +1,20 @@
 import { Box, Text } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useMemo } from 'react';
+import { MaskedInput } from '@components/MaskedInput/index.tsx';
+import { OutcomeMessage, RequestErrorMessage } from '@components/ConnectSurface/OutcomeMessage.tsx';
 import { ModelRows } from '@components/ModelSurface/ModelRows.tsx';
+import { useInlineConnect } from '@components/ModelSurface/useInlineConnect.ts';
 import { useModelBackend } from '@components/ModelSurface/useModelBackend.ts';
 import { useModelInput } from '@components/ModelSurface/useModelInput.ts';
 import { columnsAtom, rowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
 import { closeActiveSurfaceAtom } from '@state/ui/surface/index.ts';
 import {
   modelHighlightAtom,
+  inlineConnectInFlightAtom,
+  inlineConnectOutcomeAtom,
+  inlineConnectProviderIdAtom,
+  inlineConnectRequestErrorAtom,
   modelRowsAtom,
   modelVisibleRowsAtom,
   modelWindowOffsetAtom,
@@ -17,6 +24,7 @@ import { activeThemeAtom } from '@state/global/index.ts';
 
 const HEADER_ROWS = 3;
 const FOOTER_ROWS = 1;
+const INLINE_CONNECT_ROWS = 3;
 const MODEL_FOOTER_HINT = '↑/↓ choose · enter select/connect · esc close';
 
 /** Fullscreen `/model` picker across connected providers. */
@@ -28,13 +36,19 @@ export function ModelSurface() {
   const allRows = useAtomValue(modelRowsAtom);
   const visibleRows = useAtomValue(visibleModelRowsAtom);
   const highlight = useAtomValue(modelHighlightAtom);
+  const inlineProviderId = useAtomValue(inlineConnectProviderIdAtom);
+  const inlineInFlight = useAtomValue(inlineConnectInFlightAtom);
+  const inlineOutcome = useAtomValue(inlineConnectOutcomeAtom);
+  const inlineRequestError = useAtomValue(inlineConnectRequestErrorAtom);
   const theme = useAtomValue(activeThemeAtom);
   const setVisibleRows = useSetAtom(modelVisibleRowsAtom);
   const closeActiveSurface = useSetAtom(closeActiveSurfaceAtom);
   const { refreshModels, retryProvider, selectModel } = useModelBackend(closeActiveSurface);
-  const bodyRows = useMemo(() => Math.max(1, rows - HEADER_ROWS - FOOTER_ROWS), [rows]);
+  const { cancelInlineConnect, startInlineConnect, submitInlineKey } = useInlineConnect(refreshModels);
+  const inlineRows = inlineProviderId === null ? 0 : INLINE_CONNECT_ROWS;
+  const bodyRows = useMemo(() => Math.max(1, rows - HEADER_ROWS - FOOTER_ROWS - inlineRows), [inlineRows, rows]);
 
-  useModelInput({ retryProvider, selectModel });
+  useModelInput({ cancelInlineConnect, retryProvider, selectModel, startInlineConnect });
 
   useEffect(() => {
     setVisibleRows(bodyRows);
@@ -50,6 +64,17 @@ export function ModelSurface() {
       <Text color={theme.colors.muted}>Choose a model or connect a provider.</Text>
       <Text> </Text>
       <ModelRows columns={safeChromeColumns} highlight={highlight} rows={visibleRows} visibleRows={bodyRows} />
+      {inlineProviderId === null ? null : (
+        <Box flexDirection="column" width={safeChromeColumns}>
+          <Box width={safeChromeColumns}>
+            <Text color={theme.colors.accentBlue}>API key: </Text>
+            <MaskedInput isActive={!inlineInFlight} onCancel={cancelInlineConnect} onSubmit={submitInlineKey} />
+          </Box>
+          {inlineInFlight ? <Text color={theme.colors.warning}>Working…</Text> : null}
+          <OutcomeMessage outcome={inlineOutcome} providerId={inlineProviderId} />
+          <RequestErrorMessage message={inlineRequestError} />
+        </Box>
+      )}
       <ModelFooter columns={safeChromeColumns} offset={windowOffset} total={allRows.length} visible={bodyRows} />
     </Box>
   );

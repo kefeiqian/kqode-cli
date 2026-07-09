@@ -5,6 +5,7 @@ import type {
   ActiveSelectionResult,
   ProviderStatusInfo
 } from '@contracts/backend/providerMessages.ts';
+import type { SetKeyOutcome } from '@contracts/backend/providerMessages.ts';
 import {
   flattenProviderModelRows,
   groupProviderModels,
@@ -40,6 +41,13 @@ export const modelHighlightAtom = atom<ModelHighlightIdentity | null>(null);
 export const modelWindowOffsetAtom = atom(0);
 /** Visible row budget supplied by the surface for stable window math in atoms. */
 export const modelVisibleRowsAtom = atom(1);
+export const inlineConnectProviderIdAtom = atom<string | null>(null);
+export const inlineConnectInFlightAtom = atom(false);
+export const inlineConnectOutcomeAtom = atom<SetKeyOutcome | null>(null);
+export const inlineConnectRequestErrorAtom = atom<string | null>(null);
+export const modelSurfaceConsumesEscAtom = atom((get) => {
+  return get(inlineConnectProviderIdAtom) !== null || get(inlineConnectInFlightAtom) || get(inlineConnectOutcomeAtom) !== null;
+});
 
 /** Resets `/model` state before a fresh backend load. */
 export const resetModelSurfaceAtom = atom(null, (_get, set) => {
@@ -48,6 +56,10 @@ export const resetModelSurfaceAtom = atom(null, (_get, set) => {
   set(modelActiveSelectionAtom, { providerId: null, modelId: null });
   set(modelHighlightAtom, null);
   set(modelWindowOffsetAtom, 0);
+  set(inlineConnectProviderIdAtom, null);
+  set(inlineConnectInFlightAtom, false);
+  set(inlineConnectOutcomeAtom, null);
+  set(inlineConnectRequestErrorAtom, null);
 });
 
 /** Stores providers and marks each connected provider as loading immediately. */
