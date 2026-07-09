@@ -1,7 +1,7 @@
 ---
 title: "feat: Full conversation history and auto-compaction"
 type: feat
-status: active
+status: completed
 date: 2026-07-09
 origin: docs/brainstorms/2026-07-09-conversation-history-and-auto-compaction-requirements.md
 deepened: 2026-07-09
