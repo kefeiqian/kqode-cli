@@ -54,7 +54,7 @@ impl CompactionState {
     /// Returns whether a round is represented by the summary rather than kept
     /// verbatim. Always false while no summary is set.
     #[must_use]
-    fn covers(&self, seq: u64) -> bool {
+    pub fn covers(&self, seq: u64) -> bool {
         self.summary.is_some() && seq <= self.covered_through_seq
     }
 }
