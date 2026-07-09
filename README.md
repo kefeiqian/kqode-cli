@@ -110,10 +110,11 @@ cargo xtask tui-dev        # run the TUI from a throwaway fixture workspace
 `cargo xtask tui-dev` runs the Ink TUI against a copied fixture workspace, so the
 displayed working directory is a realistic project rather than the KQode repo.
 Today the TUI talks to a local Rust JSON-RPC backend that acknowledges each
-submitted prompt and now persists local resumable session history under
-`~/.kqode/`; `/help`, `/clear`, `/login`, `/model`, and `/resume` are wired to
-real TUI surfaces or backend flows. It still does not yet call a model, run
-tools, or execute an agent loop, and mention support remains a placeholder.
+submitted prompt and now persists local resumable session history and durable
+local memory under `~/.kqode/`; `/help`, `/clear`, `/login`, `/model`,
+`/resume`, and `/memory` are wired to real TUI surfaces or backend flows. It
+still does not yet call a model, run tools, or execute an agent loop, and mention
+support remains a placeholder.
 
 Prepare or reset that fixture workspace explicitly with:
 

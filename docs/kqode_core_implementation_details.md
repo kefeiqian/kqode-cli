@@ -55,10 +55,10 @@ This file expands R1-R84 from `2026-06-25-kqode-requirements.md`.
 | R32 | Repo map | Defer AST map; implement file tree and symbol hooks first. | Repo map command returns bounded summary. |
 | R33 | Working set | Track files read, edited, mentioned, and tested. | TUI shows active working set. |
 | R34 | Long context | Add compaction trigger based on token estimate. | Long session compacts before provider limit. |
-| R35 | Memory | Store user, project, and badcase memory as inspectable files plus SQLite index. | User can view memory from command. |
-| R36 | Memory correction | Add memory edit/delete command. | User can remove a bad memory. |
-| R37 | Memory scopes | Separate global user memory, repo memory, and team memory. | Repo memory does not leak into unrelated repo. |
-| R38 | Auto extraction | Defer; record candidate memory events first. | Corrections appear in candidate memory log. |
+| R35 | Memory | Landed: markdown topic files under `~/.kqode/memory/<scope>` are item truth; a rebuildable SQLite V3 index + `memory_events.jsonl` back `/memory` list/show. | User views memory via the `/memory` surface. |
+| R36 | Memory correction | Landed: `/memory` add/edit/forget plus an inbox with approve/reject/stale/undo (rollback-conflict aware) and content-free correction suppression keys. | User removes/undoes a bad memory; it is not recreated. |
+| R37 | Memory scopes | Landed: user/repo/folder/session scopes keyed by opaque ids hashed from canonical workspace identity; ambiguous repo/folder identity fails closed. Team scope reserved. | Repo memory does not leak into an unrelated repo. |
+| R38 | Auto extraction | Landed seam: cursor-gated, coalesced, proposal-only extraction scheduler over settled turns produces inbox candidates/active-audit entries; provider-backed extraction is deferred behind the worker trait. | Settled turns produce reviewable candidate entries without provider calls. |
 | R39 | Prompt settings | Support system prompt override and generation knobs in config. | Config can change temperature/reasoning for a profile. |
 | R40 | Ignore/trust rules | Add `.kqodeignore` and trusted-root config. | Ignored files are excluded from search/read. |
 | R41 | Advanced RAG | Defer; keep context adapter interface open. | No vector DB required for first demo. |
