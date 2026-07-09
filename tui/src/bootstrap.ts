@@ -8,12 +8,10 @@ import { startBackendRuntime } from '@backend/runtime/backendRuntime.ts';
 import { resolveRepoRoot, resolveWorkspaceCwd } from '@libs/path/runtimePaths.ts';
 import { systemClipboard } from '@libs/clipboard/systemClipboard.ts';
 import { PRODUCT_NAME } from '@constants/product.ts';
+import { INITIAL_THEME_READ_DEADLINE_MS } from '@constants/backend.ts';
 import { resolveProductVersion } from '@libs/product/productMetadata.ts';
 import { setTerminalWindowTitle, resetTerminalWindowTitle } from '@libs/terminal/windowTitle.ts';
-import {
-  resetTerminalBackground,
-  setTerminalBackground
-} from '@libs/terminal/terminalBackground.ts';
+import { resetTerminalBackground } from '@libs/terminal/terminalBackground.ts';
 import {
   enterAlternateScreen,
   leaveAlternateScreen
@@ -21,6 +19,7 @@ import {
 import { resolveSessionSeed } from '@components/AppExitSummary/resolveSessionSeed.ts';
 import { windowColumnsAtom, windowRowsAtom } from '@state/ui/index.ts';
 import {
+  applyThemeAtom,
   productVersionAtom,
   repoRootAtom,
   sessionGitBaselineAtom,
@@ -29,7 +28,7 @@ import {
   clipboardClientAtom
 } from '@state/global/index.ts';
 import { newTurnIdAtom } from '@state/promptQueue/atoms.ts';
-import { theme } from '@theme/themeConfig.ts';
+import { resolveInitialTheme } from '@theme/resolveInitialTheme.ts';
 import type { EmbeddedBackendAsset } from '@backend/packaged/materializeBackend.ts';
 
 type Store = ReturnType<typeof createStore>;
@@ -125,15 +124,27 @@ export async function createAppRuntime({
   }
 
   store.set(productVersionAtom, productVersion);
+
+  // Register readiness/transcript listeners and start the backend BEFORE the
+  // pre-render theme read: the theme id lives in the Rust store, so the read
+  // goes through the (starting) backend and must not consume backend readiness
+  // before session logging and transcript reset are wired.
+  const disposeBackend = startBackendRuntime(store, client, logger);
+
+  // Resolve the saved theme within a short deadline and seed it before the first
+  // frame. On timeout, read failure, unset preference, or unknown id this falls
+  // back to the default preset while normal backend startup continues.
+  const initialTheme = await resolveInitialTheme(client, INITIAL_THEME_READ_DEADLINE_MS);
+
   // Enter the alternate screen buffer before any visual setup so the session
   // renders in a scrollback-less buffer: while the TUI owns the screen the
   // terminal's native scrollbar has no pre-launch history to scroll into, and
   // the original buffer (with its scrollback) is restored on exit.
   enterAlternateScreen();
   setTerminalWindowTitle(PRODUCT_NAME, productVersion);
-  setTerminalBackground(theme.colors.bodyBackground);
-
-  const disposeBackend = startBackendRuntime(store, client, logger);
+  // Seed the active theme and terminal background together through the same
+  // centralized apply-theme seam the /theme picker uses.
+  store.set(applyThemeAtom, initialTheme);
 
   // Restore the user's terminal on clean shutdown and on hard exit (Ctrl+C /
   // crash) so neither the OSC 2 window title, the OSC 11 background override,

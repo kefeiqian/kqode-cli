@@ -36,6 +36,14 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
  */
 export const VALIDATION_REQUEST_TIMEOUT_MS = 20_000;
 
+/**
+ * Ceiling for the pre-render saved-theme read. Long enough for a warm (prebuilt)
+ * backend to answer `kqode.theme.get`, but short enough that a cold start (Cargo
+ * build) does not stall the first frame: on timeout the default theme is seeded
+ * and normal backend startup continues.
+ */
+export const INITIAL_THEME_READ_DEADLINE_MS = 1_500;
+
 /** Captured Cargo stderr is capped so a noisy build cannot exhaust memory. */
 export const BUILD_STDERR_CAP_BYTES = 16 * 1024;
 
