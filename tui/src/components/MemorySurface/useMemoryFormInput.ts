@@ -1,6 +1,7 @@
 import { useInput } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useRef } from 'react';
+import type { MemoryItem } from '@contracts/backend/index.ts';
 import { MODIFIED_ENTER_INPUTS } from '@components/PromptComposer/constants.ts';
 import { printableInput } from '@libs/composer/promptText.ts';
 import { isMouseInput } from '@libs/terminal/mouse.ts';
@@ -19,6 +20,7 @@ const SHIFT_TAB_INPUT = '\u001B[Z';
 
 export type MemoryFormActions = {
   addItem: (params: { title: string; body: string }) => Promise<void>;
+  editItem: (params: { item: MemoryItem; title: string; body: string }) => Promise<void>;
 };
 
 export function useMemoryFormInput(actions: MemoryFormActions) {
@@ -85,7 +87,11 @@ async function submit(
     setError({ titleError: 'Title is required' });
     return;
   }
-  await actions.addItem({ title, body: form.body });
+  if (form.mode === 'edit' && form.item !== null) {
+    await actions.editItem({ item: form.item, title, body: form.body });
+  } else {
+    await actions.addItem({ title, body: form.body });
+  }
 }
 
 function editCurrentField(

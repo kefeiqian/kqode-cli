@@ -20,7 +20,12 @@ import {
 } from '@state/promptQueue/index.ts';
 import { openHelpAtom } from '@state/ui/help/index.ts';
 import { openLoginSurfaceAtom, openMemorySurfaceAtom, openModelSurfaceAtom, openResumeSurfaceAtom, openThemeSurfaceAtom } from '@state/ui/surface/index.ts';
-import { MemoryMode, openAddMemoryFormAtom } from '@state/ui/memory/index.ts';
+import {
+  MemoryMode,
+  PendingMemoryItemAction,
+  openAddMemoryFormAtom,
+  setPendingMemoryItemActionAtom
+} from '@state/ui/memory/index.ts';
 import { CommandMemoryMode } from '@libs/commands/executeCommand.ts';
 import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import { resolveComposerWindow } from '@libs/composer/composerWindow.ts';
@@ -86,6 +91,7 @@ export function PromptComposer({
   const openResume = useSetAtom(openResumeSurfaceAtom);
   const openMemory = useSetAtom(openMemorySurfaceAtom);
   const openAddMemoryForm = useSetAtom(openAddMemoryFormAtom);
+  const setPendingMemoryItemAction = useSetAtom(setPendingMemoryItemActionAtom);
   const openTheme = useSetAtom(openThemeSurfaceAtom);
   const composerRef = useRef<DOMElement | null>(null);
   const composerMetrics = useBoxMetrics(composerRef);
@@ -118,9 +124,24 @@ export function PromptComposer({
         openMemory(MemoryMode.Active);
         openAddMemoryForm();
       },
+      openMemoryEdit: () => {
+        openMemory(MemoryMode.Active);
+        setPendingMemoryItemAction(PendingMemoryItemAction.Edit);
+      },
       openTheme
     }),
-    [exit, clearTranscript, openHelp, openLogin, openModel, openResume, openMemory, openAddMemoryForm, openTheme]
+    [
+      exit,
+      clearTranscript,
+      openHelp,
+      openLogin,
+      openModel,
+      openResume,
+      openMemory,
+      openAddMemoryForm,
+      setPendingMemoryItemAction,
+      openTheme
+    ]
   );
 
   useEffect(() => {

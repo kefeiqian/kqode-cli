@@ -6,6 +6,7 @@ import { isMouseInput } from '@libs/terminal/mouse.ts';
 import {
   MemoryMode,
   MemoryStatus,
+  PendingMemoryItemAction,
   highlightedInboxEntryAtom,
   highlightedMemoryItemAtom,
   memoryDetailBodyAtom,
@@ -14,6 +15,8 @@ import {
   moveMemoryHighlightAtom,
   setMemoryDetailAtom,
   memoryFormAtom,
+  pendingMemoryItemActionAtom,
+  setPendingMemoryItemActionAtom,
   switchMemoryModeAtom
 } from '@state/ui/memory/index.ts';
 
@@ -22,6 +25,7 @@ export type MemoryInputActions = {
   refresh: () => Promise<void>;
   showDetail: (item: MemoryItem) => Promise<void>;
   forgetItem: (item: MemoryItem) => Promise<void>;
+  beginEdit: (item: MemoryItem) => Promise<void>;
   applyInbox: (entryId: string, action: 'approve' | 'reject' | 'stale') => Promise<void>;
   undoInbox: (entryId: string) => Promise<void>;
 };
@@ -33,9 +37,11 @@ export function useMemoryInput(actions: MemoryInputActions) {
   const entry = useLatest<MemoryInboxEntry | null>(useAtomValue(highlightedInboxEntryAtom));
   const detail = useLatest(useAtomValue(memoryDetailBodyAtom));
   const form = useLatest(useAtomValue(memoryFormAtom));
+  const pendingAction = useLatest(useAtomValue(pendingMemoryItemActionAtom));
   const moveHighlight = useSetAtom(moveMemoryHighlightAtom);
   const switchMode = useSetAtom(switchMemoryModeAtom);
   const setDetail = useSetAtom(setMemoryDetailAtom);
+  const setPendingAction = useSetAtom(setPendingMemoryItemActionAtom);
 
   useInput((input, key) => {
     if (isMouseInput(input)) {
@@ -55,6 +61,10 @@ export function useMemoryInput(actions: MemoryInputActions) {
       }
       return;
     }
+    if (key.escape && pendingAction.current !== null) {
+      setPendingAction(null);
+      return;
+    }
     if (key.upArrow) {
       moveHighlight(-1);
       return;
@@ -72,7 +82,7 @@ export function useMemoryInput(actions: MemoryInputActions) {
       return;
     }
     if (mode.current === MemoryMode.Active) {
-      handleActiveKey(input, key, item.current, actions);
+      handleActiveKey(input, key, item.current, pendingAction.current, actions);
     } else {
       handleInboxKey(input, entry.current, actions);
     }
@@ -83,9 +93,14 @@ function handleActiveKey(
   input: string,
   key: { return: boolean },
   item: MemoryItem | null,
+  pendingAction: PendingMemoryItemAction | null,
   actions: MemoryInputActions
 ): void {
   if (item === null) {
+    return;
+  }
+  if (pendingAction === PendingMemoryItemAction.Edit && key.return) {
+    void actions.beginEdit(item);
     return;
   }
   if (key.return) {

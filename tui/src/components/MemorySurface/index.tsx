@@ -18,6 +18,7 @@ import {
   memoryErrorAtom,
   memoryFormAtom,
   memoryModeAtom,
+  pendingMemoryItemActionAtom,
   memoryStatusAtom,
   memoryVisibleRowsAtom,
   visibleInboxEntriesAtom,
@@ -41,17 +42,18 @@ export function MemorySurface() {
   const highlightedEntry = useAtomValue(highlightedInboxEntryAtom);
   const detailBody = useAtomValue(memoryDetailBodyAtom);
   const form = useAtomValue(memoryFormAtom);
+  const pendingAction = useAtomValue(pendingMemoryItemActionAtom);
   const theme = useAtomValue(activeThemeAtom);
   const setVisibleRows = useSetAtom(memoryVisibleRowsAtom);
-  const { refresh, showDetail, forgetItem, addItem, applyInbox, undoInbox } = useMemoryBackend();
+  const { refresh, showDetail, forgetItem, addItem, beginEdit, editItem, applyInbox, undoInbox } = useMemoryBackend();
   const bodyRows = useMemo(() => Math.max(1, rows - HEADER_ROWS - FOOTER_ROWS), [rows]);
   // The list area renders a table header on its first line, so the data-row
   // capacity that drives the scroll window is one less than the rendered height.
   const listRows = Math.max(1, bodyRows - 1);
   const dataRows = Math.max(1, listRows - 1);
 
-  useMemoryInput({ refresh, showDetail, forgetItem, applyInbox, undoInbox });
-  useMemoryFormInput({ addItem });
+  useMemoryInput({ refresh, showDetail, forgetItem, beginEdit, applyInbox, undoInbox });
+  useMemoryFormInput({ addItem, editItem });
 
   useEffect(() => {
     setVisibleRows(dataRows);
@@ -65,7 +67,7 @@ export function MemorySurface() {
     <Box flexDirection="column" width={columns} height={rows} backgroundColor={theme.colors.bodyBackground}>
       <Text color={theme.colors.accentBlue}>/memory</Text>
       <Text>{modeTabs(mode)}</Text>
-      <Text color={theme.colors.muted}>{statusLine(status, error)}</Text>
+      <Text color={theme.colors.muted}>{statusLine(status, error, pendingAction)}</Text>
       <Text> </Text>
       {form !== null ? (
         <MemoryForm columns={safeChromeColumns} form={form} />
@@ -143,7 +145,10 @@ function modeTabs(mode: MemoryMode): string {
   return `${active}  ${inbox}`;
 }
 
-function statusLine(status: MemoryStatus, error: string | null): string {
+function statusLine(status: MemoryStatus, error: string | null, pendingAction: string | null = null): string {
+  if (pendingAction === 'edit') {
+    return 'Pick a memory to edit · enter choose · esc cancel';
+  }
   switch (status) {
     case MemoryStatus.Loading:
       return 'Loading memory…';

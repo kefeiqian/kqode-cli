@@ -5,6 +5,7 @@ import { backendClientAtom } from '@state/global/index.ts';
 import { backendErrorMessage } from '@libs/promptQueue/promptQueue.ts';
 import {
   resetMemorySurfaceAtom,
+  openEditMemoryFormAtom,
   setMemoryBusyAtom,
   setMemoryDataAtom,
   setMemoryDetailAtom,
@@ -25,6 +26,7 @@ export function useMemoryBackend() {
   const setMemoryBusy = useSetAtom(setMemoryBusyAtom);
   const setMemoryDetail = useSetAtom(setMemoryDetailAtom);
   const setMemoryFormError = useSetAtom(setMemoryFormErrorAtom);
+  const openEditMemoryForm = useSetAtom(openEditMemoryFormAtom);
 
   const refresh = useCallback(async () => {
     resetMemory();
@@ -98,6 +100,48 @@ export function useMemoryBackend() {
     [client, refresh, setMemoryFormError]
   );
 
+  const beginEdit = useCallback(
+    async (item: MemoryItem) => {
+      if (client === undefined) {
+        setMemoryFailure('Rust backend unavailable');
+        return;
+      }
+      try {
+        const result = await client.showMemory({
+          scope: item.scope,
+          scopeId: item.scopeId ?? undefined,
+          id: item.id
+        });
+        openEditMemoryForm({ item: result.item, body: result.body });
+      } catch (error) {
+        setMemoryFailure(backendErrorMessage(error));
+      }
+    },
+    [client, openEditMemoryForm, setMemoryFailure]
+  );
+
+  const editItem = useCallback(
+    async ({ item, title, body }: { item: MemoryItem; title: string; body: string }) => {
+      if (client === undefined) {
+        setMemoryFormError({ submitError: 'Rust backend unavailable' });
+        return;
+      }
+      try {
+        await client.editMemory({
+          scope: item.scope,
+          scopeId: item.scopeId ?? undefined,
+          id: item.id,
+          title,
+          body
+        });
+        await refresh();
+      } catch (error) {
+        setMemoryFormError({ submitError: backendErrorMessage(error) });
+      }
+    },
+    [client, refresh, setMemoryFormError]
+  );
+
   const applyInbox = useCallback(
     async (entryId: string, action: InboxAction) => {
       if (client === undefined) {
@@ -130,5 +174,5 @@ export function useMemoryBackend() {
     [client, refresh, setMemoryBusy, setMemoryFailure]
   );
 
-  return { refresh, showDetail, forgetItem, addItem, applyInbox, undoInbox };
+  return { refresh, showDetail, forgetItem, addItem, beginEdit, editItem, applyInbox, undoInbox };
 }

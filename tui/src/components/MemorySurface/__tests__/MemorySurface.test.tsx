@@ -3,7 +3,14 @@ import { describe, expect, it, vi } from 'vitest';
 import type { BackendClient, MemoryInboxEntry, MemoryItem } from '@contracts/backend/index.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { activeSurfaceAtom, columnsTestOverrideAtom, rowsTestOverrideAtom, Surface } from '@state/ui/index.ts';
-import { MemoryMode, memoryModeAtom, memoryFormAtom, openAddMemoryFormAtom } from '@state/ui/memory/index.ts';
+import {
+  MemoryMode,
+  PendingMemoryItemAction,
+  memoryFormAtom,
+  memoryModeAtom,
+  openAddMemoryFormAtom,
+  setPendingMemoryItemActionAtom
+} from '@state/ui/memory/index.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 import { flushInput } from '@test/flushInput.ts';
 import { memoryBackendStub } from '@test/backendMemoryStub.ts';
@@ -170,5 +177,55 @@ describe('MemorySurface', () => {
     await flushInput();
     await waitForFrame(lastFrame, 'No memory yet.');
     expect(store.get(activeSurfaceAtom)).toBe(Surface.Memory);
+  });
+
+  it('picks an active memory to edit, preloads its body, and submits edits', async () => {
+    const original = sampleItem({ id: 'edit-1', title: 'Old title', scope: 'repo' });
+    const showMemory = vi.fn(async () => ({ item: original, body: 'Old body' }));
+    const editMemory = vi.fn(async () => ({ item: { ...original, title: 'Old title updated' } }));
+    const client = fakeClient({ items: [original] });
+    client.showMemory = showMemory;
+    client.editMemory = editMemory;
+    const { store, stdin, lastFrame } = renderMemory(client);
+    await waitForFrame(lastFrame, 'Old title');
+
+    store.set(setPendingMemoryItemActionAtom, PendingMemoryItemAction.Edit);
+    await waitForFrame(lastFrame, 'Pick a memory to edit');
+    stdin.write('\r');
+    await waitForFrame(lastFrame, 'Edit project memory');
+    expect(showMemory).toHaveBeenCalledWith({ scope: 'repo', id: 'edit-1' });
+
+    stdin.write(' updated');
+    await flushInput();
+    stdin.write('\t');
+    await flushInput();
+    stdin.write(' updated');
+    await flushInput();
+    stdin.write('\r');
+    await waitForFrame(lastFrame, 'Old title');
+
+    expect(editMemory).toHaveBeenCalledWith({
+      scope: 'repo',
+      id: 'edit-1',
+      title: 'Old title updated',
+      body: 'Old body updated'
+    });
+    expect(store.get(memoryFormAtom)).toBeNull();
+  });
+
+  it('aborts edit pick on body fetch failure without opening the form', async () => {
+    const client = fakeClient({ items: [sampleItem()] });
+    client.showMemory = vi.fn(async () => {
+      throw new Error('show failed');
+    });
+    const { store, stdin, lastFrame } = renderMemory(client);
+    await waitForFrame(lastFrame, 'Use tabs in Go');
+
+    store.set(setPendingMemoryItemActionAtom, PendingMemoryItemAction.Edit);
+    stdin.write('\r');
+    const frame = await waitForFrame(lastFrame, 'show failed');
+
+    expect(frame).not.toContain('Edit project memory');
+    expect(store.get(memoryFormAtom)).toBeNull();
   });
 });

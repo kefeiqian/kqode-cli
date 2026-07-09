@@ -4,6 +4,7 @@ import type { MemoryInboxEntry, MemoryItem } from '@contracts/backend/index.ts';
 import {
   MemoryMode,
   MemoryStatus,
+  PendingMemoryItemAction,
   closeMemoryFormAtom,
   highlightedMemoryItemAtom,
   memoryErrorAtom,
@@ -11,14 +12,17 @@ import {
   memoryHighlightIndexAtom,
   memoryItemsAtom,
   memoryModeAtom,
+  pendingMemoryItemActionAtom,
   memoryStatusAtom,
   memoryVisibleRowsAtom,
   moveMemoryHighlightAtom,
+  openEditMemoryFormAtom,
   openAddMemoryFormAtom,
   resetMemorySurfaceAtom,
   setMemoryFormBodyAtom,
   setMemoryFormErrorAtom,
   setMemoryFormFieldAtom,
+  setPendingMemoryItemActionAtom,
   setMemoryFormTitleAtom,
   setMemoryDataAtom,
   setMemoryFailureAtom,
@@ -130,6 +134,23 @@ describe('memory surface atoms', () => {
     store.set(openAddMemoryFormAtom);
     store.set(closeMemoryFormAtom);
     expect(store.get(memoryFormAtom)).toBeNull();
+  });
+
+  it('tracks pick-to-edit state and opens a prefilled edit form', () => {
+    const store = createStore();
+    const selected = item('edit-me');
+
+    store.set(setPendingMemoryItemActionAtom, PendingMemoryItemAction.Edit);
+    expect(store.get(pendingMemoryItemActionAtom)).toBe(PendingMemoryItemAction.Edit);
+
+    store.set(openEditMemoryFormAtom, { item: selected, body: 'full body' });
+    expect(store.get(pendingMemoryItemActionAtom)).toBeNull();
+    expect(store.get(memoryFormAtom)).toMatchObject({
+      mode: 'edit',
+      item: selected,
+      title: selected.title,
+      body: 'full body'
+    });
   });
 
   it('preserves a failed status and error when switching modes', () => {

@@ -31,6 +31,7 @@ const commandActions: CommandActions = {
   openResume: vi.fn(),
   openMemory: vi.fn(),
   openMemoryAdd: vi.fn(),
+  openMemoryEdit: vi.fn(),
   openTheme: vi.fn()
 };
 
