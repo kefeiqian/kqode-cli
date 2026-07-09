@@ -17,10 +17,7 @@ export type Surface = (typeof Surface)[keyof typeof Surface];
 /** The one active shell surface; opening one surface closes every other one. */
 export const activeSurfaceAtom = atom<Surface>(Surface.Home);
 
-const surfaceNavigationVersionAtom = atom(0);
-
 const setActiveSurfaceAtom = atom(null, (_get, set, surface: Surface) => {
-  set(surfaceNavigationVersionAtom, (version) => version + 1);
   set(activeSurfaceAtom, surface);
 });
 
