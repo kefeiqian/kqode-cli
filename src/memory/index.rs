@@ -13,7 +13,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use super::event_log::{self, MemoryEvent, MemoryOp};
 use super::{
     MemoryError, MemoryItem, MemoryProvenance, MemoryScope, MemorySource, MemoryType, ScopeRoots,
-    corpus, paths, security,
+    corpus, model, paths, security,
 };
 use crate::store::{Store, StoredMemoryItem};
 
@@ -144,6 +144,9 @@ impl MemoryService {
         title: String,
         body: String,
     ) -> Result<StoredMemoryItem, MemoryError> {
+        // Validate fully up front (title validity, size, secrets) so a refused
+        // write never appends a durable operation intent (no orphan pending op).
+        model::validate_title(&title)?;
         enforce_sizes(&title, &body)?;
         security::validate_for_write(&title, &body)?;
         let (resolved, root) = self.resolve(scope, scope_id)?;
@@ -184,17 +187,21 @@ impl MemoryService {
     ) -> Result<StoredMemoryItem, MemoryError> {
         let (resolved, root) = self.resolve(scope, scope_id)?;
         let mut item = corpus::read_item(&root, id)?;
-        let op_id = new_op_id();
-        self.record_rollback(&op_id, &item, resolved.as_deref())?;
+        let prior = item.clone();
         if let Some(title) = title {
             item.title = title;
         }
         if let Some(body) = body {
             item.body = body;
         }
+        // Validate the edited content fully before appending any event, so a bad
+        // edit orphans neither a RollbackPoint nor an OperationStarted.
+        model::validate_title(&item.title)?;
         enforce_sizes(&item.title, &item.body)?;
         security::validate_for_write(&item.title, &item.body)?;
         item.provenance.updated_at_ms = now_ms();
+        let op_id = new_op_id();
+        self.record_rollback(&op_id, &prior, resolved.as_deref())?;
         self.persist(&op_id, &root, &mut item, MemoryOp::Write)
     }
 
@@ -343,7 +350,19 @@ impl MemoryService {
             result_hash: Some(hash),
             at_ms: now_ms(),
         })?;
-        let path = corpus::write_item(root, item)?;
+        let path = match corpus::write_item(root, item) {
+            Ok(path) => path,
+            Err(error) => {
+                // Keep the operation self-contained: a failed write settles its
+                // own intent so no dangling OperationStarted survives.
+                let _ = self.append(&MemoryEvent::OperationFailed {
+                    operation_id: op_id.to_owned(),
+                    reason: Some("memory write failed".to_owned()),
+                    at_ms: now_ms(),
+                });
+                return Err(error);
+            }
+        };
         self.append(&MemoryEvent::OperationApplied {
             operation_id: op_id.to_owned(),
             at_ms: now_ms(),

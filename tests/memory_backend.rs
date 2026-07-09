@@ -95,6 +95,27 @@ fn oversized_body_is_rejected() {
 }
 
 #[test]
+fn invalid_title_add_is_refused_with_no_orphan_event() {
+    let fixture = setup();
+    let error = fixture
+        .service
+        .add(
+            MemoryScope::User,
+            None,
+            MemoryType::User,
+            "   ".to_owned(),
+            "body".to_owned(),
+        )
+        .expect_err("blank title refused");
+    assert!(matches!(error, MemoryError::InvalidTitle(_)));
+    assert!(
+        kqode::memory::event_log::read_events(fixture.service.event_log_path()).is_empty(),
+        "a refused invalid-title write must not append any durable operation intent"
+    );
+    assert!(fixture.service.list(None, false).unwrap().is_empty());
+}
+
+#[test]
 fn edit_updates_body_and_forget_removes_the_item() {
     let fixture = setup();
     let item = fixture
