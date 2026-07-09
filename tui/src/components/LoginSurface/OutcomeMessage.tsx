@@ -41,7 +41,7 @@ const OUTCOME_MESSAGES: Record<SetKeyOutcome, { colorToken: keyof ThemeColors; t
   },
   [SET_KEY_OUTCOME_STORE_FAILED]: {
     colorToken: 'errorRed',
-    text: 'Keychain write failed — set `CUSTOM_API_KEY` in `.env`, then retry.'
+    text: 'Keychain write failed — unlock or repair the OS keychain, then retry.'
   }
 };
 

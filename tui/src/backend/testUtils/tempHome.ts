@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-type EnvName = 'HOME' | 'USERPROFILE' | 'CARGO_HOME' | 'RUSTUP_HOME' | 'CUSTOM_API_KEY' | 'KQODE_DEBUG';
+type EnvName = 'HOME' | 'USERPROFILE' | 'CARGO_HOME' | 'RUSTUP_HOME' | 'KQODE_DEBUG';
 
 type TempHomeOptions = {
   env?: Partial<Record<EnvName, string>>;

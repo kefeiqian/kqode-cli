@@ -675,9 +675,8 @@ describe('createSourceBackendClient (integration)', () => {
   it(
     'builds and launches the Rust backend, routing to configuration without a key',
     async () => {
-      // Run in a temp workspace whose ancestry has no `.env`, so the backend
-      // finds no CUSTOM_API_KEY and deterministically returns needsConfiguration —
-      // regardless of a developer's real `.env` at the repo root.
+      // Run in a temp workspace and isolated home so no keychain-backed provider
+      // credential exists and submit deterministically returns needsConfiguration.
       const workspaceCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-src-client-'));
       await withTempHome(
         async () => {
@@ -707,7 +706,7 @@ describe('createSourceBackendClient (integration)', () => {
             }
           }
         },
-        { env: { CUSTOM_API_KEY: '', KQODE_DEBUG: '0' } }
+        { env: { KQODE_DEBUG: '0' } }
       );
     },
     INTEGRATION_TIMEOUT_MS
