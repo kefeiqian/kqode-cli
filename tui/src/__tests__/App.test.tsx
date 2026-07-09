@@ -236,6 +236,12 @@ describe('App', () => {
     // No out-of-scope theme affordances leak into the picker.
     expect(themeFrame).not.toMatch(/light|custom|plugin|import|export/i);
 
+    // Move the highlight off the active (default) row first, so "Esc did not
+    // apply" is distinguishable from "Esc applied the highlighted theme" — an
+    // Esc-applies regression would leave a non-default theme active below.
+    stdin.write('\u001B[B');
+    await flushInput();
+
     stdin.write('\u001B');
     await new Promise((resolve) => setTimeout(resolve, 80));
 
