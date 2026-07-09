@@ -5,6 +5,7 @@ import {
   MemoryMode,
   MemoryStatus,
   highlightedMemoryItemAtom,
+  memoryErrorAtom,
   memoryHighlightIndexAtom,
   memoryItemsAtom,
   memoryModeAtom,
@@ -12,7 +13,9 @@ import {
   memoryVisibleRowsAtom,
   moveMemoryHighlightAtom,
   setMemoryDataAtom,
-  switchMemoryModeAtom
+  setMemoryFailureAtom,
+  switchMemoryModeAtom,
+  visibleMemoryItemsAtom
 } from '@state/ui/memory/index.ts';
 
 function item(id: string): MemoryItem {
@@ -84,5 +87,27 @@ describe('memory surface atoms', () => {
     expect(store.get(memoryModeAtom)).toBe(MemoryMode.Inbox);
     expect(store.get(memoryStatusAtom)).toBe(MemoryStatus.Empty);
     expect(store.get(memoryHighlightIndexAtom)).toBe(0);
+  });
+
+  it('preserves a failed status and error when switching modes', () => {
+    const store = createStore();
+    store.set(setMemoryFailureAtom, 'backend down');
+
+    store.set(switchMemoryModeAtom, MemoryMode.Inbox);
+    expect(store.get(memoryStatusAtom)).toBe(MemoryStatus.Failed);
+    expect(store.get(memoryErrorAtom)).toBe('backend down');
+  });
+
+  it('scrolls the window to keep the highlight visible for a header-reserved viewport', () => {
+    const store = createStore();
+    store.set(memoryVisibleRowsAtom, 2);
+    store.set(setMemoryDataAtom, {
+      items: [item('a'), item('b'), item('c'), item('d'), item('e')],
+      inbox: []
+    });
+
+    store.set(moveMemoryHighlightAtom, 4);
+    expect(store.get(memoryHighlightIndexAtom)).toBe(4);
+    expect(store.get(visibleMemoryItemsAtom).map((entry) => entry.id)).toEqual(['d', 'e']);
   });
 });

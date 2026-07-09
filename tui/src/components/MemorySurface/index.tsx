@@ -40,18 +40,20 @@ export function MemorySurface() {
   const setVisibleRows = useSetAtom(memoryVisibleRowsAtom);
   const { refresh, showDetail, forgetItem, applyInbox, undoInbox } = useMemoryBackend();
   const bodyRows = useMemo(() => Math.max(1, rows - HEADER_ROWS - FOOTER_ROWS), [rows]);
+  // The list area renders a table header on its first line, so the data-row
+  // capacity that drives the scroll window is one less than the rendered height.
+  const listRows = Math.max(1, bodyRows - 1);
+  const dataRows = Math.max(1, listRows - 1);
 
   useMemoryInput({ refresh, showDetail, forgetItem, applyInbox, undoInbox });
 
   useEffect(() => {
-    setVisibleRows(Math.max(1, bodyRows - 1));
-  }, [bodyRows, setVisibleRows]);
+    setVisibleRows(dataRows);
+  }, [dataRows, setVisibleRows]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
-
-  const listRows = Math.max(1, bodyRows - 1);
 
   return (
     <Box flexDirection="column" width={columns} height={rows} backgroundColor={theme.colors.bodyBackground}>

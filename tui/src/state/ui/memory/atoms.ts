@@ -101,7 +101,12 @@ export const switchMemoryModeAtom = atom(null, (get, set, mode: MemoryMode) => {
   set(memoryHighlightIndexAtom, 0);
   set(memoryWindowOffsetAtom, 0);
   set(memoryDetailBodyAtom, null);
-  set(memoryStatusAtom, statusForMode(get(memoryItemsAtom), get(memoryInboxAtom), mode));
+  // Only recompute loaded/empty from the new mode's list; preserve a Failed (or
+  // in-flight) status so switching tabs after a load failure keeps the error.
+  const current = get(memoryStatusAtom);
+  if (current === MemoryStatus.Loaded || current === MemoryStatus.Empty) {
+    set(memoryStatusAtom, statusForMode(get(memoryItemsAtom), get(memoryInboxAtom), mode));
+  }
 });
 
 export const moveMemoryHighlightAtom = atom(null, (get, set, delta: number) => {
