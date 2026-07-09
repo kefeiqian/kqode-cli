@@ -177,7 +177,8 @@ fn parse_session_log(path: &std::path::Path) -> Option<StoredSession> {
             SessionLogEventWire::TurnEnqueued { prompt, at_ms } => {
                 modified_at = Some(at_ms);
                 if first_prompt_summary.is_none() {
-                    first_prompt_summary = Some(prompt.split_whitespace().collect::<Vec<_>>().join(" "));
+                    first_prompt_summary =
+                        Some(prompt.split_whitespace().collect::<Vec<_>>().join(" "));
                 }
             }
             SessionLogEventWire::TurnSettled { at_ms } => {

@@ -1,8 +1,8 @@
 use lsp_server::{Connection, Message, Request, RequestId};
 
 use super::*;
-use crate::conversation::{Coordinator, SessionPersistence};
 use crate::conversation::session_log::SessionLogEvent;
+use crate::conversation::{Coordinator, SessionPersistence};
 use crate::protocol::{SESSION_LIST_METHOD, SESSION_RESUME_METHOD};
 use crate::store::StoredSession;
 

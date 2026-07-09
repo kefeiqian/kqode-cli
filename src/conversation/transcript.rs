@@ -105,7 +105,11 @@ impl Transcript {
     /// Replaces the transcript with restored settled turns and advances the
     /// next sequence to `max(seq)+1` so resumed sessions keep monotonic order.
     pub fn replace_with(&mut self, turns: Vec<TranscriptTurn>) {
-        self.next_seq = turns.iter().map(|turn| turn.seq).max().map_or(0, |seq| seq + 1);
+        self.next_seq = turns
+            .iter()
+            .map(|turn| turn.seq)
+            .max()
+            .map_or(0, |seq| seq + 1);
         self.turns = turns;
     }
 
@@ -183,7 +187,9 @@ impl Transcript {
 
     #[must_use]
     pub fn has_unsettled(&self) -> bool {
-        self.turns.iter().any(|turn| turn.state != TurnState::Settled)
+        self.turns
+            .iter()
+            .any(|turn| turn.state != TurnState::Settled)
     }
 
     #[must_use]

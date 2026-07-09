@@ -5,7 +5,10 @@ use super::test_support::{
     Action, WAIT, enqueue, expect_activated, expect_enqueued, expect_settled, harness,
 };
 use super::transcript::{SettledKind, TurnResult, TurnState};
-use super::{Command, ConversationEvent, ConversationPersistence, Coordinator, NEEDS_CONFIGURATION_MESSAGE, TurnJob};
+use super::{
+    Command, ConversationEvent, ConversationPersistence, Coordinator, NEEDS_CONFIGURATION_MESSAGE,
+    TurnJob,
+};
 
 struct FailSecondEnqueuePersistence {
     fail_after_first: bool,

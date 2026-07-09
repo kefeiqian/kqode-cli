@@ -110,7 +110,9 @@ impl Store {
             drop(conn);
             set_private_db_permissions(&path);
             let store = Self { path: path.clone() };
-            store.reindex_sessions_from_logs().map_err(StoreError::Sanity)?;
+            store
+                .reindex_sessions_from_logs()
+                .map_err(StoreError::Sanity)?;
             Ok::<Self, StoreError>(store)
         })();
         result.map_err(|err| err.with_path(path))

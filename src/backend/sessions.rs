@@ -3,15 +3,15 @@ use std::sync::mpsc;
 
 use lsp_server::{Request, Response};
 
-use crate::conversation::{Command, ConversationStatus, SettledKind, TurnResult, TurnState};
+use crate::conversation::session_log::SessionLogEvent;
 use crate::conversation::transcript::TranscriptTurn;
+use crate::conversation::{Command, ConversationStatus, SettledKind, TurnResult, TurnState};
 use crate::protocol::{
-    JSON_RPC_INVALID_PARAMS, SessionListResult, SessionResumeParams, SessionResumeResult,
-    SessionSummaryWire, SessionTurnResultWire, ResumedTurnWire, SESSION_STATUS_CURRENT,
-    SESSION_STATUS_IDLE,
+    JSON_RPC_INVALID_PARAMS, ResumedTurnWire, SESSION_STATUS_CURRENT, SESSION_STATUS_IDLE,
+    SessionListResult, SessionResumeParams, SessionResumeResult, SessionSummaryWire,
+    SessionTurnResultWire,
 };
 use crate::store::{Store, StoredSession};
-use crate::conversation::session_log::SessionLogEvent;
 
 pub(super) fn list_sessions(
     request: Request,

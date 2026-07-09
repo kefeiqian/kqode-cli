@@ -200,7 +200,9 @@ impl ConversationPersistence for SessionPersistence {
     }
 
     fn current_session_id(&self) -> Option<String> {
-        self.current_session.as_ref().map(|session| session.id.clone())
+        self.current_session
+            .as_ref()
+            .map(|session| session.id.clone())
     }
 
     fn attach_session(&mut self, session: StoredSession) {
