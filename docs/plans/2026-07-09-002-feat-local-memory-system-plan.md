@@ -1,6 +1,7 @@
 ---
 title: "feat: Local memory system"
 type: feat
+status: completed
 date: 2026-07-09
 origin: docs/brainstorms/2026-07-09-local-memory-system-requirements.md
 deepened: 2026-07-09
