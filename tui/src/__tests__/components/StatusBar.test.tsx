@@ -1,6 +1,7 @@
 import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import { StatusBar } from '@components/StatusBar.tsx';
+import { memoryBackendStub } from '@test/backendMemoryStub.ts';
 import type { BackendClient, ProviderStatusInfo } from '@contracts/backend/index.ts';
 import {
   CREDENTIAL_SOURCE_KEYCHAIN,
@@ -145,6 +146,7 @@ describe('StatusBar', () => {
 function pendingClient(): BackendClient {
   const never = <T,>(): Promise<T> => new Promise<T>(() => undefined);
   return {
+    ...memoryBackendStub(),
     submit: async () => undefined,
     onTranscriptEvent: () => () => undefined,
     clearConversation: async () => undefined,
@@ -189,6 +191,7 @@ function clientWith({
   active?: Awaited<ReturnType<BackendClient['getActiveSelection']>>;
 }): BackendClient {
   return {
+    ...memoryBackendStub(),
     submit: async () => undefined,
     onTranscriptEvent: () => () => undefined,
     clearConversation: async () => undefined,

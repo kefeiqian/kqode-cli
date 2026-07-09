@@ -18,6 +18,23 @@ import type {
   SessionResumeParams,
   SessionResumeResult
 } from '@contracts/backend/sessionMessages.ts';
+import type {
+  MemoryAddParams,
+  MemoryEditParams,
+  MemoryForgetParams,
+  MemoryForgetResult,
+  MemoryInboxApplyParams,
+  MemoryInboxApplyResult,
+  MemoryInboxListParams,
+  MemoryInboxListResult,
+  MemoryInboxUndoParams,
+  MemoryInboxUndoResult,
+  MemoryListParams,
+  MemoryListResult,
+  MemoryMutationResult,
+  MemoryShowParams,
+  MemoryShowResult
+} from '@contracts/backend/memoryMessages.ts';
 import type { TurnResult, TurnState } from '@contracts/backend/messages.ts';
 
 /** Backend failure categories surfaced to the TUI. */
@@ -85,4 +102,22 @@ export type BackendClient = {
   listModels(providerId: string): Promise<ModelListResult>;
   listSessions(): Promise<SessionListResult>;
   resumeSession(params: SessionResumeParams): Promise<SessionResumeResult>;
+  /** Lists memory items visible in the current workspace (user + repo + session). */
+  listMemory(params: MemoryListParams): Promise<MemoryListResult>;
+  /** Reads one memory item including its body. */
+  showMemory(params: MemoryShowParams): Promise<MemoryShowResult>;
+  /** Adds an active memory item. */
+  addMemory(params: MemoryAddParams): Promise<MemoryMutationResult>;
+  /** Edits an existing memory item. */
+  editMemory(params: MemoryEditParams): Promise<MemoryMutationResult>;
+  /** Forgets (removes) a memory item. */
+  forgetMemory(params: MemoryForgetParams): Promise<MemoryForgetResult>;
+  /** Rebuilds the memory index from file + event-log truth, returning the list. */
+  reloadMemory(): Promise<MemoryListResult>;
+  /** Lists inbox entries (candidates + automatic audits). */
+  listMemoryInbox(params: MemoryInboxListParams): Promise<MemoryInboxListResult>;
+  /** Applies a review action (approve/reject/stale) to an inbox entry. */
+  applyMemoryInbox(params: MemoryInboxApplyParams): Promise<MemoryInboxApplyResult>;
+  /** Undoes an applied automatic memory update. */
+  undoMemoryInbox(params: MemoryInboxUndoParams): Promise<MemoryInboxUndoResult>;
 };

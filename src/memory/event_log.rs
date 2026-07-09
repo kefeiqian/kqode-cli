@@ -146,6 +146,20 @@ pub enum MemoryEvent {
         reason: Option<String>,
         at_ms: i64,
     },
+    /// A pre-mutation snapshot of an item's content, enabling undo/rollback of a
+    /// later operation without SQLite ever holding the raw body.
+    RollbackPoint {
+        operation_id: String,
+        item_id: String,
+        scope: MemoryScope,
+        #[serde(default)]
+        scope_id: Option<String>,
+        memory_type: MemoryType,
+        title: String,
+        body: String,
+        active: bool,
+        at_ms: i64,
+    },
     /// A correction suppression key was recorded (never raw content).
     CorrectionRecorded {
         suppression_key: String,

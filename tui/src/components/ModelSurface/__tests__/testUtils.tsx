@@ -11,6 +11,7 @@ import {
 import { backendClientAtom } from '@state/global/index.ts';
 import { activeSurfaceAtom, columnsTestOverrideAtom, rowsTestOverrideAtom, Surface } from '@state/ui/index.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
+import { memoryBackendStub } from '@test/backendMemoryStub.ts';
 
 export function provider(
   providerId: string,
@@ -34,6 +35,7 @@ export function fakeClient(options: {
   lists?: Record<string, ModelListResult | Promise<ModelListResult>>;
 }): BackendClient {
   return {
+    ...memoryBackendStub(),
     submit: vi.fn(),
     onTranscriptEvent: () => () => undefined,
     clearConversation: async () => undefined,

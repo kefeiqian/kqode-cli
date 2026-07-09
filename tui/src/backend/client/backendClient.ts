@@ -25,7 +25,22 @@ import type {
   SetKeyParams,
   SetKeyResult,
   StreamSubmitParams,
-  TranscriptEvent
+  TranscriptEvent,
+  MemoryAddParams,
+  MemoryEditParams,
+  MemoryForgetParams,
+  MemoryForgetResult,
+  MemoryInboxApplyParams,
+  MemoryInboxApplyResult,
+  MemoryInboxListParams,
+  MemoryInboxListResult,
+  MemoryInboxUndoParams,
+  MemoryInboxUndoResult,
+  MemoryListParams,
+  MemoryListResult,
+  MemoryMutationResult,
+  MemoryShowParams,
+  MemoryShowResult
 } from '@contracts/backend/index.ts';
 export { BackendLifecycleState };
 export type { BackendClientHandle, BackendClientOptions };
@@ -227,6 +242,33 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     },
     async resumeSession(params: SessionResumeParams): Promise<SessionResumeResult> {
       return withClient((client) => client.resumeSession(params));
+    },
+    async listMemory(params: MemoryListParams): Promise<MemoryListResult> {
+      return withClient((client) => client.listMemory(params));
+    },
+    async showMemory(params: MemoryShowParams): Promise<MemoryShowResult> {
+      return withClient((client) => client.showMemory(params));
+    },
+    async addMemory(params: MemoryAddParams): Promise<MemoryMutationResult> {
+      return withClient((client) => client.addMemory(params));
+    },
+    async editMemory(params: MemoryEditParams): Promise<MemoryMutationResult> {
+      return withClient((client) => client.editMemory(params));
+    },
+    async forgetMemory(params: MemoryForgetParams): Promise<MemoryForgetResult> {
+      return withClient((client) => client.forgetMemory(params));
+    },
+    async reloadMemory(): Promise<MemoryListResult> {
+      return withClient((client) => client.reloadMemory());
+    },
+    async listMemoryInbox(params: MemoryInboxListParams): Promise<MemoryInboxListResult> {
+      return withClient((client) => client.listMemoryInbox(params));
+    },
+    async applyMemoryInbox(params: MemoryInboxApplyParams): Promise<MemoryInboxApplyResult> {
+      return withClient((client) => client.applyMemoryInbox(params));
+    },
+    async undoMemoryInbox(params: MemoryInboxUndoParams): Promise<MemoryInboxUndoResult> {
+      return withClient((client) => client.undoMemoryInbox(params));
     },
     dispose() {
       disposed = true;

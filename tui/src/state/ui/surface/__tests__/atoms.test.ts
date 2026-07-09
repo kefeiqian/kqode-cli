@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { BackendClient, ProviderStatusInfo } from '@contracts/backend/index.ts';
 import { PROVIDER_STATUS_CONNECTED, PROVIDER_STATUS_NOT_CONFIGURED } from '@contracts/backend/index.ts';
 import { backendClientAtom } from '@state/global/index.ts';
+import { memoryBackendStub } from '@test/backendMemoryStub.ts';
 import {
   activeSurfaceAtom,
   closeActiveSurfaceAtom,
@@ -23,6 +24,7 @@ const provider = (status: ProviderStatusInfo['status']): ProviderStatusInfo => (
 });
 
 const clientWithProviders = (providers: ProviderStatusInfo[]): BackendClient => ({
+  ...memoryBackendStub(),
   submit: vi.fn(),
   onTranscriptEvent: () => () => undefined,
   clearConversation: async () => undefined,

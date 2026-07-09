@@ -12,6 +12,7 @@ import { backendClientAtom, workspaceCwdAtom } from '@state/global/index.ts';
 import { activeSurfaceAtom, columnsTestOverrideAtom, rowsTestOverrideAtom, Surface } from '@state/ui/index.ts';
 import { PROVIDER_ID_CUSTOM, PROVIDER_ID_KIMI } from '@state/ui/login/index.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
+import { memoryBackendStub } from '@test/backendMemoryStub.ts';
 
 export const cwd = 'C:\\repo';
 
@@ -46,6 +47,7 @@ export function fakeClient(options: {
   ];
   let listIndex = 0;
   return {
+    ...memoryBackendStub(),
     submit: vi.fn(),
     onTranscriptEvent: () => () => undefined,
     clearConversation: async () => undefined,

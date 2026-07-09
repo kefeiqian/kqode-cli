@@ -175,4 +175,21 @@ impl Store {
         )?
         .collect()
     }
+
+    /// Removes one memory item projection row.
+    ///
+    /// # Errors
+    /// Returns the underlying [`rusqlite::Error`] on connection or write failure.
+    pub fn delete_memory_item(
+        &self,
+        scope: MemoryScope,
+        scope_id: Option<&str>,
+        id: &str,
+    ) -> rusqlite::Result<()> {
+        self.connect()?.execute(
+            "DELETE FROM memory_items WHERE scope = ?1 AND scope_id = ?2 AND id = ?3",
+            params![scope.as_str(), scope_id.unwrap_or(""), id],
+        )?;
+        Ok(())
+    }
 }

@@ -9,6 +9,8 @@
 
 pub mod corpus;
 pub mod event_log;
+pub mod inbox;
+pub mod index;
 pub mod model;
 pub mod paths;
 pub mod security;
@@ -17,6 +19,8 @@ use std::fmt;
 use std::io;
 
 pub use event_log::{InboxProposal, InboxStatus, MemoryEvent, MemoryOp};
+pub use inbox::InboxAction;
+pub use index::MemoryService;
 pub use model::{MemoryItem, MemoryProvenance, MemoryScope, MemorySource, MemoryType};
 pub use paths::ScopeRoots;
 pub use security::{PromptSafety, SensitiveVerdict};
@@ -42,6 +46,12 @@ pub enum MemoryError {
     ScopeAmbiguous,
     /// Content was refused because it looked like a secret/credential.
     BlockedSensitive(&'static str),
+    /// A requested memory item does not exist.
+    NotFound,
+    /// A request/response payload exceeded its size cap.
+    PayloadTooLarge(&'static str),
+    /// A SQLite index operation failed (message carries no memory content).
+    Store(String),
     /// A filesystem operation failed.
     Io(io::Error),
     /// Frontmatter (de)serialization failed.
@@ -60,6 +70,9 @@ impl fmt::Display for MemoryError {
             Self::BlockedSensitive(reason) => {
                 write!(f, "memory content blocked as sensitive: {reason}")
             }
+            Self::NotFound => write!(f, "memory item not found"),
+            Self::PayloadTooLarge(what) => write!(f, "memory payload too large: {what}"),
+            Self::Store(detail) => write!(f, "memory index error: {detail}"),
             Self::Io(err) => write!(f, "memory filesystem error: {err}"),
             Self::Serialize(err) => write!(f, "memory serialization error: {err}"),
         }

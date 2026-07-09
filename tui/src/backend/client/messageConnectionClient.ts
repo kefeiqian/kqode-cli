@@ -26,6 +26,17 @@ import {
   sessionListRequest,
   sessionResumeRequest
 } from '@backend/protocol/sessionProtocol.ts';
+import {
+  memoryAddRequest,
+  memoryEditRequest,
+  memoryForgetRequest,
+  memoryInboxApplyRequest,
+  memoryInboxListRequest,
+  memoryInboxUndoRequest,
+  memoryListRequest,
+  memoryReloadRequest,
+  memoryShowRequest
+} from '@backend/protocol/memoryProtocol.ts';
 import { listModels, setProviderKey } from '@backend/client/validationRequests.ts';
 import {
   isFatalBackendError,
@@ -142,6 +153,33 @@ export function createMessageConnectionClient(
     },
     async resumeSession(params) {
       return request(connection.sendRequest(sessionResumeRequest, params), requestTimeoutMs);
+    },
+    async listMemory(params) {
+      return request(connection.sendRequest(memoryListRequest, params), requestTimeoutMs);
+    },
+    async showMemory(params) {
+      return request(connection.sendRequest(memoryShowRequest, params), requestTimeoutMs);
+    },
+    async addMemory(params) {
+      return request(connection.sendRequest(memoryAddRequest, params), requestTimeoutMs);
+    },
+    async editMemory(params) {
+      return request(connection.sendRequest(memoryEditRequest, params), requestTimeoutMs);
+    },
+    async forgetMemory(params) {
+      return request(connection.sendRequest(memoryForgetRequest, params), requestTimeoutMs);
+    },
+    async reloadMemory() {
+      return request(connection.sendRequest(memoryReloadRequest), requestTimeoutMs);
+    },
+    async listMemoryInbox(params) {
+      return request(connection.sendRequest(memoryInboxListRequest, params), requestTimeoutMs);
+    },
+    async applyMemoryInbox(params) {
+      return request(connection.sendRequest(memoryInboxApplyRequest, params), requestTimeoutMs);
+    },
+    async undoMemoryInbox(params) {
+      return request(connection.sendRequest(memoryInboxUndoRequest, params), requestTimeoutMs);
     },
     failInFlight
   };

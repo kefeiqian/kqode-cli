@@ -39,7 +39,7 @@ impl Store {
     /// # Errors
     /// Returns the underlying [`rusqlite::Error`] on connection, transaction, or
     /// write failure. Missing files are treated as an empty corpus, not an error.
-    pub(super) fn reindex_memory_from_files(&self) -> rusqlite::Result<()> {
+    pub(crate) fn reindex_memory_from_files(&self) -> rusqlite::Result<()> {
         let Some(memory_root) = self.path().parent().map(|dir| dir.join(MEMORY_DIRNAME)) else {
             return Ok(());
         };
@@ -103,7 +103,8 @@ fn project_event(conn: &Connection, event: &MemoryEvent) -> rusqlite::Result<()>
         } => lifecycle::upsert_cursor_on(conn, session_id, *last_extracted_seq, *at_ms),
         MemoryEvent::OperationStarted { .. }
         | MemoryEvent::OperationApplied { .. }
-        | MemoryEvent::OperationFailed { .. } => Ok(()),
+        | MemoryEvent::OperationFailed { .. }
+        | MemoryEvent::RollbackPoint { .. } => Ok(()),
     }
 }
 
@@ -178,7 +179,10 @@ fn operation_landed(
         MemoryOp::Write => {
             found.is_some_and(|item| Some(&item.content_hash) == result_hash.as_ref())
         }
-        MemoryOp::Forget => found.is_none(),
+        // Forget lands whether implemented as a hard file removal (absent) or a
+        // soft deactivate (present but inactive), so a later soft-forget path
+        // cannot be misclassified as failed on reconcile.
+        MemoryOp::Forget => found.is_none_or(|item| !item.active),
     }
 }
 

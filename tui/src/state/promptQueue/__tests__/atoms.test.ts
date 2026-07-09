@@ -22,9 +22,11 @@ import {
   type BackendClient,
   type TranscriptEvent
 } from '@contracts/backend/index.ts';
+import { memoryBackendStub } from '@test/backendMemoryStub.ts';
 
 function clientWithSubmit(submit: BackendClient['submit']): BackendClient {
   return {
+    ...memoryBackendStub(),
     submit,
     onTranscriptEvent: () => () => undefined,
     clearConversation: async () => undefined,

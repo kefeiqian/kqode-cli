@@ -1,10 +1,12 @@
 use serde::{Deserialize, Serialize};
 
+mod memory;
 mod providers;
 mod queue;
 mod sessions;
 #[cfg(test)]
 mod tests;
+pub use memory::*;
 pub use providers::*;
 pub use queue::*;
 pub use sessions::*;
@@ -47,6 +49,15 @@ pub enum RpcMethod {
     ProviderModels,
     SessionList,
     SessionResume,
+    MemoryList,
+    MemoryShow,
+    MemoryAdd,
+    MemoryEdit,
+    MemoryForget,
+    MemoryReload,
+    MemoryInboxList,
+    MemoryInboxApply,
+    MemoryInboxUndo,
 }
 
 impl RpcMethod {
@@ -64,6 +75,15 @@ impl RpcMethod {
             Self::ProviderModels => PROVIDER_MODELS_METHOD,
             Self::SessionList => SESSION_LIST_METHOD,
             Self::SessionResume => SESSION_RESUME_METHOD,
+            Self::MemoryList => MEMORY_LIST_METHOD,
+            Self::MemoryShow => MEMORY_SHOW_METHOD,
+            Self::MemoryAdd => MEMORY_ADD_METHOD,
+            Self::MemoryEdit => MEMORY_EDIT_METHOD,
+            Self::MemoryForget => MEMORY_FORGET_METHOD,
+            Self::MemoryReload => MEMORY_RELOAD_METHOD,
+            Self::MemoryInboxList => MEMORY_INBOX_LIST_METHOD,
+            Self::MemoryInboxApply => MEMORY_INBOX_APPLY_METHOD,
+            Self::MemoryInboxUndo => MEMORY_INBOX_UNDO_METHOD,
         }
     }
 
@@ -84,6 +104,15 @@ impl RpcMethod {
             Self::ProviderModels,
             Self::SessionList,
             Self::SessionResume,
+            Self::MemoryList,
+            Self::MemoryShow,
+            Self::MemoryAdd,
+            Self::MemoryEdit,
+            Self::MemoryForget,
+            Self::MemoryReload,
+            Self::MemoryInboxList,
+            Self::MemoryInboxApply,
+            Self::MemoryInboxUndo,
         ]
         .into_iter()
         .find(|candidate| candidate.as_str() == method)

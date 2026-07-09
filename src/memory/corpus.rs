@@ -154,6 +154,31 @@ pub fn content_hash_matches(item: &MemoryItem) -> bool {
     compute_content_hash(item).is_ok_and(|hash| hash == item.content_hash)
 }
 
+/// Computes the stable content hash an item would serialize with.
+///
+/// Used to record an operation's expected `result_hash` in the event log before
+/// the atomic write, so crash recovery can verify the write landed.
+///
+/// # Errors
+/// Returns [`MemoryError::Serialize`] when the frontmatter cannot serialize.
+pub fn content_hash(item: &MemoryItem) -> Result<String, MemoryError> {
+    compute_content_hash(item)
+}
+
+/// Removes an item's topic file under `root`, returning whether a file existed.
+///
+/// # Errors
+/// Returns [`MemoryError`] on an invalid/escaping id or a filesystem error other
+/// than "not found".
+pub fn remove_item(root: &Path, id: &str) -> Result<bool, MemoryError> {
+    let path = item_path(root, id)?;
+    match fs::remove_file(&path) {
+        Ok(()) => Ok(true),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(err) => Err(MemoryError::Io(err)),
+    }
+}
+
 /// Resolves the topic-file path for `id` under `root`, guarding against escape.
 ///
 /// # Errors
@@ -189,7 +214,13 @@ pub fn write_item(root: &Path, item: &MemoryItem) -> Result<PathBuf, MemoryError
 /// frontmatter.
 pub fn read_item(root: &Path, id: &str) -> Result<MemoryItem, MemoryError> {
     let path = item_path(root, id)?;
-    let text = fs::read_to_string(&path).map_err(MemoryError::Io)?;
+    let text = fs::read_to_string(&path).map_err(|err| {
+        if err.kind() == std::io::ErrorKind::NotFound {
+            MemoryError::NotFound
+        } else {
+            MemoryError::Io(err)
+        }
+    })?;
     parse_item(&text)
 }
 

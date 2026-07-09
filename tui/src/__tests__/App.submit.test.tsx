@@ -17,6 +17,7 @@ import {
 } from '@state/promptQueue/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
+import { memoryBackendStub } from '@test/backendMemoryStub.ts';
 
 const workspaceCwd = path.join(os.homedir(), 'Projects', 'dummy-react-app');
 
@@ -27,6 +28,7 @@ function renderApp(backendClient: Partial<BackendClient>, columns = 80, rows = 4
   store.set(columnsTestOverrideAtom, columns);
   store.set(rowsTestOverrideAtom, rows);
   const client: BackendClient = {
+    ...memoryBackendStub(),
     submit: async () => undefined,
     onTranscriptEvent: () => () => {},
     clearConversation: async () => undefined,

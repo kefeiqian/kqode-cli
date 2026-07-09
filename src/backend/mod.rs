@@ -19,6 +19,7 @@ use crate::store::{Store, StoreError};
 
 mod git_status;
 mod login;
+mod memory;
 mod message;
 mod providers;
 mod resolve;
@@ -206,6 +207,17 @@ fn handle_request(
         Some(RpcMethod::SessionResume) => {
             Some(sessions::resume_session(request, store, coordinator))
         }
+        Some(RpcMethod::MemoryList) => Some(memory::handle_memory_list(request, store)),
+        Some(RpcMethod::MemoryShow) => Some(memory::handle_memory_show(request, store)),
+        Some(RpcMethod::MemoryAdd) => Some(memory::handle_memory_add(request, store)),
+        Some(RpcMethod::MemoryEdit) => Some(memory::handle_memory_edit(request, store)),
+        Some(RpcMethod::MemoryForget) => Some(memory::handle_memory_forget(request, store)),
+        Some(RpcMethod::MemoryReload) => Some(memory::handle_memory_reload(request, store)),
+        Some(RpcMethod::MemoryInboxList) => Some(memory::handle_memory_inbox_list(request, store)),
+        Some(RpcMethod::MemoryInboxApply) => {
+            Some(memory::handle_memory_inbox_apply(request, store))
+        }
+        Some(RpcMethod::MemoryInboxUndo) => Some(memory::handle_memory_inbox_undo(request, store)),
         None => Some(Response::new_err(
             request.id,
             JSON_RPC_METHOD_NOT_FOUND,
