@@ -2,6 +2,7 @@ import { createStore } from 'jotai';
 import { describe, expect, it } from 'vitest';
 import type { BackendClient, ProviderStatusInfo, SetKeyParams } from '@contracts/backend/index.ts';
 import { memoryBackendStub } from '@test/backendMemoryStub.ts';
+import { themeBackendStub } from '@test/backendThemeStub.ts';
 import {
   CREDENTIAL_SOURCE_ENV,
   CREDENTIAL_SOURCE_KEYCHAIN,
@@ -152,6 +153,7 @@ function clientWith({
 }): BackendClient {
   return {
     ...memoryBackendStub(),
+    ...themeBackendStub(),
     submit: async () => undefined,
     onTranscriptEvent: () => () => undefined,
     clearConversation: async () => undefined,
@@ -179,6 +181,7 @@ function mutableLoginClient(): BackendClient {
   let active = { providerId: null, modelId: null } as Awaited<ReturnType<BackendClient['getActiveSelection']>>;
   return {
     ...memoryBackendStub(),
+    ...themeBackendStub(),
     submit: async () => undefined,
     onTranscriptEvent: () => () => undefined,
     clearConversation: async () => undefined,

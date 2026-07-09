@@ -40,7 +40,9 @@ import type {
   MemoryListResult,
   MemoryMutationResult,
   MemoryShowParams,
-  MemoryShowResult
+  MemoryShowResult,
+  ThemeGetResult,
+  ThemeSetResult
 } from '@contracts/backend/index.ts';
 export { BackendLifecycleState };
 export type { BackendClientHandle, BackendClientOptions };
@@ -236,6 +238,12 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     },
     async listModels(providerId: string): Promise<ModelListResult> {
       return withClient((client) => client.listModels(providerId));
+    },
+    async getTheme(): Promise<ThemeGetResult> {
+      return withClient((client) => client.getTheme());
+    },
+    async setTheme(themeId: string): Promise<ThemeSetResult> {
+      return withClient((client) => client.setTheme(themeId));
     },
     async listSessions(): Promise<SessionListResult> {
       return withClient((client) => client.listSessions());

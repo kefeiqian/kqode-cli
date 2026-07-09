@@ -14,6 +14,18 @@ fn rpc_method_maps_clear_and_cancel_methods() {
 }
 
 #[test]
+fn rpc_method_maps_theme_methods() {
+    assert_eq!(
+        RpcMethod::from_method("kqode.theme.get"),
+        Some(RpcMethod::ThemeGet)
+    );
+    assert_eq!(
+        RpcMethod::from_method("kqode.theme.set"),
+        Some(RpcMethod::ThemeSet)
+    );
+}
+
+#[test]
 fn queue_lifecycle_params_use_camel_case() {
     let enqueued = EnqueuedParams {
         turn_id: "turn-1".to_string(),

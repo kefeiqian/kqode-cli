@@ -6,10 +6,12 @@ mod queue;
 mod sessions;
 #[cfg(test)]
 mod tests;
+mod themes;
 pub use memory::*;
 pub use providers::*;
 pub use queue::*;
 pub use sessions::*;
+pub use themes::*;
 
 /// Hidden argument that starts the internal JSON-RPC backend loop.
 pub const BACKEND_MODE_ARG: &str = "--__kqode-json-rpc-backend";
@@ -47,6 +49,8 @@ pub enum RpcMethod {
     ProviderClearKey,
     ProviderSetKey,
     ProviderModels,
+    ThemeGet,
+    ThemeSet,
     SessionList,
     SessionResume,
     MemoryList,
@@ -73,6 +77,8 @@ impl RpcMethod {
             Self::ProviderClearKey => PROVIDER_CLEAR_KEY_METHOD,
             Self::ProviderSetKey => PROVIDER_SET_KEY_METHOD,
             Self::ProviderModels => PROVIDER_MODELS_METHOD,
+            Self::ThemeGet => THEME_GET_METHOD,
+            Self::ThemeSet => THEME_SET_METHOD,
             Self::SessionList => SESSION_LIST_METHOD,
             Self::SessionResume => SESSION_RESUME_METHOD,
             Self::MemoryList => MEMORY_LIST_METHOD,
@@ -102,6 +108,8 @@ impl RpcMethod {
             Self::ProviderClearKey,
             Self::ProviderSetKey,
             Self::ProviderModels,
+            Self::ThemeGet,
+            Self::ThemeSet,
             Self::SessionList,
             Self::SessionResume,
             Self::MemoryList,

@@ -12,6 +12,7 @@ import { backendClientAtom } from '@state/global/index.ts';
 import { activeSurfaceAtom, columnsTestOverrideAtom, rowsTestOverrideAtom, Surface } from '@state/ui/index.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 import { memoryBackendStub } from '@test/backendMemoryStub.ts';
+import { themeBackendStub } from '@test/backendThemeStub.ts';
 
 export function provider(
   providerId: string,
@@ -36,6 +37,7 @@ export function fakeClient(options: {
 }): BackendClient {
   return {
     ...memoryBackendStub(),
+    ...themeBackendStub(),
     submit: vi.fn(),
     onTranscriptEvent: () => () => undefined,
     clearConversation: async () => undefined,

@@ -26,6 +26,7 @@ import {
   sessionListRequest,
   sessionResumeRequest
 } from '@backend/protocol/sessionProtocol.ts';
+import { themeGetRequest, themeSetRequest } from '@backend/protocol/themeProtocol.ts';
 import {
   memoryAddRequest,
   memoryEditRequest,
@@ -147,6 +148,12 @@ export function createMessageConnectionClient(
     },
     async listModels(providerId) {
       return listModels(connection, providerId, validationRequestTimeoutMs);
+    },
+    async getTheme() {
+      return request(connection.sendRequest(themeGetRequest), requestTimeoutMs);
+    },
+    async setTheme(themeId: string) {
+      return request(connection.sendRequest(themeSetRequest, { themeId }), requestTimeoutMs);
     },
     async listSessions() {
       return request(connection.sendRequest(sessionListRequest), requestTimeoutMs);

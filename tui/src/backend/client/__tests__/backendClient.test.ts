@@ -20,7 +20,8 @@ import {
   SET_KEY_OUTCOME_CONNECTED,
   SET_KEY_OUTCOME_UNREACHABLE,
   SETTLED_KIND_CANCELLED,
-  SETTLED_KIND_COMPLETED
+  SETTLED_KIND_COMPLETED,
+  THEME_SET_OUTCOME_SAVED
 } from '@contracts/backend/index.ts';
 import {
   messageSubmitRequest,
@@ -37,6 +38,7 @@ import {
   providerModelsRequest,
   providerSetKeyRequest
 } from '@backend/protocol/providerProtocol.ts';
+import { themeGetRequest, themeSetRequest } from '@backend/protocol/themeProtocol.ts';
 import type { MessageSubmitResult } from '@contracts/backend/index.ts';
 import {
   BackendLifecycleState,
@@ -574,6 +576,26 @@ describe('createBackendClient (fake backend)', () => {
       status: MODEL_LIST_STATUS_FAILED,
       models: []
     });
+    expect(client.getState()).toBe(BackendLifecycleState.Ready);
+    client.dispose();
+  });
+
+  it('round-trips theme get and set through the client handle', async () => {
+    const seen: Array<{ themeId: string }> = [];
+    const fake = makeFakeBackend((server) => {
+      server.onRequest(themeGetRequest, () => ({ themeId: 'nord' }));
+      server.onRequest(themeSetRequest, (params) => {
+        seen.push(params);
+        return { outcome: THEME_SET_OUTCOME_SAVED };
+      });
+    });
+    const client = createBackendClient({ launch: async () => fake.launched });
+
+    await expect(client.getTheme()).resolves.toEqual({ themeId: 'nord' });
+    await expect(client.setTheme('gruvbox-dark')).resolves.toEqual({
+      outcome: THEME_SET_OUTCOME_SAVED
+    });
+    expect(seen).toEqual([{ themeId: 'gruvbox-dark' }]);
     expect(client.getState()).toBe(BackendLifecycleState.Ready);
     client.dispose();
   });

@@ -13,7 +13,7 @@ use crate::protocol::{
     ClearKeyParams, CompactionStatusParams, ConversationClearResult, EnqueuedParams,
     JSON_RPC_INVALID_PARAMS, JSON_RPC_METHOD_NOT_FOUND, RpcMethod, SelectionSetParams,
     SettledParams, TOKEN_DELTA_METHOD, TURN_ACTIVATED_METHOD, TURN_ENQUEUED_METHOD,
-    TURN_SETTLED_METHOD, TokenDeltaParams, TurnCancelParams, TurnCancelResult,
+    TURN_SETTLED_METHOD, ThemeSetParams, TokenDeltaParams, TurnCancelParams, TurnCancelResult,
 };
 use crate::store::{Store, StoreError};
 
@@ -26,6 +26,7 @@ mod resolve;
 mod sessions;
 #[cfg(test)]
 mod tests;
+mod themes;
 
 #[derive(Debug)]
 pub enum BackendError {
@@ -203,6 +204,8 @@ fn handle_request(
         Some(RpcMethod::ProviderModels) => {
             login::handle_provider_models(request, connection, store)
         }
+        Some(RpcMethod::ThemeGet) => Some(Response::new_ok(request.id, themes::theme_get(store))),
+        Some(RpcMethod::ThemeSet) => Some(handle_theme_set(request, store)),
         Some(RpcMethod::SessionList) => Some(sessions::list_sessions(request, store, coordinator)),
         Some(RpcMethod::SessionResume) => {
             Some(sessions::resume_session(request, store, coordinator))
@@ -343,4 +346,18 @@ fn handle_provider_clear_key(request: Request, store: &Store) -> Response {
         }
     };
     Response::new_ok(request.id, providers::clear_provider_key(store, params))
+}
+
+fn handle_theme_set(request: Request, store: &Store) -> Response {
+    let params = match serde_json::from_value::<ThemeSetParams>(request.params) {
+        Ok(params) => params,
+        Err(error) => {
+            return Response::new_err(
+                request.id,
+                JSON_RPC_INVALID_PARAMS,
+                format!("invalid theme set params: {error}"),
+            );
+        }
+    };
+    Response::new_ok(request.id, themes::set_theme(store, params))
 }

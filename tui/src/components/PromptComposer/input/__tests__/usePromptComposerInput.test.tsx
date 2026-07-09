@@ -2,6 +2,7 @@ import { Text } from 'ink';
 import { createStore } from 'jotai';
 import { useAtomValue } from 'jotai';
 import { memoryBackendStub } from '@test/backendMemoryStub.ts';
+import { themeBackendStub } from '@test/backendThemeStub.ts';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { usePromptComposerInput } from '@components/PromptComposer/usePromptComposerInput.ts';
@@ -34,6 +35,7 @@ const commandActions: CommandActions = {
 function clientWithCancel(cancelTurn: BackendClient['cancelTurn']): BackendClient {
   return {
     ...memoryBackendStub(),
+    ...themeBackendStub(),
     submit: async () => undefined,
     onTranscriptEvent: () => () => undefined,
     clearConversation: async () => undefined,

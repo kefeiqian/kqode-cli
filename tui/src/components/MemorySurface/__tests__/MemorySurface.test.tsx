@@ -6,6 +6,7 @@ import { activeSurfaceAtom, columnsTestOverrideAtom, rowsTestOverrideAtom, Surfa
 import { MemoryMode, memoryModeAtom } from '@state/ui/memory/index.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 import { memoryBackendStub } from '@test/backendMemoryStub.ts';
+import { themeBackendStub } from '@test/backendThemeStub.ts';
 import { MemorySurface } from '@components/MemorySurface/index.tsx';
 
 function sampleItem(overrides: Partial<MemoryItem> = {}): MemoryItem {
@@ -47,6 +48,7 @@ function sampleEntry(overrides: Partial<MemoryInboxEntry> = {}): MemoryInboxEntr
 function fakeClient(memory: { items?: MemoryItem[]; inbox?: MemoryInboxEntry[]; fail?: boolean }): BackendClient {
   return {
     ...memoryBackendStub(),
+    ...themeBackendStub(),
     submit: async () => undefined,
     onTranscriptEvent: () => () => undefined,
     clearConversation: async () => undefined,

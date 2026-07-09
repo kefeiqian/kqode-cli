@@ -6,10 +6,12 @@ import { backendClientAtom } from '@state/global/index.ts';
 import { activeSurfaceAtom, columnsTestOverrideAtom, rowsTestOverrideAtom, Surface } from '@state/ui/index.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 import { memoryBackendStub } from '@test/backendMemoryStub.ts';
+import { themeBackendStub } from '@test/backendThemeStub.ts';
 
 function fakeClient(sessions: Awaited<ReturnType<BackendClient['listSessions']>>['sessions']): BackendClient {
   return {
     ...memoryBackendStub(),
+    ...themeBackendStub(),
     submit: async () => undefined,
     onTranscriptEvent: () => () => undefined,
     clearConversation: async () => undefined,

@@ -2,12 +2,14 @@ import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import type { BackendClient } from '@contracts/backend/index.ts';
 import { memoryBackendStub } from '@test/backendMemoryStub.ts';
+import { themeBackendStub } from '@test/backendThemeStub.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { gitStatusLabelAtom, refreshGitStatusAtom } from '@state/ui/gitStatus.ts';
 
 function clientWithGitStatus(gitStatus: BackendClient['gitStatus']): BackendClient {
   return {
     ...memoryBackendStub(),
+    ...themeBackendStub(),
     submit: vi.fn(),
     onTranscriptEvent: () => () => undefined,
     clearConversation: async () => undefined,

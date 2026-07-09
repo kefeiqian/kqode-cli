@@ -36,6 +36,7 @@ import type {
   MemoryShowResult
 } from '@contracts/backend/memoryMessages.ts';
 import type { TurnResult, TurnState } from '@contracts/backend/messages.ts';
+import type { ThemeGetResult, ThemeSetResult } from '@contracts/backend/themeMessages.ts';
 
 /** Backend failure categories surfaced to the TUI. */
 export const BackendErrorKind = {
@@ -100,6 +101,10 @@ export type BackendClient = {
   clearProviderKey(providerId: string): Promise<void>;
   setProviderKey(params: SetKeyParams): Promise<SetKeyResult>;
   listModels(providerId: string): Promise<ModelListResult>;
+  /** Reads the saved theme id, or null when unset (the TUI resolves its default preset). */
+  getTheme(): Promise<ThemeGetResult>;
+  /** Persists the selected theme id, returning a saved/invalid/storeFailed outcome. */
+  setTheme(themeId: string): Promise<ThemeSetResult>;
   listSessions(): Promise<SessionListResult>;
   resumeSession(params: SessionResumeParams): Promise<SessionResumeResult>;
   /** Lists memory items visible in the current workspace (user + repo + session). */
