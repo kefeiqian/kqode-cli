@@ -5,6 +5,7 @@ import { BodyPane } from '@components/BodyPane.tsx';
 import { CwdLine } from '@components/CwdLine.tsx';
 import { Header } from '@components/Header.tsx';
 import { PromptComposer } from '@components/PromptComposer/index.tsx';
+import { ResumePanel } from '@components/ResumePanel/index.tsx';
 import { SlashCommandMenu } from '@components/SlashCommandMenu/index.tsx';
 import { StatusBar } from '@components/StatusBar.tsx';
 import {
@@ -31,6 +32,7 @@ import {
 } from '@state/ui/index.ts';
 import { columnsAtom, copyModeActiveAtom, rowsAtom } from '@state/ui/index.ts';
 import { commandMenuOpenAtom } from '@state/ui/commands/index.ts';
+import { resumePanelOpenAtom } from '@state/ui/resume/index.ts';
 import {
   composerScrollOffsetRowsAtom,
   composerStateAtom,
@@ -72,6 +74,14 @@ export function HomeScreenView() {
 
     const wheel = parseMouseWheelEvent(input);
     if (wheel !== null) {
+      if (store.get(resumePanelOpenAtom)) {
+        notifyScroll();
+        scrollBodyByRows(
+          wheel.direction === 'up' ? MOUSE_WHEEL_SCROLL_ROWS : -MOUSE_WHEEL_SCROLL_ROWS
+        );
+        return;
+      }
+
       const currentRows = store.get(rowsAtom);
       const currentSafeChromeColumns = store.get(safeChromeColumnsAtom);
       const target = resolveWheelTarget({
@@ -100,6 +110,10 @@ export function HomeScreenView() {
 
     const click = parseMouseClickEvent(input);
     if (click !== null) {
+      if (store.get(resumePanelOpenAtom)) {
+        return;
+      }
+
       const currentRows = store.get(rowsAtom);
       const currentSafeChromeColumns = store.get(safeChromeColumnsAtom);
       const currentComposerTop = store.get(composerTopAtom);
@@ -159,7 +173,7 @@ export function HomeScreenView() {
       <HomeBody />
       <HomeBottomStack />
       <HomeComposer />
-      <StatusBar />
+      <HomeStatusBar />
     </Box>
   );
 }
@@ -186,6 +200,15 @@ function HomeBody() {
 function HomeBottomStack() {
   const bottomSpacerRows = useAtomValue(bottomSpacerRowsAtom);
   const menuOpen = useAtomValue(commandMenuOpenAtom);
+  const resumeOpen = useAtomValue(resumePanelOpenAtom);
+
+  if (resumeOpen) {
+    return (
+      <Box marginTop={bottomSpacerRows} flexDirection="column">
+        <ResumePanel />
+      </Box>
+    );
+  }
 
   // The cwd line and the command palette share the row directly above the
   // composer: the palette replaces the cwd while it is open. The spacer + gap
@@ -200,5 +223,19 @@ function HomeBottomStack() {
 }
 
 function HomeComposer() {
+  const resumeOpen = useAtomValue(resumePanelOpenAtom);
+  if (resumeOpen) {
+    return null;
+  }
+
   return <PromptComposer />;
+}
+
+function HomeStatusBar() {
+  const resumeOpen = useAtomValue(resumePanelOpenAtom);
+  if (resumeOpen) {
+    return null;
+  }
+
+  return <StatusBar />;
 }

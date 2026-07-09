@@ -10,6 +10,7 @@ import type { BodyEntry } from '@libs/tui/bodyRows.ts';
 import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import { NOT_CONFIGURED_MODEL_LABEL } from '@libs/model/index.ts';
 import { COPY_MODE_HINT, PASTE_FAILED_HINT } from '@constants/ui.ts';
+import { BodyEntryKind } from '@constants/bodyEntry.ts';
 import {
   DISABLE_SGR_MOUSE_TRACKING,
   ENABLE_SGR_MOUSE_TRACKING
@@ -24,6 +25,7 @@ import {
 import { clipboardClientAtom, productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
 import { composerStateAtom } from '@state/ui/composer/index.ts';
 import { transientStatusHintAtom } from '@state/ui/index.ts';
+import { openResumePanelAtom } from '@state/ui/resume/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 import { theme } from '@theme/themeConfig.ts';
@@ -42,6 +44,7 @@ type RenderHomeScreenOptions = {
   columns?: number;
   rows?: number;
   bodyEntries?: readonly BodyEntry[];
+  resumeOpen?: boolean;
 };
 
 function renderHomeScreen({
@@ -50,7 +53,8 @@ function renderHomeScreen({
   gitStatusLabel,
   columns,
   rows,
-  bodyEntries
+  bodyEntries,
+  resumeOpen = false
 }: RenderHomeScreenOptions = {}) {
   const store = createStore();
   store.set(productVersionAtom, productVersion);
@@ -67,10 +71,28 @@ function renderHomeScreen({
   if (bodyEntries !== undefined) {
     store.set(bodyEntriesAtom, bodyEntries);
   }
+  if (resumeOpen) {
+    store.set(openResumePanelAtom);
+  }
   return { ...renderWithJotai(<App />, store), store };
 }
 
 describe('HomeScreen', () => {
+  it('keeps the body visible and unmounts composer chrome while resume is open', () => {
+    const { lastFrame } = renderHomeScreen({
+      columns: 100,
+      rows: 24,
+      bodyEntries: [{ id: 'body', kind: BodyEntryKind.System, text: 'conversation stays visible' }],
+      resumeOpen: true
+    });
+
+    const output = lastFrame() ?? '';
+    expect(output).toContain('conversation stays visible');
+    expect(output).toContain('Resume Session:');
+    expect(output).not.toContain('> ');
+    expect(output).not.toContain(displayCwd);
+  });
+
   it('renders the first-frame identity, cwd, composer, and hints with the model label hidden until the backend resolves', () => {
     const { lastFrame } = renderHomeScreen({ columns: 100, rows: 20 });
 

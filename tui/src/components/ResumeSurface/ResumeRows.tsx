@@ -7,21 +7,23 @@ export function ResumeRows({
   columns,
   sessions,
   visibleRows,
-  highlightedSessionId
+  highlightedSessionId,
+  startIndex = 0
 }: {
   columns: number;
   sessions: readonly SessionSummary[];
   visibleRows: number;
   highlightedSessionId: string | null;
+  startIndex?: number;
 }) {
   const homeDir = os.homedir();
   const lines = [
     formatResumeHeader(columns),
-    ...sessions.map((session, index) => formatResumeRow(session, index, columns, homeDir))
+    ...sessions.map((session, index) => formatResumeRow(session, startIndex + index, columns, homeDir))
   ];
   return (
-    <Box flexDirection="column" height={visibleRows}>
-      {Array.from({ length: visibleRows }, (_, index) => {
+    <Box flexDirection="column" height={visibleRows + 1}>
+      {Array.from({ length: visibleRows + 1 }, (_, index) => {
         const line = lines[index];
         if (line === undefined) {
           return <Text key={index}> </Text>;

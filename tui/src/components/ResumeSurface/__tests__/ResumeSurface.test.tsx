@@ -4,6 +4,7 @@ import { ResumeSurface } from '@components/ResumeSurface/index.tsx';
 import type { BackendClient } from '@contracts/backend/index.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/index.ts';
+import { openResumePanelAtom } from '@state/ui/resume/index.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 import { memoryBackendStub } from '@test/backendMemoryStub.ts';
 import { themeBackendStub } from '@test/backendThemeStub.ts';
@@ -38,6 +39,7 @@ function renderResume(client: BackendClient, columns = 100, rows = 12) {
   store.set(backendClientAtom, client);
   store.set(columnsTestOverrideAtom, columns);
   store.set(rowsTestOverrideAtom, rows);
+  store.set(openResumePanelAtom);
   return { store, ...renderWithJotai(<ResumeSurface />, store) };
 }
 
@@ -68,7 +70,8 @@ describe('ResumeSurface', () => {
     );
 
     const frame = await waitForFrame(lastFrame, 'hello world');
-    expect(frame).toContain('/resume');
+    expect(frame).toContain('Resume Session:');
+    expect(frame).toContain('─'.repeat(99));
     expect(frame).toContain('Summary');
     expect(frame).toContain('Current');
   });
@@ -78,5 +81,27 @@ describe('ResumeSurface', () => {
     expect(await waitForFrame(lastFrame, 'No saved local sessions yet.')).toContain(
       'Submit your first prompt to create one.'
     );
+  });
+
+  it('caps session rows and scrolls the highlighted row within the panel', async () => {
+    const sessions = Array.from({ length: 15 }, (_, index) => ({
+      sessionId: `sess-${index}`,
+      summary: `session ${index}`,
+      status: 'Idle' as const,
+      modifiedAt: Date.now() - index,
+      createdAt: Date.now() - index,
+      folder: `C:\\workspace\\${index}`
+    }));
+    const view = renderResume(fakeClient(sessions), 100, 20);
+
+    await waitForFrame(view.lastFrame, 'session 0');
+    for (let index = 0; index < 11; index += 1) {
+      view.stdin.write('\u001B[B');
+    }
+
+    const frame = await waitForFrame(view.lastFrame, 'session 11');
+    expect(frame).not.toContain('session 0');
+    expect(frame).toContain('session 11');
+    expect(frame).toContain('more ↑↓');
   });
 });
