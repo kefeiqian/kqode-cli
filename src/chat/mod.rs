@@ -4,6 +4,7 @@
 pub mod compaction_plan;
 pub mod context_budget;
 pub mod request;
+pub mod summarize;
 pub mod system_prompt;
 pub mod token_estimate;
 pub mod turn;
