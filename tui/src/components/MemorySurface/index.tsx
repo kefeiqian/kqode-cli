@@ -191,7 +191,7 @@ function bodyMessage(status: MemoryStatus, error: string | null, mode: MemoryMod
       return error ?? 'Failed to load memory.';
     case MemoryStatus.Empty:
       return mode === MemoryMode.Active
-        ? 'No memory yet. Add memory with the /memory add backend command.'
+        ? 'No memory yet. Add memory with /memory add.'
         : 'No inbox entries. Automatic extraction will propose updates here.';
     case MemoryStatus.Loaded:
       return '';

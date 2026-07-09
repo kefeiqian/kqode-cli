@@ -5,17 +5,37 @@ import {
   flattenHelpLines
 } from '@components/HelpScreen/helpContent.ts';
 import { COMMAND_REGISTRY } from '@libs/commands/registry.ts';
+import { commandSubcommands, subcommandFullName } from '@libs/commands/subcommands.ts';
 
 describe('helpContent', () => {
   it('derives the COMMANDS section from the shared command registry', () => {
     const section = buildCommandSection();
 
     expect(section.title).toBe('COMMANDS');
-    expect(section.entries).toHaveLength(COMMAND_REGISTRY.length);
+    const expectedLength = COMMAND_REGISTRY.reduce(
+      (total, command) => total + 1 + commandSubcommands(command).length,
+      0
+    );
+    expect(section.entries).toHaveLength(expectedLength);
     for (const command of COMMAND_REGISTRY) {
       const entry = section.entries.find((candidate) => candidate.keys === command.name);
       expect(entry?.description).toBe(command.description);
+      for (const subcommand of commandSubcommands(command)) {
+        const subEntry = section.entries.find(
+          (candidate) => candidate.keys === subcommandFullName(command, subcommand)
+        );
+        expect(subEntry?.description).toBe(subcommand.description);
+      }
     }
+  });
+
+  it('documents memory subcommands in the COMMANDS section', () => {
+    const entries = buildCommandSection().entries.map((entry) => entry.keys);
+
+    expect(entries).toContain('/memory add');
+    expect(entries).toContain('/memory inbox');
+    expect(entries).toContain('/memory edit');
+    expect(entries).toContain('/memory forget');
   });
 
   it('lists commands first, then the keybinding sections', () => {

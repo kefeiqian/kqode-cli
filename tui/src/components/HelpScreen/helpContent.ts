@@ -1,4 +1,8 @@
 import { COMMAND_REGISTRY } from '@libs/commands/registry.ts';
+import {
+  commandSubcommands,
+  subcommandFullName
+} from '@libs/commands/subcommands.ts';
 
 /** A single row inside a help section: a key/command label and what it does. */
 export type HelpEntry = { keys: string; description: string };
@@ -68,10 +72,16 @@ const KEYBINDING_SECTIONS: readonly HelpSection[] = [
 export function buildCommandSection(): HelpSection {
   return {
     title: 'COMMANDS',
-    entries: COMMAND_REGISTRY.map((command) => ({
-      keys: command.name,
-      description: command.description
-    }))
+    entries: COMMAND_REGISTRY.flatMap((command) => [
+      {
+        keys: command.name,
+        description: command.description
+      },
+      ...commandSubcommands(command).map((subcommand) => ({
+        keys: subcommandFullName(command, subcommand),
+        description: subcommand.description
+      }))
+    ])
   };
 }
 
