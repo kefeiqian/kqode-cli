@@ -21,7 +21,7 @@ const COMPOSER_ERROR_RESERVE_ROWS = 1;
  *
  * `bodyEntryCount` caps the body at its content height (plus one) so short
  * transcripts do not reserve the whole pane. `composerRows`, `cwdRows`, and
- * `commandMenuRows` are the current heights of the pinned bottom stack, whose
+ * `commandMenuRows`/`resumePanelRows` are the current heights of the pinned bottom stack, whose
  * rows come out of the body budget so the composer and status row stay pinned to
  * the bottom and the total never exceeds the canvas.
  */
@@ -30,9 +30,20 @@ export function resolveHomeScreenLayout(
   bodyEntryCount = Number.POSITIVE_INFINITY,
   composerRows = DEFAULT_COMPOSER_ROWS,
   cwdRows = 1,
-  commandMenuRows = 0
+  commandMenuRows = 0,
+  resumePanelRows = 0
 ): { bodyRows: number; composerVisibleRows: number; cwdRows: number } {
   const headerRows = HEADER_ROWS;
+  const resolvedResumePanelRows = Math.max(0, resumePanelRows);
+  if (resolvedResumePanelRows > 0) {
+    const maxBodyRows = rows - headerRows - resolvedResumePanelRows;
+    return {
+      bodyRows: Math.max(1, Math.min(maxBodyRows, bodyEntryCount + 1)),
+      composerVisibleRows: 1,
+      cwdRows: 0
+    };
+  }
+
   const resolvedCwdRows = Math.max(0, cwdRows);
   const statusRows = 1;
   const composerErrorReserveRows = COMPOSER_ERROR_RESERVE_ROWS;
@@ -65,4 +76,3 @@ export function resolveHomeScreenLayout(
     cwdRows: resolvedCwdRows
   };
 }
-

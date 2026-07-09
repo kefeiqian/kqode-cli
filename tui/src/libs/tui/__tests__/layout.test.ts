@@ -22,6 +22,23 @@ describe('resolveHomeScreenLayout with a command menu', () => {
   });
 });
 
+describe('resolveHomeScreenLayout with a resume panel', () => {
+  it('reflows the body by the panel height and hides cwd rows', () => {
+    const layout = resolveHomeScreenLayout(24, 1000, 3, 1, 0, 12);
+
+    expect(layout.bodyRows).toBe(24 - 1 - 12);
+    expect(layout.cwdRows).toBe(0);
+    expect(layout.composerVisibleRows).toBe(1);
+  });
+
+  it('preserves at least one body row on short terminals', () => {
+    const layout = resolveHomeScreenLayout(12, 1000, 3, 1, 0, 10);
+
+    expect(layout.bodyRows).toBeGreaterThanOrEqual(1);
+    expect(layout.cwdRows).toBe(0);
+  });
+});
+
 describe('resolveHomeScreenLayout composer height cap', () => {
   it.each([24, 40, 15])('caps the composer box within floor(rows/2) at rows=%i', (rows) => {
     const layout = resolveHomeScreenLayout(rows, 1000, 3, 1, 0);

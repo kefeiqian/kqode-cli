@@ -56,6 +56,17 @@ export const CARET_SCROLL_SETTLE_MS = 100;
  */
 export const COMMAND_MENU_PANEL_ROWS = 7;
 
+// --- Resume panel ---
+
+/** Maximum number of session rows shown in the docked resume panel. */
+export const RESUME_PANEL_SESSION_ROWS = 10;
+
+/** Non-session rows in the docked resume panel: divider, label, header, footer. */
+export const RESUME_PANEL_CHROME_ROWS = 4;
+
+/** Fixed desired height of the docked resume panel while open. */
+export const RESUME_PANEL_ROWS = RESUME_PANEL_SESSION_ROWS + RESUME_PANEL_CHROME_ROWS;
+
 // --- Two-step key confirmations ---
 
 /**

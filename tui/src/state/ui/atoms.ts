@@ -19,6 +19,7 @@ import {
 } from '@state/ui/dimensions.ts';
 import { gitStatusLabelAtom } from '@state/ui/gitStatus.ts';
 import { commandMenuDesiredRowsAtom, commandMenuOpenAtom } from '@state/ui/commands/index.ts';
+import { resumePanelDesiredRowsAtom, resumePanelOpenAtom } from '@state/ui/resume/index.ts';
 import { PROMPT_PREFIX } from '@constants/ui.ts';
 import {
   resolveComposerWindow,
@@ -44,7 +45,7 @@ export const submittedPromptEntriesAtom = atom((get) =>
  * the composer and status row pinned.
  */
 export const cwdRowsAtom = atom((get) => {
-  if (get(commandMenuOpenAtom)) {
+  if (get(commandMenuOpenAtom) || get(resumePanelOpenAtom)) {
     return 0;
   }
   return countCwdRows(get(workspaceCwdAtom), get(gitStatusLabelAtom), get(safeChromeColumnsAtom));
@@ -65,6 +66,10 @@ export const displayedBodyEntriesAtom = atom((get) => {
  * suppressed rather than pushing the total past the canvas at small sizes.
  */
 export const commandMenuRowsAtom = atom((get) => {
+  if (get(resumePanelOpenAtom)) {
+    return 0;
+  }
+
   const desired = get(commandMenuDesiredRowsAtom);
   if (desired === 0) {
     return 0;
@@ -78,6 +83,17 @@ export const commandMenuRowsAtom = atom((get) => {
     rows - HEADER_ROWS - BODY_CWD_GAP_ROWS - cwdRows - 1 - composerRows - 1
   );
   return Math.min(desired, freeMenuRows);
+});
+
+export const resumePanelRowsAtom = atom((get) => {
+  const desired = get(resumePanelDesiredRowsAtom);
+  if (desired === 0) {
+    return 0;
+  }
+
+  const rows = get(rowsAtom);
+  const freePanelRows = Math.max(0, rows - HEADER_ROWS - 1);
+  return Math.min(desired, freePanelRows);
 });
 
 export const layoutAtom = atom((get) => {
@@ -94,7 +110,8 @@ export const layoutAtom = atom((get) => {
     bodyEntryRows,
     composerRows,
     get(cwdRowsAtom),
-    get(commandMenuRowsAtom)
+    get(commandMenuRowsAtom),
+    get(resumePanelRowsAtom)
   );
 });
 
@@ -113,6 +130,11 @@ export const maxBodyScrollOffsetRowsAtom = atom((get) => {
 export const bottomSpacerRowsAtom = atom((get) => {
   const rows = get(rowsAtom);
   const layout = get(layoutAtom);
+  const resumePanelRows = get(resumePanelRowsAtom);
+  if (resumePanelRows > 0) {
+    return Math.max(0, rows - HEADER_ROWS - layout.bodyRows - resumePanelRows);
+  }
+
   const composerRows = get(composerRowsAtom);
   // Keep cwd/composer/status pinned to the bottom by giving every spare row to
   // the body-to-cwd spacer instead of allowing the body to push the prompt down.

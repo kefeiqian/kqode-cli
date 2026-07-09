@@ -2,15 +2,39 @@ import { createStore } from 'jotai';
 import { describe, expect, it } from 'vitest';
 import {
   highlightedResumeSessionAtom,
+  closeResumePanelAtom,
   moveResumeHighlightAtom,
+  openResumePanelAtom,
+  resumePanelDesiredRowsAtom,
+  resumePanelOpenAtom,
   ResumeStatus,
   resumeStatusAtom,
   resumeVisibleRowsAtom,
   setResumeRowsAtom,
   visibleResumeSessionsAtom
 } from '@state/ui/resume/index.ts';
+import { RESUME_PANEL_ROWS } from '@constants/ui.ts';
 
 describe('resume atoms', () => {
+  it('opens and closes the docked panel while resetting list state', () => {
+    const store = createStore();
+    store.set(setResumeRowsAtom, [
+      { sessionId: 'a', summary: 'a', status: 'Idle', modifiedAt: 3, createdAt: 1, folder: 'A' }
+    ]);
+
+    store.set(openResumePanelAtom);
+
+    expect(store.get(resumePanelOpenAtom)).toBe(true);
+    expect(store.get(resumePanelDesiredRowsAtom)).toBe(RESUME_PANEL_ROWS);
+    expect(store.get(resumeStatusAtom)).toBe(ResumeStatus.Loading);
+    expect(store.get(visibleResumeSessionsAtom)).toEqual([]);
+
+    store.set(closeResumePanelAtom);
+
+    expect(store.get(resumePanelOpenAtom)).toBe(false);
+    expect(store.get(resumePanelDesiredRowsAtom)).toBe(0);
+  });
+
   it('moves highlight and windows rows within the visible budget', () => {
     const store = createStore();
     store.set(resumeVisibleRowsAtom, 2);

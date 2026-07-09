@@ -19,13 +19,14 @@ import {
   restoreComposerDraftAtom
 } from '@state/promptQueue/index.ts';
 import { openHelpAtom } from '@state/ui/help/index.ts';
-import { openLoginSurfaceAtom, openMemorySurfaceAtom, openModelSurfaceAtom, openResumeSurfaceAtom, openThemeSurfaceAtom } from '@state/ui/surface/index.ts';
+import { openLoginSurfaceAtom, openMemorySurfaceAtom, openModelSurfaceAtom, openThemeSurfaceAtom } from '@state/ui/surface/index.ts';
 import {
   MemoryMode,
   PendingMemoryItemAction,
   openAddMemoryFormAtom,
   setPendingMemoryItemActionAtom
 } from '@state/ui/memory/index.ts';
+import { openResumePanelAtom } from '@state/ui/resume/index.ts';
 import { CommandMemoryMode } from '@libs/commands/executeCommand.ts';
 import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import { resolveComposerWindow } from '@libs/composer/composerWindow.ts';
@@ -88,7 +89,7 @@ export function PromptComposer({
   const openHelp = useSetAtom(openHelpAtom);
   const openLogin = useSetAtom(openLoginSurfaceAtom);
   const openModel = useSetAtom(openModelSurfaceAtom);
-  const openResume = useSetAtom(openResumeSurfaceAtom);
+  const openResume = useSetAtom(openResumePanelAtom);
   const openMemory = useSetAtom(openMemorySurfaceAtom);
   const openAddMemoryForm = useSetAtom(openAddMemoryFormAtom);
   const setPendingMemoryItemAction = useSetAtom(setPendingMemoryItemActionAtom);

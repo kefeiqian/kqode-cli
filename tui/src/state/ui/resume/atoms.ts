@@ -1,4 +1,5 @@
 import { atom } from 'jotai';
+import { RESUME_PANEL_ROWS } from '@constants/ui.ts';
 import type { SessionSummary } from '@contracts/backend/index.ts';
 import { clamp } from '@libs/math/clamp.ts';
 
@@ -18,6 +19,11 @@ export const resumeErrorAtom = atom<string | null>(null);
 export const resumeHighlightIndexAtom = atom(0);
 export const resumeWindowOffsetAtom = atom(0);
 export const resumeVisibleRowsAtom = atom(1);
+export const resumePanelOpenAtom = atom(false);
+
+export const resumePanelDesiredRowsAtom = atom((get) =>
+  get(resumePanelOpenAtom) ? RESUME_PANEL_ROWS : 0
+);
 
 export const resetResumeSurfaceAtom = atom(null, (_get, set) => {
   set(resumeSessionsAtom, []);
@@ -25,6 +31,15 @@ export const resetResumeSurfaceAtom = atom(null, (_get, set) => {
   set(resumeErrorAtom, null);
   set(resumeHighlightIndexAtom, 0);
   set(resumeWindowOffsetAtom, 0);
+});
+
+export const openResumePanelAtom = atom(null, (_get, set) => {
+  set(resumePanelOpenAtom, true);
+  set(resetResumeSurfaceAtom);
+});
+
+export const closeResumePanelAtom = atom(null, (_get, set) => {
+  set(resumePanelOpenAtom, false);
 });
 
 export const setResumeRowsAtom = atom(null, (_get, set, sessions: SessionSummary[]) => {

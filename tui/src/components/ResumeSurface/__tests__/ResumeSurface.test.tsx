@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { ResumeSurface } from '@components/ResumeSurface/index.tsx';
 import type { BackendClient } from '@contracts/backend/index.ts';
 import { backendClientAtom } from '@state/global/index.ts';
-import { activeSurfaceAtom, columnsTestOverrideAtom, rowsTestOverrideAtom, Surface } from '@state/ui/index.ts';
+import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/index.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 import { memoryBackendStub } from '@test/backendMemoryStub.ts';
 import { themeBackendStub } from '@test/backendThemeStub.ts';
@@ -35,7 +35,6 @@ function fakeClient(sessions: Awaited<ReturnType<BackendClient['listSessions']>>
 
 function renderResume(client: BackendClient, columns = 100, rows = 12) {
   const store = createStore();
-  store.set(activeSurfaceAtom, Surface.Resume);
   store.set(backendClientAtom, client);
   store.set(columnsTestOverrideAtom, columns);
   store.set(rowsTestOverrideAtom, rows);

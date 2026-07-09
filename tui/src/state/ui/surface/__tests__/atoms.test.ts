@@ -11,7 +11,6 @@ import {
   openMemorySurfaceAtom,
   openLoginSurfaceAtom,
   openModelSurfaceAtom,
-  openResumeSurfaceAtom,
   Surface
 } from '@state/ui/surface/index.ts';
 import { helpVisibleAtom, openHelpAtom } from '@state/ui/help/index.ts';
@@ -107,14 +106,6 @@ describe('surface atoms', () => {
     await store.set(openModelSurfaceAtom);
 
     expect(store.get(activeSurfaceAtom)).toBe(Surface.Login);
-  });
-
-  it('opens resume directly as its own fullscreen surface', () => {
-    const store = createStore();
-
-    store.set(openResumeSurfaceAtom);
-
-    expect(store.get(activeSurfaceAtom)).toBe(Surface.Resume);
   });
 
   it('opens memory with an explicit initial mode and resets to active by default', () => {

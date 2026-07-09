@@ -1,10 +1,10 @@
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { useCallback } from 'react';
 import { backendClientAtom } from '@state/global/index.ts';
-import { closeActiveSurfaceAtom } from '@state/ui/surface/index.ts';
 import { hydrateResumedTranscriptAtom } from '@state/promptQueue/atoms.ts';
 import { turnInFlightAtom } from '@state/promptQueue/store.ts';
 import {
+  closeResumePanelAtom,
   resetResumeSurfaceAtom,
   setResumeFailureAtom,
   setResumeResumingAtom,
@@ -26,7 +26,7 @@ export function useResumeBackend() {
   const setResumeFailure = useSetAtom(setResumeFailureAtom);
   const setResumeResuming = useSetAtom(setResumeResumingAtom);
   const hydrateResumedTranscript = useSetAtom(hydrateResumedTranscriptAtom);
-  const closeActiveSurface = useSetAtom(closeActiveSurfaceAtom);
+  const closeResumePanel = useSetAtom(closeResumePanelAtom);
 
   const refreshSessions = useCallback(async () => {
     resetResume();
@@ -66,14 +66,14 @@ export function useResumeBackend() {
           workspaceCwd: session.folder
         });
         hydrateResumedTranscript(resumed);
-        closeActiveSurface();
+        closeResumePanel();
       } catch (error) {
         setResumeFailure(backendErrorMessage(error));
       }
     },
     [
       client,
-      closeActiveSurface,
+      closeResumePanel,
       hydrateResumedTranscript,
       setResumeFailure,
       setResumeResuming,

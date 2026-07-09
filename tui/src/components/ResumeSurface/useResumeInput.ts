@@ -4,6 +4,7 @@ import { useRef } from 'react';
 import { isMouseInput } from '@libs/terminal/mouse.ts';
 import {
   highlightedResumeSessionAtom,
+  closeResumePanelAtom,
   moveResumeHighlightAtom,
   ResumeStatus,
   resumeStatusAtom
@@ -15,8 +16,14 @@ export function useResumeInput(onSelect: (sessionId: string) => Promise<void>) {
   const highlightedRef = useLatest(highlighted);
   const statusRef = useLatest(status);
   const moveHighlight = useSetAtom(moveResumeHighlightAtom);
+  const closeResumePanel = useSetAtom(closeResumePanelAtom);
 
   useInput((input, key) => {
+    if (key.escape) {
+      closeResumePanel();
+      return;
+    }
+
     if (isMouseInput(input) || statusRef.current === ResumeStatus.Loading || statusRef.current === ResumeStatus.Resuming) {
       return;
     }
