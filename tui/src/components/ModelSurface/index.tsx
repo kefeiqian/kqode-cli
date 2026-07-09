@@ -13,7 +13,7 @@ import {
   modelWindowOffsetAtom,
   visibleModelRowsAtom
 } from '@state/ui/model/index.ts';
-import { theme } from '@theme/themeConfig.ts';
+import { activeThemeAtom } from '@state/global/index.ts';
 
 const HEADER_ROWS = 3;
 const FOOTER_ROWS = 1;
@@ -28,6 +28,7 @@ export function ModelSurface() {
   const allRows = useAtomValue(modelRowsAtom);
   const visibleRows = useAtomValue(visibleModelRowsAtom);
   const highlight = useAtomValue(modelHighlightAtom);
+  const theme = useAtomValue(activeThemeAtom);
   const setVisibleRows = useSetAtom(modelVisibleRowsAtom);
   const closeActiveSurface = useSetAtom(closeActiveSurfaceAtom);
   const { refreshModels, retryProvider, selectModel } = useModelBackend(closeActiveSurface);
@@ -65,6 +66,7 @@ function ModelFooter({
   total: number;
   visible: number;
 }) {
+  const theme = useAtomValue(activeThemeAtom);
   const maxOffset = Math.max(0, total - visible);
   const position = maxOffset === 0 ? '' : offset <= 0 ? 'top' : offset >= maxOffset ? 'end' : 'more ↓';
   return (

@@ -1,4 +1,5 @@
 import { Text } from 'ink';
+import { useAtomValue } from 'jotai';
 import {
   SET_KEY_OUTCOME_AUTH_FAILED,
   SET_KEY_OUTCOME_CONNECTED,
@@ -10,41 +11,44 @@ import {
 } from '@contracts/backend/providerMessages.ts';
 import type { SetKeyOutcome } from '@contracts/backend/providerMessages.ts';
 import { PROVIDER_ID_CUSTOM } from '@state/ui/login/index.ts';
-import { theme } from '@theme/themeConfig.ts';
+import { activeThemeAtom } from '@state/global/index.ts';
+import type { ThemeColors } from '@theme/themeConfig.ts';
 
-const OUTCOME_MESSAGES: Record<SetKeyOutcome, { color: string; text: string }> = {
+const OUTCOME_MESSAGES: Record<SetKeyOutcome, { colorToken: keyof ThemeColors; text: string }> = {
   [SET_KEY_OUTCOME_CONNECTED]: {
-    color: theme.colors.accentGreen,
+    colorToken: 'accentGreen',
     text: 'Connected. Selecting the default model…'
   },
   [SET_KEY_OUTCOME_AUTH_FAILED]: {
-    color: theme.colors.errorRed,
+    colorToken: 'errorRed',
     text: 'Authentication failed — fix the key or URL, then retry.'
   },
   [SET_KEY_OUTCOME_RATE_LIMITED]: {
-    color: theme.colors.warning,
+    colorToken: 'warning',
     text: 'Rate limited — wait & retry.'
   },
   [SET_KEY_OUTCOME_UNREACHABLE]: {
-    color: theme.colors.warning,
+    colorToken: 'warning',
     text: 'Provider unreachable — wait & retry.'
   },
   [SET_KEY_OUTCOME_NOT_COMPATIBLE]: {
-    color: theme.colors.errorRed,
+    colorToken: 'errorRed',
     text: 'Endpoint not compatible — fix the URL; /v1/models must respond like OpenAI.'
   },
   [SET_KEY_OUTCOME_EMPTY_CATALOG]: {
-    color: theme.colors.errorRed,
+    colorToken: 'errorRed',
     text: 'Model catalog is empty — fix the key or URL.'
   },
   [SET_KEY_OUTCOME_STORE_FAILED]: {
-    color: theme.colors.errorRed,
+    colorToken: 'errorRed',
     text: 'Keychain write failed — set `CUSTOM_API_KEY` in `.env`, then retry.'
   }
 };
 
 /** Themed set-key result copy keyed by backend outcome constants. */
 export function OutcomeMessage({ outcome, providerId }: { outcome: SetKeyOutcome | null; providerId: string | null }) {
+  const theme = useAtomValue(activeThemeAtom);
+
   if (outcome === null) {
     return null;
   }
@@ -54,11 +58,13 @@ export function OutcomeMessage({ outcome, providerId }: { outcome: SetKeyOutcome
   }
 
   const message = OUTCOME_MESSAGES[outcome];
-  return <Text color={message.color}>{message.text}</Text>;
+  return <Text color={theme.colors[message.colorToken]}>{message.text}</Text>;
 }
 
 /** Sensible degraded-mode hint for backend request failures. */
 export function RequestErrorMessage({ message }: { message: string | null }) {
+  const theme = useAtomValue(activeThemeAtom);
+
   if (message === null) {
     return null;
   }

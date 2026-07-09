@@ -1,7 +1,8 @@
 import { Box, Text } from 'ink';
+import { useAtomValue } from 'jotai';
 import { LoginStep } from '@state/ui/login/index.ts';
 import type { LoginStep as LoginStepValue } from '@state/ui/login/index.ts';
-import { theme } from '@theme/themeConfig.ts';
+import { activeThemeAtom } from '@state/global/index.ts';
 
 const CARET = '▌';
 
@@ -19,6 +20,8 @@ export function CustomForm({
   labelError: string | null;
   step: LoginStepValue;
 }) {
+  const theme = useAtomValue(activeThemeAtom);
+
   return (
     <Box flexDirection="column">
       <FieldRow
@@ -52,6 +55,7 @@ function FieldRow({
   placeholder: string;
   value: string;
 }) {
+  const theme = useAtomValue(activeThemeAtom);
   const rendered = value.length > 0 ? value : placeholder;
   return (
     <Text color={active ? theme.colors.accentBlue : theme.colors.foreground} wrap="truncate">
@@ -61,6 +65,8 @@ function FieldRow({
 }
 
 function InlineError({ message }: { message: string | null }) {
+  const theme = useAtomValue(activeThemeAtom);
+
   if (message === null) {
     return null;
   }

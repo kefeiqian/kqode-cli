@@ -1,6 +1,7 @@
 import { Box, Text } from 'ink';
+import { useAtomValue } from 'jotai';
 import type { ProviderStatusInfo } from '@contracts/backend/providerMessages.ts';
-import { theme } from '@theme/themeConfig.ts';
+import { activeThemeAtom } from '@state/global/index.ts';
 
 export const CONNECTED_ACTION_REPLACE_INDEX = 0;
 export const CONNECTED_ACTION_CLEAR_INDEX = 1;
@@ -15,6 +16,8 @@ export function ConnectedActions({
   confirmClear: boolean;
   provider: ProviderStatusInfo;
 }) {
+  const theme = useAtomValue(activeThemeAtom);
+
   return (
     <Box flexDirection="column">
       <Text color={theme.colors.accentBlue}>{provider.label} is already connected.</Text>
@@ -30,6 +33,8 @@ export function ConnectedActions({
 }
 
 function ActionRow({ active, text }: { active: boolean; text: string }) {
+  const theme = useAtomValue(activeThemeAtom);
+
   return (
     <Text color={active ? theme.colors.accentBlue : theme.colors.foreground}>
       {active ? '›' : ' '} {text}

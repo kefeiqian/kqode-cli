@@ -1,9 +1,11 @@
 import { Box, Text } from 'ink';
+import { useAtomValue } from 'jotai';
 import { LOWER_HALF_BLOCK, UPPER_HALF_BLOCK } from '@libs/tui/backgroundBlock.ts';
 import { PROMPT_PREFIX } from '@constants/ui.ts';
 import { formatValidationError } from '@components/PromptComposer/promptTextView.ts';
 import { padEndToWidth } from '@libs/text/displayWidth.ts';
-import { theme } from '@theme/themeConfig.ts';
+import { activeThemeAtom } from '@state/global/index.ts';
+import type { ThemeDefinition } from '@theme/themeConfig.ts';
 
 type ComposerFrameProps = {
   columns: number;
@@ -18,6 +20,8 @@ export function ComposerFrame({
   validationError,
   visibleTextRows
 }: ComposerFrameProps) {
+  const theme = useAtomValue(activeThemeAtom);
+
   return (
     <>
       {shouldRenderBackground ? <ComposerHalfLine glyph={LOWER_HALF_BLOCK} columns={columns} /> : null}
@@ -32,7 +36,7 @@ export function ComposerFrame({
       ))}
       {validationError === null ? null : (
         <Text
-          backgroundColor={backgroundColor(shouldRenderBackground)}
+          backgroundColor={backgroundColor(shouldRenderBackground, theme)}
           color={theme.colors.errorRed}
         >
           {formatValidationError(validationError, columns, shouldRenderBackground)}
@@ -56,6 +60,7 @@ function ComposerTextRow({
 }) {
   const prefix = promptPrefixForRow(rowIndex);
   const rowColumns = Math.max(0, columns - prefix.length);
+  const theme = useAtomValue(activeThemeAtom);
 
   return (
     // Pin the row to the safe content width. Without an explicit width Ink's
@@ -65,15 +70,15 @@ function ComposerTextRow({
     // composer's right edge on the initial paint until the first keystroke's
     // incremental `ESC[K` erases it. Pinning the width keeps every composer row
     // at the safe width so the reserved column stays a background gutter.
-    <Box backgroundColor={backgroundColor(shouldRenderBackground)} width={columns}>
+    <Box backgroundColor={backgroundColor(shouldRenderBackground, theme)} width={columns}>
       <Text
-        backgroundColor={backgroundColor(shouldRenderBackground)}
+        backgroundColor={backgroundColor(shouldRenderBackground, theme)}
         color={rowIndex === 0 ? theme.colors.accentBlue : theme.colors.foreground}
       >
         {prefix}
       </Text>
       <Text
-        backgroundColor={backgroundColor(shouldRenderBackground)}
+        backgroundColor={backgroundColor(shouldRenderBackground, theme)}
         color={theme.colors.foreground}
       >
         {shouldRenderBackground ? padEndToWidth(row, rowColumns) : row}
@@ -83,6 +88,8 @@ function ComposerTextRow({
 }
 
 function ComposerHalfLine({ glyph, columns }: { glyph: string; columns: number }) {
+  const theme = useAtomValue(activeThemeAtom);
+
   return (
     <Text
       backgroundColor={theme.colors.bodyBackground}
@@ -97,6 +104,6 @@ function promptPrefixForRow(index: number): string {
   return index === 0 ? PROMPT_PREFIX : ' '.repeat(PROMPT_PREFIX.length);
 }
 
-function backgroundColor(isEnabled: boolean): string | undefined {
+function backgroundColor(isEnabled: boolean, theme: ThemeDefinition): string | undefined {
   return isEnabled ? theme.colors.inputBackground : undefined;
 }

@@ -36,7 +36,7 @@ import {
   composerStateAtom,
   setComposerCursorWithOffsetAtom
 } from '@state/ui/composer/index.ts';
-import { theme } from '@theme/themeConfig.ts';
+import { activeThemeAtom } from '@state/global/index.ts';
 import {
   COMPOSER_BACKGROUND_TOP_PADDING_ROWS,
   MOUSE_WHEEL_SCROLL_ROWS,
@@ -52,6 +52,7 @@ export function HomeScreenView() {
   const scrollComposerByRows = useSetAtom(scrollComposerByRowsAtom);
   const notifyScroll = useCaretScrollSuppression();
   const store = useStore();
+  const theme = useAtomValue(activeThemeAtom);
 
   useEffect(() => {
     if (!stdout.isTTY) {
@@ -169,6 +170,7 @@ function HomeHeader() {
 
 function HomeBody() {
   const layout = useAtomValue(layoutAtom);
+  const theme = useAtomValue(activeThemeAtom);
 
   return (
     <Box

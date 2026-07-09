@@ -5,6 +5,7 @@ import type { GitLineDelta } from '@libs/git/lineDelta.ts';
 import { colorize as ansiColorize } from '@libs/terminal/ansiColor.ts';
 import type { Colorize } from '@components/AppExitSummary/types.ts';
 import { DEFAULT_COLUMNS } from '@constants/ui.ts';
+import { activeThemeAtom } from '@state/global/index.ts';
 
 type Store = ReturnType<typeof createStore>;
 
@@ -40,7 +41,8 @@ export function printExitSummary({
   try {
     const data = computeExitSummary({ store, now, readLineDelta });
     const columns = stream.columns ?? DEFAULT_COLUMNS;
-    stream.write(`${formatExitSummaryCard(data, { colorize, columns })}\n`);
+    const theme = store.get(activeThemeAtom);
+    stream.write(`${formatExitSummaryCard(data, { colorize, columns, theme })}\n`);
   } catch {
     // A summary is a courtesy; never let it break teardown.
   }

@@ -8,7 +8,7 @@ import {
 } from '@state/ui/commands/index.ts';
 import { safeChromeColumnsAtom } from '@state/ui/index.ts';
 import { commandMenuRowsAtom } from '@state/ui/index.ts';
-import { theme } from '@theme/themeConfig.ts';
+import { activeThemeAtom } from '@state/global/index.ts';
 
 const NO_MATCHES_LABEL = 'No matching commands';
 const HIGHLIGHT_MARKER = '\u276F '; // "❯ "
@@ -30,6 +30,7 @@ export function SlashCommandMenu() {
   const highlightIndex = useAtomValue(commandMenuHighlightIndexAtom);
   const menuRows = useAtomValue(commandMenuRowsAtom);
   const columns = useAtomValue(safeChromeColumnsAtom);
+  const theme = useAtomValue(activeThemeAtom);
 
   if (!isOpen || menuRows === 0) {
     return null;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { formatExitSummaryCard } from '@components/AppExitSummary/formatExitSummaryCard.ts';
 import type { Colorize } from '@components/AppExitSummary/types.ts';
+import { DEFAULT_THEME } from '@theme/themeConfig.ts';
 
 const identity: Colorize = (text) => text;
 
@@ -8,7 +9,7 @@ describe('formatExitSummaryCard', () => {
   it('renders a bordered banner card with only the rows that carry data (covers R2, R3, R10)', () => {
     const card = formatExitSummaryCard(
       { changes: { insertions: 12, deletions: 4 }, durationMs: 125_000 },
-      { colorize: identity, columns: 80 }
+      { colorize: identity, theme: DEFAULT_THEME, columns: 80 }
     );
 
     // Rounded border + block banner on top of the stat rows.
@@ -34,7 +35,7 @@ describe('formatExitSummaryCard', () => {
   it('omits the Changes row when unavailable, e.g. non-repo (covers AE3)', () => {
     const card = formatExitSummaryCard(
       { changes: undefined, durationMs: 1_000 },
-      { colorize: identity, columns: 80 }
+      { colorize: identity, theme: DEFAULT_THEME, columns: 80 }
     );
 
     // Empty rows are dropped rather than shown as a placeholder.
@@ -47,7 +48,7 @@ describe('formatExitSummaryCard', () => {
   it('omits every row when no stat has data', () => {
     const card = formatExitSummaryCard(
       { changes: undefined, durationMs: undefined },
-      { colorize: identity, columns: 80 }
+      { colorize: identity, theme: DEFAULT_THEME, columns: 80 }
     );
 
     expect(card).not.toContain('Changes');
@@ -61,7 +62,7 @@ describe('formatExitSummaryCard', () => {
   it('degrades to a single-line wordmark box when the banner will not fit (covers R11)', () => {
     const card = formatExitSummaryCard(
       { changes: { insertions: 0, deletions: 0 }, durationMs: 1_000 },
-      { colorize: identity, columns: 30 }
+      { colorize: identity, theme: DEFAULT_THEME, columns: 30 }
     );
 
     expect(card).toContain('╭');
@@ -72,7 +73,7 @@ describe('formatExitSummaryCard', () => {
   it('drops the border and stacks the populated rows plainly on a very narrow terminal (covers R11)', () => {
     const card = formatExitSummaryCard(
       { changes: { insertions: 0, deletions: 0 }, durationMs: 0 },
-      { colorize: identity, columns: 15 }
+      { colorize: identity, theme: DEFAULT_THEME, columns: 15 }
     );
     const lines = card.split('\n');
 
@@ -87,7 +88,7 @@ describe('formatExitSummaryCard', () => {
   it('leaves text uncolored under the identity seam so it stays background-agnostic', () => {
     const card = formatExitSummaryCard(
       { changes: { insertions: 1, deletions: 1 }, durationMs: 1_000 },
-      { colorize: identity, columns: 80 }
+      { colorize: identity, theme: DEFAULT_THEME, columns: 80 }
     );
 
     expect(card).not.toContain('\u001B[');

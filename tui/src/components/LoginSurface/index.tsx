@@ -8,7 +8,7 @@ import { OutcomeMessage, RequestErrorMessage } from '@components/LoginSurface/Ou
 import { ProviderList } from '@components/LoginSurface/ProviderList.tsx';
 import { useLoginBackend } from '@components/LoginSurface/useLoginBackend.ts';
 import { useLoginInput } from '@components/LoginSurface/useLoginInput.ts';
-import { workspaceCwdAtom } from '@state/global/index.ts';
+import { activeThemeAtom, workspaceCwdAtom } from '@state/global/index.ts';
 import { columnsAtom, rowsAtom } from '@state/ui/index.ts';
 import {
   KIMI_BASE_URL,
@@ -30,7 +30,6 @@ import {
   resetLoginSurfaceAtom,
   selectedProviderAtom
 } from '@state/ui/login/index.ts';
-import { theme } from '@theme/themeConfig.ts';
 
 /** Fullscreen `/login` provider credential surface. */
 export function LoginSurface() {
@@ -50,6 +49,7 @@ export function LoginSurface() {
   const labelError = useAtomValue(customLabelErrorAtom);
   const actionIndex = useAtomValue(connectedActionIndexAtom);
   const confirmClear = useAtomValue(clearConfirmAtom);
+  const theme = useAtomValue(activeThemeAtom);
   const resetLogin = useSetAtom(resetLoginSurfaceAtom);
   const backStep = useSetAtom(backLoginStepAtom);
   const { clearProvider, refreshProviders, submitKey } = useLoginBackend(baseUrl, label);

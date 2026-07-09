@@ -20,7 +20,7 @@ import {
   visibleInboxEntriesAtom,
   visibleMemoryItemsAtom
 } from '@state/ui/memory/index.ts';
-import { theme } from '@theme/themeConfig.ts';
+import { activeThemeAtom } from '@state/global/index.ts';
 
 const HEADER_ROWS = 4;
 const FOOTER_ROWS = 1;
@@ -37,6 +37,7 @@ export function MemorySurface() {
   const highlightedItem = useAtomValue(highlightedMemoryItemAtom);
   const highlightedEntry = useAtomValue(highlightedInboxEntryAtom);
   const detailBody = useAtomValue(memoryDetailBodyAtom);
+  const theme = useAtomValue(activeThemeAtom);
   const setVisibleRows = useSetAtom(memoryVisibleRowsAtom);
   const { refresh, showDetail, forgetItem, applyInbox, undoInbox } = useMemoryBackend();
   const bodyRows = useMemo(() => Math.max(1, rows - HEADER_ROWS - FOOTER_ROWS), [rows]);
@@ -118,6 +119,8 @@ function BodyMessage({ columns, rows, text }: { columns: number; rows: number; t
 }
 
 function MemoryFooter({ columns, mode, detailOpen }: { columns: number; mode: MemoryMode; detailOpen: boolean }) {
+  const theme = useAtomValue(activeThemeAtom);
+
   return (
     <Box width={columns}>
       <Text color={theme.colors.muted}>{footerHint(mode, detailOpen).slice(0, columns)}</Text>

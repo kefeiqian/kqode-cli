@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
 import { resolveBodyRows } from '@libs/tui/bodyRows.ts';
+import { DEFAULT_THEME, ThemeId, findTheme } from '@theme/themeConfig.ts';
 
 const WIDE_COLUMNS = 80;
 const TALL_ROWS = 40;
 
 function rowTexts(kind: BodyEntryKind, text: string): string[] {
-  return resolveBodyRows([{ kind, text }], WIDE_COLUMNS, TALL_ROWS).map((row) => row.text);
+  return resolveBodyRows([{ kind, text }], WIDE_COLUMNS, TALL_ROWS, DEFAULT_THEME).map(
+    (row) => row.text
+  );
 }
 
 describe('resolveBodyRows hard line breaks', () => {
@@ -55,34 +58,49 @@ describe('resolveBodyRows hard line breaks', () => {
   });
 });
 
-describe('resolveBodyRows memoization', () => {
-  it('returns the same row objects for an unchanged entry and width', () => {
+describe('resolveBodyRows theming and wrapping', () => {
+  it('returns equal rows for an unchanged entry, width, and theme', () => {
     const entry = { kind: BodyEntryKind.Assistant, text: 'stable text' };
 
-    const first = resolveBodyRows([entry], WIDE_COLUMNS, TALL_ROWS);
-    const second = resolveBodyRows([entry], WIDE_COLUMNS, TALL_ROWS);
+    const first = resolveBodyRows([entry], WIDE_COLUMNS, TALL_ROWS, DEFAULT_THEME);
+    const second = resolveBodyRows([entry], WIDE_COLUMNS, TALL_ROWS, DEFAULT_THEME);
 
-    expect(second[0]).toBe(first[0]);
     expect(second).toEqual(first);
   });
 
-  it('recomputes fresh rows when the column width changes', () => {
-    const entry = { kind: BodyEntryKind.Assistant, text: 'stable text' };
+  it('recomputes wrapping when the column width changes', () => {
+    const entry = { kind: BodyEntryKind.Assistant, text: 'x'.repeat(30) };
 
-    const wide = resolveBodyRows([entry], WIDE_COLUMNS, TALL_ROWS);
-    const narrow = resolveBodyRows([entry], 20, TALL_ROWS);
+    const wide = resolveBodyRows([entry], WIDE_COLUMNS, TALL_ROWS, DEFAULT_THEME);
+    const narrow = resolveBodyRows([entry], 20, TALL_ROWS, DEFAULT_THEME);
 
-    expect(narrow[0]).not.toBe(wide[0]);
+    expect(narrow.length).toBeGreaterThan(wide.length);
   });
 
   it('does not reuse rows across distinct entry objects with equal content', () => {
     const a = { kind: BodyEntryKind.Assistant, text: 'same' };
     const b = { kind: BodyEntryKind.Assistant, text: 'same' };
 
-    const rowsA = resolveBodyRows([a], WIDE_COLUMNS, TALL_ROWS);
-    const rowsB = resolveBodyRows([b], WIDE_COLUMNS, TALL_ROWS);
+    const rowsA = resolveBodyRows([a], WIDE_COLUMNS, TALL_ROWS, DEFAULT_THEME);
+    const rowsB = resolveBodyRows([b], WIDE_COLUMNS, TALL_ROWS, DEFAULT_THEME);
 
-    expect(rowsB[0]).not.toBe(rowsA[0]);
     expect(rowsB).toEqual(rowsA);
+  });
+
+  it('applies the active theme colors on top of cached wrapping (covers AE3)', () => {
+    const entry = { kind: BodyEntryKind.Assistant, text: 'themed line' };
+    const nord = findTheme(ThemeId.Nord);
+    if (nord === undefined) {
+      throw new Error('expected the Nord preset to exist');
+    }
+
+    const draculaRows = resolveBodyRows([entry], WIDE_COLUMNS, TALL_ROWS, DEFAULT_THEME);
+    const nordRows = resolveBodyRows([entry], WIDE_COLUMNS, TALL_ROWS, nord);
+
+    // Same wrapped text, but theme-specific colors — never a stale cached color.
+    expect(nordRows.map((row) => row.text)).toEqual(draculaRows.map((row) => row.text));
+    expect(draculaRows[0].color).toBe(DEFAULT_THEME.colors.foreground);
+    expect(nordRows[0].color).toBe(nord.colors.foreground);
+    expect(nordRows[0].color).not.toBe(draculaRows[0].color);
   });
 });

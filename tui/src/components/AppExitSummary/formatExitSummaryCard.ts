@@ -5,7 +5,7 @@ import type { Colorize, ExitSummaryData } from '@components/AppExitSummary/types
 import { PRODUCT_NAME } from '@constants/product.ts';
 import { visibleLength } from '@libs/terminal/ansiColor.ts';
 import { maxWidth } from '@libs/text/maxWidth.ts';
-import { theme } from '@theme/themeConfig.ts';
+import type { ThemeDefinition } from '@theme/themeConfig.ts';
 
 const INSERTIONS_SIGN = '+';
 const DELETIONS_SIGN = '−';
@@ -18,6 +18,7 @@ type RowLabel = (typeof ROW_LABELS)[number];
 export type FormatExitSummaryCardOptions = {
   colorize: Colorize;
   columns: number;
+  theme: ThemeDefinition;
 };
 
 /**
@@ -34,9 +35,9 @@ export type FormatExitSummaryCardOptions = {
  */
 export function formatExitSummaryCard(
   data: ExitSummaryData,
-  { colorize, columns }: FormatExitSummaryCardOptions
+  { colorize, columns, theme }: FormatExitSummaryCardOptions
 ): string {
-  const rows = ROW_LABELS.map((label) => renderRow(label, data, colorize)).filter(
+  const rows = ROW_LABELS.map((label) => renderRow(label, data, colorize, theme)).filter(
     (row): row is string => row !== undefined
   );
   return renderCard(rows, columns).join('\n');
@@ -59,9 +60,10 @@ function renderCard(rows: readonly string[], columns: number): string[] {
 function renderRow(
   label: RowLabel,
   data: ExitSummaryData,
-  colorize: Colorize
+  colorize: Colorize,
+  theme: ThemeDefinition
 ): string | undefined {
-  const value = renderValue(label, data, colorize);
+  const value = renderValue(label, data, colorize, theme);
   if (value === undefined) {
     return undefined;
   }
@@ -72,7 +74,8 @@ function renderRow(
 function renderValue(
   label: RowLabel,
   data: ExitSummaryData,
-  colorize: Colorize
+  colorize: Colorize,
+  theme: ThemeDefinition
 ): string | undefined {
   if (label === 'Changes') {
     if (data.changes === undefined) {

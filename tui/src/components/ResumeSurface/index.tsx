@@ -14,7 +14,7 @@ import {
   resumeVisibleRowsAtom,
   visibleResumeSessionsAtom
 } from '@state/ui/resume/index.ts';
-import { theme } from '@theme/themeConfig.ts';
+import { activeThemeAtom } from '@state/global/index.ts';
 
 const HEADER_ROWS = 4;
 const FOOTER_ROWS = 1;
@@ -29,6 +29,7 @@ export function ResumeSurface() {
   const highlighted = useAtomValue(highlightedResumeSessionAtom);
   const status = useAtomValue(resumeStatusAtom);
   const error = useAtomValue(resumeErrorAtom);
+  const theme = useAtomValue(activeThemeAtom);
   const setVisibleRows = useSetAtom(resumeVisibleRowsAtom);
   const { refreshSessions, resumeSelected } = useResumeBackend();
   const bodyRows = useMemo(() => Math.max(1, rows - HEADER_ROWS - FOOTER_ROWS), [rows]);
@@ -81,6 +82,8 @@ function ResumeBodyMessage({ columns, rows, text }: { columns: number; rows: num
 }
 
 function ResumeFooter({ columns }: { columns: number }) {
+  const theme = useAtomValue(activeThemeAtom);
+
   return (
     <Box width={columns}>
       <Text color={theme.colors.muted}>{RESUME_FOOTER_HINT}</Text>

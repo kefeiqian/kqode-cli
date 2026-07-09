@@ -10,7 +10,7 @@ import {
   helpScrollOffsetAtom,
   scrollHelpByRowsAtom
 } from '@state/ui/help/index.ts';
-import { theme } from '@theme/themeConfig.ts';
+import { activeThemeAtom } from '@state/global/index.ts';
 
 /** Bottom hint shown in the pager, mirroring `less`/`more` affordances. */
 const HELP_FOOTER_HINT = '↑/↓ scroll · q/esc close';
@@ -28,6 +28,7 @@ export function HelpScreen() {
   const scrollOffset = useAtomValue(helpScrollOffsetAtom);
   const closeHelp = useSetAtom(closeHelpAtom);
   const scrollBy = useSetAtom(scrollHelpByRowsAtom);
+  const theme = useAtomValue(activeThemeAtom);
 
   const lines = useMemo(() => flattenHelpLines(buildHelpSections()), []);
   const visibleRows = Math.max(1, rows - 1);
@@ -77,6 +78,8 @@ export function HelpScreen() {
 }
 
 function HelpRow({ line }: { line: HelpLine | undefined }) {
+  const theme = useAtomValue(activeThemeAtom);
+
   if (line === undefined || line.kind === 'blank') {
     return <Text> </Text>;
   }
@@ -98,6 +101,7 @@ function HelpFooter({
   offset: number;
   maxOffset: number;
 }) {
+  const theme = useAtomValue(activeThemeAtom);
   const position = scrollPositionLabel(offset, maxOffset);
 
   return (

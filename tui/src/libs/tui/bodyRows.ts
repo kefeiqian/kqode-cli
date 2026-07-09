@@ -3,7 +3,7 @@ import {
   UPPER_HALF_BLOCK
 } from '@libs/tui/backgroundBlock.ts';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
-import { theme } from '@theme/themeConfig.ts';
+import type { ThemeColors, ThemeDefinition } from '@theme/themeConfig.ts';
 
 export type BodyEntry = {
   id?: string;
@@ -20,17 +20,56 @@ export type BodyRow = {
   text: string;
 };
 
+/** A semantic theme-color token name, resolved to a concrete color per render. */
+type ThemeColorToken = keyof ThemeColors;
+
+// Theme-free structural row: caches text/marker/fill plus semantic color TOKEN
+// names (not resolved colors), so wrapping is memoized once while the active
+// theme's colors are applied on top per render (see `resolveBodyRows`).
+type BodyRowStructure = {
+  backgroundColorToken?: ThemeColorToken;
+  colorToken?: ThemeColorToken;
+  fillColumns?: boolean;
+  marker?: string;
+  markerColorToken?: ThemeColorToken;
+  text: string;
+};
+
 export const DEFAULT_BODY_ENTRIES: readonly BodyEntry[] = [];
 
 const ASSISTANT_MESSAGE_PREFIX = '• ';
 const USER_MESSAGE_PREFIX = '❯ ';
 const USER_MESSAGE_HORIZONTAL_PADDING = 2;
 
+/**
+ * Wraps `entries` into rendered rows for the active `theme`. Text wrapping is
+ * cached per entry + width (theme-free); the active theme's colors are applied
+ * on top per call, so switching themes never returns stale cached colors.
+ */
 export function resolveBodyRows(
   entries: readonly BodyEntry[],
   columns: number,
-  visibleRows: number
+  visibleRows: number,
+  theme: ThemeDefinition
 ): BodyRow[] {
+  return structuralBodyRows(entries, columns, visibleRows).map((row) => applyTheme(row, theme));
+}
+
+export function countBodyRows(
+  entries: readonly BodyEntry[],
+  columns: number,
+  visibleRows: number
+): number {
+  return structuralBodyRows(entries, Math.max(1, columns), Math.max(1, visibleRows)).length;
+}
+
+// Wrapping and row count are theme-independent, so this is shared by
+// `resolveBodyRows` (which then applies colors) and `countBodyRows`.
+function structuralBodyRows(
+  entries: readonly BodyEntry[],
+  columns: number,
+  visibleRows: number
+): BodyRowStructure[] {
   const fullWidthRows = toBodyRowsWithEntryGaps(entries, columns);
   // If content overflows vertically, reserve the final terminal column for the
   // scrollbar and re-wrap text so body rows do not collide with it.
@@ -41,30 +80,38 @@ export function resolveBodyRows(
     : toBodyRowsWithEntryGaps(entries, contentColumns);
 }
 
-export function countBodyRows(
-  entries: readonly BodyEntry[],
-  columns: number,
-  visibleRows: number
-): number {
-  return resolveBodyRows(entries, Math.max(1, columns), Math.max(1, visibleRows)).length;
+function applyTheme(row: BodyRowStructure, theme: ThemeDefinition): BodyRow {
+  return {
+    backgroundColor:
+      row.backgroundColorToken === undefined ? undefined : theme.colors[row.backgroundColorToken],
+    color: row.colorToken === undefined ? undefined : theme.colors[row.colorToken],
+    fillColumns: row.fillColumns,
+    marker: row.marker,
+    markerColor:
+      row.markerColorToken === undefined ? undefined : theme.colors[row.markerColorToken],
+    text: row.text
+  };
 }
 
-function toBodyRowsWithEntryGaps(entries: readonly BodyEntry[], columns: number): BodyRow[] {
+function toBodyRowsWithEntryGaps(
+  entries: readonly BodyEntry[],
+  columns: number
+): BodyRowStructure[] {
   return entries.flatMap((entry) => toBodyRows(entry, columns));
 }
 
 // Wrapping a `BodyEntry` depends only on its immutable kind/text and the column
-// width, so memoize the rendered rows per entry identity and width. During
+// width, so memoize the structural rows per entry identity and width. During
 // streaming only the changed entry is a fresh object (new identity), so the rest
 // of the transcript hits the cache instead of re-wrapping on every token/render;
 // resizes and scrolls reuse it too. Entries are GC'd from the WeakMap once the
-// transcript drops them (e.g. on `/clear`).
-// NOTE: assumes `theme` colors are static for the process. If runtime theming is
-// added, include the active theme in the cache key.
+// transcript drops them (e.g. on `/clear`). The cache is theme-safe: it stores
+// color TOKEN names, not resolved colors, so a theme switch reuses the cache and
+// re-resolves colors (see `applyTheme`).
 const MAX_CACHED_WIDTHS = 4;
-const bodyRowsByEntry = new WeakMap<BodyEntry, Map<number, BodyRow[]>>();
+const bodyRowsByEntry = new WeakMap<BodyEntry, Map<number, BodyRowStructure[]>>();
 
-function toBodyRows(entry: BodyEntry, columns: number): BodyRow[] {
+function toBodyRows(entry: BodyEntry, columns: number): BodyRowStructure[] {
   let rowsByWidth = bodyRowsByEntry.get(entry);
   if (rowsByWidth === undefined) {
     rowsByWidth = new Map();
@@ -91,7 +138,7 @@ function toBodyRows(entry: BodyEntry, columns: number): BodyRow[] {
   return rows;
 }
 
-function computeBodyRows(entry: BodyEntry, columns: number): BodyRow[] {
+function computeBodyRows(entry: BodyEntry, columns: number): BodyRowStructure[] {
   if (entry.kind === BodyEntryKind.User) {
     return toPromptRows(entry.text, columns);
   }
@@ -101,33 +148,33 @@ function computeBodyRows(entry: BodyEntry, columns: number): BodyRow[] {
   }
 
   return wrapBodyText(labelForEntry(entry), columns).map((text) => ({
-    color: colorForEntry(entry.kind),
+    colorToken: colorTokenForEntry(entry.kind),
     text
   }));
 }
 
-function toAssistantRows(text: string, columns: number): BodyRow[] {
+function toAssistantRows(text: string, columns: number): BodyRowStructure[] {
   const continuationPrefix = ' '.repeat(ASSISTANT_MESSAGE_PREFIX.length);
   const wrappedText = wrapBodyText(text, Math.max(1, columns - ASSISTANT_MESSAGE_PREFIX.length));
 
-  return wrappedText.map((line, index) => ({
-    color: theme.colors.foreground,
+  return wrappedText.map((line, index): BodyRowStructure => ({
+    colorToken: 'foreground',
     marker: index === 0 ? ASSISTANT_MESSAGE_PREFIX : continuationPrefix,
-    markerColor: index === 0 ? theme.colors.accentBlue : theme.colors.foreground,
+    markerColorToken: index === 0 ? 'accentBlue' : 'foreground',
     text: line
   }));
 }
 
-function toPromptRows(text: string, columns: number): BodyRow[] {
+function toPromptRows(text: string, columns: number): BodyRowStructure[] {
   const promptIndent = USER_MESSAGE_HORIZONTAL_PADDING + USER_MESSAGE_PREFIX.length;
   // User prompts have symmetric horizontal padding inside their message block;
   // continuation rows replace the visible prefix with spaces to align wrapped text.
   const textColumns = Math.max(1, columns - promptIndent - USER_MESSAGE_HORIZONTAL_PADDING);
   const continuationPrefix = ' '.repeat(promptIndent);
   const wrappedText = wrapBodyText(text, textColumns);
-  const textRows = wrappedText.map((line, index) => ({
-    backgroundColor: theme.colors.messageBackground,
-    color: theme.colors.foreground,
+  const textRows = wrappedText.map((line, index): BodyRowStructure => ({
+    backgroundColorToken: 'messageBackground',
+    colorToken: 'foreground',
     fillColumns: true,
     text: `${index === 0 ? promptPrefix() : continuationPrefix}${line}`
   }));
@@ -143,29 +190,29 @@ function promptPrefix(): string {
   return `${' '.repeat(USER_MESSAGE_HORIZONTAL_PADDING)}${USER_MESSAGE_PREFIX}`;
 }
 
-function halfLineRow(columns: number, glyph: string): BodyRow {
+function halfLineRow(columns: number, glyph: string): BodyRowStructure {
   return {
-    backgroundColor: theme.colors.bodyBackground,
-    color: theme.colors.messageBackground,
+    backgroundColorToken: 'bodyBackground',
+    colorToken: 'messageBackground',
     text: glyph.repeat(columns)
   };
 }
 
-function colorForEntry(kind: BodyEntry['kind']): string {
+function colorTokenForEntry(kind: BodyEntry['kind']): ThemeColorToken {
   switch (kind) {
     case BodyEntryKind.Error:
-      return theme.colors.errorRed;
+      return 'errorRed';
     case BodyEntryKind.Pending:
-      return theme.colors.warning;
+      return 'warning';
     case BodyEntryKind.Success:
-      return theme.colors.accentGreen;
+      return 'accentGreen';
     case BodyEntryKind.System:
-      return theme.colors.warning;
+      return 'warning';
     case BodyEntryKind.User:
-      return theme.colors.foreground;
+      return 'foreground';
     case BodyEntryKind.Assistant:
     case BodyEntryKind.Muted:
-      return theme.colors.muted;
+      return 'muted';
   }
 }
 

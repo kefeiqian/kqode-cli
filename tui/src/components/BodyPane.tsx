@@ -9,7 +9,8 @@ import {
   layoutAtom,
   safeChromeColumnsAtom
 } from '@state/ui/index.ts';
-import { theme } from '@theme/themeConfig.ts';
+import { activeThemeAtom } from '@state/global/index.ts';
+import type { ThemeDefinition } from '@theme/themeConfig.ts';
 import { SCROLLBAR_THUMB, SCROLLBAR_TRACK } from '@constants/ui.ts';
 
 export type { BodyEntry } from '@libs/tui/bodyRows.ts';
@@ -43,6 +44,7 @@ export function BodyPane({
   const atomLayout = useAtomValue(layoutAtom);
   const atomSafeColumns = useAtomValue(safeChromeColumnsAtom);
   const atomScrollOffsetRows = useAtomValue(bodyScrollOffsetRowsAtom);
+  const theme = useAtomValue(activeThemeAtom);
 
   const resolvedEntries = entries ?? atomEntries ?? DEFAULT_BODY_ENTRIES;
   const resolvedRows = rows ?? atomLayout.bodyRows;
@@ -50,7 +52,7 @@ export function BodyPane({
   const resolvedScrollOffsetRows = scrollOffsetRows ?? atomScrollOffsetRows;
   const visibleRows = Math.max(1, resolvedRows);
   const visibleColumns = Math.max(1, resolvedColumns);
-  const allRows = resolveBodyRows(resolvedEntries, visibleColumns, visibleRows);
+  const allRows = resolveBodyRows(resolvedEntries, visibleColumns, visibleRows, theme);
   const maxScrollOffset = Math.max(0, allRows.length - visibleRows);
   const scrollOffset = clamp(resolvedScrollOffsetRows, 0, maxScrollOffset);
   // Offset counts rows back from the newest content at the bottom, matching
@@ -65,7 +67,8 @@ export function BodyPane({
     ? renderScrollbar({
         rows: visibleRows,
         totalRows: allRows.length,
-        startRow: start
+        startRow: start,
+        theme
       })
     : [];
 
@@ -108,11 +111,13 @@ export function BodyPane({
 function renderScrollbar({
   rows,
   totalRows,
-  startRow
+  startRow,
+  theme
 }: {
   rows: number;
   totalRows: number;
   startRow: number;
+  theme: ThemeDefinition;
 }): ScrollbarCell[] {
   // Scale the thumb to the visible fraction, then map the first visible row to
   // the same fraction of the scrollbar track so top/bottom positions align.

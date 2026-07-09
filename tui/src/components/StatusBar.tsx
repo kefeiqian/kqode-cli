@@ -1,7 +1,7 @@
 import { Box, Text } from 'ink';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useEffect } from 'react';
-import { activeModelLabelAtom, refreshActiveModelAtom } from '@state/global/index.ts';
+import { activeModelLabelAtom, activeThemeAtom, refreshActiveModelAtom } from '@state/global/index.ts';
 import { turnInFlightAtom } from '@state/promptQueue/index.ts';
 import {
   activeSurfaceAtom,
@@ -27,7 +27,6 @@ import {
   PRESS_AGAIN_TO_EXIT_HINT,
   TRANSIENT_STATUS_HINT_MS
 } from '@constants/ui.ts';
-import { theme } from '@theme/themeConfig.ts';
 
 export function StatusBar() {
   const columns = useAtomValue(safeChromeColumnsAtom);
@@ -38,6 +37,7 @@ export function StatusBar() {
   const armedAction = useAtomValue(armedActionAtom);
   const turnInFlight = useAtomValue(turnInFlightAtom);
   const compactionInProgress = useAtomValue(compactionInProgressAtom);
+  const theme = useAtomValue(activeThemeAtom);
   useActiveModelRefresh();
   useTransientStatusHintClear(transientStatusHint);
   // Backend startup takes precedence over the working spinner, which in turn

@@ -1,4 +1,5 @@
 import { Text } from 'ink';
+import { useAtomValue } from 'jotai';
 import {
   MODEL_LIST_STATUS_EMPTY,
   MODEL_LIST_STATUS_FAILED
@@ -8,7 +9,7 @@ import {
   MODEL_LOAD_STATUS_LOADING,
   MODEL_LOAD_STATUS_NOT_CONNECTED
 } from '@state/ui/model/index.ts';
-import { theme } from '@theme/themeConfig.ts';
+import { activeThemeAtom } from '@state/global/index.ts';
 
 const SELECTED_MARKER = '›';
 const PLAIN_MARKER = ' ';
@@ -25,6 +26,8 @@ export function ModelRow({
   highlight: ModelHighlightIdentity | null;
   row: ModelSurfaceRow;
 }) {
+  const theme = useAtomValue(activeThemeAtom);
+
   if (row.type === 'provider') {
     return <Text color={theme.colors.accentBlue}>{truncate(row.label, columns)}</Text>;
   }
