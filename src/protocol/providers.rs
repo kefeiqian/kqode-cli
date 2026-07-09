@@ -34,9 +34,6 @@ pub const PROVIDER_STATUS_NOT_CONFIGURED: &str = "notConfigured";
 /// Credential source value for an OS-keychain key.
 pub const CREDENTIAL_SOURCE_KEYCHAIN: &str = "keychain";
 
-/// Credential source value for a workspace environment key.
-pub const CREDENTIAL_SOURCE_ENV: &str = "env";
-
 /// `kqode.provider.setKey` outcome for a validated provider.
 pub const SET_KEY_OUTCOME_CONNECTED: &str = "connected";
 /// `kqode.provider.setKey` outcome for a rejected credential.

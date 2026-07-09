@@ -5,11 +5,10 @@
 //! [`ApiKey::expose`], which is the single audited leak surface for future
 //! provider authentication call sites.
 
-use std::{env, fmt};
+use std::fmt;
 
 use secrecy::{ExposeSecret, SecretString};
 
-use crate::config::CUSTOM_API_KEY_VAR;
 use crate::provider::ProviderId;
 use crate::provider::registry::{KeyResolver, KeySource};
 
@@ -122,17 +121,13 @@ pub fn clear_key(provider: ProviderId) -> Result<(), KeychainError> {
     })
 }
 
-/// Resolves a provider API key, preferring keychain over `.env`.
+/// Resolves a provider API key from the OS keychain.
 ///
 /// Resolution is intentionally uncached so clear/set operations take effect on
-/// the next call. Keychain failures fall through to the Custom-only `.env`
-/// fallback instead of hiding a working environment key.
+/// the next call.
 #[must_use]
 pub fn resolve_key(provider: ProviderId) -> Option<ApiKey> {
-    get_key(provider)
-        .ok()
-        .flatten()
-        .or_else(|| env_key(provider))
+    get_key(provider).ok().flatten()
 }
 
 /// Real key-source resolver for provider status derivation.
@@ -143,25 +138,9 @@ impl KeyResolver for KeychainKeyResolver {
     fn key_source(&self, provider: ProviderId) -> KeySource {
         if matches!(get_key(provider), Ok(Some(_))) {
             KeySource::Keychain
-        } else if env_key(provider).is_some() {
-            KeySource::Env
         } else {
             KeySource::None
         }
-    }
-}
-
-fn env_key(provider: ProviderId) -> Option<ApiKey> {
-    match provider {
-        ProviderId::Custom => non_empty_env(CUSTOM_API_KEY_VAR).map(ApiKey::new),
-        ProviderId::Kimi => None,
-    }
-}
-
-fn non_empty_env(name: &str) -> Option<String> {
-    match env::var(name) {
-        Ok(value) if !value.trim().is_empty() => Some(value.trim().to_owned()),
-        _ => None,
     }
 }
 

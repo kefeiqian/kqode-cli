@@ -6,8 +6,6 @@ use crate::protocol::{
     SET_KEY_OUTCOME_NOT_COMPATIBLE, SET_KEY_OUTCOME_RATE_LIMITED, SET_KEY_OUTCOME_UNREACHABLE,
 };
 use crate::provider::ModelInfo;
-use std::env;
-use std::ffi::OsString;
 
 fn model(id: &str) -> ModelInfo {
     ModelInfo {
@@ -20,15 +18,6 @@ fn temp_store() -> (tempfile::TempDir, Store) {
     let dir = tempfile::tempdir().expect("temp dir");
     let store = Store::open_or_bootstrap_at(dir.path().join("kqode.db")).expect("store");
     (dir, store)
-}
-
-fn restore_env(name: &str, previous: Option<OsString>) {
-    unsafe {
-        match previous {
-            Some(value) => env::set_var(name, value),
-            None => env::remove_var(name),
-        }
-    }
 }
 
 #[test]
@@ -130,49 +119,29 @@ fn model_id_sanitization_strips_controls_and_ansi() {
 }
 
 #[test]
-fn resolve_base_url_falls_back_to_custom_env_when_store_has_no_settings() {
-    let _lock = crate::test_env::lock();
-    let previous = env::var_os(crate::config::CUSTOM_BASE_URL_VAR);
-    // A fresh store has no persisted Custom endpoint, so `/model` catalog loads
-    // must reach the workspace `.env` base URL instead of failing to load.
-    unsafe { env::set_var(crate::config::CUSTOM_BASE_URL_VAR, "https://custom.env/v1/") };
+fn resolve_base_url_is_none_for_custom_without_store_settings() {
     let (_dir, store) = temp_store();
 
     let resolved = resolve_base_url(&store, ProviderId::Custom);
 
-    restore_env(crate::config::CUSTOM_BASE_URL_VAR, previous);
-    assert_eq!(resolved.as_deref(), Some("https://custom.env/v1"));
-}
-
-#[test]
-fn resolve_base_url_is_none_for_custom_without_store_or_env() {
-    let _lock = crate::test_env::lock();
-    let previous = env::var_os(crate::config::CUSTOM_BASE_URL_VAR);
-    restore_env(crate::config::CUSTOM_BASE_URL_VAR, None);
-    let (_dir, store) = temp_store();
-
-    let resolved = resolve_base_url(&store, ProviderId::Custom);
-
-    restore_env(crate::config::CUSTOM_BASE_URL_VAR, previous);
     assert_eq!(resolved, None);
 }
 
 #[test]
 fn resolve_base_url_uses_compiled_endpoint_for_fixed_preset_providers() {
-    let _lock = crate::test_env::lock();
-    let previous = env::var_os(crate::config::CUSTOM_BASE_URL_VAR);
-    // The Custom `.env` base URL must never override a preset's fixed endpoint.
-    unsafe {
-        env::set_var(
-            crate::config::CUSTOM_BASE_URL_VAR,
-            "https://attacker.example/v1",
-        )
-    };
     let (_dir, store) = temp_store();
+    store
+        .upsert_provider_settings(&crate::store::ProviderSettings {
+            provider: ProviderId::Custom,
+            base_url: "https://attacker.example/v1".to_owned(),
+            label: Some("Attacker".to_owned()),
+            key_present: true,
+            last_connected_at: None,
+        })
+        .unwrap();
 
     let resolved = resolve_base_url(&store, ProviderId::Kimi);
 
-    restore_env(crate::config::CUSTOM_BASE_URL_VAR, previous);
     assert_eq!(
         resolved.as_deref(),
         Some(crate::config::DEFAULT_KIMI_BASE_URL)
@@ -217,38 +186,4 @@ fn unreachable_set_key_does_not_leak_sentinel_to_persistent_sinks() {
             assert!(!String::from_utf8_lossy(&bytes).contains(&sentinel));
         }
     }
-}
-
-#[test]
-fn list_models_pins_custom_env_model_without_fetch() {
-    let _lock = crate::test_env::lock();
-    let previous = env::var_os(crate::config::CUSTOM_MODEL_VAR);
-    // A `.env`-pinned Custom model is authoritative: `/model` must offer just
-    // that one model. Reaching this result with no key, base URL, or runtime
-    // network I/O proves the catalog fetch is skipped entirely.
-    unsafe { env::set_var(crate::config::CUSTOM_MODEL_VAR, "my-pinned-model") };
-
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-    let (_dir, store) = temp_store();
-    let result = runtime.block_on(list_models(store.clone(), ProviderId::Custom));
-
-    restore_env(crate::config::CUSTOM_MODEL_VAR, previous);
-    assert_eq!(result.status, MODEL_LIST_STATUS_LOADED);
-    assert_eq!(result.models.len(), 1);
-    assert_eq!(result.models[0].id, "my-pinned-model");
-    assert_eq!(result.models[0].owned_by, None);
-}
-
-#[test]
-fn custom_env_model_result_sanitizes_pinned_id() {
-    // The pinned id is display-bound, so it is scrubbed on the same boundary as
-    // a fetched catalog entry even though it originates from the user's `.env`.
-    let result = custom_env_model_result("gpt-4o\u{1b}[31m-mini");
-    assert_eq!(result.status, MODEL_LIST_STATUS_LOADED);
-    assert_eq!(result.models.len(), 1);
-    assert_eq!(result.models[0].id, "gpt-4o-mini");
-    assert_eq!(result.models[0].owned_by, None);
 }

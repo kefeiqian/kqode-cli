@@ -55,22 +55,15 @@ pub fn provider_descriptor(provider: ProviderId) -> &'static ProviderDescriptor 
     }
 }
 
-/// The default model for a provider, including the Custom provider's `.env`
-/// override.
+/// The compiled default model for a provider, when one exists.
 ///
-/// Presets return their compiled default model. The Custom provider has no
-/// compiled default and instead falls back to the `.env` `CUSTOM_MODEL` value
-/// when one is configured, so the effective-default and status surfaces can
-/// treat an env-configured Custom provider like any other selectable model.
+/// Presets may provide a compiled default model. The Custom provider has no
+/// default model and is selected only through an explicit `/model` choice.
 #[must_use]
 pub fn effective_default_model(provider: ProviderId) -> Option<String> {
-    if let Some(model) = provider_descriptor(provider).default_model {
-        return Some(model.to_owned());
-    }
-    match provider {
-        ProviderId::Custom => crate::config::custom_env_model(),
-        ProviderId::Kimi => None,
-    }
+    provider_descriptor(provider)
+        .default_model
+        .map(str::to_owned)
 }
 
 /// User-supplied Custom provider settings.
@@ -126,8 +119,6 @@ pub fn validate_base_url(base_url: &str) -> Result<String, ProviderError> {
 pub enum KeySource {
     /// The OS keychain.
     Keychain,
-    /// A workspace environment variable.
-    Env,
     /// No usable key was found.
     None,
 }
@@ -137,8 +128,6 @@ pub enum KeySource {
 pub enum CredentialSource {
     /// Connected via the OS keychain.
     Keychain,
-    /// Connected via a workspace environment variable.
-    Env,
 }
 
 /// Cached provider status for selection/login surfaces.
@@ -173,7 +162,6 @@ pub fn derive_status<R: KeyResolver + ?Sized>(
 ) -> ProviderStatus {
     match resolver.key_source(provider) {
         KeySource::Keychain => ProviderStatus::Connected(CredentialSource::Keychain),
-        KeySource::Env => ProviderStatus::Connected(CredentialSource::Env),
         KeySource::None => ProviderStatus::NotConfigured,
     }
 }

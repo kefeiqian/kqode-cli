@@ -54,8 +54,8 @@ impl Error for BackendError {
 
 /// Runs the internal JSON-RPC stdio backend until stdin closes.
 ///
-/// Loads a `.env` file (if present) into the process environment first so the
-/// Custom provider can read `CUSTOM_API_KEY` and friends, then emits a single
+/// Loads a `.env` file (if present) into the process environment first so
+/// development-only settings such as `KQODE_DEBUG` are available, then emits a single
 /// [`BACKEND_READY_METHOD`] notification as soon as the stdio transport is
 /// established and before any request is handled, so clients bound startup on
 /// real JSON-RPC readiness rather than the OS process-spawn event.

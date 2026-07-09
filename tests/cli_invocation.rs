@@ -46,7 +46,6 @@ fn backend_store_failure_exits_with_store_code_without_ready() {
         .arg(BACKEND_MODE_ARG)
         .env("HOME", home.path())
         .env("USERPROFILE", home.path())
-        .env("CUSTOM_API_KEY", "")
         .env("KQODE_DEBUG", "0")
         .output()
         .expect("binary runs");
@@ -70,7 +69,6 @@ fn backend_without_home_exits_with_store_code_and_sentinel() {
         .arg(BACKEND_MODE_ARG)
         .env_remove("HOME")
         .env_remove("USERPROFILE")
-        .env("CUSTOM_API_KEY", "")
         .env("KQODE_DEBUG", "0")
         .output()
         .expect("binary runs");

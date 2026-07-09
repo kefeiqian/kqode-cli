@@ -1,8 +1,11 @@
 use super::*;
-use crate::config::{CUSTOM_BASE_URL_VAR, CUSTOM_MODEL_VAR};
 use crate::test_env;
 use std::env;
 use std::sync::MutexGuard;
+
+const CUSTOM_KEY_VAR: &str = concat!("CUSTOM_", "API_KEY");
+const CUSTOM_PROVIDER_MODEL_VAR: &str = concat!("CUSTOM_", "MODEL");
+const CUSTOM_BASE_ENV_VAR: &str = concat!("CUSTOM_", "BASE_URL");
 
 struct EnvGuard {
     custom_key: Option<std::ffi::OsString>,
@@ -14,15 +17,15 @@ struct EnvGuard {
 impl EnvGuard {
     fn new(lock: MutexGuard<'static, ()>) -> Self {
         let guard = Self {
-            custom_key: env::var_os(CUSTOM_API_KEY_VAR),
-            custom_model: env::var_os(CUSTOM_MODEL_VAR),
-            custom_base_url: env::var_os(CUSTOM_BASE_URL_VAR),
+            custom_key: env::var_os(CUSTOM_KEY_VAR),
+            custom_model: env::var_os(CUSTOM_PROVIDER_MODEL_VAR),
+            custom_base_url: env::var_os(CUSTOM_BASE_ENV_VAR),
             _lock: lock,
         };
         unsafe {
-            env::remove_var(CUSTOM_API_KEY_VAR);
-            env::remove_var(CUSTOM_MODEL_VAR);
-            env::remove_var(CUSTOM_BASE_URL_VAR);
+            env::remove_var(CUSTOM_KEY_VAR);
+            env::remove_var(CUSTOM_PROVIDER_MODEL_VAR);
+            env::remove_var(CUSTOM_BASE_ENV_VAR);
         }
         guard
     }
@@ -30,9 +33,9 @@ impl EnvGuard {
 
 impl Drop for EnvGuard {
     fn drop(&mut self) {
-        restore_env(CUSTOM_API_KEY_VAR, self.custom_key.as_ref());
-        restore_env(CUSTOM_MODEL_VAR, self.custom_model.as_ref());
-        restore_env(CUSTOM_BASE_URL_VAR, self.custom_base_url.as_ref());
+        restore_env(CUSTOM_KEY_VAR, self.custom_key.as_ref());
+        restore_env(CUSTOM_PROVIDER_MODEL_VAR, self.custom_model.as_ref());
+        restore_env(CUSTOM_BASE_ENV_VAR, self.custom_base_url.as_ref());
     }
 }
 
@@ -79,7 +82,7 @@ fn active_selection_core_is_null_when_unset() {
 }
 
 #[test]
-fn provider_list_empty_store_without_env_marks_kimi_not_configured() {
+fn provider_list_empty_store_marks_kimi_not_configured() {
     let (_dir, store, _env) = bootstrap();
     let result = provider_list(&store);
     let kimi = result
@@ -118,43 +121,12 @@ fn provider_list_uses_cached_key_present_bit_for_keychain_status() {
 }
 
 #[test]
-fn provider_list_reports_custom_connected_via_env_with_default_model() {
+fn provider_list_ignores_custom_environment_configuration() {
     let (_dir, store, _env) = bootstrap();
     unsafe {
-        env::set_var(CUSTOM_API_KEY_VAR, "sk-env-custom");
-        env::set_var(CUSTOM_MODEL_VAR, "env-model");
-        env::set_var(CUSTOM_BASE_URL_VAR, "https://models.example/v1");
-    }
-
-    let result = provider_list(&store);
-
-    let custom = result
-        .providers
-        .iter()
-        .find(|row| row.provider_id == "custom")
-        .unwrap();
-    assert_eq!(custom.status, PROVIDER_STATUS_CONNECTED);
-    assert_eq!(custom.credential_source, Some(CREDENTIAL_SOURCE_ENV));
-    assert_eq!(custom.default_model.as_deref(), Some("env-model"));
-    assert_eq!(
-        custom.base_url.as_deref(),
-        Some("https://models.example/v1")
-    );
-
-    let kimi = result
-        .providers
-        .iter()
-        .find(|row| row.provider_id == "kimi")
-        .unwrap();
-    assert_eq!(kimi.status, PROVIDER_STATUS_NOT_CONFIGURED);
-}
-
-#[test]
-fn provider_list_marks_custom_not_configured_without_a_base_url() {
-    let (_dir, store, _env) = bootstrap();
-    unsafe {
-        env::set_var(CUSTOM_API_KEY_VAR, "sk-env-custom");
-        env::set_var(CUSTOM_MODEL_VAR, "env-model");
+        env::set_var(CUSTOM_KEY_VAR, "sk-env-custom");
+        env::set_var(CUSTOM_PROVIDER_MODEL_VAR, "env-model");
+        env::set_var(CUSTOM_BASE_ENV_VAR, "https://models.example/v1");
     }
 
     let result = provider_list(&store);
@@ -166,4 +138,34 @@ fn provider_list_marks_custom_not_configured_without_a_base_url() {
         .unwrap();
     assert_eq!(custom.status, PROVIDER_STATUS_NOT_CONFIGURED);
     assert_eq!(custom.credential_source, None);
+    assert_eq!(custom.default_model, None);
+    assert_eq!(custom.base_url, None);
+}
+
+#[test]
+fn provider_list_marks_custom_not_configured_without_settings() {
+    let (_dir, store, _env) = bootstrap();
+
+    let result = provider_list(&store);
+
+    let custom = result
+        .providers
+        .iter()
+        .find(|row| row.provider_id == "custom")
+        .unwrap();
+    assert_eq!(custom.status, PROVIDER_STATUS_NOT_CONFIGURED);
+    assert_eq!(custom.credential_source, None);
+    assert_eq!(custom.base_url, None);
+}
+
+#[test]
+fn provider_list_gates_custom_key_present_without_base_url() {
+    assert_eq!(
+        gate_status_on_base_url(
+            ProviderId::Custom,
+            ProviderStatus::Connected(CredentialSource::Keychain),
+            None,
+        ),
+        ProviderStatus::NotConfigured
+    );
 }

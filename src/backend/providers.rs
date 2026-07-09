@@ -1,7 +1,6 @@
-use crate::config::CUSTOM_API_KEY_VAR;
 use crate::protocol::{
-    ActiveSelectionResult, CREDENTIAL_SOURCE_ENV, CREDENTIAL_SOURCE_KEYCHAIN, ClearKeyParams,
-    ClearKeyResult, PROVIDER_STATUS_CONNECTED, PROVIDER_STATUS_NOT_CONFIGURED, ProviderListResult,
+    ActiveSelectionResult, CREDENTIAL_SOURCE_KEYCHAIN, ClearKeyParams, ClearKeyResult,
+    PROVIDER_STATUS_CONNECTED, PROVIDER_STATUS_NOT_CONFIGURED, ProviderListResult,
     ProviderStatusInfo, SelectionSetParams, SelectionSetResult,
 };
 use crate::provider::ProviderId;
@@ -11,19 +10,19 @@ use crate::provider::registry::{
 use crate::secrets::KeychainError;
 use crate::store::{ActiveSelection, ProviderSettings, Store};
 
-/// Builds provider status rows from SQLite's cached key-present bit and env fallbacks.
+/// Builds provider status rows from SQLite's cached key-present bit.
 #[must_use]
 pub(crate) fn provider_list(store: &Store) -> ProviderListResult {
     let providers = registry::PROVIDERS
         .iter()
         .map(|descriptor| {
             let settings = provider_settings(store, descriptor.id);
-            let source = key_source(descriptor.id, settings.as_ref());
+            let source = key_source(settings.as_ref());
             let raw_status = registry::derive_status(descriptor.id, &move |provider| {
                 if provider == descriptor.id {
                     source
                 } else {
-                    key_source(provider, None)
+                    key_source(None)
                 }
             });
             let base_url = settings
@@ -101,25 +100,20 @@ fn provider_settings(store: &Store, provider: ProviderId) -> Option<ProviderSett
     store.provider_settings(provider).ok().flatten()
 }
 
-fn key_source(provider: ProviderId, settings: Option<&ProviderSettings>) -> KeySource {
+fn key_source(settings: Option<&ProviderSettings>) -> KeySource {
     if settings.is_some_and(|settings| settings.key_present) {
-        return KeySource::Keychain;
+        KeySource::Keychain
+    } else {
+        KeySource::None
     }
-    if provider == ProviderId::Custom
-        && std::env::var(CUSTOM_API_KEY_VAR).is_ok_and(|value| !value.trim().is_empty())
-    {
-        return KeySource::Env;
-    }
-    KeySource::None
 }
 
 /// Base URL to show when no stored provider settings exist: a preset's fixed
-/// endpoint, or the Custom provider's validated `.env` base URL.
+/// endpoint, or none for the Custom provider.
 fn fallback_base_url(endpoint: ProviderEndpoint) -> Option<String> {
     match endpoint {
         ProviderEndpoint::Fixed { base_url } => Some(base_url.to_owned()),
-        ProviderEndpoint::Custom => crate::config::custom_env_base_url()
-            .and_then(|url| registry::validate_base_url(&url).ok()),
+        ProviderEndpoint::Custom => None,
     }
 }
 
@@ -127,7 +121,7 @@ fn fallback_base_url(endpoint: ProviderEndpoint) -> Option<String> {
 /// base URL resolves.
 ///
 /// The Custom endpoint is user-supplied, so a credential without a resolvable
-/// (store or validated `.env`) base URL is unusable — the submit path already
+/// store base URL is unusable — the submit path already
 /// yields needs-configuration in that case. Gating the status here keeps the
 /// selection surfaces from advertising a provider that cannot serve a turn.
 /// Preset providers have a fixed compiled endpoint and are never gated.
@@ -147,9 +141,6 @@ fn status_fields(status: ProviderStatus) -> (&'static str, Option<&'static str>)
     match status {
         ProviderStatus::Connected(CredentialSource::Keychain) => {
             (PROVIDER_STATUS_CONNECTED, Some(CREDENTIAL_SOURCE_KEYCHAIN))
-        }
-        ProviderStatus::Connected(CredentialSource::Env) => {
-            (PROVIDER_STATUS_CONNECTED, Some(CREDENTIAL_SOURCE_ENV))
         }
         ProviderStatus::NotConfigured => (PROVIDER_STATUS_NOT_CONFIGURED, None),
     }

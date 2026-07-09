@@ -11,8 +11,8 @@ use crate::store::Store;
 /// An explicit active selection is authoritative: if its key or custom endpoint
 /// cannot be resolved, the submit needs configuration and does not switch to
 /// another provider. When no active selection exists, the effective default is
-/// the first registry provider with a resolvable key and a resolvable default
-/// model (a preset's compiled default, or the Custom provider's `.env` model).
+/// the first registry provider with a resolvable key and a resolvable compiled
+/// default model. Custom has no compiled default and is never auto-selected.
 #[must_use]
 pub(crate) fn resolve_submit_config(store: &Store) -> Option<KimiConfig> {
     let (provider, model) = match active_choice(store) {

@@ -172,16 +172,11 @@ fn status_derivation_uses_key_resolver_source() {
         ProviderId::Kimi => KeySource::Keychain,
         ProviderId::Custom => KeySource::None,
     };
-    let env = |_provider: ProviderId| KeySource::Env;
     let none = |_provider: ProviderId| KeySource::None;
 
     assert_eq!(
         derive_status(ProviderId::Kimi, &keychain),
         ProviderStatus::Connected(CredentialSource::Keychain)
-    );
-    assert_eq!(
-        derive_status(ProviderId::Kimi, &env),
-        ProviderStatus::Connected(CredentialSource::Env)
     );
     assert_eq!(
         derive_status(ProviderId::Kimi, &none),

@@ -7,6 +7,7 @@ use std::{
 use kqode::protocol::{BACKEND_MODE_ARG, BACKEND_READY_METHOD};
 use serde_json::{Value, json};
 
+#[allow(dead_code)]
 pub fn backend_output(input: &[u8]) -> Output {
     let home = tempfile::tempdir().expect("backend test home");
     backend_output_in(home.path(), Path::new("."), input)
@@ -18,10 +19,8 @@ pub fn backend_output_in(home: &Path, cwd: &Path, input: &[u8]) -> Output {
         .current_dir(cwd)
         .env("HOME", home)
         .env("USERPROFILE", home)
-        // Force the no-key path so integration tests are deterministic and never
-        // issue a live provider call, even when a developer's `.env` has a real
-        // key (dotenvy does not override an already-set variable).
-        .env("CUSTOM_API_KEY", "")
+        // The isolated home keeps provider credentials unavailable so integration
+        // tests are deterministic and never issue a live provider call.
         // Disable debug logging so the test-spawned backend never writes under
         // the real `~/.kqode/logs` (the dev build defaults it on).
         .env("KQODE_DEBUG", "0")

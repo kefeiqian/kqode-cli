@@ -9,8 +9,8 @@ mod sanitize;
 mod selection;
 
 use crate::protocol::{
-    MODEL_LIST_STATUS_EMPTY, MODEL_LIST_STATUS_FAILED, MODEL_LIST_STATUS_LOADED, ModelInfoWire,
-    ModelListResult, SetKeyResult,
+    MODEL_LIST_STATUS_EMPTY, MODEL_LIST_STATUS_FAILED, MODEL_LIST_STATUS_LOADED, ModelListResult,
+    SetKeyResult,
 };
 use crate::provider::registry::{ProviderEndpoint, provider_descriptor};
 use crate::provider::{ProviderId, ValidationOutcome, validate_base_url};
@@ -74,19 +74,10 @@ pub async fn set_provider_key(store: Store, work: SetKeyWork) -> SetKeyResult {
 
 /// Loads a provider's model catalog using the currently resolvable key.
 ///
-/// A Custom provider whose model is pinned in the workspace `.env`
-/// (`CUSTOM_MODEL`) short-circuits to a single-model catalog and skips the
-/// network fetch: the user has already chosen the model, and many
-/// OpenAI-compatible endpoints don't expose a browsable `/models` catalog
-/// anyway. Keychain-configured Custom logins (no `.env` model) and preset
-/// providers still fetch the full catalog.
+/// Catalog loading always uses the selected provider endpoint and keychain key.
+/// Custom providers without a persisted endpoint or key fail closed.
 #[must_use]
 pub async fn list_models(store: Store, provider: ProviderId) -> ModelListResult {
-    if provider == ProviderId::Custom
-        && let Some(model_id) = crate::config::custom_env_model()
-    {
-        return custom_env_model_result(&model_id);
-    }
     let Some(key) = crate::secrets::resolve_key(provider) else {
         return model_failed();
     };
@@ -106,29 +97,13 @@ pub async fn list_models(store: Store, provider: ProviderId) -> ModelListResult 
     }
 }
 
-/// Builds the single-model catalog for a Custom provider whose model is pinned
-/// in `.env` (`CUSTOM_MODEL`).
-///
-/// The id is scrubbed on this display boundary exactly like a fetched catalog
-/// entry; `owned_by` is `None` because no provider metadata is fetched.
-fn custom_env_model_result(model_id: &str) -> ModelListResult {
-    ModelListResult {
-        status: MODEL_LIST_STATUS_LOADED,
-        models: vec![ModelInfoWire {
-            id: sanitize::sanitize_model_id(model_id),
-            owned_by: None,
-        }],
-    }
-}
-
 /// Resolves a provider's API base URL for outbound requests.
 ///
 /// Preset (`Fixed`) providers always use their compiled endpoint and never
-/// consult the store or environment, preserving the SSRF guarantee that a
-/// preset URL can't be overridden. The Custom provider prefers persisted store
-/// settings and otherwise falls back to the validated workspace `.env`
-/// `CUSTOM_BASE_URL`. Shared by submit resolution and `/model` catalog loading
-/// so both agree on where to reach a provider.
+/// consult the store, preserving the SSRF guarantee that a preset URL can't be
+/// overridden. The Custom provider uses persisted store settings only. Shared
+/// by submit resolution and `/model` catalog loading so both agree on where to
+/// reach a provider.
 #[must_use]
 pub(crate) fn resolve_base_url(store: &Store, provider: ProviderId) -> Option<String> {
     match provider_descriptor(provider).endpoint {
@@ -137,10 +112,7 @@ pub(crate) fn resolve_base_url(store: &Store, provider: ProviderId) -> Option<St
             .provider_settings(ProviderId::Custom)
             .ok()
             .flatten()
-            .map(|settings| settings.base_url)
-            .or_else(|| {
-                crate::config::custom_env_base_url().and_then(|url| validate_base_url(&url).ok())
-            }),
+            .map(|settings| settings.base_url),
     }
 }
 
