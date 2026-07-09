@@ -26,8 +26,12 @@ fn table_names(conn: &Connection) -> Vec<String> {
         .collect()
 }
 
-const EXPECTED_TABLES: [&str; 5] = [
+const EXPECTED_TABLES: [&str; 9] = [
     "active_selection",
+    "memory_corrections",
+    "memory_cursors",
+    "memory_inbox_entries",
+    "memory_items",
     "provider_settings",
     "refinery_schema_history",
     "sessions",
@@ -107,15 +111,17 @@ fn fresh_path_bootstraps_to_latest_with_all_tables() {
     let store = Store::open_or_bootstrap_at(path).expect("bootstrap");
     let conn = store.connect().expect("connect");
     assert_eq!(migrations::user_version(&conn).unwrap(), 0);
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(2));
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(3));
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
     let rows = history_rows(&conn);
-    assert_eq!(rows.len(), 2);
+    assert_eq!(rows.len(), 3);
     assert_eq!(rows[0].version, 1);
     assert_eq!(rows[0].name, "initial_schema");
     assert_eq!(rows[0].checksum, migrations::v1_checksum().to_string());
     assert_eq!(rows[1].version, 2);
     assert_eq!(rows[1].name, "session_resume_index");
+    assert_eq!(rows[2].version, 3);
+    assert_eq!(rows[2].name, "memory_index");
 }
 
 #[test]
@@ -171,8 +177,8 @@ fn concurrent_bootstraps_across_processes_all_succeed() {
 
     let store = Store::open_or_bootstrap_at(path).unwrap();
     let conn = store.connect().unwrap();
-    assert_eq!(history_rows(&conn).len(), 2);
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(2));
+    assert_eq!(history_rows(&conn).len(), 3);
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(3));
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
 }
 
@@ -213,8 +219,8 @@ fn reopening_a_migrated_db_is_idempotent() {
     Store::open_or_bootstrap_at(path.clone()).expect("first bootstrap");
     let store = Store::open_or_bootstrap_at(path).expect("second bootstrap is a no-op");
     let conn = store.connect().unwrap();
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(2));
-    assert_eq!(history_rows(&conn).len(), 2);
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(3));
+    assert_eq!(history_rows(&conn).len(), 3);
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
 }
 
@@ -230,7 +236,7 @@ fn a_version_zero_db_migrates_forward() {
     let store = Store::open_or_bootstrap_at(path).expect("bootstrap");
     let conn = store.connect().unwrap();
     assert_eq!(migrations::user_version(&conn).unwrap(), 0);
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(2));
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(3));
 }
 
 #[test]
@@ -275,7 +281,7 @@ fn db_ahead_of_embedded_migrations_refuses_to_bootstrap() {
     {
         let conn = Connection::open(&path).unwrap();
         create_refinery_history(&conn);
-        seed_history_row(&conn, 3, "future_schema", 1);
+        seed_history_row(&conn, 4, "future_schema", 1);
     }
     let err = Store::open_or_bootstrap_at(path.clone()).unwrap_err();
     match err.root_cause() {
@@ -323,7 +329,7 @@ fn legacy_user_version_one_db_gets_reset_message_and_can_rebootstrap_after_delet
     remove_db_with_sidecars(&path);
     let store = Store::open_or_bootstrap_at(path).expect("fresh bootstrap after reset");
     let conn = store.connect().unwrap();
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(2));
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(3));
 }
 
 #[test]
@@ -420,7 +426,7 @@ fn sanity_check_reports_history_version_mismatch() {
         err,
         StoreError::SchemaHistoryMismatch {
             found: None,
-            known: 2
+            known: 3
         }
     ));
 }
@@ -796,4 +802,255 @@ fn no_key_or_secret_column_exists_in_the_schema() {
             "column {column:?} looks like it stores a secret"
         );
     }
+}
+
+// ---- Memory index (V3) ----
+
+use crate::memory::corpus;
+use crate::memory::event_log::{self, InboxProposal, InboxStatus, MemoryEvent, MemoryOp};
+use crate::memory::model::{MemoryItem, MemoryProvenance, MemoryScope, MemorySource, MemoryType};
+
+fn memory_root_of(store: &Store) -> PathBuf {
+    store.path().parent().unwrap().join("memory")
+}
+
+fn sample_memory_item(id: &str, scope: MemoryScope, active: bool) -> MemoryItem {
+    MemoryItem {
+        id: id.to_owned(),
+        scope,
+        scope_id: match scope {
+            MemoryScope::User => None,
+            _ => Some("rid".to_owned()),
+        },
+        memory_type: MemoryType::Decision,
+        title: format!("title {id}"),
+        body: "memory body".to_owned(),
+        active,
+        provenance: MemoryProvenance {
+            source: MemorySource::Manual,
+            source_session_id: Some("conv-1".to_owned()),
+            source_turn_start: Some(0),
+            source_turn_end: Some(0),
+            created_at_ms: 100,
+            updated_at_ms: 200,
+        },
+        content_hash: String::new(),
+    }
+}
+
+fn append_memory_event(store: &Store, event: &MemoryEvent) {
+    event_log::append_event(&memory_root_of(store).join("memory_events.jsonl"), event).unwrap();
+}
+
+#[test]
+fn reindex_rebuilds_items_inbox_cursor_and_corrections_from_files_and_events() {
+    let (_dir, store) = bootstrap();
+    let user_root = memory_root_of(&store).join("user");
+    corpus::write_item(
+        &user_root,
+        &sample_memory_item("i1", MemoryScope::User, true),
+    )
+    .unwrap();
+
+    append_memory_event(
+        &store,
+        &MemoryEvent::InboxProposed {
+            data: InboxProposal {
+                entry_id: "e1".to_owned(),
+                status: InboxStatus::Candidate,
+                scope: MemoryScope::User,
+                scope_id: None,
+                target_item_id: None,
+                memory_type: Some(MemoryType::User),
+                title: Some("candidate pref".to_owned()),
+                confidence: Some(0.3),
+                source_session_id: Some("conv-1".to_owned()),
+                source_turn_start: Some(0),
+                source_turn_end: Some(1),
+                operation_id: None,
+                base_hash: None,
+                result_hash: None,
+                reason: None,
+                at_ms: 5,
+            },
+        },
+    );
+    append_memory_event(
+        &store,
+        &MemoryEvent::InboxReviewed {
+            entry_id: "e1".to_owned(),
+            status: InboxStatus::Approved,
+            reason: None,
+            at_ms: 6,
+        },
+    );
+    append_memory_event(
+        &store,
+        &MemoryEvent::CorrectionRecorded {
+            suppression_key: "k1".to_owned(),
+            scope: MemoryScope::User,
+            scope_id: None,
+            reason: Some("rejected".to_owned()),
+            at_ms: 7,
+        },
+    );
+    append_memory_event(
+        &store,
+        &MemoryEvent::CursorAdvanced {
+            session_id: "conv-1".to_owned(),
+            last_extracted_seq: 4,
+            at_ms: 8,
+        },
+    );
+
+    store.reindex_memory_from_files().unwrap();
+
+    let items = store
+        .list_memory_items(MemoryScope::User, None, false)
+        .unwrap();
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].id, "i1");
+    let entry = store.inbox_entry("e1").unwrap().expect("inbox row");
+    assert_eq!(
+        entry.status,
+        InboxStatus::Approved,
+        "the later review status wins over the initial proposal"
+    );
+    assert!(store.has_memory_correction("k1").unwrap());
+    assert_eq!(store.memory_cursor("conv-1").unwrap(), Some(4));
+}
+
+#[test]
+fn reindex_is_idempotent_and_survives_a_db_reset() {
+    let (dir, store) = bootstrap();
+    let path = store.path().to_path_buf();
+    let user_root = memory_root_of(&store).join("user");
+    corpus::write_item(
+        &user_root,
+        &sample_memory_item("i1", MemoryScope::User, true),
+    )
+    .unwrap();
+
+    store.reindex_memory_from_files().unwrap();
+    store.reindex_memory_from_files().unwrap();
+    assert_eq!(
+        store
+            .list_memory_items(MemoryScope::User, None, false)
+            .unwrap()
+            .len(),
+        1,
+        "repeated reindex does not duplicate rows"
+    );
+
+    // Delete the DB and rebuild the index purely from files at bootstrap.
+    drop(store);
+    remove_db_with_sidecars(&path);
+    let rebuilt = Store::open_or_bootstrap_at(path).unwrap();
+    let _keep = dir;
+    assert_eq!(
+        rebuilt
+            .list_memory_items(MemoryScope::User, None, false)
+            .unwrap()
+            .len(),
+        1,
+        "the item projection rebuilds from topic files after a DB reset"
+    );
+}
+
+#[test]
+fn list_memory_items_filters_by_scope_and_active() {
+    let (_dir, store) = bootstrap();
+    let user_root = memory_root_of(&store).join("user");
+    corpus::write_item(
+        &user_root,
+        &sample_memory_item("a", MemoryScope::User, true),
+    )
+    .unwrap();
+    corpus::write_item(
+        &user_root,
+        &sample_memory_item("b", MemoryScope::User, false),
+    )
+    .unwrap();
+    store.reindex_memory_from_files().unwrap();
+
+    assert_eq!(
+        store
+            .list_memory_items(MemoryScope::User, None, false)
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        store
+            .list_memory_items(MemoryScope::User, None, true)
+            .unwrap()
+            .len(),
+        1,
+        "active_only excludes the inactive candidate"
+    );
+    assert!(
+        store
+            .list_memory_items(MemoryScope::Repo, Some("rid"), false)
+            .unwrap()
+            .is_empty(),
+        "a different scope sees no user items"
+    );
+}
+
+#[test]
+fn reindex_reconciles_a_pending_write_operation_from_file_hash() {
+    let (_dir, store) = bootstrap();
+    let user_root = memory_root_of(&store).join("user");
+    corpus::write_item(
+        &user_root,
+        &sample_memory_item("recon", MemoryScope::User, true),
+    )
+    .unwrap();
+    let landed_hash = corpus::read_item(&user_root, "recon").unwrap().content_hash;
+
+    append_memory_event(
+        &store,
+        &MemoryEvent::OperationStarted {
+            operation_id: "op-1".to_owned(),
+            item_id: "recon".to_owned(),
+            scope: MemoryScope::User,
+            scope_id: None,
+            op: MemoryOp::Write,
+            base_hash: None,
+            result_hash: Some(landed_hash),
+            at_ms: 1,
+        },
+    );
+
+    store.reindex_memory_from_files().unwrap();
+
+    let log = memory_root_of(&store).join("memory_events.jsonl");
+    let resolved = event_log::read_events(&log).iter().any(|event| {
+        matches!(event, MemoryEvent::OperationApplied { operation_id, .. } if operation_id == "op-1")
+    });
+    assert!(
+        resolved,
+        "a pending write whose result hash matches the file is reconciled as applied"
+    );
+}
+
+#[test]
+fn memory_cursor_and_correction_round_trip_via_store_methods() {
+    let (_dir, store) = bootstrap();
+
+    assert_eq!(store.memory_cursor("s1").unwrap(), None);
+    store.upsert_memory_cursor("s1", 2, 10).unwrap();
+    store.upsert_memory_cursor("s1", 5, 11).unwrap();
+    store.upsert_memory_cursor("s1", 3, 12).unwrap();
+    assert_eq!(
+        store.memory_cursor("s1").unwrap(),
+        Some(5),
+        "a cursor never moves backward"
+    );
+
+    assert!(!store.has_memory_correction("supp").unwrap());
+    store
+        .upsert_memory_correction("supp", MemoryScope::Repo, Some("rid"), Some("reason"), 1)
+        .unwrap();
+    assert!(store.has_memory_correction("supp").unwrap());
 }

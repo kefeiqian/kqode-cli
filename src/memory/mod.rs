@@ -8,6 +8,7 @@
 //! injection-shaped text from prompt loading.
 
 pub mod corpus;
+pub mod event_log;
 pub mod model;
 pub mod paths;
 pub mod security;
@@ -15,6 +16,7 @@ pub mod security;
 use std::fmt;
 use std::io;
 
+pub use event_log::{InboxProposal, InboxStatus, MemoryEvent, MemoryOp};
 pub use model::{MemoryItem, MemoryProvenance, MemoryScope, MemorySource, MemoryType};
 pub use paths::ScopeRoots;
 pub use security::{PromptSafety, SensitiveVerdict};

@@ -103,6 +103,83 @@ pub struct MemoryItem {
     pub content_hash: String,
 }
 
+impl MemoryScope {
+    /// The stable lowercase string form used in SQLite projections.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::User => "user",
+            Self::Repo => "repo",
+            Self::Folder => "folder",
+            Self::Session => "session",
+        }
+    }
+
+    /// Parses the string form back into a scope, or `None` if unrecognized.
+    #[must_use]
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "user" => Some(Self::User),
+            "repo" => Some(Self::Repo),
+            "folder" => Some(Self::Folder),
+            "session" => Some(Self::Session),
+            _ => None,
+        }
+    }
+}
+
+impl MemoryType {
+    /// The stable lowercase string form used in SQLite projections.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::User => "user",
+            Self::Feedback => "feedback",
+            Self::Project => "project",
+            Self::Decision => "decision",
+            Self::Badcase => "badcase",
+            Self::Reference => "reference",
+        }
+    }
+
+    /// Parses the string form back into a type, or `None` if unrecognized.
+    #[must_use]
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "user" => Some(Self::User),
+            "feedback" => Some(Self::Feedback),
+            "project" => Some(Self::Project),
+            "decision" => Some(Self::Decision),
+            "badcase" => Some(Self::Badcase),
+            "reference" => Some(Self::Reference),
+            _ => None,
+        }
+    }
+}
+
+impl MemorySource {
+    /// The stable lowercase string form used in SQLite projections.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Manual => "manual",
+            Self::Extraction => "extraction",
+            Self::External => "external",
+        }
+    }
+
+    /// Parses the string form back into a source, or `None` if unrecognized.
+    #[must_use]
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "manual" => Some(Self::Manual),
+            "extraction" => Some(Self::Extraction),
+            "external" => Some(Self::External),
+            _ => None,
+        }
+    }
+}
+
 /// Validates a memory id is a safe slug so it cannot escape a scope root.
 ///
 /// # Errors

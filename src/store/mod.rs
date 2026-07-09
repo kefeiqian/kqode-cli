@@ -28,6 +28,7 @@
 
 mod error;
 mod lock;
+mod memory;
 mod migrations;
 mod providers;
 mod recovery;
@@ -41,6 +42,7 @@ use std::time::Duration;
 use rusqlite::Connection;
 
 pub use error::{STORE_FATAL_SENTINEL, StoreError};
+pub use memory::{StoredInboxEntry, StoredMemoryItem};
 pub use providers::{ActiveSelection, ProviderSettings};
 pub use sessions::StoredSession;
 
@@ -112,6 +114,9 @@ impl Store {
             let store = Self { path: path.clone() };
             store
                 .reindex_sessions_from_logs()
+                .map_err(StoreError::Sanity)?;
+            store
+                .reindex_memory_from_files()
                 .map_err(StoreError::Sanity)?;
             Ok::<Self, StoreError>(store)
         })();
