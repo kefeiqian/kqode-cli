@@ -1,5 +1,9 @@
 import type { Token, Tokens } from 'marked';
-import { parseBlocks, tokenPlainText } from '@libs/markdown/parseBlocks.ts';
+import {
+  parseBlocks,
+  splitStreamingMarkdown,
+  tokenPlainText
+} from '@libs/markdown/parseBlocks.ts';
 import { renderCodeBlock } from '@libs/markdown/renderCodeBlock.ts';
 import { renderTable } from '@libs/markdown/renderTable.ts';
 import { renderInline, renderInlineTokens } from '@libs/markdown/renderInline.ts';
@@ -9,8 +13,19 @@ import { wrapSegments } from '@libs/markdown/wrapSegments.ts';
 const MIN_NESTED_CONTENT_COLUMNS = 20;
 
 /** Renders markdown into one content row per visual terminal row. */
-export function renderMarkdownContentRows(markdown: string, columns: number): MarkdownContentRow[] {
+export function renderMarkdownContentRows(
+  markdown: string,
+  columns: number,
+  options: { streaming?: boolean } = {}
+): MarkdownContentRow[] {
   const safeColumns = Math.max(1, columns);
+  if (options.streaming === true) {
+    const { completed, trailing } = splitStreamingMarkdown(markdown);
+    return [
+      ...(completed.length > 0 ? renderTokens(parseBlocks(completed), safeColumns, 0) : []),
+      ...(trailing.length > 0 ? plainRows(trailing.replace(/^\n+/, ''), safeColumns) : [])
+    ];
+  }
   return renderTokens(parseBlocks(markdown), safeColumns, 0);
 }
 

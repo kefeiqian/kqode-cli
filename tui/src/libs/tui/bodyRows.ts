@@ -157,7 +157,7 @@ function computeBodyRows(entry: BodyEntry, columns: number): BodyRowStructure[] 
   }
 
   if (entry.kind === BodyEntryKind.Assistant) {
-    return toAssistantRows(entry.text, columns);
+    return toAssistantRows(entry.text, columns, entry.id?.startsWith('stream-') === true);
   }
 
   return wrapBodyText(labelForEntry(entry), columns).map((text) => ({
@@ -166,17 +166,19 @@ function computeBodyRows(entry: BodyEntry, columns: number): BodyRowStructure[] 
   }));
 }
 
-function toAssistantRows(text: string, columns: number): BodyRowStructure[] {
+function toAssistantRows(text: string, columns: number, streaming = false): BodyRowStructure[] {
   const continuationPrefix = ' '.repeat(ASSISTANT_MESSAGE_PREFIX.length);
   const contentColumns = Math.max(1, columns - ASSISTANT_MESSAGE_PREFIX.length);
 
   try {
-    return renderMarkdownContentRows(text, contentColumns).map((row, index): BodyRowStructure => ({
-      ...row,
-      colorToken: row.colorToken ?? 'foreground',
-      marker: index === 0 ? ASSISTANT_MESSAGE_PREFIX : continuationPrefix,
-      markerColorToken: index === 0 ? 'accentBlue' : 'foreground'
-    }));
+    return renderMarkdownContentRows(text, contentColumns, { streaming }).map(
+      (row, index): BodyRowStructure => ({
+        ...row,
+        colorToken: row.colorToken ?? 'foreground',
+        marker: index === 0 ? ASSISTANT_MESSAGE_PREFIX : continuationPrefix,
+        markerColorToken: index === 0 ? 'accentBlue' : 'foreground'
+      })
+    );
   } catch {
     // Fail safe: markdown parsing must never break transcript rendering.
   }

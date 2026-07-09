@@ -138,4 +138,23 @@ describe('resolveBodyRows theming and wrapping', () => {
       true
     );
   });
+
+  it('derives streaming markdown behavior from stream entry ids', () => {
+    const streamRows = resolveBodyRows(
+      [{ id: 'stream-1', kind: BodyEntryKind.Assistant, text: '## Done\n\n**partial' }],
+      WIDE_COLUMNS,
+      TALL_ROWS,
+      DEFAULT_THEME
+    );
+    const settledRows = resolveBodyRows(
+      [{ id: 'result-1', kind: BodyEntryKind.Assistant, text: '## Done\n\n**partial**' }],
+      WIDE_COLUMNS,
+      TALL_ROWS,
+      DEFAULT_THEME
+    );
+
+    expect(streamRows[0].segments?.[0]?.bold).toBe(true);
+    expect(streamRows.at(-1)?.text).toBe('**partial');
+    expect(settledRows.at(-1)?.segments?.[0]?.bold).toBe(true);
+  });
 });
