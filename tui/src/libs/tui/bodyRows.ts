@@ -9,6 +9,7 @@ import type {
   StyledSegment,
   ThemeColorToken
 } from '@libs/markdown/types.ts';
+import { renderMarkdownContentRows } from '@libs/markdown/renderBlocks.ts';
 
 export type BodyEntry = {
   id?: string;
@@ -29,7 +30,7 @@ export type BodyRow = {
 // Theme-free structural row: caches text/marker/fill plus semantic color TOKEN
 // names (not resolved colors), so wrapping is memoized once while the active
 // theme's colors are applied on top per render (see `resolveBodyRows`).
-type BodyRowStructure = {
+export type BodyRowStructure = {
   backgroundColorToken?: ThemeColorToken;
   colorToken?: ThemeColorToken;
   fillColumns?: boolean;
@@ -167,7 +168,20 @@ function computeBodyRows(entry: BodyEntry, columns: number): BodyRowStructure[] 
 
 function toAssistantRows(text: string, columns: number): BodyRowStructure[] {
   const continuationPrefix = ' '.repeat(ASSISTANT_MESSAGE_PREFIX.length);
-  const wrappedText = wrapBodyText(text, Math.max(1, columns - ASSISTANT_MESSAGE_PREFIX.length));
+  const contentColumns = Math.max(1, columns - ASSISTANT_MESSAGE_PREFIX.length);
+
+  try {
+    return renderMarkdownContentRows(text, contentColumns).map((row, index): BodyRowStructure => ({
+      ...row,
+      colorToken: row.colorToken ?? 'foreground',
+      marker: index === 0 ? ASSISTANT_MESSAGE_PREFIX : continuationPrefix,
+      markerColorToken: index === 0 ? 'accentBlue' : 'foreground'
+    }));
+  } catch {
+    // Fail safe: markdown parsing must never break transcript rendering.
+  }
+
+  const wrappedText = wrapBodyText(text, contentColumns);
 
   return wrappedText.map((line, index): BodyRowStructure => ({
     colorToken: 'foreground',

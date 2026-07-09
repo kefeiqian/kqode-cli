@@ -116,11 +116,26 @@ describe('resolveBodyRows theming and wrapping', () => {
 
     expect(draculaRows[0].segments?.[0]).toMatchObject({
       color: DEFAULT_THEME.colors.foreground,
-      text: 'themed **source**'
+      text: 'themed'
     });
     expect(nordRows[0].segments?.[0]).toMatchObject({
       color: nord.colors.foreground,
-      text: 'themed **source**'
+      text: 'themed'
     });
+  });
+
+  it('renders assistant markdown while leaving source markers out of rows', () => {
+    const rows = resolveBodyRows(
+      [{ kind: BodyEntryKind.Assistant, text: '## Steps\n\n- **First** item' }],
+      WIDE_COLUMNS,
+      TALL_ROWS,
+      DEFAULT_THEME
+    );
+
+    expect(rows.map((row) => row.text)).toEqual(['Steps', '', '• First item']);
+    expect(rows[0].segments?.[0]?.bold).toBe(true);
+    expect(rows[2].segments?.some((segment) => segment.bold && segment.text === 'First')).toBe(
+      true
+    );
   });
 });

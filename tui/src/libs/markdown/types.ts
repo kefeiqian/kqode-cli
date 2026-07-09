@@ -23,3 +23,12 @@ export type RenderedStyledSegment = Omit<
   backgroundColor?: string;
   color?: string;
 };
+
+/** One theme-free markdown content row before assistant markers are applied. */
+export type MarkdownContentRow = {
+  backgroundColorToken?: ThemeColorToken;
+  colorToken?: ThemeColorToken;
+  fillColumns?: boolean;
+  segments?: StyledSegment[];
+  text: string;
+};
