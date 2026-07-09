@@ -111,6 +111,8 @@ pub struct TurnJob {
     pub history: Vec<HistoryRound>,
     pub compaction: CompactionState,
     pub prompt: String,
+    /// Bounded memory context block for the system prompt, when loaded.
+    pub memory: Option<String>,
     pub config: KimiConfig,
     pub cancel: CancellationToken,
     pub command_tx: Sender<Command>,
@@ -125,6 +127,7 @@ fn default_runner() -> impl Fn(TurnJob) + Send + Sync + 'static {
             job.history,
             job.compaction,
             job.prompt,
+            job.memory,
             job.config,
             job.cancel,
             move |event| {

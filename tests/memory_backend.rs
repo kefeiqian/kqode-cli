@@ -199,6 +199,32 @@ fn reload_rebuilds_the_index_from_files() {
     assert!(items.iter().any(|candidate| candidate.id == item.id));
 }
 
+#[test]
+fn load_prompt_block_includes_active_memory_and_records_a_trace() {
+    use kqode::memory::event_log::{MemoryEvent, read_events};
+
+    let fixture = setup();
+    fixture
+        .service
+        .add(
+            MemoryScope::User,
+            None,
+            MemoryType::User,
+            "Prefer tabs".to_owned(),
+            "Use tabs in Go files.".to_owned(),
+        )
+        .expect("add");
+
+    let block = fixture.service.load_prompt_block().expect("memory block");
+    assert!(block.contains("untrusted local memory"));
+    assert!(block.contains("Use tabs in Go files."));
+
+    let loaded = read_events(fixture.service.event_log_path())
+        .into_iter()
+        .any(|event| matches!(event, MemoryEvent::MemoryLoaded { .. }));
+    assert!(loaded, "loading records a MemoryLoaded trace event");
+}
+
 /// Simulates an automatic active-audit update (what U6/U7 will produce) by
 /// recording a rollback snapshot + an inbox entry, then verifies undo behavior.
 fn seed_active_audit_update(fixture: &Fixture, item_id: &str, updated_hash: &str) -> String {

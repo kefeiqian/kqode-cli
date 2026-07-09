@@ -19,7 +19,7 @@ use crate::provider::ChatMessage;
 /// the label could not be read; the git line is then omitted. No session id is
 /// included in the prompt.
 #[must_use]
-pub fn system_message(model: &str, git: Option<&str>) -> ChatMessage {
+pub fn system_message(model: &str, git: Option<&str>, memory: Option<&str>) -> ChatMessage {
     let cwd = env::current_dir()
         .map(|path| path.display().to_string())
         .unwrap_or_else(|_| "unknown".to_owned());
@@ -30,12 +30,20 @@ pub fn system_message(model: &str, git: Option<&str>) -> ChatMessage {
         env::consts::OS,
         &utc_now_label(),
         git,
+        memory,
     ))
 }
 
 /// Pure assembly of the environment block, so metadata contents are unit-tested
 /// without touching the environment or spawning `git`.
-fn build_content(model: &str, cwd: &str, os: &str, now: &str, git: Option<&str>) -> String {
+fn build_content(
+    model: &str,
+    cwd: &str,
+    os: &str,
+    now: &str,
+    git: Option<&str>,
+    memory: Option<&str>,
+) -> String {
     let mut content = format!(
         "You are KQode, a terminal coding assistant. Answer concisely and \
          helpfully in plain text suitable for a terminal.\n\n\
@@ -48,6 +56,10 @@ fn build_content(model: &str, cwd: &str, os: &str, now: &str, git: Option<&str>)
     if let Some(git) = git {
         content.push_str("\n- Git: ");
         content.push_str(git);
+    }
+    if let Some(memory) = memory {
+        content.push_str("\n\n");
+        content.push_str(memory);
     }
     content
 }

@@ -109,6 +109,17 @@ pub struct InboxProposal {
     pub at_ms: i64,
 }
 
+/// A single loaded memory item recorded in a [`MemoryEvent::MemoryLoaded`]
+/// trace — identity + hash only, never the raw body (R12/R18).
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct LoadedFragment {
+    pub id: String,
+    pub scope: MemoryScope,
+    pub memory_type: MemoryType,
+    pub content_hash: String,
+    pub updated_at_ms: i64,
+}
+
 /// One append-only memory lifecycle event.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
@@ -174,6 +185,12 @@ pub enum MemoryEvent {
     CursorAdvanced {
         session_id: String,
         last_extracted_seq: i64,
+        at_ms: i64,
+    },
+    /// Bounded memory context was loaded into a prompt (trace only, no bodies).
+    MemoryLoaded {
+        fragments: Vec<LoadedFragment>,
+        reason: String,
         at_ms: i64,
     },
 }

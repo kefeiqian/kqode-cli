@@ -33,6 +33,12 @@ pub trait ConversationPersistence: Send {
     fn current_session_id(&self) -> Option<String>;
     /// Attaches future submits to `session`.
     fn attach_session(&mut self, session: StoredSession);
+    /// Loads bounded active memory context for the current workspace prompt, or
+    /// `None`. Defaults to no memory for backends without a store (e.g. the
+    /// no-op used in tests).
+    fn load_memory_block(&self) -> Option<String> {
+        None
+    }
 }
 
 /// No-op persistence used by tests or code paths that do not need durable state.
@@ -230,6 +236,16 @@ impl ConversationPersistence for SessionPersistence {
     fn attach_session(&mut self, session: StoredSession) {
         self.current_session = Some(session);
         self.turn_sessions.clear();
+    }
+
+    fn load_memory_block(&self) -> Option<String> {
+        let service = crate::memory::MemoryService::new(
+            self.store.clone(),
+            std::path::Path::new(&self.workspace_cwd),
+            self.current_session_id(),
+        )
+        .ok()?;
+        service.load_prompt_block()
     }
 }
 

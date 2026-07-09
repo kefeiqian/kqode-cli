@@ -46,11 +46,13 @@ const CONTEXT_TOO_LARGE_MESSAGE: &str =
 ///
 /// The turn is instrumented with a debug-log span carrying `turn_id`; when debug
 /// logging is enabled the assembled request and the response/error are recorded.
+#[allow(clippy::too_many_arguments)]
 pub fn spawn_streaming_turn<E>(
     turn_id: String,
     history: Vec<HistoryRound>,
     compaction: CompactionState,
     user_text: String,
+    memory: Option<String>,
     config: KimiConfig,
     cancel: CancellationToken,
     emit: E,
@@ -59,18 +61,20 @@ pub fn spawn_streaming_turn<E>(
 {
     thread::spawn(move || {
         run_streaming_turn(
-            turn_id, history, compaction, user_text, config, cancel, emit,
+            turn_id, history, compaction, user_text, memory, config, cancel, emit,
         );
     });
 }
 
 /// Runs one streaming turn on the current thread and reports every update to
 /// `emit`.
+#[allow(clippy::too_many_arguments)]
 pub fn run_streaming_turn<E>(
     turn_id: String,
     history: Vec<HistoryRound>,
     compaction: CompactionState,
     user_text: String,
+    memory: Option<String>,
     config: KimiConfig,
     cancel: CancellationToken,
     emit: E,
@@ -92,24 +96,26 @@ pub fn run_streaming_turn<E>(
 
     runtime.block_on(
         stream_turn(
-            &turn_id, history, compaction, user_text, config, cancel, &emit,
+            &turn_id, history, compaction, user_text, memory, config, cancel, &emit,
         )
         .instrument(debug_log::turn_span(&turn_id)),
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn stream_turn<E: Fn(TurnStreamEvent)>(
     _turn_id: &str,
     history: Vec<HistoryRound>,
     compaction: CompactionState,
     user_text: String,
+    memory: Option<String>,
     config: KimiConfig,
     cancel: CancellationToken,
     emit: &E,
 ) {
     let model = config.model.clone();
     let git = crate::git::read_status_label().await;
-    let system = system_message(&model, git.as_deref());
+    let system = system_message(&model, git.as_deref(), memory.as_deref());
 
     let limits = ContextLimits {
         threshold: context_budget::threshold(&model),

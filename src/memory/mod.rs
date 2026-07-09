@@ -13,6 +13,7 @@ pub mod inbox;
 pub mod index;
 pub mod model;
 pub mod paths;
+pub mod prompt;
 pub mod security;
 
 use std::fmt;
@@ -23,6 +24,7 @@ pub use inbox::InboxAction;
 pub use index::MemoryService;
 pub use model::{MemoryItem, MemoryProvenance, MemoryScope, MemorySource, MemoryType};
 pub use paths::ScopeRoots;
+pub use prompt::MemoryContext;
 pub use security::{PromptSafety, SensitiveVerdict};
 
 /// Errors from memory model, path, corpus, and validation operations.

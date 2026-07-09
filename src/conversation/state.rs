@@ -216,6 +216,9 @@ impl LoopState {
         let prompt = self.active_prompt(&turn_id);
         let history = self.completed_history();
         let compaction = self.compaction.clone();
+        // Load bounded memory context on the coordinator thread (the store owner),
+        // so the turn worker stays store-free. Fails soft to None.
+        let memory = self.persistence.load_memory_block();
         self.active_thread = Some(thread::spawn(move || {
             let panic_result = panic::catch_unwind(AssertUnwindSafe(|| {
                 runner(TurnJob {
@@ -223,6 +226,7 @@ impl LoopState {
                     history,
                     compaction,
                     prompt,
+                    memory,
                     config,
                     cancel,
                     command_tx: command_tx.clone(),
