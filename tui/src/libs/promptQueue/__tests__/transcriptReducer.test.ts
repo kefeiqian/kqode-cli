@@ -108,8 +108,8 @@ describe('reduceTranscriptEvent', () => {
     expect(state.queue[0]?.result).toEqual({ kind: BodyEntryKind.Muted, text: 'Cancelled' });
   });
 
-  it('keeps needsConfiguration in the transcript as system guidance', () => {
-    const state = reduceTranscriptEvent(
+  it('keeps needsConfiguration in the transcript and emits a model reroute', () => {
+    const result = reduceTranscriptEvent(
       base(),
       {
         type: 'settled',
@@ -123,11 +123,12 @@ describe('reduceTranscriptEvent', () => {
         }
       },
       0
-    ).state;
+    );
 
-    expect(state.queue[0]?.result).toEqual({
+    expect(result.state.queue[0]?.result).toEqual({
       kind: BodyEntryKind.System,
       text: 'Use /connect to add a provider.'
     });
+    expect(result.effect).toEqual({ type: 'needsConfiguration', turnText: 'hello' });
   });
 });

@@ -170,7 +170,7 @@ describe('App submit and event-fed output', () => {
     expect(store.get(promptQueueAtom).at(-1)?.result?.text).toContain('bad key');
   });
 
-  it('renders missing provider configuration as inline system guidance', async () => {
+  it('reroutes missing provider configuration to Model with the prompt restored', async () => {
     const { lastFrame, stdin, store } = renderApp(
       settledBackend({
         kind: SETTLED_KIND_NEEDS_CONFIGURATION,
@@ -183,13 +183,10 @@ describe('App submit and event-fed output', () => {
 
     await typePrompt(stdin, 'hello without config');
 
-    const frame = await waitForFrame(lastFrame, (output) =>
-      output.includes('No provider configured. Use /connect to add a provider')
+    await waitForFrame(
+      () => `${store.get(activeSurfaceAtom)}:${store.get(restoreComposerDraftAtom)}`,
+      (state) => state === `${Surface.Model}:hello without config`
     );
-    expect(frame).not.toContain('SYSTEM:');
-    expect(frame).toContain('❯ hello without config');
-    expect(store.get(activeSurfaceAtom)).toBe(Surface.Home);
-    expect(store.get(restoreComposerDraftAtom)).toBe('');
     expect(store.get(promptQueueAtom).at(-1)?.result).toEqual({
       kind: BodyEntryKind.System,
       text: PROVIDER_NOT_CONFIGURED_MESSAGE

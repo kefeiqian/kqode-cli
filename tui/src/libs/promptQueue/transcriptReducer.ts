@@ -15,7 +15,7 @@ export type TranscriptReducerState = {
 /** Result of reducing one backend transcript event. */
 export type TranscriptReduceResult = {
   state: TranscriptReducerState;
-  effect?: { type: 'auth'; turnText: string };
+  effect?: { type: 'auth' | 'needsConfiguration'; turnText: string };
 };
 
 /** Reduces one backend event into the queue-shaped transcript read-model. */
@@ -136,6 +136,9 @@ function settleTurn(
   );
   if (event.result.kind === 'error' && event.result.errorKind === 'auth') {
     return { state: nextState, effect: { type: 'auth', turnText: item.text } };
+  }
+  if (event.result.kind === 'needsConfiguration') {
+    return { state: nextState, effect: { type: 'needsConfiguration', turnText: item.text } };
   }
   return { state: nextState };
 }
