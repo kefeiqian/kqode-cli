@@ -32,7 +32,8 @@ describe('command menu atoms', () => {
       CommandId.Exit,
       CommandId.Help,
       CommandId.Login,
-      CommandId.Model
+      CommandId.Model,
+      CommandId.Resume
     ]);
     expect(store.get(highlightedCommandAtom)?.id).toBe(CommandId.Clear);
     expect(store.get(commandMenuDesiredRowsAtom)).toBe(COMMAND_MENU_PANEL_ROWS);
@@ -86,7 +87,7 @@ describe('command menu atoms', () => {
     expect(store.get(commandMenuHighlightIndexAtom)).toBe(1);
 
     store.set(moveCommandHighlightAtom, 5);
-    expect(store.get(commandMenuHighlightIndexAtom)).toBe(4);
+    expect(store.get(commandMenuHighlightIndexAtom)).toBe(5);
 
     store.set(moveCommandHighlightAtom, -10);
     expect(store.get(commandMenuHighlightIndexAtom)).toBe(0);
