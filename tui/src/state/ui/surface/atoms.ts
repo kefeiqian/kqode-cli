@@ -8,7 +8,8 @@ export const Surface = {
   Help: 'help',
   Login: 'login',
   Model: 'model',
-  Resume: 'resume'
+  Resume: 'resume',
+  Memory: 'memory'
 } as const;
 
 export type Surface = (typeof Surface)[keyof typeof Surface];
@@ -71,4 +72,9 @@ export const openModelSurfaceAtom = atom(null, async (get, set) => {
 /** Opens the fullscreen local session-resume picker. */
 export const openResumeSurfaceAtom = atom(null, (_get, set) => {
   set(setActiveSurfaceAtom, Surface.Resume);
+});
+
+/** Opens the fullscreen local memory management surface. */
+export const openMemorySurfaceAtom = atom(null, (_get, set) => {
+  set(setActiveSurfaceAtom, Surface.Memory);
 });

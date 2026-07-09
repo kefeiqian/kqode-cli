@@ -6,6 +6,7 @@ import { HomeScreen } from '@components/HomeScreen/index.tsx';
 import { LoginSurface } from '@components/LoginSurface/index.tsx';
 import { ModelSurface } from '@components/ModelSurface/index.tsx';
 import { ResumeSurface } from '@components/ResumeSurface/index.tsx';
+import { MemorySurface } from '@components/MemorySurface/index.tsx';
 import { TerminalTooSmall } from '@components/TerminalTooSmall.tsx';
 import { useGlobalKeys } from '@/useGlobalKeys.ts';
 import {
@@ -55,5 +56,7 @@ export function App() {
       return <ModelSurface />;
     case Surface.Resume:
       return <ResumeSurface />;
+    case Surface.Memory:
+      return <MemorySurface />;
   }
 }

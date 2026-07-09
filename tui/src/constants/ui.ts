@@ -54,7 +54,7 @@ export const CARET_SCROLL_SETTLE_MS = 100;
  * shrinking as the query narrows the matches. Also serves as the scroll-window
  * size once the command set grows beyond this many entries.
  */
-export const COMMAND_MENU_PANEL_ROWS = 6;
+export const COMMAND_MENU_PANEL_ROWS = 7;
 
 // --- Two-step key confirmations ---
 

@@ -31,9 +31,9 @@ describe('SlashCommandMenu', () => {
     const lines = (lastFrame() ?? '').split('\n').filter((line) => line.includes('/'));
 
     // Each description must begin at the same column across every command row.
-    const descriptionStarts = lines.map((line) => line.search(/(Choose|Clear|Connect|Exit|Resume|Show)/));
+    const descriptionStarts = lines.map((line) => line.search(/(Choose|Clear|Connect|Exit|Manage|Resume|Show)/));
 
-    expect(lines.length).toBe(6);
+    expect(lines.length).toBe(7);
     expect(descriptionStarts.every((column) => column > 0 && column === descriptionStarts[0])).toBe(true);
   });
 

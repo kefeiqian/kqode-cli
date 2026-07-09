@@ -8,7 +8,8 @@ const makeActions = () => ({
   showHelp: vi.fn(),
   openLogin: vi.fn(),
   openModel: vi.fn(),
-  openResume: vi.fn()
+  openResume: vi.fn(),
+  openMemory: vi.fn()
 });
 
 describe('executeCommand', () => {
@@ -71,5 +72,16 @@ describe('executeCommand', () => {
     expect(actions.exit).not.toHaveBeenCalled();
     expect(actions.clearTranscript).not.toHaveBeenCalled();
     expect(actions.showHelp).not.toHaveBeenCalled();
+  });
+
+  it('runs openMemory only for the memory command without awaiting command lookup', () => {
+    const actions = makeActions();
+    executeCommand(CommandId.Memory, actions);
+
+    expect(actions.openMemory).toHaveBeenCalledTimes(1);
+    expect(actions.openResume).not.toHaveBeenCalled();
+    expect(actions.openModel).not.toHaveBeenCalled();
+    expect(actions.openLogin).not.toHaveBeenCalled();
+    expect(actions.exit).not.toHaveBeenCalled();
   });
 });

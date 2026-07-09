@@ -9,6 +9,7 @@ describe('filterCommands', () => {
       CommandId.Exit,
       CommandId.Help,
       CommandId.Login,
+      CommandId.Memory,
       CommandId.Model,
       CommandId.Resume
     ]);
@@ -39,6 +40,7 @@ describe('COMMAND_REGISTRY', () => {
       CommandId.Exit,
       CommandId.Help,
       CommandId.Login,
+      CommandId.Memory,
       CommandId.Model,
       CommandId.Resume
     ]);
