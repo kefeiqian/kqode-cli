@@ -3,6 +3,7 @@ use std::sync::mpsc;
 
 use lsp_server::{Request, Response};
 
+use crate::chat::CompactionState;
 use crate::conversation::session_log::SessionLogEvent;
 use crate::conversation::transcript::TranscriptTurn;
 use crate::conversation::{Command, ConversationStatus, SettledKind, TurnResult, TurnState};
@@ -81,8 +82,8 @@ pub(super) fn resume_session(
             format!("unknown session `{}`", params.session_id),
         );
     };
-    let turns = match restore_turns(&session) {
-        Ok(turns) => turns,
+    let (turns, compaction) = match restore_turns(&session) {
+        Ok(restored) => restored,
         Err(error) => {
             return Response::new_err(
                 request.id,
@@ -95,6 +96,7 @@ pub(super) fn resume_session(
     let _ = coordinator.send(Command::ResumeSession {
         session: session.clone(),
         turns: turns.clone(),
+        compaction,
         respond_to: tx,
     });
     let _ = rx.recv();
@@ -118,10 +120,13 @@ fn current_status(coordinator: &std::sync::mpsc::Sender<Command>) -> Conversatio
     })
 }
 
-fn restore_turns(session: &StoredSession) -> Result<Vec<TranscriptTurn>, String> {
+fn restore_turns(
+    session: &StoredSession,
+) -> Result<(Vec<TranscriptTurn>, CompactionState), String> {
     let contents = std::fs::read_to_string(&session.session_log_path)
         .map_err(|error| format!("could not read session log: {error}"))?;
     let mut turns = HashMap::<String, TranscriptTurn>::new();
+    let mut compaction = CompactionState::default();
     for line in contents.lines() {
         let event = serde_json::from_str::<SessionLogEvent>(line)
             .map_err(|error| format!("could not parse session log event: {error}"))?;
@@ -169,6 +174,16 @@ fn restore_turns(session: &StoredSession) -> Result<Vec<TranscriptTurn>, String>
                     ),
                 });
             }
+            SessionLogEvent::Compacted {
+                covered_through_seq,
+                summary,
+                ..
+            } => {
+                compaction = CompactionState {
+                    summary: Some(summary),
+                    covered_through_seq,
+                };
+            }
         }
     }
     let mut turns: Vec<_> = turns
@@ -185,7 +200,7 @@ fn restore_turns(session: &StoredSession) -> Result<Vec<TranscriptTurn>, String>
         })
         .collect();
     turns.sort_by_key(|turn| turn.seq);
-    Ok(turns)
+    Ok((turns, compaction))
 }
 
 fn to_resumed_turn(turn: TranscriptTurn) -> ResumedTurnWire {
@@ -204,5 +219,102 @@ fn to_resumed_turn(turn: TranscriptTurn) -> ResumedTurnWire {
             SettledKind::Error => SessionTurnResultWire::error(result.error_kind, result.message),
             SettledKind::Cancelled => SessionTurnResultWire::cancelled(),
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write;
+
+    use super::*;
+
+    fn started() -> SessionLogEvent {
+        SessionLogEvent::SessionStarted {
+            session_id: "sess".to_owned(),
+            created_at_ms: 0,
+            workspace_cwd: "w".to_owned(),
+            canonical_workspace_cwd: "w".to_owned(),
+        }
+    }
+
+    fn settled(turn_id: &str, seq: u64, text: &str, at_ms: i64) -> [SessionLogEvent; 2] {
+        [
+            SessionLogEvent::TurnEnqueued {
+                turn_id: turn_id.to_owned(),
+                seq,
+                prompt: format!("prompt {seq}"),
+                at_ms,
+            },
+            SessionLogEvent::TurnSettled {
+                turn_id: turn_id.to_owned(),
+                settled_kind: "completed".to_owned(),
+                text: Some(text.to_owned()),
+                finish_reason: None,
+                error_kind: None,
+                message: None,
+                at_ms: at_ms + 1,
+            },
+        ]
+    }
+
+    fn compacted(covered_through_seq: u64, summary: &str, at_ms: i64) -> SessionLogEvent {
+        SessionLogEvent::Compacted {
+            covered_through_seq,
+            summary: summary.to_owned(),
+            at_ms,
+        }
+    }
+
+    /// Writes real serialized events (so the on-disk format is exact, not guessed)
+    /// and returns a `StoredSession` pointing at them.
+    fn session_with_events(dir: &std::path::Path, events: &[SessionLogEvent]) -> StoredSession {
+        let path = dir.join("sess.jsonl");
+        let mut file = std::fs::File::create(&path).expect("create log");
+        for event in events {
+            let line = serde_json::to_string(event).expect("serialize event");
+            writeln!(file, "{line}").expect("write log line");
+        }
+        StoredSession {
+            id: "sess".to_owned(),
+            created_at: 0,
+            modified_at: 0,
+            workspace_cwd: dir.display().to_string(),
+            canonical_workspace_cwd: dir.display().to_string(),
+            session_log_path: path.display().to_string(),
+            first_prompt_summary: Some("first".to_owned()),
+        }
+    }
+
+    #[test]
+    fn restore_turns_keeps_all_turns_and_takes_the_latest_compaction() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let mut events = vec![started()];
+        events.extend(settled("t0", 0, "a0", 1));
+        events.push(compacted(0, "OLD", 3));
+        events.extend(settled("t1", 1, "a1", 4));
+        events.push(compacted(1, "LATEST", 6));
+        let session = session_with_events(dir.path(), &events);
+
+        let (turns, compaction) = restore_turns(&session).expect("restore");
+
+        // Every real turn is restored for display (R3), regardless of compaction.
+        assert_eq!(turns.len(), 2);
+        assert_eq!(turns[0].seq, 0);
+        assert_eq!(turns[1].seq, 1);
+        // The latest Compacted event wins and is restored for prompt assembly (R15/AE6).
+        assert_eq!(compaction.summary.as_deref(), Some("LATEST"));
+        assert_eq!(compaction.covered_through_seq, 1);
+    }
+
+    #[test]
+    fn restore_turns_without_compaction_yields_empty_state() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let mut events = vec![started()];
+        events.extend(settled("t0", 0, "a0", 1));
+        let session = session_with_events(dir.path(), &events);
+
+        let (turns, compaction) = restore_turns(&session).expect("restore");
+        assert_eq!(turns.len(), 1);
+        assert_eq!(compaction, CompactionState::default());
     }
 }

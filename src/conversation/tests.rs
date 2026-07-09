@@ -32,6 +32,10 @@ impl ConversationPersistence for FailSecondEnqueuePersistence {
         Ok(())
     }
 
+    fn on_compacted(&mut self, _covered_through_seq: u64, _summary: &str) -> Result<(), String> {
+        Ok(())
+    }
+
     fn current_session_id(&self) -> Option<String> {
         None
     }

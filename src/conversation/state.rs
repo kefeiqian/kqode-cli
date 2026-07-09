@@ -96,11 +96,12 @@ impl LoopState {
             Command::ResumeSession {
                 session,
                 turns,
+                compaction,
                 respond_to,
             } => {
                 self.persistence.attach_session(session);
                 self.transcript.replace_with(turns);
-                self.compaction = CompactionState::default();
+                self.compaction = compaction;
                 self.pending_compaction = None;
                 let _ = respond_to.send(());
             }
@@ -172,6 +173,13 @@ impl LoopState {
             && pending_turn == turn_id
             && result.kind == SettledKind::Completed
         {
+            if let Some(summary) = state.summary.as_deref()
+                && let Err(message) = self
+                    .persistence
+                    .on_compacted(state.covered_through_seq, summary)
+            {
+                eprintln!("KQODE_SESSION_PERSISTENCE_ERROR: {message}");
+            }
             self.compaction = state;
         }
         self.active_cancel = None;

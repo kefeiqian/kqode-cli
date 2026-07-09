@@ -34,6 +34,13 @@ pub enum SessionLogEvent {
         message: Option<String>,
         at_ms: i64,
     },
+    /// A compaction summary was produced, covering rounds up to
+    /// `covered_through_seq` (inclusive). The latest such event wins on resume.
+    Compacted {
+        covered_through_seq: u64,
+        summary: String,
+        at_ms: i64,
+    },
 }
 
 /// Appends one durable event to `path`, creating the parent directory first.

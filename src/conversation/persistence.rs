@@ -27,6 +27,8 @@ pub trait ConversationPersistence: Send {
     fn on_settle(&mut self, turn_id: &str, result: &TurnResult) -> Result<(), String>;
     /// Persists the clear/rollover of all unsettled turns before a fresh draft starts.
     fn on_clear(&mut self, turns: &[TranscriptTurn]) -> Result<(), String>;
+    /// Persists a compaction summary covering rounds up to `covered_through_seq`.
+    fn on_compacted(&mut self, covered_through_seq: u64, summary: &str) -> Result<(), String>;
     /// Returns the durable session currently attached to new submits, if any.
     fn current_session_id(&self) -> Option<String>;
     /// Attaches future submits to `session`.
@@ -46,6 +48,10 @@ impl ConversationPersistence for NoopConversationPersistence {
     }
 
     fn on_clear(&mut self, _turns: &[TranscriptTurn]) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn on_compacted(&mut self, _covered_through_seq: u64, _summary: &str) -> Result<(), String> {
         Ok(())
     }
 
@@ -199,6 +205,22 @@ impl ConversationPersistence for SessionPersistence {
         Ok(())
     }
 
+    fn on_compacted(&mut self, covered_through_seq: u64, summary: &str) -> Result<(), String> {
+        let Some(session) = self.current_session.as_ref() else {
+            return Ok(());
+        };
+        append_event(
+            std::path::Path::new(&session.session_log_path),
+            &SessionLogEvent::Compacted {
+                covered_through_seq,
+                summary: summary.to_owned(),
+                at_ms: now_ms(),
+            },
+        )
+        .map_err(|error| format!("could not append compaction event: {error}"))?;
+        self.update_modified()
+    }
+
     fn current_session_id(&self) -> Option<String> {
         self.current_session
             .as_ref()
@@ -267,6 +289,34 @@ mod tests {
             .lines()
             .map(|line| serde_json::from_str::<SessionLogEvent>(line).expect("valid log line"))
             .collect()
+    }
+
+    #[test]
+    fn on_compacted_appends_event_and_keeps_session_listable() {
+        let _lock = test_env::lock();
+        let dir = tempfile::tempdir().expect("temp dir");
+        let workspace = dir.path().join("workspace");
+        fs::create_dir_all(&workspace).unwrap();
+        let _cwd = switch_to(&workspace);
+        let store = Store::open_or_bootstrap_at(dir.path().join("kqode.db")).unwrap();
+        let mut persistence = SessionPersistence::new(store.clone());
+
+        persistence.on_enqueue("turn-a", 0, "first").unwrap();
+        persistence
+            .on_settle("turn-a", &TurnResult::completed("done".to_owned(), None))
+            .unwrap();
+        persistence.on_compacted(0, "SUMMARY of round 0").unwrap();
+
+        let sessions = store.list_resumable_sessions().unwrap();
+        assert_eq!(sessions.len(), 1);
+
+        // The Compacted event is appended to the JSONL truth (R14).
+        let events = read_log(Path::new(&sessions[0].session_log_path));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            SessionLogEvent::Compacted { covered_through_seq: 0, summary, .. }
+                if summary == "SUMMARY of round 0"
+        )));
     }
 
     #[test]

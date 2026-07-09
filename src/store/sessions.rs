@@ -26,6 +26,9 @@ enum SessionLogEventWire {
     TurnSettled {
         at_ms: i64,
     },
+    Compacted {
+        at_ms: i64,
+    },
 }
 
 /// Queryable metadata for one durable local session.
@@ -182,6 +185,9 @@ fn parse_session_log(path: &std::path::Path) -> Option<StoredSession> {
                 }
             }
             SessionLogEventWire::TurnSettled { at_ms } => {
+                modified_at = Some(at_ms);
+            }
+            SessionLogEventWire::Compacted { at_ms } => {
                 modified_at = Some(at_ms);
             }
         }

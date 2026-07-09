@@ -65,6 +65,7 @@ pub enum Command {
     ResumeSession {
         session: StoredSession,
         turns: Vec<transcript::TranscriptTurn>,
+        compaction: CompactionState,
         respond_to: Sender<()>,
     },
     Clear,
