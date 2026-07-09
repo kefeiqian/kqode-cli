@@ -103,4 +103,24 @@ describe('resolveBodyRows theming and wrapping', () => {
     expect(nordRows[0].color).toBe(nord.colors.foreground);
     expect(nordRows[0].color).not.toBe(draculaRows[0].color);
   });
+
+  it('resolves assistant segment colors from the active theme cache-free', () => {
+    const entry = { kind: BodyEntryKind.Assistant, text: 'themed **source**' };
+    const nord = findTheme(ThemeId.Nord);
+    if (nord === undefined) {
+      throw new Error('expected the Nord preset to exist');
+    }
+
+    const draculaRows = resolveBodyRows([entry], WIDE_COLUMNS, TALL_ROWS, DEFAULT_THEME);
+    const nordRows = resolveBodyRows([entry], WIDE_COLUMNS, TALL_ROWS, nord);
+
+    expect(draculaRows[0].segments?.[0]).toMatchObject({
+      color: DEFAULT_THEME.colors.foreground,
+      text: 'themed **source**'
+    });
+    expect(nordRows[0].segments?.[0]).toMatchObject({
+      color: nord.colors.foreground,
+      text: 'themed **source**'
+    });
+  });
 });

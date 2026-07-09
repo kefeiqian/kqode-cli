@@ -3,7 +3,12 @@ import {
   UPPER_HALF_BLOCK
 } from '@libs/tui/backgroundBlock.ts';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
-import type { ThemeColors, ThemeDefinition } from '@theme/themeConfig.ts';
+import type { ThemeDefinition } from '@theme/themeConfig.ts';
+import type {
+  RenderedStyledSegment,
+  StyledSegment,
+  ThemeColorToken
+} from '@libs/markdown/types.ts';
 
 export type BodyEntry = {
   id?: string;
@@ -17,11 +22,9 @@ export type BodyRow = {
   fillColumns?: boolean;
   marker?: string;
   markerColor?: string;
+  segments?: RenderedStyledSegment[];
   text: string;
 };
-
-/** A semantic theme-color token name, resolved to a concrete color per render. */
-type ThemeColorToken = keyof ThemeColors;
 
 // Theme-free structural row: caches text/marker/fill plus semantic color TOKEN
 // names (not resolved colors), so wrapping is memoized once while the active
@@ -32,6 +35,7 @@ type BodyRowStructure = {
   fillColumns?: boolean;
   marker?: string;
   markerColorToken?: ThemeColorToken;
+  segments?: StyledSegment[];
   text: string;
 };
 
@@ -89,6 +93,14 @@ function applyTheme(row: BodyRowStructure, theme: ThemeDefinition): BodyRow {
     marker: row.marker,
     markerColor:
       row.markerColorToken === undefined ? undefined : theme.colors[row.markerColorToken],
+    segments: row.segments?.map((segment) => ({
+      ...segment,
+      backgroundColor:
+        segment.backgroundColorToken === undefined
+          ? undefined
+          : theme.colors[segment.backgroundColorToken],
+      color: segment.colorToken === undefined ? undefined : theme.colors[segment.colorToken]
+    })),
     text: row.text
   };
 }
@@ -161,6 +173,7 @@ function toAssistantRows(text: string, columns: number): BodyRowStructure[] {
     colorToken: 'foreground',
     marker: index === 0 ? ASSISTANT_MESSAGE_PREFIX : continuationPrefix,
     markerColorToken: index === 0 ? 'accentBlue' : 'foreground',
+    segments: [{ colorToken: 'foreground', text: line }],
     text: line
   }));
 }

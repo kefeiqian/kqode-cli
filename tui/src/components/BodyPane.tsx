@@ -1,8 +1,10 @@
 import { Box, Text } from 'ink';
 import { useAtomValue } from 'jotai';
+import type { ReactNode } from 'react';
 import { DEFAULT_BODY_ENTRIES, resolveBodyRows } from '@libs/tui/bodyRows.ts';
 import type { BodyEntry, BodyRow } from '@libs/tui/bodyRows.ts';
 import { clamp } from '@libs/math/clamp.ts';
+import { displayWidth, padEndToWidth } from '@libs/text/displayWidth.ts';
 import {
   bodyScrollOffsetRowsAtom,
   displayedBodyEntriesAtom,
@@ -82,9 +84,13 @@ export function BodyPane({
         const marker = row.marker ?? '';
         const paddedTextColumns = Math.max(1, contentColumns - marker.length);
         const shouldPadText = isScrollable || row.fillColumns === true;
-        const displayText = shouldPadText
-          ? padBodyText(row.text, paddedTextColumns)
-          : row.text || ' ';
+        const segmentDisplay = renderSegments(row, paddedTextColumns, shouldPadText);
+        const displayText =
+          segmentDisplay === undefined
+            ? shouldPadText
+              ? padBodyText(row.text, paddedTextColumns)
+              : row.text || ' '
+            : undefined;
 
         return (
           <Box key={`${row.text}-${index}`} backgroundColor={row.backgroundColor} width={visibleColumns}>
@@ -93,9 +99,11 @@ export function BodyPane({
                 {marker}
               </Text>
             ) : null}
-            <Text backgroundColor={row.backgroundColor} color={row.color}>
-              {displayText}
-            </Text>
+            {segmentDisplay ?? (
+              <Text backgroundColor={row.backgroundColor} color={row.color}>
+                {displayText}
+              </Text>
+            )}
             {isScrollable ? (
               <Text color={scrollbarCells[index]?.color ?? theme.colors.border}>
                 {scrollbarCells[index]?.text ?? SCROLLBAR_TRACK}
@@ -139,4 +147,51 @@ function renderScrollbar({
 
 function padBodyText(text: string, contentColumns: number): string {
   return text.padEnd(contentColumns, ' ');
+}
+
+const RENDER_CONTROL_CHAR_PATTERN = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g;
+
+function sanitizeRenderedText(text: string): string {
+  return text.replace(RENDER_CONTROL_CHAR_PATTERN, '');
+}
+
+function renderSegments(
+  row: BodyRow,
+  contentColumns: number,
+  shouldPadText: boolean
+): ReactNode | undefined {
+  if (row.segments === undefined) {
+    return undefined;
+  }
+
+  const sanitizedSegments = row.segments.map((segment) => ({
+    ...segment,
+    text: sanitizeRenderedText(segment.text)
+  }));
+  const text = sanitizedSegments.map((segment) => segment.text).join('');
+  const padding =
+    shouldPadText || text.length === 0 ? padEndToWidth('', contentColumns - displayWidth(text)) : '';
+
+  return (
+    <>
+      {sanitizedSegments.map((segment, index) => (
+        <Text
+          key={`${index}-${segment.text}`}
+          backgroundColor={segment.backgroundColor ?? row.backgroundColor}
+          bold={segment.bold}
+          color={segment.color ?? row.color}
+          dimColor={segment.dimColor}
+          italic={segment.italic}
+          underline={segment.underline}
+        >
+          {segment.text}
+        </Text>
+      ))}
+      {padding.length > 0 ? (
+        <Text backgroundColor={row.backgroundColor} color={row.color}>
+          {padding}
+        </Text>
+      ) : null}
+    </>
+  );
 }

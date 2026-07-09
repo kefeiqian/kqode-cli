@@ -34,6 +34,12 @@ describe('lastAssistantResponse', () => {
       ])
     ).toBe('new');
   });
+
+  it('returns raw stored markdown source rather than rendered transcript text', () => {
+    expect(
+      lastAssistantResponse([item(1, 'settled', BodyEntryKind.Assistant, '**bold** [docs](x)')])
+    ).toBe('**bold** [docs](x)');
+  });
 });
 
 function item(
