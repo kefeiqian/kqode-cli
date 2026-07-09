@@ -32,17 +32,10 @@ export function ModelRow({
     return <Text color={theme.colors.accentBlue}>{truncate(row.label, columns)}</Text>;
   }
 
-  if (row.type === 'status' && row.status === MODEL_LOAD_STATUS_NOT_CONNECTED) {
-    return (
-      <Text color={theme.colors.muted} wrap="truncate">
-        {truncate(statusLine(row, PLAIN_MARKER), columns)}
-      </Text>
-    );
-  }
-
   const selected = isHighlighted(row, highlight);
   const marker = selected ? SELECTED_MARKER : PLAIN_MARKER;
-  const color = selected ? theme.colors.accentBlue : theme.colors.foreground;
+  const color =
+    selected ? theme.colors.accentBlue : row.type === 'status' && row.status === MODEL_LOAD_STATUS_NOT_CONNECTED ? theme.colors.muted : theme.colors.foreground;
   const line = row.type === 'model' ? modelLine(row, marker) : statusLine(row, marker);
 
   return (
@@ -69,7 +62,7 @@ function statusLine(row: Extract<ModelSurfaceRow, { type: 'status' }>, marker: s
     return `${marker}    (no models)`;
   }
   if (row.status === MODEL_LOAD_STATUS_NOT_CONNECTED) {
-    return `${marker}    (not connected — /connect to add)`;
+    return `${marker}    (not connected — enter to connect)`;
   }
   return `${marker}    ${row.status}`;
 }

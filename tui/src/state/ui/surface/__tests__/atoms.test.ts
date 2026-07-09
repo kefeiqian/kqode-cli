@@ -99,13 +99,13 @@ describe('surface atoms', () => {
     expect(store.get(activeSurfaceAtom)).toBe(Surface.Model);
   });
 
-  it('routes model to Connect when no provider is connected', async () => {
+  it('opens model when no provider is connected', async () => {
     const store = createStore();
     store.set(backendClientAtom, clientWithProviders([provider(PROVIDER_STATUS_NOT_CONFIGURED)]));
 
     await store.set(openModelSurfaceAtom);
 
-    expect(store.get(activeSurfaceAtom)).toBe(Surface.Connect);
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Model);
   });
 
   it('opens memory with an explicit initial mode and resets to active by default', () => {

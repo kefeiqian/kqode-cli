@@ -12,7 +12,6 @@ import type {
   ProviderStatusInfo
 } from '@contracts/backend/providerMessages.ts';
 import { backendClientAtom } from '@state/global/index.ts';
-import { openConnectSurfaceAtom } from '@state/ui/index.ts';
 import {
   MODEL_LOAD_STATUS_LOADING,
   resetModelSurfaceAtom,
@@ -24,7 +23,6 @@ import {
 /** Backend effects for `/model`: initial parallel loads, retry, and set-active. */
 export function useModelBackend(onSelected: () => void) {
   const client = useAtomValue(backendClientAtom);
-  const openConnect = useSetAtom(openConnectSurfaceAtom);
   const resetModel = useSetAtom(resetModelSurfaceAtom);
   const setProvidersLoading = useSetAtom(setModelProvidersLoadingAtom);
   const setActiveSelection = useSetAtom(setModelActiveSelectionAtom);
@@ -54,7 +52,6 @@ export function useModelBackend(onSelected: () => void) {
   const refreshModels = useCallback(async () => {
     resetModel();
     if (client === undefined) {
-      openConnect();
       return;
     }
     const version = requestVersion.current + 1;
@@ -69,19 +66,14 @@ export function useModelBackend(onSelected: () => void) {
         return;
       }
       const connected = providerList.providers.filter((provider) => provider.status === PROVIDER_STATUS_CONNECTED);
-      if (connected.length === 0) {
-        openConnect();
-        return;
-      }
       setProvidersLoading(providerList.providers);
       setActiveSelection(effectiveSelection(active, providerList.providers));
       connected.forEach((provider) => void loadProviderModels(provider.providerId, version));
     } catch {
-      if (requestVersion.current === version) {
-        openConnect();
-      }
+      // Keep the model front door open; transient provider-list failures should
+      // not bounce the user out of the picker.
     }
-  }, [client, loadProviderModels, openConnect, resetModel, setActiveSelection, setProvidersLoading]);
+  }, [client, loadProviderModels, resetModel, setActiveSelection, setProvidersLoading]);
 
   const selectModel = useCallback(
     async (providerId: string, modelId: string) => {

@@ -67,7 +67,7 @@ describe('model atoms', () => {
     expect(store.get(modelRowsAtom).some((row) => row.type === 'status')).toBe(true);
   });
 
-  it('renders not-connected providers without making them focusable', () => {
+  it('renders not-connected providers as focusable rows', () => {
     const store = createStore();
     store.set(setModelProvidersLoadingAtom, [
       provider('kimi'),
@@ -85,6 +85,7 @@ describe('model atoms', () => {
       providerId: 'custom',
       status: MODEL_LOAD_STATUS_NOT_CONNECTED
     });
-    expect(store.get(modelHighlightAtom)).toEqual({ providerId: 'kimi', modelId: null });
+    store.set(moveModelHighlightAtom, 1);
+    expect(store.get(modelHighlightAtom)).toEqual({ providerId: 'custom', modelId: null });
   });
 });

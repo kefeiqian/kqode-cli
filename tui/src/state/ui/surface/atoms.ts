@@ -1,6 +1,4 @@
 import { atom } from 'jotai';
-import { PROVIDER_STATUS_CONNECTED } from '@contracts/backend/providerMessages.ts';
-import { backendClientAtom } from '@state/global/backend.ts';
 import { MemoryMode, memoryModeAtom, resetMemorySubStateAtom } from '@state/ui/memory/index.ts';
 
 /** Mutually exclusive fullscreen surfaces the TUI shell can render. */
@@ -40,34 +38,9 @@ export const openHelpSurfaceAtom = atom(null, (_get, set) => {
   set(setActiveSurfaceAtom, Surface.Help);
 });
 
-/**
- * Opens the model picker when at least one provider is connected; otherwise
- * routes to Connect so the model surface is never empty on first open.
- */
-export const openModelSurfaceAtom = atom(null, async (get, set) => {
-  const client = get(backendClientAtom);
-  if (client === undefined) {
-    set(setActiveSurfaceAtom, Surface.Connect);
-    return;
-  }
-
-  const requestVersion = get(surfaceNavigationVersionAtom) + 1;
-  set(surfaceNavigationVersionAtom, requestVersion);
-
-  try {
-    const providerList = await client.listProviders();
-    if (get(surfaceNavigationVersionAtom) !== requestVersion) {
-      return;
-    }
-    const nextSurface = providerList.providers.some((provider) => provider.status === PROVIDER_STATUS_CONNECTED)
-      ? Surface.Model
-      : Surface.Connect;
-    set(activeSurfaceAtom, nextSurface);
-  } catch {
-    if (get(surfaceNavigationVersionAtom) === requestVersion) {
-      set(activeSurfaceAtom, Surface.Connect);
-    }
-  }
+/** Opens the model picker front door. */
+export const openModelSurfaceAtom = atom(null, (_get, set) => {
+  set(setActiveSurfaceAtom, Surface.Model);
 });
 
 /** Opens the fullscreen local memory management surface. */

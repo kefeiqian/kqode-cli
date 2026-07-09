@@ -37,5 +37,5 @@ export function initialProviderModelLoads(providers: readonly ProviderStatusInfo
 
 /** Returns whether a provider status row can receive keyboard focus. */
 export function isFocusableModelStatus(status: ModelLoadStatus) {
-  return status !== MODEL_LIST_STATUS_LOADED && status !== MODEL_LOAD_STATUS_NOT_CONNECTED;
+  return status !== MODEL_LIST_STATUS_LOADED;
 }

@@ -17,7 +17,7 @@ import { activeThemeAtom } from '@state/global/index.ts';
 
 const HEADER_ROWS = 3;
 const FOOTER_ROWS = 1;
-const MODEL_FOOTER_HINT = '↑/↓ choose · enter select/retry · esc close';
+const MODEL_FOOTER_HINT = '↑/↓ choose · enter select/connect · esc close';
 
 /** Fullscreen `/model` picker across connected providers. */
 export function ModelSurface() {
@@ -47,7 +47,7 @@ export function ModelSurface() {
   return (
     <Box flexDirection="column" width={columns} height={rows} backgroundColor={theme.colors.bodyBackground}>
       <Text color={theme.colors.accentBlue}>/model</Text>
-      <Text color={theme.colors.muted}>Choose the active model for future turns.</Text>
+      <Text color={theme.colors.muted}>Choose a model or connect a provider.</Text>
       <Text> </Text>
       <ModelRows columns={safeChromeColumns} highlight={highlight} rows={visibleRows} visibleRows={bodyRows} />
       <ModelFooter columns={safeChromeColumns} offset={windowOffset} total={allRows.length} visible={bodyRows} />
