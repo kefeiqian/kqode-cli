@@ -1,3 +1,4 @@
+import os from 'node:os';
 import { Box, Text } from 'ink';
 import type { SessionSummary } from '@contracts/backend/index.ts';
 import { formatResumeHeader, formatResumeRow } from '@libs/resume/formatSessionRows.ts';
@@ -13,7 +14,11 @@ export function ResumeRows({
   visibleRows: number;
   highlightedSessionId: string | null;
 }) {
-  const lines = [formatResumeHeader(columns), ...sessions.map((session, index) => formatResumeRow(session, index, columns))];
+  const homeDir = os.homedir();
+  const lines = [
+    formatResumeHeader(columns),
+    ...sessions.map((session, index) => formatResumeRow(session, index, columns, homeDir))
+  ];
   return (
     <Box flexDirection="column" height={visibleRows}>
       {Array.from({ length: visibleRows }, (_, index) => {

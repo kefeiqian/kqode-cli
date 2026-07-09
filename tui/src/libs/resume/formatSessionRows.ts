@@ -1,4 +1,5 @@
 import type { SessionSummary } from '@contracts/backend/index.ts';
+import { homeRelativePath } from '@libs/path/homeRelativePath.ts';
 import { displayWidth, measureGraphemes, padEndToWidth } from '@libs/text/displayWidth.ts';
 
 const STATUS_WIDTH = 8;
@@ -8,6 +9,7 @@ const RANK_WIDTH = 4;
 const GUTTER = 2;
 const MIN_SUMMARY_WIDTH = 12;
 const MIN_FOLDER_WIDTH = 10;
+const PREFERRED_FOLDER_WIDTH = 24;
 
 export function formatResumeHeader(columns: number): string {
   return formatLine(columns, '#', 'Summary', 'Status', 'Modified', 'Created', 'Folder');
@@ -16,8 +18,10 @@ export function formatResumeHeader(columns: number): string {
 export function formatResumeRow(
   session: SessionSummary,
   index: number,
-  columns: number
+  columns: number,
+  homeDir: string
 ): string {
+  const { folderWidth } = resolveColumnWidths(columns);
   return formatLine(
     columns,
     `${index + 1}.`,
@@ -25,7 +29,7 @@ export function formatResumeRow(
     session.status,
     formatAge(session.modifiedAt),
     formatAge(session.createdAt),
-    session.folder
+    homeRelativePath(session.folder, homeDir, folderWidth)
   );
 }
 
@@ -38,15 +42,7 @@ function formatLine(
   created: string,
   folder: string
 ): string {
-  const safeColumns = Math.max(1, columns);
-  const fixedWidth =
-    RANK_WIDTH + STATUS_WIDTH + MODIFIED_WIDTH + CREATED_WIDTH + GUTTER * 5 + MIN_FOLDER_WIDTH;
-  const summaryWidth = Math.max(MIN_SUMMARY_WIDTH, safeColumns - fixedWidth);
-  const folderWidth = Math.max(
-    MIN_FOLDER_WIDTH,
-    safeColumns -
-      (RANK_WIDTH + summaryWidth + STATUS_WIDTH + MODIFIED_WIDTH + CREATED_WIDTH + GUTTER * 5)
-  );
+  const { safeColumns, summaryWidth, folderWidth } = resolveColumnWidths(columns);
   const row = [
     pad(truncate(rank, RANK_WIDTH), RANK_WIDTH),
     pad(truncate(summary, summaryWidth), summaryWidth),
@@ -56,6 +52,22 @@ function formatLine(
     pad(truncate(folder, folderWidth), folderWidth)
   ].join(' '.repeat(GUTTER));
   return clipLine(row, safeColumns);
+}
+
+function resolveColumnWidths(columns: number): {
+  safeColumns: number;
+  summaryWidth: number;
+  folderWidth: number;
+} {
+  const safeColumns = Math.max(1, columns);
+  const fixedWidth = RANK_WIDTH + STATUS_WIDTH + MODIFIED_WIDTH + CREATED_WIDTH + GUTTER * 5;
+  const flexibleWidth = safeColumns - fixedWidth;
+  const folderWidth = Math.max(
+    MIN_FOLDER_WIDTH,
+    Math.min(PREFERRED_FOLDER_WIDTH, flexibleWidth - MIN_SUMMARY_WIDTH)
+  );
+  const summaryWidth = Math.max(MIN_SUMMARY_WIDTH, flexibleWidth - folderWidth);
+  return { safeColumns, summaryWidth, folderWidth };
 }
 
 function formatAge(timestampMs: number): string {

@@ -6,6 +6,7 @@ import { formatResumeHeader, formatResumeRow } from '@libs/resume/formatSessionR
 
 const NOW = Date.UTC(2026, 6, 10, 3, 0, 0);
 const COLUMNS = 96;
+const HOME_DIR = 'C:\\Users\\kefeiqian';
 
 function session(overrides: Partial<SessionSummary>): SessionSummary {
   return {
@@ -44,9 +45,9 @@ describe('formatSessionRows', () => {
   it('aligns cells with the header across differing row content', () => {
     const header = formatResumeHeader(COLUMNS);
     const rows = [
-      formatResumeRow(session({ summary: 'Short', status: SESSION_STATUS_CURRENT, folder: 'C:\\repo' }), 0, COLUMNS),
-      formatResumeRow(session({ summary: 'A much longer summary value', folder: 'C:\\repo\\deep\\leaf' }), 1, COLUMNS),
-      formatResumeRow(session({ summary: 'Tabs\tand\nnewlines', folder: 'C:\\other' }), 2, COLUMNS)
+      formatResumeRow(session({ summary: 'Short', status: SESSION_STATUS_CURRENT, folder: 'C:\\repo' }), 0, COLUMNS, HOME_DIR),
+      formatResumeRow(session({ summary: 'A much longer summary value', folder: 'C:\\repo\\deep\\leaf' }), 1, COLUMNS, HOME_DIR),
+      formatResumeRow(session({ summary: 'Tabs\tand\nnewlines', folder: 'C:\\other' }), 2, COLUMNS, HOME_DIR)
     ];
 
     for (const row of rows) {
@@ -61,7 +62,8 @@ describe('formatSessionRows', () => {
     const row = formatResumeRow(
       session({ summary: 'This summary is intentionally far too long for its column' }),
       0,
-      72
+      72,
+      HOME_DIR
     );
 
     expect(row).toContain('…');
@@ -71,16 +73,27 @@ describe('formatSessionRows', () => {
 
   it('measures wide glyphs by display width when aligning columns', () => {
     const header = formatResumeHeader(COLUMNS);
-    const row = formatResumeRow(session({ summary: '修复表格 😀 columns' }), 0, COLUMNS);
+    const row = formatResumeRow(session({ summary: '修复表格 😀 columns' }), 0, COLUMNS, HOME_DIR);
 
     expect(columnStart(row, 'Idle')).toBe(columnStart(header, 'Status'));
     expect(columnStart(row, '5m ago')).toBe(columnStart(header, 'Modified'));
   });
 
   it('clips rows to the requested safe width on narrow terminals', () => {
-    const row = formatResumeRow(session({ summary: 'Long summary', folder: 'C:\\very\\long\\folder' }), 0, 32);
+    const row = formatResumeRow(session({ summary: 'Long summary', folder: 'C:\\very\\long\\folder' }), 0, 32, HOME_DIR);
 
     expect(displayWidth(row)).toBeLessThanOrEqual(32);
     expect(row).toContain('Idle');
+  });
+
+  it('renders the folder cell relative to home with a preserved tail', () => {
+    const row = formatResumeRow(
+      session({ folder: 'C:\\Users\\kefeiqian\\Projects\\KQode\\blog-v0.1' }),
+      0,
+      COLUMNS,
+      HOME_DIR
+    );
+
+    expect(row).toContain('~\\...\\blog-v0.1');
   });
 });
