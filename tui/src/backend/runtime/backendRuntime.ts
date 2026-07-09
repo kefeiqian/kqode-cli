@@ -5,7 +5,7 @@ import { backendClientAtom } from '@state/global/backend.ts';
 import { resetTranscriptMirrorAtom, transcriptEventAtom } from '@state/promptQueue/atoms.ts';
 import { appendClientOnlyErrorAtom } from '@state/promptQueue/clientOnlyRows.ts';
 import { gitStatusLabelAtom } from '@state/ui/gitStatus.ts';
-import { BACKEND_LOADING_HINT, startupStatusHintAtom } from '@state/ui/statusHint.ts';
+import { BACKEND_LOADING_HINT, compactionInProgressAtom, startupStatusHintAtom } from '@state/ui/statusHint.ts';
 
 type Store = ReturnType<typeof createStore>;
 
@@ -37,6 +37,15 @@ export function startBackendRuntime(
   store.set(backendClientAtom, client);
   store.set(startupStatusHintAtom, BACKEND_LOADING_HINT);
   const unsubscribeTranscript = client.onTranscriptEvent((event) => {
+    if (event.type === 'compactionStatus') {
+      store.set(compactionInProgressAtom, event.active);
+      return;
+    }
+    if (event.type === 'settled') {
+      // Safety net: a cancel mid-compaction never emits CompactionFinished, so
+      // clear the "Auto compacting…" status on any terminal settle.
+      store.set(compactionInProgressAtom, false);
+    }
     store.set(transcriptEventAtom, event);
   });
 

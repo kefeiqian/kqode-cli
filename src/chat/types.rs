@@ -71,6 +71,10 @@ pub enum TurnStreamEvent {
     Compacted {
         state: CompactionState,
     },
+    /// The hidden summarization call began ("Auto compacting…").
+    CompactionStarted,
+    /// The hidden summarization call ended (status returns to "Working").
+    CompactionFinished,
     Completed {
         text: String,
         finish_reason: Option<String>,

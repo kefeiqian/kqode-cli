@@ -123,7 +123,12 @@ async fn stream_turn<E: Fn(TurnStreamEvent)>(
         &user_text,
         limits,
         &cancel,
-        move |prior, head| async move { summarize(prior.as_deref(), &head, summary_config).await },
+        move |prior, head| async move {
+            emit(TurnStreamEvent::CompactionStarted);
+            let result = summarize(prior.as_deref(), &head, summary_config).await;
+            emit(TurnStreamEvent::CompactionFinished);
+            result
+        },
     )
     .await
     {

@@ -17,7 +17,16 @@ export const WORKING_STATUS_HINT: StatusHint = {
   kind: 'loading'
 };
 
+/** Status hint shown while a turn's hidden compaction runs, ahead of "Working". */
+export const AUTO_COMPACTING_HINT: StatusHint = {
+  text: 'Auto compacting',
+  kind: 'loading'
+};
+
 export const startupStatusHintAtom = atom<StatusHint | undefined>(undefined);
+
+/** True while the backend reports that a turn's hidden compaction is running. */
+export const compactionInProgressAtom = atom(false);
 
 /**
  * Frame counter for the animated loading/working status-hint dots. Lifted out of

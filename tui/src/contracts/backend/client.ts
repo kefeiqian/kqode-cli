@@ -56,7 +56,8 @@ export type TranscriptEvent =
   | { type: 'enqueued'; turnId: string; seq: number; state: TurnState }
   | { type: 'activated'; turnId: string }
   | { type: 'tokenDelta'; turnId: string; delta: string }
-  | { type: 'settled'; turnId: string; result: TurnResult };
+  | { type: 'settled'; turnId: string; result: TurnResult }
+  | { type: 'compactionStatus'; turnId: string; active: boolean };
 
 /**
  * Narrow backend seam the TUI uses for backend-backed transcript turns.

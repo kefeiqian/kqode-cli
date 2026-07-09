@@ -63,6 +63,9 @@ export const TURN_ACTIVATED_METHOD = 'kqode/turnActivated';
 /** Must match `TURN_SETTLED_METHOD` in `src/protocol.rs`. */
 export const TURN_SETTLED_METHOD = 'kqode/turnSettled';
 
+/** Must match `COMPACTION_STATUS_METHOD` in `src/protocol.rs`. */
+export const COMPACTION_STATUS_METHOD = 'kqode/compactionStatus';
+
 /** Must match `TURN_STATE_ACTIVE` in `src/protocol.rs`. */
 export const TURN_STATE_ACTIVE = 'active';
 
@@ -148,6 +151,12 @@ export type EnqueuedParams = {
 /** Payload for {@link TURN_ACTIVATED_METHOD}. Must match `ActivatedParams` in `src/protocol.rs`. */
 export type ActivatedParams = {
   turnId: string;
+};
+
+/** Payload for {@link COMPACTION_STATUS_METHOD}. Must match `CompactionStatusParams` in `src/protocol.rs`. */
+export type CompactionStatusParams = {
+  turnId: string;
+  active: boolean;
 };
 
 /** Payload for {@link TURN_SETTLED_METHOD}. Must match `SettledParams` in `src/protocol.rs`. */

@@ -6,6 +6,7 @@ import {
 } from '@contracts/backend/index.ts';
 import type { BackendClient, TranscriptEvent } from '@contracts/backend/index.ts';
 import {
+  compactionStatusNotification,
   conversationClearRequest,
   gitStatusRequest,
   messageSubmitRequest,
@@ -70,6 +71,9 @@ export function createMessageConnectionClient(
   );
   connection.onNotification(turnSettledNotification, (event) =>
     emit({ type: 'settled', ...event })
+  );
+  connection.onNotification(compactionStatusNotification, (event) =>
+    emit({ type: 'compactionStatus', ...event })
   );
   const failInFlight = (reason: string): void => {
     for (const turnId of [...inFlightTurnIds]) {

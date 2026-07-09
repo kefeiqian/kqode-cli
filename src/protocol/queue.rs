@@ -12,6 +12,10 @@ pub const TURN_ACTIVATED_METHOD: &str = "kqode/turnActivated";
 /// Mirrored in `tui/src/contracts/backend/messages.ts`.
 pub const TURN_SETTLED_METHOD: &str = "kqode/turnSettled";
 
+/// Server→client notification toggling the "Auto compacting…" status while a
+/// turn's hidden compaction runs. Mirrored in `tui/src/contracts/backend/messages.ts`.
+pub const COMPACTION_STATUS_METHOD: &str = "kqode/compactionStatus";
+
 /// Queue state for a turn that became the active head immediately on enqueue.
 pub const TURN_STATE_ACTIVE: &str = "active";
 
@@ -44,6 +48,14 @@ pub struct EnqueuedParams {
 #[serde(rename_all = "camelCase")]
 pub struct ActivatedParams {
     pub turn_id: String,
+}
+
+/// Payload for [`COMPACTION_STATUS_METHOD`].
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompactionStatusParams {
+    pub turn_id: String,
+    pub active: bool,
 }
 
 /// Payload for [`TURN_SETTLED_METHOD`].

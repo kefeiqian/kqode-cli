@@ -1,6 +1,7 @@
 import { NotificationType, RequestType, RequestType0 } from 'vscode-jsonrpc';
 import {
   BACKEND_READY_METHOD,
+  COMPACTION_STATUS_METHOD,
   CONVERSATION_CLEAR_METHOD,
   GIT_STATUS_METHOD,
   MESSAGE_SUBMIT_METHOD,
@@ -13,6 +14,7 @@ import {
 import type {
   ActivatedParams,
   BackendReadyParams,
+  CompactionStatusParams,
   ConversationClearResult,
   EnqueuedParams,
   GitStatusResult,
@@ -80,3 +82,8 @@ export const turnActivatedNotification = new NotificationType<ActivatedParams>(
 
 /** Unified terminal result notification for a turn. */
 export const turnSettledNotification = new NotificationType<SettledParams>(TURN_SETTLED_METHOD);
+
+/** Toggles the "Auto compacting…" status while a turn's hidden compaction runs. */
+export const compactionStatusNotification = new NotificationType<CompactionStatusParams>(
+  COMPACTION_STATUS_METHOD
+);

@@ -76,6 +76,9 @@ impl LoopState {
             Command::Compacted { turn_id, state } => {
                 self.pending_compaction = Some((turn_id, state));
             }
+            Command::CompactionStatus { turn_id, active } => {
+                (self.event_sink)(ConversationEvent::CompactionStatus { turn_id, active });
+            }
             Command::Cancel { turn_id }
                 if self.transcript.active_id() == Some(turn_id.as_str()) =>
             {

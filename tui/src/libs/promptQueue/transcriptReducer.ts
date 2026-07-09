@@ -24,6 +24,10 @@ export function reduceTranscriptEvent(
   event: TranscriptEvent,
   currentGeneration: number
 ): TranscriptReduceResult {
+  if (event.type === 'compactionStatus') {
+    // Status-only event handled at the runtime layer; never a transcript row.
+    return { state };
+  }
   if (state.settledTurnIds.has(event.turnId)) {
     return { state };
   }

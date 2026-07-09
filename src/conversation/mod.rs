@@ -51,6 +51,11 @@ pub enum Command {
         turn_id: String,
         state: CompactionState,
     },
+    /// Toggle the "Auto compacting…" status for a turn.
+    CompactionStatus {
+        turn_id: String,
+        active: bool,
+    },
     Cancel {
         turn_id: String,
     },
@@ -84,6 +89,11 @@ pub enum ConversationEvent {
     Settled {
         turn_id: String,
         result: TurnResult,
+    },
+    /// The "Auto compacting…" status toggled for a turn.
+    CompactionStatus {
+        turn_id: String,
+        active: bool,
     },
 }
 
@@ -125,6 +135,14 @@ fn default_runner() -> impl Fn(TurnJob) + Send + Sync + 'static {
                     TurnStreamEvent::Compacted { state } => Command::Compacted {
                         turn_id: turn_id.clone(),
                         state,
+                    },
+                    TurnStreamEvent::CompactionStarted => Command::CompactionStatus {
+                        turn_id: turn_id.clone(),
+                        active: true,
+                    },
+                    TurnStreamEvent::CompactionFinished => Command::CompactionStatus {
+                        turn_id: turn_id.clone(),
+                        active: false,
                     },
                     TurnStreamEvent::Completed {
                         text,

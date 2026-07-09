@@ -6,6 +6,8 @@ import { turnInFlightAtom } from '@state/promptQueue/index.ts';
 import {
   activeSurfaceAtom,
   armedActionAtom,
+  AUTO_COMPACTING_HINT,
+  compactionInProgressAtom,
   copyModeActiveAtom,
   loadingFrameAtom,
   safeChromeColumnsAtom,
@@ -35,12 +37,14 @@ export function StatusBar() {
   const copyModeActive = useAtomValue(copyModeActiveAtom);
   const armedAction = useAtomValue(armedActionAtom);
   const turnInFlight = useAtomValue(turnInFlightAtom);
+  const compactionInProgress = useAtomValue(compactionInProgressAtom);
   useActiveModelRefresh();
   useTransientStatusHintClear(transientStatusHint);
   // Backend startup takes precedence over the working spinner, which in turn
   // sits ahead of Copy Mode; a loading-kind hint drives the animated dots.
   const persistentStatusHint =
     startupStatusHint ??
+    (compactionInProgress ? AUTO_COMPACTING_HINT : undefined) ??
     (turnInFlight ? WORKING_STATUS_HINT : undefined) ??
     (copyModeActive ? { text: COPY_MODE_HINT } : undefined);
   const loadingFrame = useLoadingFrame(persistentStatusHint?.kind === 'loading');
