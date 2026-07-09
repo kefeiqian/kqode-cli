@@ -17,6 +17,7 @@ const noopActions = {
   openModel: vi.fn(),
   openResume: vi.fn(),
   openMemory: vi.fn(),
+  openMemoryAdd: vi.fn(),
   openTheme: vi.fn()
 };
 

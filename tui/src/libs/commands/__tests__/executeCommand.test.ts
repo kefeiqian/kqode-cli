@@ -15,6 +15,7 @@ const makeActions = () => ({
   openModel: vi.fn(),
   openResume: vi.fn(),
   openMemory: vi.fn(),
+  openMemoryAdd: vi.fn(),
   openTheme: vi.fn()
 });
 
@@ -40,6 +41,14 @@ describe('executeMenuSelection', () => {
     executeMenuSelection(exactCommandMatch('/memory edit')!, actions);
 
     expect(actions.openMemory).toHaveBeenCalledWith(undefined);
+  });
+
+  it('opens the add flow for memory add', () => {
+    const actions = makeActions();
+    executeMenuSelection(exactCommandMatch('/memory add')!, actions);
+
+    expect(actions.openMemoryAdd).toHaveBeenCalledTimes(1);
+    expect(actions.openMemory).not.toHaveBeenCalled();
   });
 });
 

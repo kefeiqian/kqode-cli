@@ -13,6 +13,7 @@ import {
   memoryStatusAtom,
   moveMemoryHighlightAtom,
   setMemoryDetailAtom,
+  memoryFormAtom,
   switchMemoryModeAtom
 } from '@state/ui/memory/index.ts';
 
@@ -31,12 +32,16 @@ export function useMemoryInput(actions: MemoryInputActions) {
   const item = useLatest<MemoryItem | null>(useAtomValue(highlightedMemoryItemAtom));
   const entry = useLatest<MemoryInboxEntry | null>(useAtomValue(highlightedInboxEntryAtom));
   const detail = useLatest(useAtomValue(memoryDetailBodyAtom));
+  const form = useLatest(useAtomValue(memoryFormAtom));
   const moveHighlight = useSetAtom(moveMemoryHighlightAtom);
   const switchMode = useSetAtom(switchMemoryModeAtom);
   const setDetail = useSetAtom(setMemoryDetailAtom);
 
   useInput((input, key) => {
     if (isMouseInput(input)) {
+      return;
+    }
+    if (form.current !== null) {
       return;
     }
     if (status.current === MemoryStatus.Loading || status.current === MemoryStatus.Busy) {

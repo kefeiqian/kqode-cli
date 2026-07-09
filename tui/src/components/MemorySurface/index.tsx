@@ -3,8 +3,10 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useMemo } from 'react';
 import type { MemoryInboxEntry, MemoryItem } from '@contracts/backend/index.ts';
 import { InboxRows } from '@components/MemorySurface/InboxRows.tsx';
+import { MemoryForm } from '@components/MemorySurface/MemoryForm.tsx';
 import { MemoryRows } from '@components/MemorySurface/MemoryRows.tsx';
 import { useMemoryBackend } from '@components/MemorySurface/useMemoryBackend.ts';
+import { useMemoryFormInput } from '@components/MemorySurface/useMemoryFormInput.ts';
 import { useMemoryInput } from '@components/MemorySurface/useMemoryInput.ts';
 import { columnsAtom, rowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
 import {
@@ -14,6 +16,7 @@ import {
   highlightedMemoryItemAtom,
   memoryDetailBodyAtom,
   memoryErrorAtom,
+  memoryFormAtom,
   memoryModeAtom,
   memoryStatusAtom,
   memoryVisibleRowsAtom,
@@ -37,9 +40,10 @@ export function MemorySurface() {
   const highlightedItem = useAtomValue(highlightedMemoryItemAtom);
   const highlightedEntry = useAtomValue(highlightedInboxEntryAtom);
   const detailBody = useAtomValue(memoryDetailBodyAtom);
+  const form = useAtomValue(memoryFormAtom);
   const theme = useAtomValue(activeThemeAtom);
   const setVisibleRows = useSetAtom(memoryVisibleRowsAtom);
-  const { refresh, showDetail, forgetItem, applyInbox, undoInbox } = useMemoryBackend();
+  const { refresh, showDetail, forgetItem, addItem, applyInbox, undoInbox } = useMemoryBackend();
   const bodyRows = useMemo(() => Math.max(1, rows - HEADER_ROWS - FOOTER_ROWS), [rows]);
   // The list area renders a table header on its first line, so the data-row
   // capacity that drives the scroll window is one less than the rendered height.
@@ -47,6 +51,7 @@ export function MemorySurface() {
   const dataRows = Math.max(1, listRows - 1);
 
   useMemoryInput({ refresh, showDetail, forgetItem, applyInbox, undoInbox });
+  useMemoryFormInput({ addItem });
 
   useEffect(() => {
     setVisibleRows(dataRows);
@@ -62,7 +67,11 @@ export function MemorySurface() {
       <Text>{modeTabs(mode)}</Text>
       <Text color={theme.colors.muted}>{statusLine(status, error)}</Text>
       <Text> </Text>
-      {renderBody({ status, error, mode, detailBody, items, entries, highlightedItem, highlightedEntry, columns: safeChromeColumns, listRows })}
+      {form !== null ? (
+        <MemoryForm columns={safeChromeColumns} form={form} />
+      ) : (
+        renderBody({ status, error, mode, detailBody, items, entries, highlightedItem, highlightedEntry, columns: safeChromeColumns, listRows })
+      )}
       <MemoryFooter columns={safeChromeColumns} mode={mode} detailOpen={detailBody !== null} />
     </Box>
   );

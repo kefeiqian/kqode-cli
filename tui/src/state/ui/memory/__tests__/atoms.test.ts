@@ -4,15 +4,22 @@ import type { MemoryInboxEntry, MemoryItem } from '@contracts/backend/index.ts';
 import {
   MemoryMode,
   MemoryStatus,
+  closeMemoryFormAtom,
   highlightedMemoryItemAtom,
   memoryErrorAtom,
+  memoryFormAtom,
   memoryHighlightIndexAtom,
   memoryItemsAtom,
   memoryModeAtom,
   memoryStatusAtom,
   memoryVisibleRowsAtom,
   moveMemoryHighlightAtom,
+  openAddMemoryFormAtom,
   resetMemorySurfaceAtom,
+  setMemoryFormBodyAtom,
+  setMemoryFormErrorAtom,
+  setMemoryFormFieldAtom,
+  setMemoryFormTitleAtom,
   setMemoryDataAtom,
   setMemoryFailureAtom,
   switchMemoryModeAtom,
@@ -100,6 +107,29 @@ describe('memory surface atoms', () => {
     expect(store.get(memoryModeAtom)).toBe(MemoryMode.Inbox);
     expect(store.get(memoryStatusAtom)).toBe(MemoryStatus.Loading);
     expect(store.get(memoryItemsAtom)).toEqual([]);
+  });
+
+  it('opens, edits, errors, and resets the memory form', () => {
+    const store = createStore();
+
+    store.set(openAddMemoryFormAtom);
+    store.set(setMemoryFormTitleAtom, { title: 'T', cursor: 1 });
+    store.set(setMemoryFormBodyAtom, { body: 'B', cursor: 1 });
+    store.set(setMemoryFormErrorAtom, { titleError: 'bad', submitError: 'boom' });
+
+    expect(store.get(memoryFormAtom)).toMatchObject({
+      title: 'T',
+      body: 'B',
+      titleError: 'bad',
+      submitError: 'boom'
+    });
+
+    store.set(resetMemorySurfaceAtom);
+    expect(store.get(memoryFormAtom)).toBeNull();
+
+    store.set(openAddMemoryFormAtom);
+    store.set(closeMemoryFormAtom);
+    expect(store.get(memoryFormAtom)).toBeNull();
   });
 
   it('preserves a failed status and error when switching modes', () => {

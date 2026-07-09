@@ -19,6 +19,7 @@ import {
   windowColumnsAtom,
   windowRowsAtom
 } from '@state/ui/index.ts';
+import { memorySurfaceConsumesEscAtom } from '@state/ui/memory/index.ts';
 
 export function App() {
   useGlobalKeys();
@@ -29,9 +30,15 @@ export function App() {
   const activeSurface = useAtomValue(activeSurfaceAtom);
   const closeActiveSurface = useSetAtom(closeActiveSurfaceAtom);
   const setArmedAction = useSetAtom(armedActionAtom);
+  const memoryConsumesEsc = useAtomValue(memorySurfaceConsumesEscAtom);
 
   useInput((_input, key) => {
-    if (key.escape && activeSurface !== Surface.Home && activeSurface !== Surface.Login) {
+    if (
+      key.escape &&
+      activeSurface !== Surface.Home &&
+      activeSurface !== Surface.Login &&
+      !(activeSurface === Surface.Memory && memoryConsumesEsc)
+    ) {
       setArmedAction(null);
       closeActiveSurface();
     }

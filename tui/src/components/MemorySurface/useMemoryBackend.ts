@@ -8,6 +8,7 @@ import {
   setMemoryBusyAtom,
   setMemoryDataAtom,
   setMemoryDetailAtom,
+  setMemoryFormErrorAtom,
   setMemoryFailureAtom
 } from '@state/ui/memory/index.ts';
 
@@ -23,6 +24,7 @@ export function useMemoryBackend() {
   const setMemoryFailure = useSetAtom(setMemoryFailureAtom);
   const setMemoryBusy = useSetAtom(setMemoryBusyAtom);
   const setMemoryDetail = useSetAtom(setMemoryDetailAtom);
+  const setMemoryFormError = useSetAtom(setMemoryFormErrorAtom);
 
   const refresh = useCallback(async () => {
     resetMemory();
@@ -80,6 +82,22 @@ export function useMemoryBackend() {
     [client, refresh, setMemoryBusy, setMemoryFailure]
   );
 
+  const addItem = useCallback(
+    async ({ title, body }: { title: string; body: string }) => {
+      if (client === undefined) {
+        setMemoryFormError({ submitError: 'Rust backend unavailable' });
+        return;
+      }
+      try {
+        await client.addMemory({ scope: 'repo', memoryType: 'project', title, body });
+        await refresh();
+      } catch (error) {
+        setMemoryFormError({ submitError: backendErrorMessage(error) });
+      }
+    },
+    [client, refresh, setMemoryFormError]
+  );
+
   const applyInbox = useCallback(
     async (entryId: string, action: InboxAction) => {
       if (client === undefined) {
@@ -112,5 +130,5 @@ export function useMemoryBackend() {
     [client, refresh, setMemoryBusy, setMemoryFailure]
   );
 
-  return { refresh, showDetail, forgetItem, applyInbox, undoInbox };
+  return { refresh, showDetail, forgetItem, addItem, applyInbox, undoInbox };
 }

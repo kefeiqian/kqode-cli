@@ -21,6 +21,32 @@ export const MemoryStatus = {
 
 export type MemoryStatus = (typeof MemoryStatus)[keyof typeof MemoryStatus];
 
+export const MemoryFormMode = {
+  Add: 'add',
+  Edit: 'edit'
+} as const;
+
+export type MemoryFormMode = (typeof MemoryFormMode)[keyof typeof MemoryFormMode];
+
+export const MemoryFormField = {
+  Title: 'title',
+  Body: 'body'
+} as const;
+
+export type MemoryFormField = (typeof MemoryFormField)[keyof typeof MemoryFormField];
+
+export type MemoryFormState = {
+  mode: MemoryFormMode;
+  item: MemoryItem | null;
+  title: string;
+  body: string;
+  activeField: MemoryFormField;
+  titleCursor: number;
+  bodyCursor: number;
+  titleError: string | null;
+  submitError: string | null;
+};
+
 export const memoryModeAtom = atom<MemoryMode>(MemoryMode.Active);
 export const memoryItemsAtom = atom<MemoryItem[]>([]);
 export const memoryInboxAtom = atom<MemoryInboxEntry[]>([]);
@@ -30,6 +56,9 @@ export const memoryHighlightIndexAtom = atom(0);
 export const memoryWindowOffsetAtom = atom(0);
 export const memoryVisibleRowsAtom = atom(1);
 export const memoryDetailBodyAtom = atom<string | null>(null);
+export const memoryFormAtom = atom<MemoryFormState | null>(null);
+
+export const memorySurfaceConsumesEscAtom = atom((get) => get(memoryFormAtom) !== null);
 
 const currentListLengthAtom = atom((get) =>
   get(memoryModeAtom) === MemoryMode.Active ? get(memoryItemsAtom).length : get(memoryInboxAtom).length
@@ -68,6 +97,7 @@ export const resetMemorySurfaceAtom = atom(null, (_get, set) => {
   set(memoryHighlightIndexAtom, 0);
   set(memoryWindowOffsetAtom, 0);
   set(memoryDetailBodyAtom, null);
+  set(memoryFormAtom, null);
 });
 
 export const setMemoryDataAtom = atom(
@@ -128,3 +158,55 @@ export const moveMemoryHighlightAtom = atom(null, (get, set, delta: number) => {
 export const setMemoryDetailAtom = atom(null, (_get, set, body: string | null) => {
   set(memoryDetailBodyAtom, body);
 });
+
+export const openAddMemoryFormAtom = atom(null, (_get, set) => {
+  set(memoryFormAtom, {
+    mode: MemoryFormMode.Add,
+    item: null,
+    title: '',
+    body: '',
+    activeField: MemoryFormField.Title,
+    titleCursor: 0,
+    bodyCursor: 0,
+    titleError: null,
+    submitError: null
+  });
+});
+
+export const closeMemoryFormAtom = atom(null, (_get, set) => {
+  set(memoryFormAtom, null);
+});
+
+export const setMemoryFormFieldAtom = atom(null, (get, set, field: MemoryFormField) => {
+  const form = get(memoryFormAtom);
+  if (form !== null) {
+    set(memoryFormAtom, { ...form, activeField: field });
+  }
+});
+
+export const setMemoryFormTitleAtom = atom(
+  null,
+  (get, set, update: { title: string; cursor: number }) => {
+    const form = get(memoryFormAtom);
+    if (form !== null) {
+      set(memoryFormAtom, { ...form, title: update.title, titleCursor: update.cursor, titleError: null, submitError: null });
+    }
+  }
+);
+
+export const setMemoryFormBodyAtom = atom(null, (get, set, update: { body: string; cursor: number }) => {
+  const form = get(memoryFormAtom);
+  if (form !== null) {
+    set(memoryFormAtom, { ...form, body: update.body, bodyCursor: update.cursor, submitError: null });
+  }
+});
+
+export const setMemoryFormErrorAtom = atom(
+  null,
+  (get, set, error: { titleError?: string | null; submitError?: string | null }) => {
+    const form = get(memoryFormAtom);
+    if (form !== null) {
+      set(memoryFormAtom, { ...form, ...error });
+    }
+  }
+);

@@ -1,10 +1,11 @@
 import { createStore } from 'jotai';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { BackendClient, MemoryInboxEntry, MemoryItem } from '@contracts/backend/index.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { activeSurfaceAtom, columnsTestOverrideAtom, rowsTestOverrideAtom, Surface } from '@state/ui/index.ts';
-import { MemoryMode, memoryModeAtom } from '@state/ui/memory/index.ts';
+import { MemoryMode, memoryModeAtom, memoryFormAtom, openAddMemoryFormAtom } from '@state/ui/memory/index.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
+import { flushInput } from '@test/flushInput.ts';
 import { memoryBackendStub } from '@test/backendMemoryStub.ts';
 import { themeBackendStub } from '@test/backendThemeStub.ts';
 import { MemorySurface } from '@components/MemorySurface/index.tsx';
@@ -126,5 +127,48 @@ describe('MemorySurface', () => {
     const { lastFrame } = renderMemory(fakeClient({ fail: true }));
     const frame = await waitForFrame(lastFrame, 'boom');
     expect(frame).toContain('/memory');
+  });
+
+  it('submits the add form as a repo project memory and refreshes', async () => {
+    const addMemory = vi.fn(async () => ({ item: sampleItem({ scope: 'repo', memoryType: 'project', title: 'New fact' }) }));
+    const client = fakeClient({ items: [sampleItem({ scope: 'repo', memoryType: 'project', title: 'New fact' })] });
+    client.addMemory = addMemory;
+    const { store, stdin, lastFrame } = renderMemory(client);
+    store.set(openAddMemoryFormAtom);
+    await waitForFrame(lastFrame, 'Add project memory');
+
+    stdin.write('New fact');
+    await flushInput();
+    stdin.write('\t');
+    await flushInput();
+    stdin.write('Body line');
+    await flushInput();
+    stdin.write('\r');
+    await waitForFrame(lastFrame, 'New fact');
+
+    expect(addMemory).toHaveBeenCalledWith({
+      scope: 'repo',
+      memoryType: 'project',
+      title: 'New fact',
+      body: 'Body line'
+    });
+    expect(store.get(memoryFormAtom)).toBeNull();
+  });
+
+  it('blocks empty add titles and keeps Esc local to the form', async () => {
+    const client = fakeClient({ items: [] });
+    const { store, stdin, lastFrame } = renderMemory(client);
+    store.set(openAddMemoryFormAtom);
+    await waitForFrame(lastFrame, 'Add project memory');
+
+    stdin.write('\r');
+    const frame = await waitForFrame(lastFrame, 'Title is required');
+    expect(frame).toContain('Title is required');
+    expect(client.addMemory).not.toHaveBeenCalled();
+
+    stdin.write('\u001B');
+    await flushInput();
+    await waitForFrame(lastFrame, 'No memory yet.');
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Memory);
   });
 });
