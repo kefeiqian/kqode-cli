@@ -11,6 +11,7 @@ import {
   chooseSelectedProviderAtom,
   clearConfirmAtom,
   connectedActionIndexAtom,
+  connectReturnToModelAtom,
   customBaseUrlAtom,
   customBaseUrlErrorAtom,
   customLabelAtom,
@@ -21,6 +22,7 @@ import {
   selectedProviderAtom
 } from '@state/ui/connect/index.ts';
 import { closeActiveSurfaceAtom } from '@state/ui/index.ts';
+import { openModelSurfaceAtom } from '@state/ui/surface/index.ts';
 import {
   CONNECTED_ACTION_CLEAR_INDEX,
   CONNECTED_ACTION_REPLACE_INDEX
@@ -37,6 +39,7 @@ export function useConnectInput(clearProvider: () => Promise<void>) {
   const label = useAtomValue(customLabelAtom);
   const actionIndex = useAtomValue(connectedActionIndexAtom);
   const confirmClear = useAtomValue(clearConfirmAtom);
+  const returnToModel = useAtomValue(connectReturnToModelAtom);
   const stepRef = useLatest(step);
   const inFlightRef = useLatest(inFlight);
   const selectedProviderRef = useLatest(selectedProvider);
@@ -44,6 +47,7 @@ export function useConnectInput(clearProvider: () => Promise<void>) {
   const labelRef = useLatest(label);
   const actionIndexRef = useLatest(actionIndex);
   const confirmClearRef = useLatest(confirmClear);
+  const returnToModelRef = useLatest(returnToModel);
 
   const setStep = useSetAtom(connectStepAtom);
   const setBaseUrl = useSetAtom(customBaseUrlAtom);
@@ -56,10 +60,15 @@ export function useConnectInput(clearProvider: () => Promise<void>) {
   const chooseSelectedProvider = useSetAtom(chooseSelectedProviderAtom);
   const backStep = useSetAtom(backConnectStepAtom);
   const closeActiveSurface = useSetAtom(closeActiveSurfaceAtom);
+  const openModel = useSetAtom(openModelSurfaceAtom);
 
   useInput((input, key) => {
     const currentStep = stepRef.current;
     if (inFlightRef.current || isMouseInput(input)) {
+      return;
+    }
+    if (key.escape && returnToModelRef.current) {
+      openModel();
       return;
     }
     if (currentStep === ConnectStep.Key) {

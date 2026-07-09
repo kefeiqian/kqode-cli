@@ -6,13 +6,12 @@ import {
   customLabelErrorAtom,
   connectInFlightAtom,
   connectLastOutcomeAtom,
-  connectProvidersAtom,
+  setConnectProvidersAtom,
   connectRequestErrorAtom,
-  connectSelectedIndexAtom,
   connectStepAtom,
   selectedProviderAtom
 } from '@state/ui/connect/index.ts';
-import { closeActiveSurfaceAtom } from '@state/ui/index.ts';
+import { openModelSurfaceAtom } from '@state/ui/index.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { validateBaseUrl, validateLabel } from '@libs/providers/index.ts';
 
@@ -21,15 +20,14 @@ export function useConnectBackend(baseUrl: string, label: string) {
   const client = useAtomValue(backendClientAtom);
   const selectedProvider = useAtomValue(selectedProviderAtom);
   const inFlight = useAtomValue(connectInFlightAtom);
-  const setProviders = useSetAtom(connectProvidersAtom);
-  const setSelectedIndex = useSetAtom(connectSelectedIndexAtom);
+  const setProviders = useSetAtom(setConnectProvidersAtom);
   const setStep = useSetAtom(connectStepAtom);
   const setInFlight = useSetAtom(connectInFlightAtom);
   const setOutcome = useSetAtom(connectLastOutcomeAtom);
   const setRequestError = useSetAtom(connectRequestErrorAtom);
   const setBaseUrlError = useSetAtom(customBaseUrlErrorAtom);
   const setLabelError = useSetAtom(customLabelErrorAtom);
-  const closeActiveSurface = useSetAtom(closeActiveSurfaceAtom);
+  const openModel = useSetAtom(openModelSurfaceAtom);
 
   const refreshProviders = useCallback(async () => {
     if (client === undefined) {
@@ -40,12 +38,11 @@ export function useConnectBackend(baseUrl: string, label: string) {
     try {
       const result = await client.listProviders();
       setProviders(result.providers);
-      setSelectedIndex((current) => Math.min(current, Math.max(0, result.providers.length - 1)));
       setRequestError(null);
     } catch {
       setRequestError('Could not read providers — ensure settings storage is available, then retry.');
     }
-  }, [client, setProviders, setRequestError, setSelectedIndex]);
+  }, [client, setProviders, setRequestError]);
 
   const submitKey = useCallback(
     async (apiKey: string) => {
@@ -65,7 +62,7 @@ export function useConnectBackend(baseUrl: string, label: string) {
         setOutcome({ ...result, providerId: selectedProvider.providerId });
         await refreshProviders();
         if (result.outcome === 'connected') {
-          closeActiveSurface();
+          openModel();
         }
       } catch {
         setRequestError('Connect failed — ensure the OS keychain is available, then retry.');
@@ -73,7 +70,7 @@ export function useConnectBackend(baseUrl: string, label: string) {
         setInFlight(false);
       }
     },
-    [client, closeActiveSurface, inFlight, refreshProviders, selectedProvider, setInFlight, setOutcome, setRequestError]
+    [client, inFlight, openModel, refreshProviders, selectedProvider, setInFlight, setOutcome, setRequestError]
   );
 
   const clearProvider = useCallback(async () => {

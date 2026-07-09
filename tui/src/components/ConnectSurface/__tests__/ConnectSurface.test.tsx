@@ -18,15 +18,17 @@ import {
   PROVIDER_ID_KIMI,
   customBaseUrlAtom,
   customLabelAtom,
+  connectReturnToModelAtom,
   connectLastOutcomeAtom,
   connectSelectedIndexAtom,
-  connectStepAtom
+  connectStepAtom,
+  connectTargetProviderIdAtom
 } from '@state/ui/connect/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { fakeClient, provider, renderConnect, waitForFrame, waitUntil } from '@components/ConnectSurface/__tests__/testUtils.tsx';
 
 describe('ConnectSurface', () => {
-  it('connects Kimi with a masked key and closes only on connected', async () => {
+  it('connects Kimi with a masked key and lands in the model picker', async () => {
     const client = fakeClient({ outcome: SET_KEY_OUTCOME_CONNECTED });
     const { store, stdin, lastFrame } = renderConnect(client);
     await waitForFrame(lastFrame, 'Kimi');
@@ -36,10 +38,10 @@ describe('ConnectSurface', () => {
     stdin.write('sk-valid-kimi');
     await flushInput();
     stdin.write('\r');
-    await waitUntil(() => store.get(activeSurfaceAtom) === Surface.Home, 'surface close');
+    await waitUntil(() => store.get(activeSurfaceAtom) === Surface.Model, 'model picker open');
 
     expect(client.setProviderKey).toHaveBeenCalledWith(expect.objectContaining({ providerId: PROVIDER_ID_KIMI, apiKey: 'sk-valid-kimi' }));
-    expect(store.get(activeSurfaceAtom)).toBe(Surface.Home);
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Model);
   });
 
   it('renders auth failure and stays open for a 401-style Kimi result', async () => {
@@ -116,6 +118,21 @@ describe('ConnectSurface', () => {
 
     expect(client.clearProviderKey).toHaveBeenCalledWith(PROVIDER_ID_KIMI);
     expect(frame).toContain('not configured');
+  });
+
+  it('preselects Custom for a model deep-link and returns to model on Esc', async () => {
+    const { store, stdin, lastFrame } = renderConnect(fakeClient(), (nextStore) => {
+      nextStore.set(connectTargetProviderIdAtom, PROVIDER_ID_CUSTOM);
+      nextStore.set(connectReturnToModelAtom, true);
+    });
+
+    const frame = await waitForFrame(lastFrame, 'Base URL');
+    expect(frame).toContain('Custom');
+    expect(store.get(connectStepAtom)).toBe(ConnectStep.CustomUrl);
+
+    stdin.write('\u001B');
+    await flushInput();
+    await waitUntil(() => store.get(activeSurfaceAtom) === Surface.Model, 'model return');
   });
 
   it("renders a Custom-specific store failure instead of a keychain hint", async () => {

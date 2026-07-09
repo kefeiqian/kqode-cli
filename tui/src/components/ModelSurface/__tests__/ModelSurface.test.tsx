@@ -209,4 +209,15 @@ describe('ModelSurface', () => {
     expect(store.get(activeSurfaceAtom)).toBe(Surface.Model);
     expect(client.setProviderKey).not.toHaveBeenCalled();
   });
+
+  it('opens Connect for a not-connected Custom provider', async () => {
+    const client = fakeClient({ providers: [provider('custom', 'Custom', false)] });
+    const { store, stdin, lastFrame } = renderModel(client);
+    await waitForFrame(lastFrame, '›    (not connected — enter to connect)');
+
+    stdin.write('\r');
+    await flushInput();
+
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Connect);
+  });
 });

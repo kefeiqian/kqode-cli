@@ -8,7 +8,8 @@ import { useInlineConnect } from '@components/ModelSurface/useInlineConnect.ts';
 import { useModelBackend } from '@components/ModelSurface/useModelBackend.ts';
 import { useModelInput } from '@components/ModelSurface/useModelInput.ts';
 import { columnsAtom, rowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
-import { closeActiveSurfaceAtom } from '@state/ui/surface/index.ts';
+import { closeActiveSurfaceAtom, openConnectSurfaceAtom } from '@state/ui/surface/index.ts';
+import { PROVIDER_ID_CUSTOM } from '@state/ui/connect/index.ts';
 import {
   modelHighlightAtom,
   inlineConnectInFlightAtom,
@@ -43,12 +44,19 @@ export function ModelSurface() {
   const theme = useAtomValue(activeThemeAtom);
   const setVisibleRows = useSetAtom(modelVisibleRowsAtom);
   const closeActiveSurface = useSetAtom(closeActiveSurfaceAtom);
+  const openConnect = useSetAtom(openConnectSurfaceAtom);
   const { refreshModels, retryProvider, selectModel } = useModelBackend(closeActiveSurface);
   const { cancelInlineConnect, startInlineConnect, submitInlineKey } = useInlineConnect(refreshModels);
   const inlineRows = inlineProviderId === null ? 0 : INLINE_CONNECT_ROWS;
   const bodyRows = useMemo(() => Math.max(1, rows - HEADER_ROWS - FOOTER_ROWS - inlineRows), [inlineRows, rows]);
 
-  useModelInput({ cancelInlineConnect, retryProvider, selectModel, startInlineConnect });
+  useModelInput({
+    cancelInlineConnect,
+    openCustomConnect: () => openConnect({ providerId: PROVIDER_ID_CUSTOM, returnToModel: true }),
+    retryProvider,
+    selectModel,
+    startInlineConnect
+  });
 
   useEffect(() => {
     setVisibleRows(bodyRows);

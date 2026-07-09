@@ -1,4 +1,5 @@
 import { atom } from 'jotai';
+import type { Setter } from 'jotai';
 import {
   PROVIDER_STATUS_CONNECTED,
   SET_KEY_OUTCOME_CONNECTED
@@ -45,6 +46,8 @@ export const connectLastOutcomeAtom = atom<ConnectOutcome | null>(null);
 
 /** Non-secret request error rendered as a degraded backend hint. */
 export const connectRequestErrorAtom = atom<string | null>(null);
+export const connectTargetProviderIdAtom = atom<string | null>(null);
+export const connectReturnToModelAtom = atom(false);
 
 /** Custom provider base URL draft. This atom never stores API keys. */
 export const customBaseUrlAtom = atom('');
@@ -85,6 +88,23 @@ export const resetConnectSurfaceAtom = atom(null, (_get, set) => {
   set(clearConfirmAtom, false);
 });
 
+/** Stores refreshed provider rows and applies any pending deep-link target. */
+export const setConnectProvidersAtom = atom(null, (get, set, providers: ProviderStatusInfo[]) => {
+  set(connectProvidersAtom, providers);
+  const targetProviderId = get(connectTargetProviderIdAtom);
+  const targetIndex = targetProviderId === null
+    ? -1
+    : providers.findIndex((provider) => provider.providerId === targetProviderId);
+  const nextIndex = targetIndex >= 0
+    ? targetIndex
+    : Math.min(get(connectSelectedIndexAtom), Math.max(0, providers.length - 1));
+  set(connectSelectedIndexAtom, nextIndex);
+  if (targetIndex >= 0) {
+    setProviderFlow(set, providers[targetIndex]);
+    set(connectTargetProviderIdAtom, null);
+  }
+});
+
 /** Moves the provider list highlight, clamped to available backend rows. */
 export const moveConnectSelectionAtom = atom(null, (get, set, delta: number) => {
   const maxIndex = Math.max(0, get(connectProvidersAtom).length - 1);
@@ -105,8 +125,7 @@ export const chooseSelectedProviderAtom = atom(null, (get, set) => {
   set(connectedActionIndexAtom, 0);
 
   if (provider.providerId === PROVIDER_ID_CUSTOM) {
-    set(customBaseUrlAtom, provider.baseUrl ?? '');
-    set(customLabelAtom, provider.baseUrl === null ? '' : provider.label);
+    setCustomDrafts(set, provider);
   }
 
   set(
@@ -118,6 +137,29 @@ export const chooseSelectedProviderAtom = atom(null, (get, set) => {
         : ConnectStep.Key
   );
 });
+
+function setProviderFlow(set: Setter, provider: ProviderStatusInfo) {
+  set(connectLastOutcomeAtom, null);
+  set(connectRequestErrorAtom, null);
+  set(clearConfirmAtom, false);
+  set(connectedActionIndexAtom, 0);
+  if (provider.providerId === PROVIDER_ID_CUSTOM) {
+    setCustomDrafts(set, provider);
+  }
+  set(
+    connectStepAtom,
+    provider.status === PROVIDER_STATUS_CONNECTED
+      ? ConnectStep.ConnectedActions
+      : provider.providerId === PROVIDER_ID_CUSTOM
+        ? ConnectStep.CustomUrl
+        : ConnectStep.Key
+  );
+}
+
+function setCustomDrafts(set: Setter, provider: ProviderStatusInfo) {
+  set(customBaseUrlAtom, provider.baseUrl ?? '');
+  set(customLabelAtom, provider.baseUrl === null ? '' : provider.label);
+}
 
 /** Backs out one visible connect step, returning to the list at the top. */
 export const backConnectStepAtom = atom(null, (get, set) => {

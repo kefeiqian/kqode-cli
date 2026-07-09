@@ -79,13 +79,14 @@ export function fakeClient(options: {
   };
 }
 
-export function renderConnect(client: BackendClient = fakeClient()) {
+export function renderConnect(client: BackendClient = fakeClient(), setup?: (store: ReturnType<typeof createStore>) => void) {
   const store = createStore();
   store.set(activeSurfaceAtom, Surface.Connect);
   store.set(backendClientAtom, client);
   store.set(workspaceCwdAtom, cwd);
   store.set(columnsTestOverrideAtom, 100);
   store.set(rowsTestOverrideAtom, 24);
+  setup?.(store);
   return { client, store, ...renderWithJotai(<ConnectSurface />, store) };
 }
 

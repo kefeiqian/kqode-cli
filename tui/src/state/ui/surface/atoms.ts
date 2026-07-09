@@ -1,4 +1,5 @@
 import { atom } from 'jotai';
+import { connectReturnToModelAtom, connectTargetProviderIdAtom } from '@state/ui/connect/index.ts';
 import { MemoryMode, memoryModeAtom, resetMemorySubStateAtom } from '@state/ui/memory/index.ts';
 
 /** Mutually exclusive fullscreen surfaces the TUI shell can render. */
@@ -28,8 +29,12 @@ export const closeActiveSurfaceAtom = atom(null, (_get, set) => {
   set(setActiveSurfaceAtom, Surface.Home);
 });
 
+export type OpenConnectOptions = { providerId?: string; returnToModel?: boolean };
+
 /** Opens the provider connect surface. */
-export const openConnectSurfaceAtom = atom(null, (_get, set) => {
+export const openConnectSurfaceAtom = atom(null, (_get, set, options: OpenConnectOptions | undefined = undefined) => {
+  set(connectTargetProviderIdAtom, options?.providerId ?? null);
+  set(connectReturnToModelAtom, options?.returnToModel ?? false);
   set(setActiveSurfaceAtom, Surface.Connect);
 });
 

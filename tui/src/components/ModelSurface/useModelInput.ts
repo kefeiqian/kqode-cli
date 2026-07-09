@@ -17,6 +17,7 @@ import { MODEL_LOAD_STATUS_NOT_CONNECTED } from '@state/ui/model/index.ts';
 /** Wires `/model` navigation, retry, and selection keybindings. */
 export function useModelInput(actions: {
   cancelInlineConnect: () => void;
+  openCustomConnect: () => void;
   retryProvider: (providerId: string) => Promise<void>;
   selectModel: (providerId: string, modelId: string) => Promise<void>;
   startInlineConnect: (providerId: string) => void;
@@ -70,6 +71,12 @@ export function useModelInput(actions: {
         row.providerId !== PROVIDER_ID_CUSTOM
       ) {
         actions.startInlineConnect(row.providerId);
+      } else if (
+        row?.type === 'status' &&
+        row.status === MODEL_LOAD_STATUS_NOT_CONNECTED &&
+        row.providerId === PROVIDER_ID_CUSTOM
+      ) {
+        actions.openCustomConnect();
       }
     }
   });
