@@ -4,7 +4,6 @@ import type { BackendClient, ProviderStatusInfo, SetKeyParams } from '@contracts
 import { memoryBackendStub } from '@test/backendMemoryStub.ts';
 import { themeBackendStub } from '@test/backendThemeStub.ts';
 import {
-  CREDENTIAL_SOURCE_ENV,
   CREDENTIAL_SOURCE_KEYCHAIN,
   PROVIDER_STATUS_CONNECTED,
   PROVIDER_STATUS_NOT_CONFIGURED
@@ -52,13 +51,13 @@ describe('activeModel atoms', () => {
     store.set(
       backendClientAtom,
       clientWith({
-        providers: [provider('kimi', 'Kimi', PROVIDER_STATUS_CONNECTED, CREDENTIAL_SOURCE_ENV, 'kimi-k2.7-code')]
+        providers: [provider('kimi', 'Kimi', PROVIDER_STATUS_CONNECTED, CREDENTIAL_SOURCE_KEYCHAIN, 'kimi-k2.7-code')]
       })
     );
 
     await store.set(refreshActiveModelAtom);
 
-    expect(store.get(activeModelLabelAtom)).toBe(formatModelLabel('Kimi', 'kimi-k2.7-code', CREDENTIAL_SOURCE_ENV));
+    expect(store.get(activeModelLabelAtom)).toBe(formatModelLabel('Kimi', 'kimi-k2.7-code', CREDENTIAL_SOURCE_KEYCHAIN));
   });
 
   it('shows not configured when no connected provider has a default model', async () => {

@@ -1,13 +1,7 @@
-import {
-  CREDENTIAL_SOURCE_ENV,
-  CREDENTIAL_SOURCE_KEYCHAIN
-} from '@contracts/backend/providerMessages.ts';
+import { CREDENTIAL_SOURCE_KEYCHAIN } from '@contracts/backend/providerMessages.ts';
 import type { CredentialSource } from '@contracts/backend/providerMessages.ts';
 
 const MODEL_LABEL_SEPARATOR = ' · ';
-
-/** Compact source tag for workspace `.env` credentials. */
-export const MODEL_SOURCE_TAG_ENV = '.env';
 
 /** Compact source tag for OS-keychain credentials. */
 export const MODEL_SOURCE_TAG_KEYCHAIN = 'keychain';
@@ -47,9 +41,6 @@ export function formatModelLabel(
 
 /** Converts provider credential source wire values into status-bar tags. */
 export function modelSourceTag(source?: CredentialSource | null): string | null {
-  if (source === CREDENTIAL_SOURCE_ENV) {
-    return MODEL_SOURCE_TAG_ENV;
-  }
   if (source === CREDENTIAL_SOURCE_KEYCHAIN) {
     return MODEL_SOURCE_TAG_KEYCHAIN;
   }

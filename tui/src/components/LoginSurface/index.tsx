@@ -8,7 +8,7 @@ import { OutcomeMessage, RequestErrorMessage } from '@components/LoginSurface/Ou
 import { ProviderList } from '@components/LoginSurface/ProviderList.tsx';
 import { useLoginBackend } from '@components/LoginSurface/useLoginBackend.ts';
 import { useLoginInput } from '@components/LoginSurface/useLoginInput.ts';
-import { activeThemeAtom, workspaceCwdAtom } from '@state/global/index.ts';
+import { activeThemeAtom } from '@state/global/index.ts';
 import { columnsAtom, rowsAtom } from '@state/ui/index.ts';
 import {
   KIMI_BASE_URL,
@@ -35,7 +35,6 @@ import {
 export function LoginSurface() {
   const columns = useAtomValue(columnsAtom);
   const rows = useAtomValue(rowsAtom);
-  const cwd = useAtomValue(workspaceCwdAtom);
   const providers = useAtomValue(loginProvidersAtom);
   const selectedIndex = useAtomValue(loginSelectedIndexAtom);
   const selectedProvider = useAtomValue(selectedProviderAtom);
@@ -65,7 +64,7 @@ export function LoginSurface() {
     <Box flexDirection="column" width={columns} height={rows} backgroundColor={theme.colors.bodyBackground}>
       <Text color={theme.colors.accentBlue}>/login</Text>
       <Text color={theme.colors.muted}>Connect a provider. Secrets stay in masked local input only.</Text>
-      <ProviderList cwd={cwd} providers={providers} selectedIndex={selectedIndex} />
+      <ProviderList providers={providers} selectedIndex={selectedIndex} />
       {selectedProvider !== null && step === LoginStep.ConnectedActions ? (
         <ConnectedActions actionIndex={actionIndex} confirmClear={confirmClear} provider={selectedProvider} />
       ) : null}

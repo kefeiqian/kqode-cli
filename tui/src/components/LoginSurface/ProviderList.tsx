@@ -6,11 +6,9 @@ import { activeThemeAtom } from '@state/global/index.ts';
 
 /** Selectable backend provider rows with credential source status. */
 export function ProviderList({
-  cwd,
   providers,
   selectedIndex
 }: {
-  cwd: string;
   providers: ProviderStatusInfo[];
   selectedIndex: number;
 }) {
@@ -25,7 +23,6 @@ export function ProviderList({
       {providers.map((provider, index) => (
         <ProviderRow
           key={provider.providerId}
-          cwd={cwd}
           isSelected={index === selectedIndex}
           provider={provider}
         />
@@ -35,18 +32,16 @@ export function ProviderList({
 }
 
 function ProviderRow({
-  cwd,
   isSelected,
   provider
 }: {
-  cwd: string;
   isSelected: boolean;
   provider: ProviderStatusInfo;
 }) {
   const theme = useAtomValue(activeThemeAtom);
   const prefix = isSelected ? '›' : ' ';
   const color = isSelected ? theme.colors.accentBlue : theme.colors.foreground;
-  const label = statusLabel(provider.status, provider.credentialSource, cwd);
+  const label = statusLabel(provider.status, provider.credentialSource);
 
   return (
     <Box>

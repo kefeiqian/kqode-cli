@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CREDENTIAL_SOURCE_ENV,
   CREDENTIAL_SOURCE_KEYCHAIN,
   PROVIDER_STATUS_CONNECTED,
+  PROVIDER_STATUS_NOT_CONFIGURED,
   SET_KEY_OUTCOME_AUTH_FAILED,
   SET_KEY_OUTCOME_CONNECTED,
   SET_KEY_OUTCOME_EMPTY_CATALOG,
@@ -97,11 +97,11 @@ describe('LoginSurface', () => {
     expect(client.setProviderKey).toHaveBeenCalledWith(expect.objectContaining({ providerId: PROVIDER_ID_CUSTOM, baseUrl: 'https://ok.test/v1' }));
   });
 
-  it('clears a key and re-renders refreshed .env status', async () => {
+  it('clears a key and re-renders refreshed not-configured status', async () => {
     const client = fakeClient({
       providers: [
         [provider(PROVIDER_ID_KIMI, 'Kimi', PROVIDER_STATUS_CONNECTED, CREDENTIAL_SOURCE_KEYCHAIN)],
-        [provider(PROVIDER_ID_KIMI, 'Kimi', PROVIDER_STATUS_CONNECTED, CREDENTIAL_SOURCE_ENV)]
+        [provider(PROVIDER_ID_KIMI, 'Kimi', PROVIDER_STATUS_NOT_CONFIGURED)]
       ]
     });
     const { stdin, lastFrame } = renderLogin(client);
@@ -112,10 +112,10 @@ describe('LoginSurface', () => {
     stdin.write('c');
     await flushInput();
     stdin.write('y');
-    const frame = await waitForFrame(lastFrame, 'connected via .env');
+    const frame = await waitForFrame(lastFrame, 'not configured');
 
     expect(client.clearProviderKey).toHaveBeenCalledWith(PROVIDER_ID_KIMI);
-    expect(frame).toContain('connected via .env (`C:\\repo`)');
+    expect(frame).toContain('not configured');
   });
 
   it("renders a Custom-specific store failure instead of a keychain hint", async () => {
@@ -133,16 +133,6 @@ describe('LoginSurface', () => {
     expect(frame).not.toContain('Keychain write failed');
   });
 
-  it('shows .env-connected providers', async () => {
-    const { lastFrame } = renderLogin(
-      fakeClient({
-        providers: [[provider(PROVIDER_ID_KIMI, 'Kimi', PROVIDER_STATUS_CONNECTED, CREDENTIAL_SOURCE_ENV)]]
-      })
-    );
-    const frame = await waitForFrame(lastFrame, 'connected via .env');
-
-    expect(frame).toContain('connected via .env (`C:\\repo`)');
-  });
 
   it('advances and backs through Custom fields without advancing invalid URLs', async () => {
     const first = renderLogin();

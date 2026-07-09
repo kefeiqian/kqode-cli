@@ -31,9 +31,6 @@ export const PROVIDER_STATUS_NOT_CONFIGURED = 'notConfigured';
 /** Must match `CREDENTIAL_SOURCE_KEYCHAIN` in `src/protocol.rs`. */
 export const CREDENTIAL_SOURCE_KEYCHAIN = 'keychain';
 
-/** Must match `CREDENTIAL_SOURCE_ENV` in `src/protocol.rs`. */
-export const CREDENTIAL_SOURCE_ENV = 'env';
-
 /** Must match `SET_KEY_OUTCOME_CONNECTED` in `src/protocol.rs`. */
 export const SET_KEY_OUTCOME_CONNECTED = 'connected';
 
@@ -66,7 +63,7 @@ export const MODEL_LIST_STATUS_FAILED = 'failed';
 
 export type ProviderStatus = typeof PROVIDER_STATUS_CONNECTED | typeof PROVIDER_STATUS_NOT_CONFIGURED;
 
-export type CredentialSource = typeof CREDENTIAL_SOURCE_KEYCHAIN | typeof CREDENTIAL_SOURCE_ENV;
+export type CredentialSource = typeof CREDENTIAL_SOURCE_KEYCHAIN;
 
 export type SetKeyOutcome =
   | typeof SET_KEY_OUTCOME_CONNECTED

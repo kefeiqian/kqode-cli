@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  CREDENTIAL_SOURCE_ENV,
   MODEL_LIST_STATUS_EMPTY,
   MODEL_LIST_STATUS_FAILED,
   MODEL_LIST_STATUS_LOADED
@@ -59,7 +58,7 @@ describe('ModelSurface', () => {
   it('shows connected models and disconnected providers as separate sections', async () => {
     const client = fakeClient({
       providers: [
-        provider('kimi', 'Kimi', true, CREDENTIAL_SOURCE_ENV),
+        provider('kimi', 'Kimi'),
         provider('custom', 'Custom', false)
       ],
       lists: { kimi: { status: MODEL_LIST_STATUS_LOADED, models: [{ id: 'k1', ownedBy: null }] } }
@@ -67,7 +66,7 @@ describe('ModelSurface', () => {
     const { lastFrame } = renderModel(client);
 
     const frame = await waitForFrame(lastFrame, '(not connected — /login to add)');
-    expect(frame).toContain('Kimi (via .env)');
+    expect(frame).toContain('Kimi (via keychain)');
     expect(frame).toContain('k1');
     expect(frame).toContain('Custom');
     expect(client.listModels).toHaveBeenCalledTimes(1);
