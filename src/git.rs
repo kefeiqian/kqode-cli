@@ -53,7 +53,11 @@ pub fn status_label() -> Option<String> {
 }
 
 /// Runs `git status` (bounded by [`GIT_STATUS_TIMEOUT`]) and parses its output.
-async fn read_status_label() -> Option<String> {
+///
+/// Exposed to the crate so the turn worker can fetch the label from within its
+/// own async runtime (the sync [`status_label`] wrapper would panic there — it
+/// creates a nested runtime).
+pub(crate) async fn read_status_label() -> Option<String> {
     let command = Command::new("git")
         .args(["status", "--porcelain=v1", "--branch"])
         .stdin(Stdio::null())

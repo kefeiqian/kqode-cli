@@ -13,6 +13,7 @@ use futures_util::StreamExt;
 use tracing::Instrument;
 
 use crate::chat::request::{CompactionState, HistoryRound, assemble};
+use crate::chat::system_prompt::system_message;
 use crate::chat::{CancellationToken, TurnStreamEvent};
 use crate::config::KimiConfig;
 use crate::debug_log;
@@ -97,7 +98,9 @@ async fn stream_turn<E: Fn(TurnStreamEvent)>(
     emit: &E,
 ) {
     let model = config.model.clone();
-    let messages = assemble(&history, &compaction, &model, &user_text);
+    let git = crate::git::read_status_label().await;
+    let system = system_message(&model, git.as_deref());
+    let messages = assemble(system, &history, &compaction, &user_text);
     let provider = match KimiProvider::new(config) {
         Ok(provider) => provider,
         Err(error) => return fail(&error, emit),

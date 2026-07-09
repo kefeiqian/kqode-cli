@@ -6,7 +6,6 @@
 //! [`CompactionState`] and produces the `system → (summary?) → verbatim tail →
 //! new prompt` message list. It never touches the durable transcript.
 
-use crate::chat::system_prompt::system_message;
 use crate::provider::ChatMessage;
 
 /// One prior completed round contributing verbatim history.
@@ -67,13 +66,13 @@ impl CompactionState {
 /// summary are skipped so they are never sent twice.
 #[must_use]
 pub fn assemble(
+    system: ChatMessage,
     history: &[HistoryRound],
     compaction: &CompactionState,
-    model: &str,
     new_prompt: &str,
 ) -> Vec<ChatMessage> {
     let mut messages = Vec::with_capacity(history.len() * 2 + 2);
-    messages.push(system_message(model));
+    messages.push(system);
     if let Some(summary) = compaction.summary.as_deref() {
         messages.push(summary_message(summary));
     }
@@ -111,7 +110,12 @@ mod tests {
 
     #[test]
     fn full_history_without_summary() {
-        let messages = assemble(&rounds(), &CompactionState::default(), "kimi", "third ask");
+        let messages = assemble(
+            ChatMessage::system("SYSTEM"),
+            &rounds(),
+            &CompactionState::default(),
+            "third ask",
+        );
 
         let shape: Vec<(Role, &str)> = messages
             .iter()
@@ -132,7 +136,12 @@ mod tests {
 
     #[test]
     fn no_prior_rounds_is_system_plus_new_prompt() {
-        let messages = assemble(&[], &CompactionState::default(), "kimi", "only ask");
+        let messages = assemble(
+            ChatMessage::system("SYSTEM"),
+            &[],
+            &CompactionState::default(),
+            "only ask",
+        );
         assert_eq!(messages.len(), 2);
         assert_eq!(messages[0].role, Role::System);
         assert_eq!(messages[1].role, Role::User);
@@ -146,7 +155,12 @@ mod tests {
             covered_through_seq: 0,
         };
 
-        let messages = assemble(&rounds(), &compaction, "kimi", "third ask");
+        let messages = assemble(
+            ChatMessage::system("SYSTEM"),
+            &rounds(),
+            &compaction,
+            "third ask",
+        );
 
         // system, summary, then only seq > 0 verbatim, then the new prompt.
         assert_eq!(messages[0].role, Role::System);
