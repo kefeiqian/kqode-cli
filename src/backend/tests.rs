@@ -34,6 +34,52 @@ fn set_key_rejects_bad_custom_url_immediately_without_worker() {
 }
 
 #[test]
+fn theme_get_and_set_round_trip_through_dispatch() {
+    let (backend, _client) = Connection::memory();
+    let (coordinator, _receiver) = std::sync::mpsc::channel();
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open_or_bootstrap_at(dir.path().join("kqode.db")).unwrap();
+
+    let get_theme = || {
+        handle_request(
+            Request {
+                id: RequestId::from(1),
+                method: crate::protocol::THEME_GET_METHOD.to_owned(),
+                params: serde_json::json!({}),
+            },
+            &backend,
+            &store,
+            &coordinator,
+        )
+        .expect("theme get response")
+        .result
+        .expect("ok result")
+    };
+
+    // Unset before any save.
+    assert_eq!(get_theme(), serde_json::json!({ "themeId": null }));
+
+    // A valid id persists through the dispatch + store layers.
+    let set_result = handle_request(
+        Request {
+            id: RequestId::from(2),
+            method: crate::protocol::THEME_SET_METHOD.to_owned(),
+            params: serde_json::json!({ "themeId": "nord" }),
+        },
+        &backend,
+        &store,
+        &coordinator,
+    )
+    .expect("theme set response")
+    .result
+    .expect("ok result");
+    assert_eq!(set_result, serde_json::json!({ "outcome": "saved" }));
+
+    // The saved id now round-trips back through get.
+    assert_eq!(get_theme(), serde_json::json!({ "themeId": "nord" }));
+}
+
+#[test]
 fn store_failure_returns_before_ready_or_loop() {
     let (backend, client) = Connection::memory();
     client

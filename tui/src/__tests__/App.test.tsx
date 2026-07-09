@@ -4,15 +4,18 @@ import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '@/App.tsx';
 import {
+  activeSurfaceAtom,
   armedActionAtom,
   columnsTestOverrideAtom,
   copyModeActiveAtom,
   FULLSCREEN_GUARD_ROWS,
-  rowsTestOverrideAtom
+  rowsTestOverrideAtom,
+  Surface
 } from '@state/ui/index.ts';
 import { ArmedAction } from '@constants/ui.ts';
-import { productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
+import { activeThemeAtom, productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
 import { helpVisibleAtom } from '@state/ui/help/index.ts';
+import { DEFAULT_THEME } from '@theme/themeConfig.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
@@ -215,6 +218,30 @@ describe('App', () => {
     const homeFrame = lastFrame() ?? '';
     expect(homeFrame).toContain('/ commands | @ mention | ? help');
     expect(homeFrame).not.toContain('↑/↓ scroll · q/esc close');
+  });
+
+  it('opens the /theme picker from the composer and returns home on Esc without applying (covers AE1, AE5)', async () => {
+    const { store, lastFrame, stdin } = renderApp({ columns: 100, rows: 24 });
+    await flushInput();
+
+    stdin.write('/theme');
+    await flushInput();
+    stdin.write('\r');
+    await flushInput();
+
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Theme);
+    const themeFrame = lastFrame() ?? '';
+    expect(themeFrame).toContain('/theme');
+    expect(themeFrame).toContain('Dracula');
+    // No out-of-scope theme affordances leak into the picker.
+    expect(themeFrame).not.toMatch(/light|custom|plugin|import|export/i);
+
+    stdin.write('\u001B');
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    // Esc returns to the transcript without applying the highlighted theme.
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Home);
+    expect(store.get(activeThemeAtom)).toBe(DEFAULT_THEME);
   });
 
   it('disarms Ctrl+C when Esc closes an active surface', async () => {
