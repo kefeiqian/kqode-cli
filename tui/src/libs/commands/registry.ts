@@ -32,11 +32,30 @@ export const CommandName = {
   Theme: '/theme'
 } as const;
 
+/** Stable identifiers for `/memory` subcommands. */
+export const MemorySubcommandId = {
+  Add: 'add',
+  Show: 'show',
+  Inbox: 'inbox',
+  Edit: 'edit',
+  Forget: 'forget'
+} as const;
+
+export type MemorySubcommandId = (typeof MemorySubcommandId)[keyof typeof MemorySubcommandId];
+
+/** A single slash subcommand token declared under a parent command. */
+export type SubcommandDefinition = {
+  id: string;
+  name: string;
+  description: string;
+};
+
 /** A single slash command: its id, the `/name` shown in the menu, and a short description. */
 export type CommandDefinition = {
   id: CommandId;
   name: string;
   description: string;
+  subcommands?: readonly SubcommandDefinition[];
 };
 
 /**
@@ -52,7 +71,18 @@ const BUILT_IN_COMMANDS: readonly CommandDefinition[] = [
   { id: CommandId.Login, name: CommandName.Login, description: 'Connect or update provider credentials' },
   { id: CommandId.Model, name: CommandName.Model, description: 'Choose the active provider model' },
   { id: CommandId.Resume, name: CommandName.Resume, description: 'Resume a saved local session' },
-  { id: CommandId.Memory, name: CommandName.Memory, description: 'Manage local memory' },
+  {
+    id: CommandId.Memory,
+    name: CommandName.Memory,
+    description: 'Manage local memory',
+    subcommands: [
+      { id: MemorySubcommandId.Add, name: 'add', description: 'Add a project memory' },
+      { id: MemorySubcommandId.Show, name: 'show', description: 'Show active memory' },
+      { id: MemorySubcommandId.Inbox, name: 'inbox', description: 'Review memory inbox candidates' },
+      { id: MemorySubcommandId.Edit, name: 'edit', description: 'Edit an active memory' },
+      { id: MemorySubcommandId.Forget, name: 'forget', description: 'Forget an active memory' }
+    ]
+  },
   { id: CommandId.Theme, name: CommandName.Theme, description: 'Choose a color theme' }
 ];
 
