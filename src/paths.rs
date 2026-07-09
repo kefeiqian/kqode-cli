@@ -13,6 +13,9 @@ pub const KQODE_HOME_DIRNAME: &str = ".kqode";
 /// SQLite database filename under the KQode home.
 const DB_FILENAME: &str = "kqode.db";
 
+/// Local memory directory name under the KQode home.
+const MEMORY_DIRNAME: &str = "memory";
+
 /// Best-effort home directory from `USERPROFILE` (Windows) or `HOME` (Unix).
 ///
 /// Returns `None` when neither variable is set to a non-empty value, so callers
@@ -41,6 +44,16 @@ pub fn kqode_home() -> Option<PathBuf> {
 #[must_use]
 pub fn db_path() -> Option<PathBuf> {
     Some(kqode_home()?.join(DB_FILENAME))
+}
+
+/// Resolves the local memory root: `<kqode_home>/memory`.
+///
+/// Returns `None` when the home cannot be resolved. Callers that need a
+/// test-controlled root construct [`crate::memory::ScopeRoots`] with an explicit
+/// base instead of overriding this resolver.
+#[must_use]
+pub fn memory_dir() -> Option<PathBuf> {
+    Some(kqode_home()?.join(MEMORY_DIRNAME))
 }
 
 #[cfg(test)]
