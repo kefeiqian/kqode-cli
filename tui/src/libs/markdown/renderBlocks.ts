@@ -1,6 +1,7 @@
 import type { Token, Tokens } from 'marked';
 import { parseBlocks, tokenPlainText } from '@libs/markdown/parseBlocks.ts';
 import { renderCodeBlock } from '@libs/markdown/renderCodeBlock.ts';
+import { renderTable } from '@libs/markdown/renderTable.ts';
 import { renderInline, renderInlineTokens } from '@libs/markdown/renderInline.ts';
 import type { MarkdownContentRow, StyledSegment, ThemeColorToken } from '@libs/markdown/types.ts';
 import { wrapSegments } from '@libs/markdown/wrapSegments.ts';
@@ -42,6 +43,8 @@ function renderTokens(tokens: readonly Token[], columns: number, depth: number):
         rows.push(...renderCodeBlock(token as Tokens.Code, columns));
         break;
       case 'table':
+        rows.push(...renderTable(token as Tokens.Table, columns));
+        break;
       case 'html':
         rows.push(...plainRows(tokenPlainText(token), columns));
         break;

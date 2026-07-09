@@ -40,13 +40,13 @@ describe('renderMarkdownContentRows', () => {
     );
   });
 
-  it('renders code blocks in-place and keeps tables plain before the table renderer', () => {
+  it('renders code blocks and tables in-place with specialized renderers', () => {
     const rows = renderMarkdownContentRows('## A\n\n```js\nconst x = 1;\n```\n\n| A | B |\n| - | - |', 40);
 
     expect(rows.map((row) => row.text)).toContain('const x = 1;');
     expect(rows.find((row) => row.text === 'const x = 1;')?.backgroundColorToken).toBe(
       'messageBackground'
     );
-    expect(rows.map((row) => row.text)).toContain('| A | B |');
+    expect(rows.some((row) => row.text.startsWith('┌'))).toBe(true);
   });
 });
