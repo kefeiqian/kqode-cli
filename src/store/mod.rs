@@ -35,6 +35,7 @@ mod recovery;
 mod sessions;
 #[cfg(test)]
 mod tests;
+mod theme;
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -45,6 +46,7 @@ pub use error::{STORE_FATAL_SENTINEL, StoreError};
 pub use memory::{StoredInboxEntry, StoredMemoryItem};
 pub use providers::{ActiveSelection, ProviderSettings};
 pub use sessions::StoredSession;
+pub use theme::{MAX_THEME_ID_LEN, is_valid_theme_id};
 
 /// Bootstrap busy-timeout: at startup wait only briefly for a locked DB, then
 /// fail fast with a store-fatal error instead of hanging the backend spawn.

@@ -26,7 +26,7 @@ fn table_names(conn: &Connection) -> Vec<String> {
         .collect()
 }
 
-const EXPECTED_TABLES: [&str; 9] = [
+const EXPECTED_TABLES: [&str; 10] = [
     "active_selection",
     "memory_corrections",
     "memory_cursors",
@@ -36,6 +36,7 @@ const EXPECTED_TABLES: [&str; 9] = [
     "refinery_schema_history",
     "sessions",
     "turns",
+    "ui_preferences",
 ];
 
 #[derive(Debug, PartialEq, Eq)]
@@ -111,10 +112,10 @@ fn fresh_path_bootstraps_to_latest_with_all_tables() {
     let store = Store::open_or_bootstrap_at(path).expect("bootstrap");
     let conn = store.connect().expect("connect");
     assert_eq!(migrations::user_version(&conn).unwrap(), 0);
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(3));
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(4));
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
     let rows = history_rows(&conn);
-    assert_eq!(rows.len(), 3);
+    assert_eq!(rows.len(), 4);
     assert_eq!(rows[0].version, 1);
     assert_eq!(rows[0].name, "initial_schema");
     assert_eq!(rows[0].checksum, migrations::v1_checksum().to_string());
@@ -122,6 +123,9 @@ fn fresh_path_bootstraps_to_latest_with_all_tables() {
     assert_eq!(rows[1].name, "session_resume_index");
     assert_eq!(rows[2].version, 3);
     assert_eq!(rows[2].name, "memory_index");
+    assert_eq!(rows[3].version, 4);
+    assert_eq!(rows[3].name, "theme_preferences");
+    assert_eq!(rows[3].checksum, migrations::v4_checksum().to_string());
 }
 
 #[test]
@@ -177,8 +181,8 @@ fn concurrent_bootstraps_across_processes_all_succeed() {
 
     let store = Store::open_or_bootstrap_at(path).unwrap();
     let conn = store.connect().unwrap();
-    assert_eq!(history_rows(&conn).len(), 3);
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(3));
+    assert_eq!(history_rows(&conn).len(), 4);
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(4));
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
 }
 
@@ -219,8 +223,8 @@ fn reopening_a_migrated_db_is_idempotent() {
     Store::open_or_bootstrap_at(path.clone()).expect("first bootstrap");
     let store = Store::open_or_bootstrap_at(path).expect("second bootstrap is a no-op");
     let conn = store.connect().unwrap();
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(3));
-    assert_eq!(history_rows(&conn).len(), 3);
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(4));
+    assert_eq!(history_rows(&conn).len(), 4);
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
 }
 
@@ -236,7 +240,7 @@ fn a_version_zero_db_migrates_forward() {
     let store = Store::open_or_bootstrap_at(path).expect("bootstrap");
     let conn = store.connect().unwrap();
     assert_eq!(migrations::user_version(&conn).unwrap(), 0);
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(3));
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(4));
 }
 
 #[test]
@@ -245,6 +249,15 @@ fn v1_migration_checksum_is_pinned() {
         migrations::v1_checksum(),
         17197033309386186228,
         "editing a shipped V1 migration must intentionally update this pin"
+    );
+}
+
+#[test]
+fn v4_migration_checksum_is_pinned() {
+    assert_eq!(
+        migrations::v4_checksum(),
+        8135057403458267641,
+        "editing the shipped V4 theme migration must intentionally update this pin"
     );
 }
 
@@ -281,7 +294,7 @@ fn db_ahead_of_embedded_migrations_refuses_to_bootstrap() {
     {
         let conn = Connection::open(&path).unwrap();
         create_refinery_history(&conn);
-        seed_history_row(&conn, 4, "future_schema", 1);
+        seed_history_row(&conn, 5, "future_schema", 1);
     }
     let err = Store::open_or_bootstrap_at(path.clone()).unwrap_err();
     match err.root_cause() {
@@ -329,7 +342,7 @@ fn legacy_user_version_one_db_gets_reset_message_and_can_rebootstrap_after_delet
     remove_db_with_sidecars(&path);
     let store = Store::open_or_bootstrap_at(path).expect("fresh bootstrap after reset");
     let conn = store.connect().unwrap();
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(3));
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(4));
 }
 
 #[test]
@@ -426,7 +439,7 @@ fn sanity_check_reports_history_version_mismatch() {
         err,
         StoreError::SchemaHistoryMismatch {
             found: None,
-            known: 3
+            known: 4
         }
     ));
 }
@@ -802,6 +815,138 @@ fn no_key_or_secret_column_exists_in_the_schema() {
             "column {column:?} looks like it stores a secret"
         );
     }
+}
+
+// ---- Theme preference (V4) ----
+
+#[test]
+fn ui_preferences_table_has_expected_columns() {
+    let (_dir, store) = bootstrap();
+    let conn = store.connect().unwrap();
+    assert_eq!(
+        column_names(&conn, "ui_preferences"),
+        ["id", "theme_id", "updated_at"]
+    );
+}
+
+#[test]
+fn theme_id_is_none_when_unset() {
+    let (_dir, store) = bootstrap();
+    assert_eq!(store.theme_id().unwrap(), None);
+}
+
+#[test]
+fn set_then_get_theme_id_round_trips_including_unknown_ids() {
+    let (_dir, store) = bootstrap();
+    assert!(store.set_theme_id("nord").unwrap());
+    assert_eq!(store.theme_id().unwrap(), Some("nord".to_owned()));
+    // An unknown-but-well-formed id round-trips unchanged; resolving it to the
+    // default preset is the TUI's job, not the store's.
+    assert!(store.set_theme_id("brand-new-unreleased-theme").unwrap());
+    assert_eq!(
+        store.theme_id().unwrap(),
+        Some("brand-new-unreleased-theme".to_owned())
+    );
+}
+
+#[test]
+fn set_theme_id_is_last_writer_wins_and_survives_reopening_the_db() {
+    let (_dir, path) = temp_db();
+    {
+        let store = Store::open_or_bootstrap_at(path.clone()).unwrap();
+        assert!(store.set_theme_id("nord").unwrap());
+        assert!(store.set_theme_id("gruvbox-dark").unwrap());
+        let conn = store.connect().unwrap();
+        let rows: i64 = conn
+            .query_row("SELECT count(*) FROM ui_preferences", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(rows, 1, "singleton row is never duplicated");
+    }
+    let reopened = Store::open_or_bootstrap_at(path).unwrap();
+    assert_eq!(
+        reopened.theme_id().unwrap(),
+        Some("gruvbox-dark".to_owned())
+    );
+}
+
+#[test]
+fn malformed_theme_ids_are_rejected_and_leave_the_prior_value() {
+    let (_dir, store) = bootstrap();
+    assert!(store.set_theme_id("tokyo-night").unwrap());
+
+    let oversized = "x".repeat(MAX_THEME_ID_LEN + 1);
+    for bad in ["", "   ", "bad\tid", "bad\nid", oversized.as_str()] {
+        assert!(!is_valid_theme_id(bad), "{bad:?} should be invalid");
+        assert!(
+            !store.set_theme_id(bad).unwrap(),
+            "{bad:?} must not be persisted"
+        );
+    }
+    assert_eq!(store.theme_id().unwrap(), Some("tokyo-night".to_owned()));
+}
+
+#[test]
+fn clear_theme_id_reads_back_as_unset() {
+    let (_dir, store) = bootstrap();
+    assert!(store.set_theme_id("catppuccin-mocha").unwrap());
+    store.clear_theme_id().unwrap();
+    assert_eq!(store.theme_id().unwrap(), None);
+}
+
+#[test]
+fn concurrent_theme_writes_leave_one_row_and_a_single_final_id() {
+    let (_dir, store) = bootstrap();
+    let handle_a = store.clone();
+    let handle_b = store.clone();
+    assert!(handle_a.set_theme_id("nord").unwrap());
+    assert!(handle_b.set_theme_id("one-dark").unwrap());
+    let conn = store.connect().unwrap();
+    let rows: i64 = conn
+        .query_row("SELECT count(*) FROM ui_preferences", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(rows, 1, "two handles share one singleton row");
+    assert_eq!(store.theme_id().unwrap(), Some("one-dark".to_owned()));
+}
+
+#[test]
+fn theme_preference_coexists_with_provider_and_active_selection_across_reopen() {
+    // Adding V4 is additive: existing provider settings and the active model
+    // selection survive alongside the new theme preference across a reopen.
+    let (_dir, path) = temp_db();
+    {
+        let store = Store::open_or_bootstrap_at(path.clone()).unwrap();
+        store
+            .upsert_provider_settings(&ProviderSettings {
+                provider: ProviderId::Kimi,
+                base_url: "https://api.moonshot.cn/v1".to_owned(),
+                label: Some("Kimi".to_owned()),
+                key_present: true,
+                last_connected_at: Some(1),
+            })
+            .unwrap();
+        store
+            .set_active_selection(&ActiveSelection {
+                provider: ProviderId::Kimi,
+                model_id: "kimi-k2.7-code".to_owned(),
+            })
+            .unwrap();
+        assert!(store.set_theme_id("nord").unwrap());
+    }
+    let reopened = Store::open_or_bootstrap_at(path).unwrap();
+    assert_eq!(reopened.theme_id().unwrap(), Some("nord".to_owned()));
+    assert_eq!(
+        reopened.active_selection().unwrap(),
+        Some(ActiveSelection {
+            provider: ProviderId::Kimi,
+            model_id: "kimi-k2.7-code".to_owned(),
+        })
+    );
+    let settings = reopened
+        .provider_settings(ProviderId::Kimi)
+        .unwrap()
+        .unwrap();
+    assert!(settings.key_present);
+    assert_eq!(settings.label, Some("Kimi".to_owned()));
 }
 
 // ---- Memory index (V3) ----

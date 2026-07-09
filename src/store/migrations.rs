@@ -56,6 +56,17 @@ pub(super) fn v1_checksum() -> u64 {
         .checksum()
 }
 
+/// The pinned checksum for the shipped V4 (theme preferences) migration.
+#[cfg(test)]
+pub(super) fn v4_checksum() -> u64 {
+    runner()
+        .get_migrations()
+        .iter()
+        .find(|migration| migration.version() == 4)
+        .expect("V4 migration is embedded")
+        .checksum()
+}
+
 /// Reads the max applied refinery migration version.
 ///
 /// # Errors
@@ -94,7 +105,7 @@ fn app_table_count(conn: &Connection) -> rusqlite::Result<i64> {
     conn.query_row(
         "SELECT COUNT(*) FROM sqlite_master
          WHERE type = 'table'
-           AND name IN ('provider_settings', 'active_selection', 'sessions', 'turns')",
+           AND name IN ('provider_settings', 'active_selection', 'sessions', 'turns', 'ui_preferences')",
         [],
         |row| row.get(0),
     )
