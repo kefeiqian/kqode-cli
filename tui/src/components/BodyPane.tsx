@@ -5,6 +5,7 @@ import { DEFAULT_BODY_ENTRIES, resolveBodyRows } from '@libs/tui/bodyRows.ts';
 import type { BodyEntry, BodyRow } from '@libs/tui/bodyRows.ts';
 import { clamp } from '@libs/math/clamp.ts';
 import { displayWidth, padEndToWidth } from '@libs/text/displayWidth.ts';
+import { isAllowedLinkHref, sanitizeLinkHref } from '@libs/markdown/linkSegment.ts';
 import {
   bodyScrollOffsetRowsAtom,
   displayedBodyEntriesAtom,
@@ -150,6 +151,7 @@ function padBodyText(text: string, contentColumns: number): string {
 }
 
 const RENDER_CONTROL_CHAR_PATTERN = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g;
+const ENABLE_OSC8_LINKS = false;
 
 function sanitizeRenderedText(text: string): string {
   return text.replace(RENDER_CONTROL_CHAR_PATTERN, '');
@@ -166,6 +168,7 @@ function renderSegments(
 
   const sanitizedSegments = row.segments.map((segment) => ({
     ...segment,
+    href: segment.href === undefined ? undefined : sanitizeLinkHref(segment.href),
     text: sanitizeRenderedText(segment.text)
   }));
   const text = sanitizedSegments.map((segment) => segment.text).join('');
@@ -184,7 +187,7 @@ function renderSegments(
           italic={segment.italic}
           underline={segment.underline}
         >
-          {segment.text}
+          {renderSegmentText(segment)}
         </Text>
       ))}
       {padding.length > 0 ? (
@@ -194,4 +197,17 @@ function renderSegments(
       ) : null}
     </>
   );
+}
+
+function renderSegmentText(segment: NonNullable<BodyRow['segments']>[number]): string {
+  if (segment.href === undefined) {
+    return segment.text;
+  }
+
+  const href = sanitizeLinkHref(segment.href);
+  if (ENABLE_OSC8_LINKS && isAllowedLinkHref(href)) {
+    return `\u001b]8;;${href}\u0007${segment.text}\u001b]8;;\u0007`;
+  }
+
+  return segment.text === href ? segment.text : `${segment.text} (${href})`;
 }

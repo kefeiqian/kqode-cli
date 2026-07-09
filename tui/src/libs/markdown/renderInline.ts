@@ -1,5 +1,6 @@
 import { Lexer } from 'marked';
 import type { Token } from 'marked';
+import { linkSegment } from '@libs/markdown/linkSegment.ts';
 import type { StyledSegment } from '@libs/markdown/types.ts';
 
 type InlineStyle = Pick<
@@ -34,13 +35,7 @@ export function renderInlineTokens(tokens: readonly Token[], style: InlineStyle 
         segments.push({ ...style, text: '\n' });
         break;
       case 'link':
-        segments.push(
-          ...renderInlineTokens(token.tokens ?? [], {
-            ...style,
-            colorToken: 'accentBlue',
-            underline: true
-          })
-        );
+        segments.push(linkSegment(token.text, token.href));
         break;
       case 'image':
         segments.push({ ...style, colorToken: 'muted', text: token.text });

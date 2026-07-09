@@ -26,4 +26,18 @@ describe('BodyPane', () => {
 
     expect(lastFrame()).toContain('你好');
   });
+
+  it('renders unsafe markdown links as visible non-clickable fallback text', () => {
+    const { lastFrame } = renderWithJotai(
+      <BodyPane
+        columns={60}
+        entries={[{ kind: BodyEntryKind.Assistant, text: '[x](javascript:alert(1))' }]}
+        rows={3}
+      />
+    );
+
+    const frame = lastFrame() ?? '';
+    expect(frame).toContain('x (javascript:alert(1))');
+    expect(frame).not.toContain('\u001b]8');
+  });
 });
