@@ -108,7 +108,7 @@ impl Store {
     /// the connect flow can set the flag **last**, only after the keychain write
     /// succeeds. Otherwise a crash (or a keychain failure) between flag and key
     /// would leave `key_present = true` with no resolvable key — a false
-    /// "connected" whose every submit reroutes to `/login`. A no-op if the row
+    /// "connected" whose every submit reroutes to `/connect`. A no-op if the row
     /// is absent (settings are always written first).
     ///
     /// # Errors

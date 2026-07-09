@@ -17,8 +17,8 @@ use crate::protocol::{
 };
 use crate::store::{Store, StoreError};
 
+mod connect;
 mod git_status;
-mod login;
 mod memory;
 mod message;
 mod providers;
@@ -199,10 +199,10 @@ fn handle_request(
         Some(RpcMethod::SelectionSet) => Some(handle_selection_set(request, store)),
         Some(RpcMethod::ProviderClearKey) => Some(handle_provider_clear_key(request, store)),
         Some(RpcMethod::ProviderSetKey) => {
-            login::handle_provider_set_key(request, connection, store)
+            connect::handle_provider_set_key(request, connection, store)
         }
         Some(RpcMethod::ProviderModels) => {
-            login::handle_provider_models(request, connection, store)
+            connect::handle_provider_models(request, connection, store)
         }
         Some(RpcMethod::ThemeGet) => Some(Response::new_ok(request.id, themes::theme_get(store))),
         Some(RpcMethod::ThemeSet) => Some(handle_theme_set(request, store)),

@@ -2,7 +2,7 @@
 //!
 //! `.env` is loaded at backend startup for development-only settings such as
 //! `KQODE_DEBUG`. Provider credentials, models, and base URLs are configured
-//! through `/login`, the OS keychain, and the SQLite settings store.
+//! through `/connect`, the OS keychain, and the SQLite settings store.
 
 /// Default model for the Kimi preset: coding-optimized, 256k context.
 pub const DEFAULT_KIMI_MODEL: &str = "kimi-k2.7-code";

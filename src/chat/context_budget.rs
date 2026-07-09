@@ -7,7 +7,7 @@
 //! which compaction should trigger.
 //!
 //! Reading the window from the provider `/models` catalog is deferred: `/models`
-//! is fetched only at login and is not threaded to turn time, so a configured
+//! is fetched only at connect and is not threaded to turn time, so a configured
 //! constant is used for now (see the plan's Deferred to Follow-Up Work).
 
 /// Configured context window (tokens) for the Kimi models, matching the value

@@ -27,7 +27,7 @@ pub use persistence::{ConversationPersistence, NoopConversationPersistence, Sess
 pub use transcript::{SettledKind, Transcript, TurnResult, TurnState};
 
 const NEEDS_CONFIGURATION_MESSAGE: &str =
-    "No provider configured. Use /login to add a provider before sending messages.";
+    "No provider configured. Use /connect to add a provider before sending messages.";
 
 /// Commands consumed by the single-owner conversation coordinator thread.
 #[derive(Debug)]

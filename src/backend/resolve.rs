@@ -20,7 +20,7 @@ pub(crate) fn resolve_submit_config(store: &Store) -> Option<KimiConfig> {
         None => effective_default()?,
     };
     let key = secrets::resolve_key(provider)?;
-    let base_url = crate::login::resolve_base_url(store, provider)?;
+    let base_url = crate::connect::resolve_base_url(store, provider)?;
 
     Some(KimiConfig {
         api_key: key.expose().to_owned(),

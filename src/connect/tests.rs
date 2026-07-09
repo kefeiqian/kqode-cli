@@ -1,6 +1,8 @@
 use super::*;
-use crate::login::sanitize::sanitize_model_id;
-use crate::login::selection::{persist_connected_provider, select_default_model, set_key_outcome};
+use crate::connect::sanitize::sanitize_model_id;
+use crate::connect::selection::{
+    persist_connected_provider, select_default_model, set_key_outcome,
+};
 use crate::protocol::{
     SET_KEY_OUTCOME_AUTH_FAILED, SET_KEY_OUTCOME_CONNECTED, SET_KEY_OUTCOME_EMPTY_CATALOG,
     SET_KEY_OUTCOME_NOT_COMPATIBLE, SET_KEY_OUTCOME_RATE_LIMITED, SET_KEY_OUTCOME_UNREACHABLE,

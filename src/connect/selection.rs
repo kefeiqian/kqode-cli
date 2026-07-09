@@ -1,6 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::login::SetKeyWork;
+use crate::connect::SetKeyWork;
 use crate::protocol::{
     SET_KEY_OUTCOME_AUTH_FAILED, SET_KEY_OUTCOME_CONNECTED, SET_KEY_OUTCOME_EMPTY_CATALOG,
     SET_KEY_OUTCOME_NOT_COMPATIBLE, SET_KEY_OUTCOME_RATE_LIMITED, SET_KEY_OUTCOME_STORE_FAILED,

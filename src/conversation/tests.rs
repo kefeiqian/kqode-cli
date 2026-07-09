@@ -137,7 +137,7 @@ fn error_and_panic_still_promote_next_turn() {
 }
 
 #[test]
-fn missing_config_settles_with_login_guidance_without_starting_runner() {
+fn missing_config_settles_with_connect_guidance_without_starting_runner() {
     let (handle, events, started) = harness();
     let sender = handle.sender();
     sender

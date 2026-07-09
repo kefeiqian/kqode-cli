@@ -1,4 +1,4 @@
-//! Provider login validation and model-catalog loading.
+//! Provider connect validation and model-catalog loading.
 //!
 //! Esc during an in-flight validation is allowed to complete on the backend:
 //! a connected response persists settings/key/selection. The TUI may discard a

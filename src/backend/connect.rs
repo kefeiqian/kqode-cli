@@ -25,7 +25,7 @@ pub(super) fn handle_provider_set_key(
         }
     };
     let key = crate::secrets::ApiKey::new(params.api_key);
-    let work = match crate::login::prepare_set_key_work(
+    let work = match crate::connect::prepare_set_key_work(
         &params.provider_id,
         params.base_url,
         params.label,
@@ -50,7 +50,7 @@ pub(super) fn handle_provider_set_key(
         {
             Ok(runtime) => Response::new_ok(id, {
                 let _guard = provider_lock(work.provider);
-                runtime.block_on(crate::login::set_provider_key(store, work))
+                runtime.block_on(crate::connect::set_provider_key(store, work))
             }),
             Err(error) => Response::new_err(
                 id,
@@ -95,7 +95,7 @@ pub(super) fn handle_provider_models(
         {
             Ok(runtime) => Response::new_ok(id, {
                 let _guard = provider_lock(provider);
-                runtime.block_on(crate::login::list_models(store, provider))
+                runtime.block_on(crate::connect::list_models(store, provider))
             }),
             Err(error) => Response::new_err(
                 id,

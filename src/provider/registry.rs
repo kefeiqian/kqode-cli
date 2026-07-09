@@ -130,7 +130,7 @@ pub enum CredentialSource {
     Keychain,
 }
 
-/// Cached provider status for selection/login surfaces.
+/// Cached provider status for selection/connect surfaces.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProviderStatus {
     /// The provider has a resolvable credential from the given source.
