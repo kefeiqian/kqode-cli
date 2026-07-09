@@ -40,7 +40,16 @@ lowlight.registerAlias({
   typescript: ['ts', 'tsx']
 });
 
+const MAX_CACHE_ENTRIES = 256;
 const cache = new Map<string, HighlightedCode>();
+
+function cacheSet(key: string, value: HighlightedCode): void {
+  if (cache.size >= MAX_CACHE_ENTRIES) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+  cache.set(key, value);
+}
 
 /** Highlights a code block with a curated lowlight language set. */
 export function highlightCode(code: string, language?: string): HighlightedCode {
@@ -55,7 +64,7 @@ export function highlightCode(code: string, language?: string): HighlightedCode 
     lowlight.registered(normalizedLanguage)
       ? highlightedResult(code, normalizedLanguage)
       : plainResult(code);
-  cache.set(cacheKey, result);
+  cacheSet(cacheKey, result);
   return result;
 }
 

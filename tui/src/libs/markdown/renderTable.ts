@@ -103,8 +103,9 @@ function tableWidth(widths: readonly number[]): number {
 }
 
 function fallbackPlainRows(token: Tokens.Table, columns: number): MarkdownContentRow[] {
-  return token.raw.split(/\r\n|\r|\n/).map((line) => ({
-    segments: [{ colorToken: 'foreground', text: line.slice(0, columns) }],
-    text: line.slice(0, columns)
-  }));
+  return token.raw.split(/\r\n|\r|\n/).flatMap((line) => {
+    const wrapped = wrapSegments([{ colorToken: 'foreground', text: line }], columns);
+    if (wrapped.length === 0) return [tableRow([{ colorToken: 'foreground', text: '' }])];
+    return wrapped.map((segments) => tableRow(segments));
+  });
 }

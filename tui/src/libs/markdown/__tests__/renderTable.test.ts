@@ -26,6 +26,19 @@ describe('renderTable', () => {
     expect(rows.every((row) => displayWidth(row.text) <= 24)).toBe(true);
   });
 
+  it('wraps the plain fallback by display width for wide content', () => {
+    // A many-column table too narrow to fit even at min widths falls back to
+    // plain rows; those must still respect the display width (no code-unit slice
+    // that overflows on CJK/wide glyphs and breaks one-row-per-visual-row).
+    const rows = renderTable(
+      table('| 列一 | 列二 | 列三 | 列四 |\n| - | - | - | - |\n| 你好世界 | 数据测试 | 值一二三 | 末列内容 |'),
+      12
+    );
+
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => displayWidth(row.text) <= 12)).toBe(true);
+  });
+
   it('handles ragged rows without crashing', () => {
     const rows = renderTable(table('| A | B |\n| - | - |\n| only |'), 20);
 
