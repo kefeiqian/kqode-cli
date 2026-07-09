@@ -228,4 +228,51 @@ describe('MemorySurface', () => {
     expect(frame).not.toContain('Edit project memory');
     expect(store.get(memoryFormAtom)).toBeNull();
   });
+
+  it('routes x through confirmation before forgetting', async () => {
+    const forgetMemory = vi.fn(async () => ({ id: 'item-1', forgotten: true }));
+    const client = fakeClient({ items: [sampleItem()] });
+    client.forgetMemory = forgetMemory;
+    const { stdin, lastFrame } = renderMemory(client);
+    await waitForFrame(lastFrame, 'Use tabs in Go');
+
+    stdin.write('x');
+    let frame = await waitForFrame(lastFrame, 'y forget');
+    expect(frame).toContain('Use tabs in Go');
+    expect(forgetMemory).not.toHaveBeenCalled();
+
+    stdin.write('\r');
+    await flushInput();
+    expect(forgetMemory).not.toHaveBeenCalled();
+
+    stdin.write('x');
+    await waitForFrame(lastFrame, 'y forget');
+    stdin.write('y');
+    await flushInput();
+    expect(forgetMemory).toHaveBeenCalledWith({ scope: 'user', id: 'item-1' });
+  });
+
+  it('picks and confirms forget from the pending action flow', async () => {
+    const forgetMemory = vi.fn(async () => ({ id: 'item-1', forgotten: true }));
+    const client = fakeClient({ items: [sampleItem()] });
+    client.forgetMemory = forgetMemory;
+    const { store, stdin, lastFrame } = renderMemory(client);
+    await waitForFrame(lastFrame, 'Use tabs in Go');
+
+    store.set(setPendingMemoryItemActionAtom, PendingMemoryItemAction.Forget);
+    await flushInput();
+    stdin.write('\r');
+    await waitForFrame(lastFrame, 'y forget');
+    stdin.write('n');
+    await flushInput();
+    expect(forgetMemory).not.toHaveBeenCalled();
+
+    store.set(setPendingMemoryItemActionAtom, PendingMemoryItemAction.Forget);
+    await flushInput();
+    stdin.write('\r');
+    await waitForFrame(lastFrame, 'y forget');
+    stdin.write('y');
+    await flushInput();
+    expect(forgetMemory).toHaveBeenCalledTimes(1);
+  });
 });

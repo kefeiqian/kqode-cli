@@ -66,9 +66,13 @@ export const memoryVisibleRowsAtom = atom(1);
 export const memoryDetailBodyAtom = atom<string | null>(null);
 export const memoryFormAtom = atom<MemoryFormState | null>(null);
 export const pendingMemoryItemActionAtom = atom<PendingMemoryItemAction | null>(null);
+export const forgetConfirmAtom = atom<MemoryItem | null>(null);
 
 export const memorySurfaceConsumesEscAtom = atom(
-  (get) => get(memoryFormAtom) !== null || get(pendingMemoryItemActionAtom) !== null
+  (get) =>
+    get(memoryFormAtom) !== null ||
+    get(pendingMemoryItemActionAtom) !== null ||
+    get(forgetConfirmAtom) !== null
 );
 
 const currentListLengthAtom = atom((get) =>
@@ -110,6 +114,7 @@ export const resetMemorySurfaceAtom = atom(null, (_get, set) => {
   set(memoryDetailBodyAtom, null);
   set(memoryFormAtom, null);
   set(pendingMemoryItemActionAtom, null);
+  set(forgetConfirmAtom, null);
 });
 
 export const setMemoryDataAtom = atom(
@@ -212,8 +217,17 @@ export const setPendingMemoryItemActionAtom = atom(
     set(memoryHighlightIndexAtom, 0);
     set(memoryWindowOffsetAtom, 0);
     set(memoryDetailBodyAtom, null);
+    set(forgetConfirmAtom, null);
   }
 );
+
+export const setForgetConfirmAtom = atom(null, (_get, set, item: MemoryItem | null) => {
+  set(forgetConfirmAtom, item);
+  if (item !== null) {
+    set(pendingMemoryItemActionAtom, null);
+    set(memoryDetailBodyAtom, null);
+  }
+});
 
 export const setMemoryFormFieldAtom = atom(null, (get, set, field: MemoryFormField) => {
   const form = get(memoryFormAtom);

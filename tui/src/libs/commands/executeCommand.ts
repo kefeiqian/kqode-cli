@@ -19,6 +19,7 @@ export type CommandActions = {
   openMemory: (mode?: CommandMemoryMode) => void | Promise<void>;
   openMemoryAdd: () => void | Promise<void>;
   openMemoryEdit: () => void | Promise<void>;
+  openMemoryForget: () => void | Promise<void>;
   openTheme: () => void | Promise<void>;
 };
 
@@ -68,6 +69,10 @@ export function executeMenuSelection(entry: MenuEntry, actions: CommandActions):
     }
     if (entry.subcommand.id === MemorySubcommandId.Edit) {
       void actions.openMemoryEdit();
+      return;
+    }
+    if (entry.subcommand.id === MemorySubcommandId.Forget) {
+      void actions.openMemoryForget();
       return;
     }
     void actions.openMemory(memoryModeForSubcommand(entry.subcommand.id));

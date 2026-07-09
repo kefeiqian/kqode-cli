@@ -17,6 +17,7 @@ const makeActions = () => ({
   openMemory: vi.fn(),
   openMemoryAdd: vi.fn(),
   openMemoryEdit: vi.fn(),
+  openMemoryForget: vi.fn(),
   openTheme: vi.fn()
 });
 
@@ -37,13 +38,6 @@ describe('executeMenuSelection', () => {
     expect(actions.openMemory).toHaveBeenNthCalledWith(2, CommandMemoryMode.Inbox);
   });
 
-  it('opens memory for other memory subcommands with the default mode', () => {
-    const actions = makeActions();
-    executeMenuSelection(exactCommandMatch('/memory forget')!, actions);
-
-    expect(actions.openMemory).toHaveBeenCalledWith(undefined);
-  });
-
   it('opens the add flow for memory add', () => {
     const actions = makeActions();
     executeMenuSelection(exactCommandMatch('/memory add')!, actions);
@@ -57,6 +51,13 @@ describe('executeMenuSelection', () => {
     executeMenuSelection(exactCommandMatch('/memory edit')!, actions);
 
     expect(actions.openMemoryEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the forget flow for memory forget', () => {
+    const actions = makeActions();
+    executeMenuSelection(exactCommandMatch('/memory forget')!, actions);
+
+    expect(actions.openMemoryForget).toHaveBeenCalledTimes(1);
   });
 });
 

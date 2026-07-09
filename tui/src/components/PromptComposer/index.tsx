@@ -128,6 +128,10 @@ export function PromptComposer({
         openMemory(MemoryMode.Active);
         setPendingMemoryItemAction(PendingMemoryItemAction.Edit);
       },
+      openMemoryForget: () => {
+        openMemory(MemoryMode.Active);
+        setPendingMemoryItemAction(PendingMemoryItemAction.Forget);
+      },
       openTheme
     }),
     [

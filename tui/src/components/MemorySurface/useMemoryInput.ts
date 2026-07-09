@@ -7,6 +7,7 @@ import {
   MemoryMode,
   MemoryStatus,
   PendingMemoryItemAction,
+  forgetConfirmAtom,
   highlightedInboxEntryAtom,
   highlightedMemoryItemAtom,
   memoryDetailBodyAtom,
@@ -16,6 +17,7 @@ import {
   setMemoryDetailAtom,
   memoryFormAtom,
   pendingMemoryItemActionAtom,
+  setForgetConfirmAtom,
   setPendingMemoryItemActionAtom,
   switchMemoryModeAtom
 } from '@state/ui/memory/index.ts';
@@ -38,10 +40,12 @@ export function useMemoryInput(actions: MemoryInputActions) {
   const detail = useLatest(useAtomValue(memoryDetailBodyAtom));
   const form = useLatest(useAtomValue(memoryFormAtom));
   const pendingAction = useLatest(useAtomValue(pendingMemoryItemActionAtom));
+  const forgetConfirm = useLatest(useAtomValue(forgetConfirmAtom));
   const moveHighlight = useSetAtom(moveMemoryHighlightAtom);
   const switchMode = useSetAtom(switchMemoryModeAtom);
   const setDetail = useSetAtom(setMemoryDetailAtom);
   const setPendingAction = useSetAtom(setPendingMemoryItemActionAtom);
+  const setForgetConfirm = useSetAtom(setForgetConfirmAtom);
 
   useInput((input, key) => {
     if (isMouseInput(input)) {
@@ -51,6 +55,15 @@ export function useMemoryInput(actions: MemoryInputActions) {
       return;
     }
     if (status.current === MemoryStatus.Loading || status.current === MemoryStatus.Busy) {
+      return;
+    }
+    if (forgetConfirm.current !== null) {
+      if (input.toLowerCase() === 'y') {
+        void actions.forgetItem(forgetConfirm.current);
+      }
+      if (key.return || key.escape || input.toLowerCase() === 'n' || input.toLowerCase() === 'y') {
+        setForgetConfirm(null);
+      }
       return;
     }
     // While an item detail is open, enter/q closes it and other keys are inert
@@ -82,7 +95,7 @@ export function useMemoryInput(actions: MemoryInputActions) {
       return;
     }
     if (mode.current === MemoryMode.Active) {
-      handleActiveKey(input, key, item.current, pendingAction.current, actions);
+      handleActiveKey(input, key, item.current, pendingAction.current, actions, setForgetConfirm);
     } else {
       handleInboxKey(input, entry.current, actions);
     }
@@ -94,7 +107,8 @@ function handleActiveKey(
   key: { return: boolean },
   item: MemoryItem | null,
   pendingAction: PendingMemoryItemAction | null,
-  actions: MemoryInputActions
+  actions: MemoryInputActions,
+  setForgetConfirm: (item: MemoryItem | null) => void
 ): void {
   if (item === null) {
     return;
@@ -103,12 +117,16 @@ function handleActiveKey(
     void actions.beginEdit(item);
     return;
   }
+  if (pendingAction === PendingMemoryItemAction.Forget && key.return) {
+    setForgetConfirm(item);
+    return;
+  }
   if (key.return) {
     void actions.showDetail(item);
     return;
   }
   if (input === 'x') {
-    void actions.forgetItem(item);
+    setForgetConfirm(item);
   }
 }
 

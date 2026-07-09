@@ -12,6 +12,7 @@ import { columnsAtom, rowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts
 import {
   MemoryMode,
   MemoryStatus,
+  forgetConfirmAtom,
   highlightedInboxEntryAtom,
   highlightedMemoryItemAtom,
   memoryDetailBodyAtom,
@@ -43,6 +44,7 @@ export function MemorySurface() {
   const detailBody = useAtomValue(memoryDetailBodyAtom);
   const form = useAtomValue(memoryFormAtom);
   const pendingAction = useAtomValue(pendingMemoryItemActionAtom);
+  const forgetConfirm = useAtomValue(forgetConfirmAtom);
   const theme = useAtomValue(activeThemeAtom);
   const setVisibleRows = useSetAtom(memoryVisibleRowsAtom);
   const { refresh, showDetail, forgetItem, addItem, beginEdit, editItem, applyInbox, undoInbox } = useMemoryBackend();
@@ -69,7 +71,9 @@ export function MemorySurface() {
       <Text>{modeTabs(mode)}</Text>
       <Text color={theme.colors.muted}>{statusLine(status, error, pendingAction)}</Text>
       <Text> </Text>
-      {form !== null ? (
+      {forgetConfirm !== null ? (
+        <ForgetConfirm columns={safeChromeColumns} item={forgetConfirm} />
+      ) : form !== null ? (
         <MemoryForm columns={safeChromeColumns} form={form} />
       ) : (
         renderBody({ status, error, mode, detailBody, items, entries, highlightedItem, highlightedEntry, columns: safeChromeColumns, listRows })
@@ -129,6 +133,17 @@ function BodyMessage({ columns, rows, text }: { columns: number; rows: number; t
   );
 }
 
+function ForgetConfirm({ columns, item }: { columns: number; item: MemoryItem }) {
+  const theme = useAtomValue(activeThemeAtom);
+  return (
+    <Box width={columns}>
+      <Text color={theme.colors.errorRed}>
+        {`Forget "${item.title}" from Active memory? y forget · n/enter/esc cancel`.slice(0, columns)}
+      </Text>
+    </Box>
+  );
+}
+
 function MemoryFooter({ columns, mode, detailOpen }: { columns: number; mode: MemoryMode; detailOpen: boolean }) {
   const theme = useAtomValue(activeThemeAtom);
 
@@ -148,6 +163,9 @@ function modeTabs(mode: MemoryMode): string {
 function statusLine(status: MemoryStatus, error: string | null, pendingAction: string | null = null): string {
   if (pendingAction === 'edit') {
     return 'Pick a memory to edit · enter choose · esc cancel';
+  }
+  if (pendingAction === 'forget') {
+    return 'Pick a memory to forget · enter choose · esc cancel';
   }
   switch (status) {
     case MemoryStatus.Loading:

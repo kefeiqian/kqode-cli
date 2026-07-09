@@ -6,6 +6,7 @@ import {
   MemoryStatus,
   PendingMemoryItemAction,
   closeMemoryFormAtom,
+  forgetConfirmAtom,
   highlightedMemoryItemAtom,
   memoryErrorAtom,
   memoryFormAtom,
@@ -25,6 +26,7 @@ import {
   setPendingMemoryItemActionAtom,
   setMemoryFormTitleAtom,
   setMemoryDataAtom,
+  setForgetConfirmAtom,
   setMemoryFailureAtom,
   switchMemoryModeAtom,
   visibleMemoryItemsAtom
@@ -151,6 +153,19 @@ describe('memory surface atoms', () => {
       title: selected.title,
       body: 'full body'
     });
+
+  });
+
+  it('tracks forget confirmation and clears it on reset', () => {
+    const store = createStore();
+    const selected = item('forget-me');
+
+    store.set(setForgetConfirmAtom, selected);
+    expect(store.get(forgetConfirmAtom)).toEqual(selected);
+    expect(store.get(pendingMemoryItemActionAtom)).toBeNull();
+
+    store.set(resetMemorySurfaceAtom);
+    expect(store.get(forgetConfirmAtom)).toBeNull();
   });
 
   it('preserves a failed status and error when switching modes', () => {
