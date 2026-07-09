@@ -1,4 +1,5 @@
 import type { SessionSummary } from '@contracts/backend/index.ts';
+import { displayWidth, measureGraphemes, padEndToWidth } from '@libs/text/displayWidth.ts';
 
 const STATUS_WIDTH = 8;
 const MODIFIED_WIDTH = 8;
@@ -54,7 +55,7 @@ function formatLine(
     pad(truncate(created, CREATED_WIDTH), CREATED_WIDTH),
     pad(truncate(folder, folderWidth), folderWidth)
   ].join(' '.repeat(GUTTER));
-  return truncate(row, safeColumns);
+  return clipLine(row, safeColumns);
 }
 
 function formatAge(timestampMs: number): string {
@@ -74,16 +75,37 @@ function formatAge(timestampMs: number): string {
 }
 
 function truncate(text: string, width: number): string {
-  const normalized = text.replace(/\s+/g, ' ').trim();
-  if (normalized.length <= width) {
+  const normalized = normalizeCell(text);
+  if (displayWidth(normalized) <= width) {
     return normalized;
   }
   if (width <= 1) {
-    return normalized.slice(0, width);
+    return clipToWidth(normalized, width);
   }
-  return `${normalized.slice(0, width - 1)}…`;
+  return `${clipToWidth(normalized, width - 1)}…`;
 }
 
 function pad(text: string, width: number): string {
-  return text.padEnd(width, ' ');
+  return padEndToWidth(text, width);
+}
+
+function clipLine(text: string, width: number): string {
+  return displayWidth(text) <= width ? text : clipToWidth(text, width);
+}
+
+function normalizeCell(text: string): string {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+function clipToWidth(text: string, width: number): string {
+  let clipped = '';
+  let used = 0;
+  for (const grapheme of measureGraphemes(text)) {
+    if (used + grapheme.width > width) {
+      break;
+    }
+    clipped += grapheme.segment;
+    used += grapheme.width;
+  }
+  return clipped;
 }
