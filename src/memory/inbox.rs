@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use super::event_log::{self, InboxProposal, InboxStatus, MemoryEvent, MemoryOp};
 use super::extraction::ExtractionOutcome;
 use super::index::MemoryService;
-use super::index::{new_item_id, new_op_id, now_ms, store_err};
+use super::index::{enforce_sizes, new_item_id, new_op_id, now_ms, store_err};
 use super::{
     MemoryError, MemoryItem, MemoryProvenance, MemoryScope, MemorySource, SensitiveVerdict, corpus,
     model, security,
@@ -75,6 +75,7 @@ impl MemoryService {
             InboxAction::Stale => InboxStatus::Stale,
         };
         if action == InboxAction::Approve
+            && entry.status == InboxStatus::Candidate
             && latest_proposal_body(self.event_log_path(), entry_id).is_some()
         {
             self.activate_inbox_entry(entry_id)?;
@@ -101,6 +102,7 @@ impl MemoryService {
         let memory_type = entry.memory_type.ok_or(MemoryError::NotFound)?;
         let title = entry.title.clone().ok_or(MemoryError::NotFound)?;
         model::validate_title(&title)?;
+        enforce_sizes(&title, &body)?;
         security::validate_for_write(&title, &body)?;
 
         let (resolved, root) = self.resolve(entry.scope, entry.scope_id.as_deref())?;
@@ -133,7 +135,18 @@ impl MemoryService {
             },
             content_hash: String::new(),
         };
-        self.persist(&op_id, &root, &mut item, MemoryOp::Write)
+        let stored = self.persist(&op_id, &root, &mut item, MemoryOp::Write)?;
+        // Durably link the entry to its item so a later purge redacts the
+        // proposal body and any re-activation reuses this id (idempotent).
+        self.append(&MemoryEvent::InboxLinked {
+            entry_id: entry_id.to_owned(),
+            target_item_id: stored.id.clone(),
+            at_ms: now,
+        })?;
+        self.store()
+            .set_inbox_target(entry_id, &stored.id, now)
+            .map_err(store_err)?;
+        Ok(stored)
     }
 
     /// Undoes an applied automatic update, restoring the target item's prior

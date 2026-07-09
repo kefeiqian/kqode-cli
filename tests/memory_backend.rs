@@ -740,3 +740,117 @@ fn purge_removes_the_item_and_redacts_its_rollback_body() {
         "purge leaves a content-free tombstone"
     );
 }
+
+#[test]
+fn purge_redacts_the_proposal_body_of_an_approved_extraction() {
+    let fixture = setup();
+    let log = session_log_with(
+        fixture._dir.path(),
+        &[
+            enqueued("t0", 0, "p"),
+            settled("t0", "completed", Some("r")),
+        ],
+    );
+    let rule = RuleExtractor(|_: &ExtractionInput| {
+        ExtractionOutcome::Candidate(MemoryProposal {
+            scope: MemoryScope::User,
+            memory_type: MemoryType::User,
+            title: "topic".to_owned(),
+            body: "REDACT-TARGET-BODY".to_owned(),
+            confidence: 0.4,
+        })
+    });
+    ExtractionScheduler::new().run_session(
+        &fixture.service,
+        "sess-p",
+        &log,
+        ExtractionTrigger::CleanExit,
+        &rule,
+    );
+    let candidates = fixture
+        .store
+        .list_inbox_entries(Some(InboxStatus::Candidate))
+        .unwrap();
+    assert_eq!(candidates.len(), 1);
+
+    fixture
+        .service
+        .inbox_apply(&candidates[0].id, InboxAction::Approve)
+        .unwrap();
+    let items = fixture.service.list(None, true).unwrap();
+    assert_eq!(
+        items.len(),
+        1,
+        "approval activates the extraction candidate"
+    );
+    let item_id = items[0].id.clone();
+
+    assert!(
+        fixture
+            .service
+            .purge(MemoryScope::User, None, &item_id)
+            .unwrap()
+    );
+
+    let events = kqode::memory::event_log::read_events(fixture.service.event_log_path());
+    assert!(
+        !events.iter().any(|event| matches!(
+            event,
+            MemoryEvent::ProposalBody { body, .. } if body.contains("REDACT-TARGET-BODY")
+        )),
+        "purge redacts the proposal body once the entry is linked to its item"
+    );
+}
+
+#[test]
+fn approving_an_active_audit_does_not_duplicate_the_item() {
+    let fixture = setup();
+    let log = session_log_with(
+        fixture._dir.path(),
+        &[
+            enqueued("t0", 0, "p"),
+            settled("t0", "completed", Some("r")),
+        ],
+    );
+    let active_rule = RuleExtractor(|_: &ExtractionInput| {
+        ExtractionOutcome::ActiveUpdate(MemoryProposal {
+            scope: MemoryScope::User,
+            memory_type: MemoryType::Project,
+            title: "setup".to_owned(),
+            body: "use pnpm".to_owned(),
+            confidence: 0.95,
+        })
+    });
+    ExtractionScheduler::new().run_session(
+        &fixture.service,
+        "sess-c",
+        &log,
+        ExtractionTrigger::CleanExit,
+        &active_rule,
+    );
+
+    let before = fixture.service.list(None, true).unwrap();
+    assert_eq!(before.len(), 1, "an active update is applied immediately");
+    let audit = fixture
+        .store
+        .list_inbox_entries(Some(InboxStatus::ActiveAudit))
+        .unwrap();
+    assert_eq!(audit.len(), 1);
+
+    let entry = fixture
+        .service
+        .inbox_apply(&audit[0].id, InboxAction::Approve)
+        .unwrap();
+    assert_eq!(entry.status, InboxStatus::Approved);
+
+    let after = fixture.service.list(None, true).unwrap();
+    assert_eq!(
+        after.len(),
+        1,
+        "approving an already-applied active-audit entry does not create a duplicate"
+    );
+    assert_eq!(
+        after[0].id, before[0].id,
+        "the item id is reused, not re-minted on approval"
+    );
+}

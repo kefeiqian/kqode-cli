@@ -381,7 +381,7 @@ pub(super) fn store_err(err: rusqlite::Error) -> MemoryError {
     MemoryError::Store(err.to_string())
 }
 
-fn enforce_sizes(title: &str, body: &str) -> Result<(), MemoryError> {
+pub(super) fn enforce_sizes(title: &str, body: &str) -> Result<(), MemoryError> {
     if title.len() > MAX_TITLE_BYTES {
         return Err(MemoryError::PayloadTooLarge("title"));
     }

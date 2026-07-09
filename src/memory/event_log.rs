@@ -157,6 +157,13 @@ pub enum MemoryEvent {
         reason: Option<String>,
         at_ms: i64,
     },
+    /// An inbox entry was linked to the memory item its proposal produced, so
+    /// purge can redact the proposal body and re-approval stays idempotent.
+    InboxLinked {
+        entry_id: String,
+        target_item_id: String,
+        at_ms: i64,
+    },
     /// A pre-mutation snapshot of an item's content, enabling undo/rollback of a
     /// later operation without SQLite ever holding the raw body.
     RollbackPoint {

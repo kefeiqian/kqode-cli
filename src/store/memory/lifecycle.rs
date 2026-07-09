@@ -112,6 +112,19 @@ pub(super) fn set_inbox_status_on(
     Ok(())
 }
 
+pub(super) fn set_inbox_target_on(
+    conn: &Connection,
+    entry_id: &str,
+    target_item_id: &str,
+    at_ms: i64,
+) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE memory_inbox_entries SET target_item_id = ?2, updated_at = ?3 WHERE id = ?1",
+        params![entry_id, target_item_id, at_ms],
+    )?;
+    Ok(())
+}
+
 pub(super) fn upsert_cursor_on(
     conn: &Connection,
     session_id: &str,
@@ -204,6 +217,19 @@ impl Store {
         at_ms: i64,
     ) -> rusqlite::Result<()> {
         set_inbox_status_on(&self.connect()?, entry_id, status, at_ms)
+    }
+
+    /// Links an inbox entry to the memory item its proposal produced.
+    ///
+    /// # Errors
+    /// Returns the underlying [`rusqlite::Error`] on connection or write failure.
+    pub fn set_inbox_target(
+        &self,
+        entry_id: &str,
+        target_item_id: &str,
+        at_ms: i64,
+    ) -> rusqlite::Result<()> {
+        set_inbox_target_on(&self.connect()?, entry_id, target_item_id, at_ms)
     }
 
     /// Reads one inbox entry by id.

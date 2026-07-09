@@ -82,6 +82,11 @@ fn project_event(conn: &Connection, event: &MemoryEvent) -> rusqlite::Result<()>
             at_ms,
             ..
         } => lifecycle::set_inbox_status_on(conn, entry_id, *status, *at_ms),
+        MemoryEvent::InboxLinked {
+            entry_id,
+            target_item_id,
+            at_ms,
+        } => lifecycle::set_inbox_target_on(conn, entry_id, target_item_id, *at_ms),
         MemoryEvent::CorrectionRecorded {
             suppression_key,
             scope,
