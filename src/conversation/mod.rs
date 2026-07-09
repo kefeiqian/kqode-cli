@@ -45,6 +45,12 @@ pub enum Command {
         turn_id: String,
         result: TurnResult,
     },
+    /// A compaction was produced for `turn_id`; the coordinator buffers it and
+    /// adopts it only on a clean completed settle (discarded on cancel/error).
+    Compacted {
+        turn_id: String,
+        state: CompactionState,
+    },
     Cancel {
         turn_id: String,
     },
@@ -115,6 +121,10 @@ fn default_runner() -> impl Fn(TurnJob) + Send + Sync + 'static {
                     TurnStreamEvent::Delta(text) => Command::Delta {
                         turn_id: turn_id.clone(),
                         text,
+                    },
+                    TurnStreamEvent::Compacted { state } => Command::Compacted {
+                        turn_id: turn_id.clone(),
+                        state,
                     },
                     TurnStreamEvent::Completed {
                         text,

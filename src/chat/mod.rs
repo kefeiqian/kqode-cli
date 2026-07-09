@@ -1,6 +1,7 @@
 //! Chat-turn orchestration: system prompt construction and the streaming turn
 //! runner that bridges the synchronous backend loop to the async provider.
 
+pub mod compaction;
 pub mod compaction_plan;
 pub mod context_budget;
 pub mod request;

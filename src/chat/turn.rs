@@ -12,7 +12,10 @@ use std::time::Duration;
 use futures_util::StreamExt;
 use tracing::Instrument;
 
-use crate::chat::request::{CompactionState, HistoryRound, assemble};
+use crate::chat::compaction::{CompactionResult, ContextLimits, run_compaction};
+use crate::chat::context_budget;
+use crate::chat::request::{CompactionState, HistoryRound};
+use crate::chat::summarize::summarize;
 use crate::chat::system_prompt::system_message;
 use crate::chat::{CancellationToken, TurnStreamEvent};
 use crate::config::KimiConfig;
@@ -26,6 +29,13 @@ const NEXT_CHUNK_TIMEOUT: Duration = Duration::from_secs(120);
 /// next chunk, so an Esc/`/clear` mid-stream is observed promptly (not only when
 /// the next chunk arrives or the chunk timeout elapses).
 const CANCEL_POLL_INTERVAL: Duration = Duration::from_millis(50);
+
+/// Error kind emitted when a request exceeds the model's context window even
+/// after compaction (R16); the turn fails cleanly rather than dispatching it.
+const CONTEXT_TOO_LARGE_ERROR_KIND: &str = "contextTooLarge";
+/// User-facing message paired with [`CONTEXT_TOO_LARGE_ERROR_KIND`].
+const CONTEXT_TOO_LARGE_MESSAGE: &str =
+    "the request is too large for this model's context window, even after compaction";
 
 /// Spawns a detached OS thread that streams one Kimi turn and emits token
 /// deltas followed by exactly one terminal event, all tagged with `turn_id`.
@@ -100,7 +110,46 @@ async fn stream_turn<E: Fn(TurnStreamEvent)>(
     let model = config.model.clone();
     let git = crate::git::read_status_label().await;
     let system = system_message(&model, git.as_deref());
-    let messages = assemble(system, &history, &compaction, &user_text);
+
+    let limits = ContextLimits {
+        threshold: context_budget::threshold(&model),
+        budget: context_budget::budget(&model),
+    };
+    let summary_config = config.clone();
+    let messages = match run_compaction(
+        system,
+        &history,
+        &compaction,
+        &user_text,
+        limits,
+        &cancel,
+        move |prior, head| async move { summarize(prior.as_deref(), &head, summary_config).await },
+    )
+    .await
+    {
+        CompactionResult::Cancelled => {
+            emit(TurnStreamEvent::Cancelled);
+            return;
+        }
+        CompactionResult::Error(error) => return fail(&error, emit),
+        CompactionResult::OverBudget => {
+            emit(TurnStreamEvent::Error {
+                error_kind: CONTEXT_TOO_LARGE_ERROR_KIND.to_owned(),
+                message: CONTEXT_TOO_LARGE_MESSAGE.to_owned(),
+            });
+            return;
+        }
+        CompactionResult::Ready {
+            messages,
+            new_state,
+        } => {
+            if let Some(state) = new_state {
+                emit(TurnStreamEvent::Compacted { state });
+            }
+            messages
+        }
+    };
+
     let provider = match KimiProvider::new(config) {
         Ok(provider) => provider,
         Err(error) => return fail(&error, emit),

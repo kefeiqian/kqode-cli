@@ -32,6 +32,11 @@ pub(super) struct LoopState {
     shutting_down: bool,
     shutdown_requested: Arc<AtomicBool>,
     persistence: Box<dyn ConversationPersistence>,
+    /// Active summary + covered boundary for the current session; the coordinator
+    /// is the single writer.
+    compaction: CompactionState,
+    /// A compaction reported by the active turn, adopted only on its clean settle.
+    pending_compaction: Option<(String, CompactionState)>,
 }
 
 impl LoopState {
@@ -54,6 +59,8 @@ impl LoopState {
             shutting_down: false,
             shutdown_requested,
             persistence,
+            compaction: CompactionState::default(),
+            pending_compaction: None,
         }
     }
 
@@ -66,6 +73,9 @@ impl LoopState {
             } => self.enqueue(turn_id, prompt, config),
             Command::Delta { turn_id, text } => self.emit_current_delta(turn_id, text),
             Command::Settle { turn_id, result } => self.settle(turn_id, result),
+            Command::Compacted { turn_id, state } => {
+                self.pending_compaction = Some((turn_id, state));
+            }
             Command::Cancel { turn_id }
                 if self.transcript.active_id() == Some(turn_id.as_str()) =>
             {
@@ -87,6 +97,8 @@ impl LoopState {
             } => {
                 self.persistence.attach_session(session);
                 self.transcript.replace_with(turns);
+                self.compaction = CompactionState::default();
+                self.pending_compaction = None;
                 let _ = respond_to.send(());
             }
             Command::Clear => self.clear(),
@@ -150,6 +162,15 @@ impl LoopState {
         if self.cancelling.as_deref() == Some(turn_id.as_str()) {
             self.cancelling = None;
         }
+        // Adopt a buffered compaction only on a clean completed settle; discard on
+        // cancel/error (the result was already forced to `cancelled` above when
+        // this turn was being cancelled). `take()` consumes the buffer either way.
+        if let Some((pending_turn, state)) = self.pending_compaction.take()
+            && pending_turn == turn_id
+            && result.kind == SettledKind::Completed
+        {
+            self.compaction = state;
+        }
         self.active_cancel = None;
         if let Some(thread) = self.active_thread.take() {
             let _ = thread.join();
@@ -183,7 +204,7 @@ impl LoopState {
         let runner = Arc::clone(&self.turn_runner);
         let prompt = self.active_prompt(&turn_id);
         let history = self.completed_history();
-        let compaction = CompactionState::default();
+        let compaction = self.compaction.clone();
         self.active_thread = Some(thread::spawn(move || {
             let panic_result = panic::catch_unwind(AssertUnwindSafe(|| {
                 runner(TurnJob {
@@ -230,6 +251,9 @@ impl LoopState {
                 if result.kind != SettledKind::Completed {
                     return None;
                 }
+                if self.compaction.covers(turn.seq) {
+                    return None;
+                }
                 let assistant = result.text.clone()?;
                 Some(HistoryRound::new(turn.seq, turn.prompt.clone(), assistant))
             })
@@ -248,6 +272,8 @@ impl LoopState {
         if let Err(message) = self.persistence.on_clear(self.transcript.turns()) {
             eprintln!("KQODE_SESSION_PERSISTENCE_ERROR: {message}");
         }
+        self.compaction = CompactionState::default();
+        self.pending_compaction = None;
         self.configs.clear();
         self.transcript.drop_pending();
         self.transcript.drop_settled();
