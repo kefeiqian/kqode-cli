@@ -1,7 +1,8 @@
 import type { ComposerKeyContext, ComposerKeyHandler } from '@components/PromptComposer/input/types.ts';
 import { appendUnknownCommandNoticeAtom } from '@state/promptQueue/index.ts';
-import { executeCommand } from '@libs/commands/executeCommand.ts';
+import { executeMenuSelection } from '@libs/commands/executeCommand.ts';
 import { exactCommandMatch } from '@libs/commands/matchCommand.ts';
+import { entryFullName } from '@libs/commands/subcommands.ts';
 import { captureComposerSubmit, SubmitCaptureKind } from '@libs/composer/submitCapture.ts';
 import { validateComposerSubmit } from '@libs/composer/promptText.ts';
 import {
@@ -37,10 +38,10 @@ function submitPrompt({ state, maxBytes, onSubmit, commandActions, store }: Comp
   }
 
   if (validation.text.startsWith('/')) {
-    const command = exactCommandMatch(validation.text);
-    if (command !== undefined) {
-      captureComposerSubmit({ kind: SubmitCaptureKind.ValidCommand, text: command.name });
-      executeCommand(command.id, commandActions);
+    const entry = exactCommandMatch(validation.text);
+    if (entry !== undefined) {
+      captureComposerSubmit({ kind: SubmitCaptureKind.ValidCommand, text: entryFullName(entry) });
+      executeMenuSelection(entry, commandActions);
     } else {
       const captured = captureComposerSubmit({
         kind: SubmitCaptureKind.UnknownCommand,

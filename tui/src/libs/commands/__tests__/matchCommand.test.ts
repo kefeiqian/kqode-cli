@@ -5,6 +5,7 @@ import {
   normalizeCommandQuery
 } from '@libs/commands/matchCommand.ts';
 import { COMMAND_REGISTRY, CommandId } from '@libs/commands/registry.ts';
+import { entryFullName } from '@libs/commands/subcommands.ts';
 
 describe('normalizeCommandQuery', () => {
   it('trims, lower-cases, and strips a single leading slash', () => {
@@ -25,9 +26,9 @@ describe('commandMatchKey', () => {
 
 describe('exactCommandMatch', () => {
   it('resolves a full command name regardless of case or leading slash', () => {
-    expect(exactCommandMatch('/clear')?.id).toBe(CommandId.Clear);
-    expect(exactCommandMatch('CLEAR')?.id).toBe(CommandId.Clear);
-    expect(exactCommandMatch('  exit  ')?.id).toBe(CommandId.Exit);
+    expect(exactCommandMatch('/clear')).toMatchObject({ kind: 'command', command: { id: CommandId.Clear } });
+    expect(exactCommandMatch('CLEAR')).toMatchObject({ kind: 'command', command: { id: CommandId.Clear } });
+    expect(exactCommandMatch('  exit  ')).toMatchObject({ kind: 'command', command: { id: CommandId.Exit } });
   });
 
   it('does not match a mere prefix', () => {
@@ -40,7 +41,14 @@ describe('exactCommandMatch', () => {
 
   it('matches every registered command by its own name', () => {
     for (const command of COMMAND_REGISTRY) {
-      expect(exactCommandMatch(command.name)?.id).toBe(command.id);
+      expect(exactCommandMatch(command.name)).toMatchObject({ kind: 'command', command: { id: command.id } });
     }
+  });
+
+  it('resolves full subcommand names', () => {
+    const entry = exactCommandMatch('/memory add');
+
+    expect(entry?.kind).toBe('subcommand');
+    expect(entry === undefined ? undefined : entryFullName(entry)).toBe('/memory add');
   });
 });

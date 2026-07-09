@@ -1,4 +1,5 @@
 import { CommandId } from '@libs/commands/registry.ts';
+import type { MenuEntry } from '@libs/commands/subcommands.ts';
 
 /** Client-side side effects a command can trigger; injected by the composer. */
 export type CommandActions = {
@@ -42,5 +43,16 @@ export function executeCommand(id: CommandId, actions: CommandActions): void {
     case CommandId.Theme:
       void actions.openTheme();
       return;
+  }
+}
+
+export function executeMenuSelection(entry: MenuEntry, actions: CommandActions): void {
+  if (entry.kind === 'command') {
+    executeCommand(entry.command.id, actions);
+    return;
+  }
+
+  if (entry.parent.id === CommandId.Memory) {
+    void actions.openMemory();
   }
 }

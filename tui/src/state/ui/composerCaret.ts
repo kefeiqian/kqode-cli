@@ -2,6 +2,8 @@ import { atom } from 'jotai';
 import { activeModelLabelAtom } from '@state/global/activeModel.ts';
 import { turnInFlightAtom } from '@state/promptQueue/store.ts';
 import { highlightedCommandAtom } from '@state/ui/commands/atoms.ts';
+import { highlightedEntryAtom } from '@state/ui/commands/atoms.ts';
+import { entryFullName } from '@libs/commands/subcommands.ts';
 import { gitStatusLabelAtom } from '@state/ui/gitStatus.ts';
 import { armedActionAtom } from '@state/ui/keyArm.ts';
 import { loadingFrameAtom, transientStatusHintAtom } from '@state/ui/statusHint.ts';
@@ -33,6 +35,7 @@ export const composerChromeSignatureAtom = atom((get) => {
   const armed = get(armedActionAtom) ?? '';
   const working = get(turnInFlightAtom) ? '1' : '0';
   const loadingFrame = get(loadingFrameAtom);
-  const highlighted = get(highlightedCommandAtom)?.name ?? '';
+  const highlightedEntry = get(highlightedEntryAtom);
+  const highlighted = highlightedEntry === undefined ? get(highlightedCommandAtom)?.name ?? '' : entryFullName(highlightedEntry);
   return [gitLabel, modelLabel, transient, armed, working, loadingFrame, highlighted].join('\u0000');
 });

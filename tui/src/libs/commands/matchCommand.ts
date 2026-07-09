@@ -1,5 +1,6 @@
 import { COMMAND_REGISTRY } from '@libs/commands/registry.ts';
 import type { CommandDefinition } from '@libs/commands/registry.ts';
+import { commandSubcommands, type MenuEntry } from '@libs/commands/subcommands.ts';
 
 /**
  * Normalizes a raw slash query to its comparable form: trimmed, lower-cased, and
@@ -22,7 +23,23 @@ export function commandMatchKey(command: CommandDefinition): string {
  * this resolves a submitted command when the menu is closed (e.g. after an Esc
  * dismiss), so `/cl` does not run `/clear` without the menu's explicit highlight.
  */
-export function exactCommandMatch(text: string): CommandDefinition | undefined {
-  const normalized = normalizeCommandQuery(text);
-  return COMMAND_REGISTRY.find((command) => commandMatchKey(command) === normalized);
+export function exactCommandMatch(text: string): MenuEntry | undefined {
+  const normalized = normalizeCommandQuery(text).replace(/\s+/g, ' ');
+  for (const command of COMMAND_REGISTRY) {
+    if (commandMatchKey(command) === normalized) {
+      return { kind: 'command', command };
+    }
+
+    const subcommands = commandSubcommands(command);
+    const prefix = `${commandMatchKey(command)} `;
+    if (subcommands.length > 0 && normalized.startsWith(prefix)) {
+      const subcommandName = normalized.slice(prefix.length);
+      const subcommand = subcommands.find((entry) => entry.name.toLowerCase() === subcommandName);
+      if (subcommand !== undefined) {
+        return { kind: 'subcommand', parent: command, subcommand };
+      }
+    }
+  }
+
+  return undefined;
 }

@@ -37,6 +37,23 @@ describe('SlashCommandMenu', () => {
     expect(descriptionStarts.every((column) => column > 0 && column === descriptionStarts[0])).toBe(true);
   });
 
+  it('renders filtered memory subcommands with descriptions', () => {
+    const { lastFrame } = renderWithJotai(<SlashCommandMenu />, makeStore('/memory'));
+    const frame = lastFrame() ?? '';
+
+    expect(frame).toContain('/memory add');
+    expect(frame).toContain('Add a project memory');
+    expect(frame).toContain('/memory inbox');
+  });
+
+  it('narrows memory subcommands by typed prefix', () => {
+    const { lastFrame } = renderWithJotai(<SlashCommandMenu />, makeStore('/memory e'));
+    const frame = lastFrame() ?? '';
+
+    expect(frame).toContain('/memory edit');
+    expect(frame).not.toContain('/memory add');
+  });
+
   it('shows a single no-matches row when nothing matches', () => {
     const { lastFrame } = renderWithJotai(<SlashCommandMenu />, makeStore('/zzz'));
 

@@ -6,6 +6,7 @@ import {
   commandMenuMatchesAtom,
   commandMenuOpenAtom
 } from '@state/ui/commands/index.ts';
+import { entryDescription, entryFullName } from '@libs/commands/subcommands.ts';
 import { safeChromeColumnsAtom } from '@state/ui/index.ts';
 import { commandMenuRowsAtom } from '@state/ui/index.ts';
 import { activeThemeAtom } from '@state/global/index.ts';
@@ -51,19 +52,19 @@ export function SlashCommandMenu() {
     Math.max(0, matches.length - menuRows)
   );
   const visible = matches.slice(start, start + menuRows);
-  const nameColumnWidth = Math.max(...matches.map((command) => command.name.length));
+  const nameColumnWidth = Math.max(...matches.map((entry) => entryFullName(entry).length));
 
   return (
     <Box flexDirection="column">
-      {visible.map((command, index) => {
+      {visible.map((entry, index) => {
         const isHighlighted = start + index === highlighted;
         const marker = isHighlighted ? HIGHLIGHT_MARKER : PLAIN_MARKER;
-        const paddedName = command.name.padEnd(nameColumnWidth);
-        const line = truncate(`${marker}${paddedName}${NAME_DESCRIPTION_GAP}${command.description}`, columns);
+        const paddedName = entryFullName(entry).padEnd(nameColumnWidth);
+        const line = truncate(`${marker}${paddedName}${NAME_DESCRIPTION_GAP}${entryDescription(entry)}`, columns);
 
         return (
           <Text
-            key={command.id}
+            key={entryFullName(entry)}
             color={isHighlighted ? theme.colors.accentBlue : theme.colors.foreground}
           >
             {line}

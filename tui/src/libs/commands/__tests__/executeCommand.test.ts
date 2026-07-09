@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { executeCommand } from '@libs/commands/executeCommand.ts';
+import { executeCommand, executeMenuSelection } from '@libs/commands/executeCommand.ts';
 import { CommandId } from '@libs/commands/registry.ts';
+import { exactCommandMatch } from '@libs/commands/matchCommand.ts';
 
 const makeActions = () => ({
   exit: vi.fn(),
@@ -11,6 +12,22 @@ const makeActions = () => ({
   openResume: vi.fn(),
   openMemory: vi.fn(),
   openTheme: vi.fn()
+});
+
+describe('executeMenuSelection', () => {
+  it('runs a selected top-level command', () => {
+    const actions = makeActions();
+    executeMenuSelection(exactCommandMatch('/clear')!, actions);
+
+    expect(actions.clearTranscript).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens memory for memory subcommands by default', () => {
+    const actions = makeActions();
+    executeMenuSelection(exactCommandMatch('/memory edit')!, actions);
+
+    expect(actions.openMemory).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('executeCommand', () => {

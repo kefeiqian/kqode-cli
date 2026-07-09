@@ -5,12 +5,13 @@ import { filterCommands } from '@libs/commands/filterCommands.ts';
 import { composerStateAtom } from '@state/ui/composer/index.ts';
 import { inputLockedAtom } from '@state/ui/inputLock.ts';
 import type { CommandDefinition } from '@libs/commands/registry.ts';
+import type { MenuEntry } from '@libs/commands/subcommands.ts';
 
 /** True while the composer text begins a slash command (`/...`). */
 const isCommandQueryAtom = atom((get) => get(composerStateAtom).text.startsWith('/'));
 
 /** Commands matching the current composer text; empty when it is not a command query. */
-export const commandMenuMatchesAtom = atom<CommandDefinition[]>((get) =>
+export const commandMenuMatchesAtom = atom<MenuEntry[]>((get) =>
   get(isCommandQueryAtom) ? filterCommands(get(composerStateAtom).text) : []
 );
 
@@ -30,14 +31,24 @@ export const commandMenuOpenAtom = atom(
 /** Raw highlight index; derived reads clamp it against the current matches. */
 export const commandMenuHighlightIndexAtom = atom(0);
 
-/** The highlighted command, or undefined when there are no matches. */
-export const highlightedCommandAtom = atom<CommandDefinition | undefined>((get) => {
+/** The highlighted menu entry, or undefined when there are no matches. */
+export const highlightedEntryAtom = atom<MenuEntry | undefined>((get) => {
   const matches = get(commandMenuMatchesAtom);
   if (matches.length === 0) {
     return undefined;
   }
   const index = clamp(get(commandMenuHighlightIndexAtom), 0, matches.length - 1);
   return matches[index];
+});
+
+/** Compatibility selector for callers that still need a parent command. */
+export const highlightedCommandAtom = atom<CommandDefinition | undefined>((get) => {
+  const entry = get(highlightedEntryAtom);
+  if (entry === undefined) {
+    return undefined;
+  }
+
+  return entry.kind === 'command' ? entry.command : entry.parent;
 });
 
 /**
