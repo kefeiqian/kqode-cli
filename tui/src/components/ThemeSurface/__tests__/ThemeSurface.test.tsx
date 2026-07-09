@@ -1,0 +1,143 @@
+import { describe, expect, it, vi } from 'vitest';
+import {
+  THEME_SET_OUTCOME_SAVED,
+  THEME_SET_OUTCOME_STORE_FAILED
+} from '@contracts/backend/index.ts';
+import type { ThemeSetResult } from '@contracts/backend/index.ts';
+import { activeThemeAtom } from '@state/global/index.ts';
+import { activeSurfaceAtom, Surface } from '@state/ui/index.ts';
+import { themeHighlightIndexAtom, themeSaveWarningAtom } from '@state/ui/theme/index.ts';
+import { DEFAULT_THEME, THEME_CATALOG, ThemeId, findTheme } from '@theme/themeConfig.ts';
+import { flushInput } from '@test/flushInput.ts';
+import {
+  ARROW_DOWN,
+  ENTER,
+  clientWithSetTheme,
+  deferredSetTheme,
+  renderTheme,
+  waitUntil
+} from './testUtils.tsx';
+
+function requireTheme(id: string) {
+  const theme = findTheme(id);
+  if (theme === undefined) {
+    throw new Error(`expected the ${id} preset to exist`);
+  }
+  return theme;
+}
+
+const nord = requireTheme(ThemeId.Nord);
+const secondTheme = THEME_CATALOG[1]; // the row below the default (Dracula)
+
+describe('ThemeSurface', () => {
+  it('opens without a backend and marks the active theme (covers AE1, AE5)', async () => {
+    const { lastFrame, store } = renderTheme(undefined, { active: nord });
+    await flushInput();
+
+    const frame = lastFrame() ?? '';
+    expect(frame).toContain('/theme');
+    expect(frame).toContain('Dracula');
+    expect(frame).toContain('Nord');
+    // Opens highlighted on the active theme.
+    expect(store.get(themeHighlightIndexAtom)).toBe(
+      THEME_CATALOG.findIndex((theme) => theme.id === nord.id)
+    );
+    // Active theme carries the non-color active marker.
+    expect(frame).toContain(`● ${nord.label}`);
+  });
+
+  it('exposes no light/custom/plugin/import/export affordance (covers AE5)', async () => {
+    const { lastFrame } = renderTheme(undefined, { active: DEFAULT_THEME });
+    await flushInput();
+
+    expect(lastFrame() ?? '').not.toMatch(/light|custom|plugin|import|export/i);
+  });
+
+  it('moves the highlight on arrow keys without applying or persisting a theme', async () => {
+    const client = clientWithSetTheme();
+    const { stdin, store } = renderTheme(client, { active: DEFAULT_THEME });
+    await flushInput();
+    expect(store.get(themeHighlightIndexAtom)).toBe(0);
+
+    stdin.write(ARROW_DOWN);
+    await flushInput();
+
+    expect(store.get(themeHighlightIndexAtom)).toBe(1);
+    expect(store.get(activeThemeAtom)).toBe(DEFAULT_THEME); // unchanged until Enter
+    expect(client.setTheme).not.toHaveBeenCalled();
+  });
+
+  it('applies, persists, and closes on Enter for a saved theme (covers AE1)', async () => {
+    const client = clientWithSetTheme();
+    const { stdin, store } = renderTheme(client, { active: DEFAULT_THEME });
+    await flushInput();
+
+    stdin.write(ARROW_DOWN);
+    await flushInput();
+    stdin.write(ENTER);
+
+    await waitUntil(() => store.get(activeSurfaceAtom) === Surface.Home, 'picker closes');
+    expect(store.get(activeThemeAtom).id).toBe(secondTheme.id);
+    expect(client.setTheme).toHaveBeenCalledWith(secondTheme.id);
+    expect(store.get(themeSaveWarningAtom)).toBeNull();
+  });
+
+  it('keeps the applied theme and warns when saving fails (covers AE4)', async () => {
+    const client = clientWithSetTheme(
+      vi.fn(async (): Promise<ThemeSetResult> => ({ outcome: THEME_SET_OUTCOME_STORE_FAILED }))
+    );
+    const { stdin, store, lastFrame } = renderTheme(client, { active: DEFAULT_THEME });
+    await flushInput();
+
+    stdin.write(ARROW_DOWN);
+    await flushInput();
+    stdin.write(ENTER);
+
+    await waitUntil(() => store.get(themeSaveWarningAtom) !== null, 'unsaved warning');
+    expect(store.get(activeThemeAtom).id).toBe(secondTheme.id); // applied for the session
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Theme); // stays open
+    expect(lastFrame() ?? '').toContain('saving it failed');
+  });
+
+  it('applies and warns when there is no backend seam to persist to (covers AE4)', async () => {
+    const { stdin, store } = renderTheme(undefined, { active: DEFAULT_THEME });
+    await flushInput();
+
+    stdin.write(ARROW_DOWN);
+    await flushInput();
+    stdin.write(ENTER);
+
+    await waitUntil(() => store.get(themeSaveWarningAtom) !== null, 'unsaved warning');
+    expect(store.get(activeThemeAtom).id).toBe(secondTheme.id);
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Theme);
+  });
+
+  it('lets only the latest save result close the picker (out-of-order guard)', async () => {
+    const deferred = deferredSetTheme();
+    const client = clientWithSetTheme(deferred.setTheme);
+    const { stdin, store } = renderTheme(client, { active: DEFAULT_THEME });
+    await flushInput();
+
+    // First selection (row 1) -> save request 0 (kept pending).
+    stdin.write(ARROW_DOWN);
+    await flushInput();
+    stdin.write(ENTER);
+    await waitUntil(() => deferred.setTheme.mock.calls.length === 1, 'first save request');
+
+    // Second selection (row 2) -> save request 1 (kept pending).
+    stdin.write(ARROW_DOWN);
+    await flushInput();
+    stdin.write(ENTER);
+    await waitUntil(() => deferred.setTheme.mock.calls.length === 2, 'second save request');
+
+    // Resolving the stale (first) request must NOT close the picker.
+    deferred.resolve(0, { outcome: THEME_SET_OUTCOME_SAVED });
+    await flushInput();
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Theme);
+
+    // Resolving the latest (second) request closes it on the newest selection.
+    deferred.resolve(1, { outcome: THEME_SET_OUTCOME_SAVED });
+    await waitUntil(() => store.get(activeSurfaceAtom) === Surface.Home, 'latest save closes');
+    expect(store.get(activeThemeAtom).id).toBe(THEME_CATALOG[2].id);
+  });
+});

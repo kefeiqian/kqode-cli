@@ -9,6 +9,7 @@ export type CommandActions = {
   openModel: () => void | Promise<void>;
   openResume: () => void | Promise<void>;
   openMemory: () => void | Promise<void>;
+  openTheme: () => void | Promise<void>;
 };
 
 /**
@@ -37,6 +38,9 @@ export function executeCommand(id: CommandId, actions: CommandActions): void {
       return;
     case CommandId.Memory:
       void actions.openMemory();
+      return;
+    case CommandId.Theme:
+      void actions.openTheme();
       return;
   }
 }

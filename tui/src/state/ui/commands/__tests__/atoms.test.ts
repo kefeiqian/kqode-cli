@@ -34,7 +34,8 @@ describe('command menu atoms', () => {
       CommandId.Login,
       CommandId.Memory,
       CommandId.Model,
-      CommandId.Resume
+      CommandId.Resume,
+      CommandId.Theme
     ]);
     expect(store.get(highlightedCommandAtom)?.id).toBe(CommandId.Clear);
     expect(store.get(commandMenuDesiredRowsAtom)).toBe(COMMAND_MENU_PANEL_ROWS);

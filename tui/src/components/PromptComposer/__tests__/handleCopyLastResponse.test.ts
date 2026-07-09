@@ -30,7 +30,8 @@ function context(store: ReturnType<typeof createStore>): ComposerKeyContext {
       openLogin: vi.fn(),
       openModel: vi.fn(),
       openResume: vi.fn(),
-      openMemory: vi.fn()
+      openMemory: vi.fn(),
+      openTheme: vi.fn()
     },
     store
   };

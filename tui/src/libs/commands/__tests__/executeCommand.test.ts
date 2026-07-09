@@ -9,7 +9,8 @@ const makeActions = () => ({
   openLogin: vi.fn(),
   openModel: vi.fn(),
   openResume: vi.fn(),
-  openMemory: vi.fn()
+  openMemory: vi.fn(),
+  openTheme: vi.fn()
 });
 
 describe('executeCommand', () => {
@@ -82,6 +83,16 @@ describe('executeCommand', () => {
     expect(actions.openResume).not.toHaveBeenCalled();
     expect(actions.openModel).not.toHaveBeenCalled();
     expect(actions.openLogin).not.toHaveBeenCalled();
+    expect(actions.exit).not.toHaveBeenCalled();
+  });
+
+  it('runs openTheme only for the theme command', () => {
+    const actions = makeActions();
+    executeCommand(CommandId.Theme, actions);
+
+    expect(actions.openTheme).toHaveBeenCalledTimes(1);
+    expect(actions.openMemory).not.toHaveBeenCalled();
+    expect(actions.openModel).not.toHaveBeenCalled();
     expect(actions.exit).not.toHaveBeenCalled();
   });
 });

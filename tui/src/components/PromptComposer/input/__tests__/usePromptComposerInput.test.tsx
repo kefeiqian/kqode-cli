@@ -29,7 +29,8 @@ const commandActions: CommandActions = {
   openLogin: vi.fn(),
   openModel: vi.fn(),
   openResume: vi.fn(),
-  openMemory: vi.fn()
+  openMemory: vi.fn(),
+  openTheme: vi.fn()
 };
 
 function clientWithCancel(cancelTurn: BackendClient['cancelTurn']): BackendClient {

@@ -16,7 +16,8 @@ const noopActions = {
   openLogin: vi.fn(),
   openModel: vi.fn(),
   openResume: vi.fn(),
-  openMemory: vi.fn()
+  openMemory: vi.fn(),
+  openTheme: vi.fn()
 };
 
 function context(

@@ -9,7 +9,8 @@ export const Surface = {
   Login: 'login',
   Model: 'model',
   Resume: 'resume',
-  Memory: 'memory'
+  Memory: 'memory',
+  Theme: 'theme'
 } as const;
 
 export type Surface = (typeof Surface)[keyof typeof Surface];
@@ -77,4 +78,9 @@ export const openResumeSurfaceAtom = atom(null, (_get, set) => {
 /** Opens the fullscreen local memory management surface. */
 export const openMemorySurfaceAtom = atom(null, (_get, set) => {
   set(setActiveSurfaceAtom, Surface.Memory);
+});
+
+/** Opens the fullscreen theme picker. No provider credentials are required. */
+export const openThemeSurfaceAtom = atom(null, (_get, set) => {
+  set(setActiveSurfaceAtom, Surface.Theme);
 });

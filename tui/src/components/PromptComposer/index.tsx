@@ -19,7 +19,7 @@ import {
   restoreComposerDraftAtom
 } from '@state/promptQueue/index.ts';
 import { openHelpAtom } from '@state/ui/help/index.ts';
-import { openLoginSurfaceAtom, openMemorySurfaceAtom, openModelSurfaceAtom, openResumeSurfaceAtom } from '@state/ui/surface/index.ts';
+import { openLoginSurfaceAtom, openMemorySurfaceAtom, openModelSurfaceAtom, openResumeSurfaceAtom, openThemeSurfaceAtom } from '@state/ui/surface/index.ts';
 import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import { resolveComposerWindow } from '@libs/composer/composerWindow.ts';
 import { subscribeComposerSubmitCapture } from '@libs/composer/submitCapture.ts';
@@ -83,6 +83,7 @@ export function PromptComposer({
   const openModel = useSetAtom(openModelSurfaceAtom);
   const openResume = useSetAtom(openResumeSurfaceAtom);
   const openMemory = useSetAtom(openMemorySurfaceAtom);
+  const openTheme = useSetAtom(openThemeSurfaceAtom);
   const composerRef = useRef<DOMElement | null>(null);
   const composerMetrics = useBoxMetrics(composerRef);
   const { setCursorPosition } = useCursor();
@@ -101,8 +102,8 @@ export function PromptComposer({
   const resolvedVisibleRowsChange = onVisibleRowsChange ?? setComposerRows;
 
   const commandActions = useMemo(
-    () => ({ exit, clearTranscript, showHelp: openHelp, openLogin, openModel, openResume, openMemory }),
-    [exit, clearTranscript, openHelp, openLogin, openModel, openResume, openMemory]
+    () => ({ exit, clearTranscript, showHelp: openHelp, openLogin, openModel, openResume, openMemory, openTheme }),
+    [exit, clearTranscript, openHelp, openLogin, openModel, openResume, openMemory, openTheme]
   );
 
   useEffect(() => {
