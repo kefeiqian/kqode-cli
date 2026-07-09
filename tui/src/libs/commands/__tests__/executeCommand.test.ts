@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { executeCommand, executeMenuSelection } from '@libs/commands/executeCommand.ts';
+import {
+  CommandMemoryMode,
+  executeCommand,
+  executeMenuSelection
+} from '@libs/commands/executeCommand.ts';
 import { CommandId } from '@libs/commands/registry.ts';
 import { exactCommandMatch } from '@libs/commands/matchCommand.ts';
 
@@ -22,11 +26,20 @@ describe('executeMenuSelection', () => {
     expect(actions.clearTranscript).toHaveBeenCalledTimes(1);
   });
 
-  it('opens memory for memory subcommands by default', () => {
+  it('opens memory active for show and memory inbox for inbox', () => {
+    const actions = makeActions();
+    executeMenuSelection(exactCommandMatch('/memory show')!, actions);
+    executeMenuSelection(exactCommandMatch('/memory inbox')!, actions);
+
+    expect(actions.openMemory).toHaveBeenNthCalledWith(1, CommandMemoryMode.Active);
+    expect(actions.openMemory).toHaveBeenNthCalledWith(2, CommandMemoryMode.Inbox);
+  });
+
+  it('opens memory for other memory subcommands with the default mode', () => {
     const actions = makeActions();
     executeMenuSelection(exactCommandMatch('/memory edit')!, actions);
 
-    expect(actions.openMemory).toHaveBeenCalledTimes(1);
+    expect(actions.openMemory).toHaveBeenCalledWith(undefined);
   });
 });
 
@@ -96,7 +109,7 @@ describe('executeCommand', () => {
     const actions = makeActions();
     executeCommand(CommandId.Memory, actions);
 
-    expect(actions.openMemory).toHaveBeenCalledTimes(1);
+    expect(actions.openMemory).toHaveBeenCalledWith(CommandMemoryMode.Active);
     expect(actions.openResume).not.toHaveBeenCalled();
     expect(actions.openModel).not.toHaveBeenCalled();
     expect(actions.openLogin).not.toHaveBeenCalled();

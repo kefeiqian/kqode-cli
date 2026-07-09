@@ -12,6 +12,7 @@ import {
   memoryStatusAtom,
   memoryVisibleRowsAtom,
   moveMemoryHighlightAtom,
+  resetMemorySurfaceAtom,
   setMemoryDataAtom,
   setMemoryFailureAtom,
   switchMemoryModeAtom,
@@ -87,6 +88,18 @@ describe('memory surface atoms', () => {
     expect(store.get(memoryModeAtom)).toBe(MemoryMode.Inbox);
     expect(store.get(memoryStatusAtom)).toBe(MemoryStatus.Empty);
     expect(store.get(memoryHighlightIndexAtom)).toBe(0);
+  });
+
+  it('reset clears data but preserves the selected mode', () => {
+    const store = createStore();
+    store.set(memoryModeAtom, MemoryMode.Inbox);
+    store.set(setMemoryDataAtom, { items: [item('a')], inbox: [entry('e')] });
+
+    store.set(resetMemorySurfaceAtom);
+
+    expect(store.get(memoryModeAtom)).toBe(MemoryMode.Inbox);
+    expect(store.get(memoryStatusAtom)).toBe(MemoryStatus.Loading);
+    expect(store.get(memoryItemsAtom)).toEqual([]);
   });
 
   it('preserves a failed status and error when switching modes', () => {

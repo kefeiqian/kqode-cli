@@ -1,6 +1,7 @@
 import { atom } from 'jotai';
 import { PROVIDER_STATUS_CONNECTED } from '@contracts/backend/providerMessages.ts';
 import { backendClientAtom } from '@state/global/backend.ts';
+import { MemoryMode, memoryModeAtom } from '@state/ui/memory/index.ts';
 
 /** Mutually exclusive fullscreen surfaces the TUI shell can render. */
 export const Surface = {
@@ -76,7 +77,8 @@ export const openResumeSurfaceAtom = atom(null, (_get, set) => {
 });
 
 /** Opens the fullscreen local memory management surface. */
-export const openMemorySurfaceAtom = atom(null, (_get, set) => {
+export const openMemorySurfaceAtom = atom(null, (_get, set, mode: MemoryMode = MemoryMode.Active) => {
+  set(memoryModeAtom, mode);
   set(setActiveSurfaceAtom, Surface.Memory);
 });
 

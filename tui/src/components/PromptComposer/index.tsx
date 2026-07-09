@@ -20,6 +20,8 @@ import {
 } from '@state/promptQueue/index.ts';
 import { openHelpAtom } from '@state/ui/help/index.ts';
 import { openLoginSurfaceAtom, openMemorySurfaceAtom, openModelSurfaceAtom, openResumeSurfaceAtom, openThemeSurfaceAtom } from '@state/ui/surface/index.ts';
+import { MemoryMode } from '@state/ui/memory/index.ts';
+import { CommandMemoryMode } from '@libs/commands/executeCommand.ts';
 import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import { resolveComposerWindow } from '@libs/composer/composerWindow.ts';
 import { subscribeComposerSubmitCapture } from '@libs/composer/submitCapture.ts';
@@ -102,7 +104,17 @@ export function PromptComposer({
   const resolvedVisibleRowsChange = onVisibleRowsChange ?? setComposerRows;
 
   const commandActions = useMemo(
-    () => ({ exit, clearTranscript, showHelp: openHelp, openLogin, openModel, openResume, openMemory, openTheme }),
+    () => ({
+      exit,
+      clearTranscript,
+      showHelp: openHelp,
+      openLogin,
+      openModel,
+      openResume,
+      openMemory: (mode?: CommandMemoryMode) =>
+        openMemory(mode === CommandMemoryMode.Inbox ? MemoryMode.Inbox : MemoryMode.Active),
+      openTheme
+    }),
     [exit, clearTranscript, openHelp, openLogin, openModel, openResume, openMemory, openTheme]
   );
 

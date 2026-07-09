@@ -8,12 +8,14 @@ import { themeBackendStub } from '@test/backendThemeStub.ts';
 import {
   activeSurfaceAtom,
   closeActiveSurfaceAtom,
+  openMemorySurfaceAtom,
   openLoginSurfaceAtom,
   openModelSurfaceAtom,
   openResumeSurfaceAtom,
   Surface
 } from '@state/ui/surface/index.ts';
 import { helpVisibleAtom, openHelpAtom } from '@state/ui/help/index.ts';
+import { MemoryMode, memoryModeAtom } from '@state/ui/memory/index.ts';
 
 const provider = (status: ProviderStatusInfo['status']): ProviderStatusInfo => ({
   providerId: `provider-${status}`,
@@ -113,6 +115,18 @@ describe('surface atoms', () => {
     store.set(openResumeSurfaceAtom);
 
     expect(store.get(activeSurfaceAtom)).toBe(Surface.Resume);
+  });
+
+  it('opens memory with an explicit initial mode and resets to active by default', () => {
+    const store = createStore();
+
+    store.set(openMemorySurfaceAtom, MemoryMode.Inbox);
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Memory);
+    expect(store.get(memoryModeAtom)).toBe(MemoryMode.Inbox);
+
+    store.set(closeActiveSurfaceAtom);
+    store.set(openMemorySurfaceAtom);
+    expect(store.get(memoryModeAtom)).toBe(MemoryMode.Active);
   });
 
   it('does not let a stale model status read overwrite newer navigation', async () => {

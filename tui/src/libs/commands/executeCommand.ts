@@ -1,5 +1,12 @@
-import { CommandId } from '@libs/commands/registry.ts';
+import { CommandId, MemorySubcommandId } from '@libs/commands/registry.ts';
 import type { MenuEntry } from '@libs/commands/subcommands.ts';
+
+export const CommandMemoryMode = {
+  Active: 'active',
+  Inbox: 'inbox'
+} as const;
+
+export type CommandMemoryMode = (typeof CommandMemoryMode)[keyof typeof CommandMemoryMode];
 
 /** Client-side side effects a command can trigger; injected by the composer. */
 export type CommandActions = {
@@ -9,7 +16,7 @@ export type CommandActions = {
   openLogin: () => void;
   openModel: () => void | Promise<void>;
   openResume: () => void | Promise<void>;
-  openMemory: () => void | Promise<void>;
+  openMemory: (mode?: CommandMemoryMode) => void | Promise<void>;
   openTheme: () => void | Promise<void>;
 };
 
@@ -38,7 +45,7 @@ export function executeCommand(id: CommandId, actions: CommandActions): void {
       void actions.openResume();
       return;
     case CommandId.Memory:
-      void actions.openMemory();
+      void actions.openMemory(CommandMemoryMode.Active);
       return;
     case CommandId.Theme:
       void actions.openTheme();
@@ -53,6 +60,17 @@ export function executeMenuSelection(entry: MenuEntry, actions: CommandActions):
   }
 
   if (entry.parent.id === CommandId.Memory) {
-    void actions.openMemory();
+    void actions.openMemory(memoryModeForSubcommand(entry.subcommand.id));
+  }
+}
+
+function memoryModeForSubcommand(id: string): CommandMemoryMode | undefined {
+  switch (id) {
+    case MemorySubcommandId.Inbox:
+      return CommandMemoryMode.Inbox;
+    case MemorySubcommandId.Show:
+      return CommandMemoryMode.Active;
+    default:
+      return undefined;
   }
 }
