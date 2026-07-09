@@ -98,31 +98,51 @@ pub fn serialize_item(item: &MemoryItem) -> Result<String, MemoryError> {
 /// Returns [`MemoryError::InvalidFrontmatter`] when the fences or JSON metadata
 /// are malformed. The on-disk file is never mutated or deleted by parsing.
 pub fn parse_item(text: &str) -> Result<MemoryItem, MemoryError> {
-    let mut lines = text.lines();
-    if lines.next() != Some(FENCE) {
+    let (first, mut offset) = read_line(text, 0);
+    if first.trim_end_matches('\r') != FENCE {
         return Err(MemoryError::InvalidFrontmatter(
             "missing opening frontmatter fence".to_owned(),
         ));
     }
     let mut json = String::new();
-    let mut closed = false;
-    for line in lines.by_ref() {
-        if line == FENCE {
-            closed = true;
+    let mut body_start = None;
+    while offset < text.len() {
+        let (line, next) = read_line(text, offset);
+        if line.trim_end_matches('\r') == FENCE {
+            body_start = Some(next);
             break;
         }
         json.push_str(line);
         json.push('\n');
+        offset = next;
     }
-    if !closed {
+    let Some(body_start) = body_start else {
         return Err(MemoryError::InvalidFrontmatter(
             "missing closing frontmatter fence".to_owned(),
         ));
-    }
-    let body = lines.collect::<Vec<_>>().join("\n");
+    };
+    // Preserve body bytes exactly — do NOT normalize CRLF via `lines()`, which
+    // would silently rewrite a CRLF body to LF and make its content hash falsely
+    // diverge on the next read. Strip only the single trailing newline that
+    // `serialize_item` appends after the body.
+    let body = text[body_start..]
+        .strip_suffix('\n')
+        .unwrap_or(&text[body_start..])
+        .to_owned();
     let front: TopicFrontmatter = serde_json::from_str(&json)
         .map_err(|err| MemoryError::InvalidFrontmatter(err.to_string()))?;
     Ok(front.into_item(body))
+}
+
+/// Returns the line at `start` (excluding its `\n`) and the byte offset just past
+/// the terminating `\n` (or end of text). A trailing `\r` is kept in the slice so
+/// the caller can strip it for fence comparison while body bytes stay verbatim.
+fn read_line(text: &str, start: usize) -> (&str, usize) {
+    let rest = &text[start..];
+    match rest.find('\n') {
+        Some(index) => (&rest[..index], start + index + 1),
+        None => (rest, text.len()),
+    }
 }
 
 /// Whether an item's stored content hash matches its current metadata + body.
@@ -152,6 +172,9 @@ pub fn item_path(root: &Path, id: &str) -> Result<PathBuf, MemoryError> {
 /// Returns [`MemoryError`] on invalid id/title, serialization failure, path
 /// escape, or filesystem errors.
 pub fn write_item(root: &Path, item: &MemoryItem) -> Result<PathBuf, MemoryError> {
+    // Refuse secret-shaped content before anything touches disk (R14/R16); the
+    // write primitive is fail-closed so no caller can persist a credential.
+    super::security::validate_for_write(&item.title, &item.body)?;
     let path = item_path(root, &item.id)?;
     let text = serialize_item(item)?;
     fs::create_dir_all(root).map_err(MemoryError::Io)?;
@@ -308,6 +331,23 @@ mod tests {
         assert!(content_hash_matches(&read), "stored hash matches content");
         // AGENTS.md and repo files are never touched by memory writes.
         assert!(root.join("use-tabs.md").exists());
+    }
+
+    #[test]
+    fn crlf_body_bytes_survive_round_trip_and_keep_hash_stable() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("user");
+        let mut item = sample_item("crlf");
+        item.body = "line one\r\nline two\r\n\r\nafter blank".to_owned();
+
+        write_item(&root, &item).unwrap();
+        let read = read_item(&root, "crlf").unwrap();
+
+        assert_eq!(read.body, item.body, "CRLF bytes must not be normalized");
+        assert!(
+            content_hash_matches(&read),
+            "an untouched CRLF item must not report as edited out of band"
+        );
     }
 
     #[test]

@@ -116,17 +116,35 @@ pub fn validate_for_write(title: &str, body: &str) -> Result<(), MemoryError> {
     Ok(())
 }
 
-/// Whether `text` contains `prefix` immediately followed by at least
-/// `min_tail` token characters (`[A-Za-z0-9_-]`).
+/// Whether `text` contains `prefix` at a token boundary immediately followed by
+/// at least `min_tail` token characters (`[A-Za-z0-9_-]`).
+///
+/// The boundary check (the char before the prefix must be a non-token char or
+/// start-of-string) prevents short prefixes like `sk-` from matching inside
+/// ordinary hyphenated words such as `disk-encryption-enabled`.
 fn has_prefixed_token(text: &str, prefix: &str, min_tail: usize) -> bool {
     text.match_indices(prefix).any(|(index, _)| {
+        if !at_token_boundary(text, index) {
+            return false;
+        }
         let tail = &text[index + prefix.len()..];
-        let run = tail
-            .chars()
-            .take_while(|ch| ch.is_ascii_alphanumeric() || *ch == '_' || *ch == '-')
-            .count();
+        let run = tail.chars().take_while(|ch| is_token_char(*ch)).count();
         run >= min_tail
     })
+}
+
+/// Whether byte `index` begins a fresh token (preceded by a non-token char or
+/// the start of the string).
+fn at_token_boundary(text: &str, index: usize) -> bool {
+    match text[..index].chars().next_back() {
+        Some(ch) => !is_token_char(ch),
+        None => true,
+    }
+}
+
+/// Whether `ch` is part of a credential-token run.
+fn is_token_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || ch == '_' || ch == '-'
 }
 
 /// Whether any single line pairs a secret assignment key with a high-entropy
@@ -188,6 +206,27 @@ mod tests {
             scan_sensitive("The user prefers concise commit messages."),
             SensitiveVerdict::Clear
         );
+    }
+
+    #[test]
+    fn short_prefix_does_not_match_inside_hyphenated_words() {
+        // `sk-` must not trip on ordinary words ending in "sk" (token boundary).
+        for benign in [
+            "enable disk-encryption-enabled mode",
+            "the task-management-workflow doc",
+            "run a risk-assessment-baseline first",
+        ] {
+            assert_eq!(
+                scan_sensitive(benign),
+                SensitiveVerdict::Clear,
+                "{benign:?} must not be flagged as a secret"
+            );
+        }
+        // A real `sk-` token at a boundary is still blocked.
+        assert!(matches!(
+            scan_sensitive("key sk-abcdefghijklmnop0123"),
+            SensitiveVerdict::Blocked(_)
+        ));
     }
 
     #[test]
