@@ -181,6 +181,14 @@ pub enum MemoryEvent {
         reason: Option<String>,
         at_ms: i64,
     },
+    /// The full proposed body for an inbox entry (event-log truth only, never
+    /// projected into the SQLite index, R18), so a candidate can be activated
+    /// into an item on approval without storing the body in the index.
+    ProposalBody {
+        entry_id: String,
+        body: String,
+        at_ms: i64,
+    },
     /// A session's extraction cursor advanced.
     CursorAdvanced {
         session_id: String,
@@ -193,6 +201,9 @@ pub enum MemoryEvent {
         reason: String,
         at_ms: i64,
     },
+    /// A content-free tombstone marking that an item's sensitive content was
+    /// purged (its rollback/proposal bodies were redacted from this log).
+    SensitivePurged { item_id: String, at_ms: i64 },
 }
 
 /// Appends one lifecycle event to `path`, creating the parent directory first.
@@ -224,6 +235,35 @@ pub fn read_events(path: &Path) -> Vec<MemoryEvent> {
         .lines()
         .filter_map(|line| serde_json::from_str::<MemoryEvent>(line).ok())
         .collect()
+}
+
+/// Atomically rewrites the log with exactly `events`, replacing the file.
+///
+/// Used by sensitive purge to redact bodies from the otherwise append-only
+/// truth. A single-user local tool; a concurrent append during the rewrite
+/// could be lost, which is acceptable for the rebuildable index.
+///
+/// # Errors
+/// Returns an [`std::io::Error`] on directory/file/rename failure.
+pub fn rewrite_events(path: &Path, events: &[MemoryEvent]) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        create_dir_all(parent)?;
+    }
+    let tmp = path.with_extension("jsonl.tmp");
+    {
+        let file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&tmp)?;
+        let mut writer = BufWriter::new(file);
+        for event in events {
+            serde_json::to_writer(&mut writer, event)?;
+            writer.write_all(b"\n")?;
+        }
+        writer.flush()?;
+    }
+    std::fs::rename(&tmp, path)
 }
 
 #[cfg(test)]

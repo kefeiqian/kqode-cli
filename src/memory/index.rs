@@ -312,7 +312,7 @@ impl MemoryService {
         scopes
     }
 
-    fn record_rollback(
+    pub(super) fn record_rollback(
         &self,
         op_id: &str,
         item: &MemoryItem,
@@ -391,7 +391,7 @@ fn enforce_sizes(title: &str, body: &str) -> Result<(), MemoryError> {
     Ok(())
 }
 
-fn new_item_id(title: &str) -> String {
+pub(super) fn new_item_id(title: &str) -> String {
     let slug = slugify(title, MAX_ID_SLUG);
     let counter = ID_COUNTER.fetch_add(1, Ordering::Relaxed);
     let seed = format!("{}-{}-{}", now_ms(), std::process::id(), counter);

@@ -601,3 +601,142 @@ fn failed_outcome_is_recorded_and_secret_proposal_is_dropped() {
     // The cursor still advances so the blocked turn is not reprocessed.
     assert_eq!(fixture.store.memory_cursor("s-secret").unwrap(), Some(0));
 }
+
+// ---- Inbox activation + sensitive purge (U7) ----
+
+#[test]
+fn approving_an_extraction_candidate_writes_the_memory_item() {
+    let fixture = setup();
+    let log = session_log_with(
+        fixture._dir.path(),
+        &[
+            enqueued("t0", 0, "how do I run tests?"),
+            settled("t0", "completed", Some("cargo test")),
+        ],
+    );
+    ExtractionScheduler::new().run_session(
+        &fixture.service,
+        "sess-a",
+        &log,
+        ExtractionTrigger::CleanExit,
+        &candidate_rule(),
+    );
+    let candidates = fixture
+        .store
+        .list_inbox_entries(Some(InboxStatus::Candidate))
+        .unwrap();
+    assert_eq!(candidates.len(), 1);
+    assert!(
+        fixture.service.list(None, true).unwrap().is_empty(),
+        "a candidate is not active until approved"
+    );
+
+    let entry = fixture
+        .service
+        .inbox_apply(&candidates[0].id, InboxAction::Approve)
+        .unwrap();
+    assert_eq!(entry.status, InboxStatus::Approved);
+    let items = fixture.service.list(None, true).unwrap();
+    assert_eq!(items.len(), 1);
+    let (_, body) = fixture
+        .service
+        .show(items[0].scope, items[0].scope_id.as_deref(), &items[0].id)
+        .unwrap();
+    assert_eq!(body, "cargo test", "approval writes the proposed body");
+}
+
+#[test]
+fn active_update_extraction_writes_the_item_immediately_with_audit() {
+    let fixture = setup();
+    let log = session_log_with(
+        fixture._dir.path(),
+        &[
+            enqueued("t0", 0, "p"),
+            settled("t0", "completed", Some("resp")),
+        ],
+    );
+    let active_rule = RuleExtractor(|_: &ExtractionInput| {
+        ExtractionOutcome::ActiveUpdate(MemoryProposal {
+            scope: MemoryScope::User,
+            memory_type: MemoryType::Project,
+            title: "setup".to_owned(),
+            body: "use pnpm".to_owned(),
+            confidence: 0.95,
+        })
+    });
+    ExtractionScheduler::new().run_session(
+        &fixture.service,
+        "sess-b",
+        &log,
+        ExtractionTrigger::CleanExit,
+        &active_rule,
+    );
+
+    let items = fixture.service.list(None, true).unwrap();
+    assert_eq!(
+        items.len(),
+        1,
+        "a high-confidence update is active immediately"
+    );
+    assert_eq!(items[0].title, "setup");
+    assert_eq!(
+        fixture
+            .store
+            .list_inbox_entries(Some(InboxStatus::ActiveAudit))
+            .unwrap()
+            .len(),
+        1,
+        "an active-audit row records the automatic write"
+    );
+}
+
+#[test]
+fn purge_removes_the_item_and_redacts_its_rollback_body() {
+    let fixture = setup();
+    let item = fixture
+        .service
+        .add(
+            MemoryScope::User,
+            None,
+            MemoryType::Project,
+            "topic".to_owned(),
+            "SENSITIVE-DATA v1".to_owned(),
+        )
+        .unwrap();
+    fixture
+        .service
+        .edit(
+            MemoryScope::User,
+            None,
+            &item.id,
+            None,
+            Some("SENSITIVE-DATA v2".to_owned()),
+        )
+        .unwrap();
+
+    assert!(
+        fixture
+            .service
+            .purge(MemoryScope::User, None, &item.id)
+            .unwrap()
+    );
+    assert!(matches!(
+        fixture.service.show(MemoryScope::User, None, &item.id),
+        Err(MemoryError::NotFound)
+    ));
+
+    let events = kqode::memory::event_log::read_events(fixture.service.event_log_path());
+    assert!(
+        !events.iter().any(|event| matches!(
+            event,
+            MemoryEvent::RollbackPoint { body, .. } if body.contains("SENSITIVE")
+        )),
+        "purge redacts the sensitive rollback body from the log"
+    );
+    assert!(
+        events
+            .iter()
+            .any(|event| matches!(event, MemoryEvent::SensitivePurged { .. })),
+        "purge leaves a content-free tombstone"
+    );
+}

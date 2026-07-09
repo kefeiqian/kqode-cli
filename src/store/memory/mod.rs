@@ -105,7 +105,9 @@ fn project_event(conn: &Connection, event: &MemoryEvent) -> rusqlite::Result<()>
         | MemoryEvent::OperationApplied { .. }
         | MemoryEvent::OperationFailed { .. }
         | MemoryEvent::RollbackPoint { .. }
-        | MemoryEvent::MemoryLoaded { .. } => Ok(()),
+        | MemoryEvent::ProposalBody { .. }
+        | MemoryEvent::MemoryLoaded { .. }
+        | MemoryEvent::SensitivePurged { .. } => Ok(()),
     }
 }
 

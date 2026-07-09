@@ -5,17 +5,18 @@
 //! the state machine (candidate activation, richer rollback-conflict handling,
 //! and sensitive purge).
 
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::event_log::{self, InboxProposal, InboxStatus, MemoryEvent, MemoryOp};
 use super::extraction::ExtractionOutcome;
 use super::index::MemoryService;
-use super::index::{new_op_id, now_ms, store_err};
+use super::index::{new_item_id, new_op_id, now_ms, store_err};
 use super::{
-    MemoryError, MemoryItem, MemoryProvenance, MemoryScope, MemorySource, SensitiveVerdict,
-    security,
+    MemoryError, MemoryItem, MemoryProvenance, MemoryScope, MemorySource, SensitiveVerdict, corpus,
+    model, security,
 };
-use crate::store::StoredInboxEntry;
+use crate::store::{StoredInboxEntry, StoredMemoryItem};
 
 /// Monotonic suffix so distinct extraction outcomes get distinct entry ids.
 static EXTRACTION_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -73,11 +74,66 @@ impl MemoryService {
             InboxAction::Reject => InboxStatus::Rejected,
             InboxAction::Stale => InboxStatus::Stale,
         };
+        if action == InboxAction::Approve
+            && latest_proposal_body(self.event_log_path(), entry_id).is_some()
+        {
+            self.activate_inbox_entry(entry_id)?;
+        }
         self.mark_status(entry_id, status, None, now)?;
         if action == InboxAction::Reject {
             self.record_correction(&entry, "rejected candidate", now)?;
         }
         self.inbox_entry(entry_id)
+    }
+
+    /// Activates an inbox entry's proposal into a live memory item, recording a
+    /// rollback of any prior version. The audit (inbox row + `ProposalBody`) must
+    /// already be durable (KTD9). Used on approve and for auto-applied active
+    /// updates.
+    ///
+    /// # Errors
+    /// Returns [`MemoryError::NotFound`] when the entry or its proposed body is
+    /// missing, or other [`MemoryError`] on validation/write failure.
+    pub fn activate_inbox_entry(&self, entry_id: &str) -> Result<StoredMemoryItem, MemoryError> {
+        let entry = self.inbox_entry(entry_id)?;
+        let body =
+            latest_proposal_body(self.event_log_path(), entry_id).ok_or(MemoryError::NotFound)?;
+        let memory_type = entry.memory_type.ok_or(MemoryError::NotFound)?;
+        let title = entry.title.clone().ok_or(MemoryError::NotFound)?;
+        model::validate_title(&title)?;
+        security::validate_for_write(&title, &body)?;
+
+        let (resolved, root) = self.resolve(entry.scope, entry.scope_id.as_deref())?;
+        let op_id = new_op_id();
+        let id = entry
+            .target_item_id
+            .clone()
+            .unwrap_or_else(|| new_item_id(&title));
+        if entry.target_item_id.is_some()
+            && let Ok(prior) = corpus::read_item(&root, &id)
+        {
+            self.record_rollback(&op_id, &prior, resolved.as_deref())?;
+        }
+        let now = now_ms();
+        let mut item = MemoryItem {
+            id,
+            scope: entry.scope,
+            scope_id: resolved,
+            memory_type,
+            title,
+            body,
+            active: true,
+            provenance: MemoryProvenance {
+                source: MemorySource::Extraction,
+                source_session_id: entry.source_session_id.clone(),
+                source_turn_start: entry.source_turn_start,
+                source_turn_end: entry.source_turn_end,
+                created_at_ms: now,
+                updated_at_ms: now,
+            },
+            content_hash: String::new(),
+        };
+        self.persist(&op_id, &root, &mut item, MemoryOp::Write)
     }
 
     /// Undoes an applied automatic update, restoring the target item's prior
@@ -199,6 +255,18 @@ impl MemoryService {
         self.store()
             .upsert_inbox_entry(&StoredInboxEntry::from_proposal(&data))
             .map_err(store_err)?;
+        if let Some(proposal) = proposal {
+            self.append(&MemoryEvent::ProposalBody {
+                entry_id: entry_id.clone(),
+                body: proposal.body.clone(),
+                at_ms: now,
+            })?;
+            // A high-confidence active update applies immediately, audit-first:
+            // the inbox row + ProposalBody above are already durable (KTD9).
+            if matches!(outcome, ExtractionOutcome::ActiveUpdate(_)) {
+                self.activate_inbox_entry(&entry_id)?;
+            }
+        }
         Ok(Some(entry_id))
     }
 
@@ -221,6 +289,46 @@ impl MemoryService {
         self.store()
             .upsert_memory_cursor(session_id, seq, now)
             .map_err(store_err)
+    }
+
+    /// Sensitive purge: removes an item AND redacts its prior bodies from the
+    /// rollback/proposal history so purged content does not linger in the
+    /// event-log truth, then tombstones the purge (R18, KTD). Distinct from the
+    /// soft `forget`, which retains a rollback snapshot for undo.
+    ///
+    /// # Errors
+    /// Returns [`MemoryError`] on ambiguous scope or filesystem/index failure.
+    pub fn purge(
+        &self,
+        scope: MemoryScope,
+        scope_id: Option<&str>,
+        id: &str,
+    ) -> Result<bool, MemoryError> {
+        let (resolved, root) = self.resolve(scope, scope_id)?;
+        let target_entries: HashSet<String> = self
+            .store()
+            .list_inbox_entries(None)
+            .map_err(store_err)?
+            .into_iter()
+            .filter(|entry| entry.target_item_id.as_deref() == Some(id))
+            .map(|entry| entry.id)
+            .collect();
+
+        let removed = corpus::remove_item(&root, id)?;
+        self.store()
+            .delete_memory_item(scope, resolved.as_deref(), id)
+            .map_err(store_err)?;
+
+        let redacted: Vec<MemoryEvent> = event_log::read_events(self.event_log_path())
+            .into_iter()
+            .map(|event| redact_purged(event, id, &target_entries))
+            .collect();
+        event_log::rewrite_events(self.event_log_path(), &redacted).map_err(MemoryError::Io)?;
+        self.append(&MemoryEvent::SensitivePurged {
+            item_id: id.to_owned(),
+            at_ms: now_ms(),
+        })?;
+        Ok(removed)
     }
 
     fn inbox_entry(&self, entry_id: &str) -> Result<StoredInboxEntry, MemoryError> {
@@ -311,6 +419,63 @@ fn latest_rollback(log: &std::path::Path, op_id: &str) -> Option<RollbackSnapsho
             }),
             _ => None,
         })
+}
+
+/// Finds the most recent proposed body recorded for an inbox entry.
+fn latest_proposal_body(log: &std::path::Path, entry_id: &str) -> Option<String> {
+    event_log::read_events(log)
+        .into_iter()
+        .rev()
+        .find_map(|event| match event {
+            MemoryEvent::ProposalBody {
+                entry_id: recorded,
+                body,
+                ..
+            } if recorded == entry_id => Some(body),
+            _ => None,
+        })
+}
+
+/// Redaction marker written in place of purged sensitive content.
+const REDACTED: &str = "[redacted: sensitive content purged]";
+
+/// Redacts an item's prior title/body from rollback and proposal-body events
+/// during a sensitive purge; every other event passes through unchanged.
+fn redact_purged(
+    event: MemoryEvent,
+    item_id: &str,
+    target_entries: &HashSet<String>,
+) -> MemoryEvent {
+    match event {
+        MemoryEvent::RollbackPoint {
+            operation_id,
+            item_id: rolled_back,
+            scope,
+            scope_id,
+            memory_type,
+            active,
+            at_ms,
+            ..
+        } if rolled_back == item_id => MemoryEvent::RollbackPoint {
+            operation_id,
+            item_id: rolled_back,
+            scope,
+            scope_id,
+            memory_type,
+            title: REDACTED.to_owned(),
+            body: REDACTED.to_owned(),
+            active,
+            at_ms,
+        },
+        MemoryEvent::ProposalBody {
+            entry_id, at_ms, ..
+        } if target_entries.contains(&entry_id) => MemoryEvent::ProposalBody {
+            entry_id,
+            body: REDACTED.to_owned(),
+            at_ms,
+        },
+        other => other,
+    }
 }
 
 /// A normalized, opaque suppression key that never stores raw rejected content:
