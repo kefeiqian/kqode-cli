@@ -37,8 +37,9 @@ function middleTruncate(text: string, separator: string, maxWidth: number): stri
     return text;
   }
 
+  const leadingSeparator = text.startsWith(separator) ? separator : '';
   const segments = text.split(separator).filter((segment) => segment.length > 0);
-  const head = segments[0] ?? '';
+  const head = `${leadingSeparator}${segments[0] ?? ''}`;
   const tail = segments.at(-1) ?? '';
   const marker = `${separator}${MIDDLE_MARKER}${separator}`;
   const prefix = `${head}${marker}`;

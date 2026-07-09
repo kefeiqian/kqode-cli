@@ -36,6 +36,14 @@ describe('homeRelativePath', () => {
     expect(displayWidth(result)).toBeLessThanOrEqual(16);
   });
 
+  it('keeps a POSIX absolute path outside home absolute when middle-truncating', () => {
+    const result = homeRelativePath('/opt/projects/services/my-web-app', '/home/user', 20);
+
+    expect(result).toBe('/opt/.../my-web-app');
+    expect(result.startsWith('/')).toBe(true);
+    expect(displayWidth(result)).toBeLessThanOrEqual(20);
+  });
+
   it('matches mixed path separators and renders with the platform separator from home', () => {
     const result = homeRelativePath('C:/Users/kefeiqian/Projects/KQode', 'C:\\Users\\kefeiqian', 12);
 
