@@ -89,12 +89,14 @@ export function MemorySurface() {
     : positionIndicator(listOffset, Math.max(0, listLength - dataRows));
 
   return (
-    <Box flexDirection="column" height={panelRows}>
+    <Box flexDirection="column" height={panelRows} overflow="hidden">
       <DockDivider />
       <Text color={theme.colors.accentBlue}>/memory</Text>
-      {subStateActive ? null : <Text>{modeTabs(mode)}</Text>}
+      {subStateActive ? null : <Text wrap="truncate">{modeTabs(mode)}</Text>}
       {subStateActive ? null : (
-        <Text color={theme.colors.muted}>{statusLine(status, error, pendingAction)}</Text>
+        <Text color={theme.colors.muted} wrap="truncate">
+          {statusLine(status, error, pendingAction)}
+        </Text>
       )}
       <Box flexDirection="column" height={bodyArea} overflow="hidden">
         {forgetConfirm !== null ? (
@@ -191,10 +193,15 @@ function MemoryFooter({
   position: string;
 }) {
   const theme = useAtomValue(activeThemeAtom);
+  // Reserve room for the right-aligned indicator so the (long) hint truncates
+  // instead of shrink-wrapping to a second row and over-subscribing the panel.
+  const hintWidth = position === '' ? columns : Math.max(0, columns - position.length - 1);
 
   return (
     <Box width={columns}>
-      <Text color={theme.colors.muted}>{footerHint(mode, detailOpen).slice(0, columns)}</Text>
+      <Text color={theme.colors.muted} wrap="truncate">
+        {footerHint(mode, detailOpen).slice(0, hintWidth)}
+      </Text>
       {position === '' ? null : (
         <Box flexGrow={1} justifyContent="flex-end">
           <Text color={theme.colors.muted}>{position}</Text>

@@ -293,4 +293,22 @@ describe('MemorySurface', () => {
     await flushInput();
     expect(forgetMemory).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps the footer + indicator on one row so the divider and title do not collapse (P007 U5 review)', async () => {
+    // Regression: the long Inbox footer hint used to shrink-wrap to a 2nd row
+    // when the scroll indicator appeared, over-subscribing the fixed-height
+    // panel and collapsing the accent divider onto the /memory title.
+    const inbox = Array.from({ length: 12 }, (_, index) =>
+      sampleEntry({ id: `e${index}`, status: 'candidate', title: `entry ${index}` })
+    );
+    const { lastFrame } = renderMemory(fakeClient({ inbox }), MemoryMode.Inbox, 80, 24);
+    await waitForFrame(lastFrame, 'entry 0');
+
+    const lines = (lastFrame() ?? '').split('\n');
+    const titleLine = lines.find((line) => line.includes('/memory'));
+    expect(lines.some((line) => /^─+\s*$/.test(line))).toBe(true); // divider is its own clean row
+    expect(titleLine).toBeDefined();
+    expect(titleLine).not.toMatch(/─/); // title row is not merged with the divider
+    expect(lastFrame() ?? '').toContain('more'); // scroll indicator visible on one footer row
+  });
 });
