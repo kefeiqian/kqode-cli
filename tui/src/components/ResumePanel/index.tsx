@@ -1,6 +1,7 @@
 import { Box, Text } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect } from 'react';
+import { DockDivider } from '@components/DockDivider.tsx';
 import { ResumeRows } from '@components/ResumeSurface/ResumeRows.tsx';
 import { useResumeBackend } from '@components/ResumeSurface/useResumeBackend.ts';
 import { useResumeInput } from '@components/ResumeSurface/useResumeInput.ts';
@@ -57,7 +58,7 @@ export function ResumePanel() {
 
   return (
     <Box flexDirection="column" height={panelRows}>
-      <Divider columns={safeChromeColumns} />
+      <DockDivider />
       <Text color={theme.colors.accentBlue}>
         {truncate(labelText(status, error, hiddenCurrentDraft), safeChromeColumns)}
       </Text>
@@ -77,14 +78,6 @@ export function ResumePanel() {
         total={allSessions.length}
         visible={sessionRows}
       />
-    </Box>
-  );
-}
-
-function Divider({ columns }: { columns: number }) {
-  return (
-    <Box width={columns}>
-      <Text>{'─'.repeat(columns)}</Text>
     </Box>
   );
 }

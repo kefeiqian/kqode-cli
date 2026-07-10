@@ -2,7 +2,7 @@ import { createStore } from 'jotai';
 import { describe, expect, it } from 'vitest';
 import { COMMAND_MENU_PANEL_ROWS, MIN_ROWS, RESUME_PANEL_ROWS } from '@constants/ui.ts';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
-import { BODY_CWD_GAP_ROWS, DEFAULT_COMPOSER_ROWS, HEADER_ROWS } from '@libs/tui/layout.ts';
+import { BODY_CWD_GAP_ROWS, DEFAULT_COMPOSER_ROWS, HEADER_ROWS, resolveDockedPanelRows } from '@libs/tui/layout.ts';
 import { composerStateAtom } from '@state/ui/composer/index.ts';
 import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/dimensions.ts';
 import {
@@ -100,10 +100,14 @@ describe('resume panel layout atoms', () => {
     store.set(openResumePanelAtom);
 
     const layout = store.get(layoutAtom);
-    expect(store.get(resumePanelRowsAtom)).toBe(RESUME_PANEL_ROWS);
-    expect(layout.bodyRows).toBe(24 - HEADER_ROWS - RESUME_PANEL_ROWS);
+    const panelRows = resolveDockedPanelRows({ rows: 24, desiredRows: RESUME_PANEL_ROWS });
+    expect(panelRows).toBe(12); // 14 desired, capped to half of a 24-row terminal
+    expect(store.get(resumePanelRowsAtom)).toBe(panelRows);
+    expect(layout.bodyRows).toBe(24 - HEADER_ROWS - panelRows);
     expect(layout.cwdRows).toBe(0);
     expect(store.get(bottomSpacerRowsAtom)).toBe(0);
+    // Caret guard: the row arithmetic that positions the composer caret sums to the canvas.
+    expect(HEADER_ROWS + layout.bodyRows + panelRows).toBe(24);
   });
 
   it('clamps the panel on short terminals so one body row remains', () => {

@@ -32,7 +32,7 @@ import {
 } from '@state/ui/index.ts';
 import { columnsAtom, copyModeActiveAtom, rowsAtom } from '@state/ui/index.ts';
 import { commandMenuOpenAtom } from '@state/ui/commands/index.ts';
-import { resumePanelOpenAtom } from '@state/ui/resume/index.ts';
+import { activeDockedPanelAtom, DockedPanel } from '@state/ui/dock/atoms.ts';
 import {
   composerScrollOffsetRowsAtom,
   composerStateAtom,
@@ -74,7 +74,7 @@ export function HomeScreenView() {
 
     const wheel = parseMouseWheelEvent(input);
     if (wheel !== null) {
-      if (store.get(resumePanelOpenAtom)) {
+      if (store.get(activeDockedPanelAtom) !== null) {
         notifyScroll();
         scrollBodyByRows(
           wheel.direction === 'up' ? MOUSE_WHEEL_SCROLL_ROWS : -MOUSE_WHEEL_SCROLL_ROWS
@@ -110,7 +110,7 @@ export function HomeScreenView() {
 
     const click = parseMouseClickEvent(input);
     if (click !== null) {
-      if (store.get(resumePanelOpenAtom)) {
+      if (store.get(activeDockedPanelAtom) !== null) {
         return;
       }
 
@@ -200,12 +200,12 @@ function HomeBody() {
 function HomeBottomStack() {
   const bottomSpacerRows = useAtomValue(bottomSpacerRowsAtom);
   const menuOpen = useAtomValue(commandMenuOpenAtom);
-  const resumeOpen = useAtomValue(resumePanelOpenAtom);
+  const dockedPanel = useAtomValue(activeDockedPanelAtom);
 
-  if (resumeOpen) {
+  if (dockedPanel !== null) {
     return (
       <Box marginTop={bottomSpacerRows} flexDirection="column">
-        <ResumePanel />
+        <DockedSurface panel={dockedPanel} />
       </Box>
     );
   }
@@ -222,9 +222,19 @@ function HomeBottomStack() {
   );
 }
 
+/** Renders the one open docked popup below the accent divider it owns. */
+function DockedSurface({ panel }: { panel: DockedPanel }) {
+  switch (panel) {
+    case DockedPanel.Resume:
+      return <ResumePanel />;
+    default:
+      return null;
+  }
+}
+
 function HomeComposer() {
-  const resumeOpen = useAtomValue(resumePanelOpenAtom);
-  if (resumeOpen) {
+  const docked = useAtomValue(activeDockedPanelAtom) !== null;
+  if (docked) {
     return null;
   }
 
@@ -232,8 +242,8 @@ function HomeComposer() {
 }
 
 function HomeStatusBar() {
-  const resumeOpen = useAtomValue(resumePanelOpenAtom);
-  if (resumeOpen) {
+  const docked = useAtomValue(activeDockedPanelAtom) !== null;
+  if (docked) {
     return null;
   }
 
