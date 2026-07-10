@@ -180,3 +180,18 @@ export const backConnectStepAtom = atom(null, (get, set) => {
 export const didConnectAtom = atom((get) => {
   return get(connectLastOutcomeAtom)?.outcome === SET_KEY_OUTCOME_CONNECTED;
 });
+
+/** Non-list chrome rows in the docked `/connect` popup: accent divider + title. */
+export const CONNECT_DOCK_CHROME_ROWS = 2;
+/** Generous row allowance for the active step (form/key) plus its feedback. */
+export const CONNECT_STEP_MAX_ROWS = 9;
+
+/**
+ * Content-derived desired popup height for the docked `/connect` surface: the
+ * provider list plus, when a provider step is open, a generous allowance for the
+ * step form/key entry and its outcome/error feedback. Capped to half by the dock.
+ */
+export const connectDesiredRowsAtom = atom((get) => {
+  const base = CONNECT_DOCK_CHROME_ROWS + Math.max(1, get(connectProvidersAtom).length);
+  return get(connectStepAtom) === ConnectStep.List ? base : base + CONNECT_STEP_MAX_ROWS;
+});

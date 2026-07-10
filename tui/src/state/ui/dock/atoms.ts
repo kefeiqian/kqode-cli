@@ -6,6 +6,7 @@ import { activeSurfaceAtom, Surface } from '@state/ui/surface/atoms.ts';
 import { themeDesiredRowsAtom } from '@state/ui/theme/atoms.ts';
 import { modelDesiredRowsAtom } from '@state/ui/model/atoms.ts';
 import { memoryDesiredRowsAtom } from '@state/ui/memory/atoms.ts';
+import { connectDesiredRowsAtom } from '@state/ui/connect/atoms.ts';
 
 /**
  * The mutually exclusive bottom-docked command popups. The resume panel is
@@ -43,6 +44,8 @@ export const activeDockedPanelAtom = atom<DockedPanel | null>((get) => {
       return DockedPanel.Model;
     case Surface.Memory:
       return DockedPanel.Memory;
+    case Surface.Connect:
+      return DockedPanel.Connect;
     default:
       return null;
   }
@@ -63,6 +66,8 @@ export const dockedPanelDesiredRowsAtom = atom((get) => {
       return get(modelDesiredRowsAtom);
     case DockedPanel.Memory:
       return get(memoryDesiredRowsAtom);
+    case DockedPanel.Connect:
+      return get(connectDesiredRowsAtom);
     default:
       return 0;
   }

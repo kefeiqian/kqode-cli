@@ -3,7 +3,6 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { useLayoutEffect } from 'react';
 import { HelpScreen } from '@components/HelpScreen/index.tsx';
 import { HomeScreen } from '@components/HomeScreen/index.tsx';
-import { ConnectSurface } from '@components/ConnectSurface/index.tsx';
 import { TerminalTooSmall } from '@components/TerminalTooSmall.tsx';
 import { useGlobalKeys } from '@/useGlobalKeys.ts';
 import {
@@ -55,12 +54,11 @@ export function App() {
   switch (activeSurface) {
     case Surface.Help:
       return <HelpScreen />;
-    case Surface.Connect:
-      return <ConnectSurface />;
     case Surface.Home:
     case Surface.Theme:
     case Surface.Model:
     case Surface.Memory:
+    case Surface.Connect:
       return <HomeScreen />;
   }
 }

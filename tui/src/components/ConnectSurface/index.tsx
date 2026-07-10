@@ -2,6 +2,7 @@ import { Box, Text } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect } from 'react';
 import { MaskedInput } from '@components/MaskedInput/index.tsx';
+import { DockDivider } from '@components/DockDivider.tsx';
 import { ConnectedActions } from '@components/ConnectSurface/ConnectedActions.tsx';
 import { CustomForm } from '@components/ConnectSurface/CustomForm.tsx';
 import { OutcomeMessage, RequestErrorMessage } from '@components/ConnectSurface/OutcomeMessage.tsx';
@@ -9,7 +10,7 @@ import { ProviderList } from '@components/ConnectSurface/ProviderList.tsx';
 import { useConnectBackend } from '@components/ConnectSurface/useConnectBackend.ts';
 import { useConnectInput } from '@components/ConnectSurface/useConnectInput.ts';
 import { activeThemeAtom } from '@state/global/index.ts';
-import { columnsAtom, rowsAtom } from '@state/ui/index.ts';
+import { dockedPanelRowsAtom } from '@state/ui/index.ts';
 import {
   KIMI_BASE_URL,
   ConnectStep,
@@ -33,8 +34,7 @@ import {
 
 /** Fullscreen `/connect` provider credential surface. */
 export function ConnectSurface() {
-  const columns = useAtomValue(columnsAtom);
-  const rows = useAtomValue(rowsAtom);
+  const panelRows = useAtomValue(dockedPanelRowsAtom);
   const providers = useAtomValue(connectProvidersAtom);
   const selectedIndex = useAtomValue(connectSelectedIndexAtom);
   const selectedProvider = useAtomValue(selectedProviderAtom);
@@ -61,9 +61,9 @@ export function ConnectSurface() {
   }, [refreshProviders, resetConnect]);
 
   return (
-    <Box flexDirection="column" width={columns} height={rows} backgroundColor={theme.colors.bodyBackground}>
+    <Box flexDirection="column" height={panelRows} overflow="hidden">
+      <DockDivider />
       <Text color={theme.colors.accentBlue}>/connect</Text>
-      <Text color={theme.colors.muted}>Connect a provider. Secrets stay in masked local input only.</Text>
       <ProviderList providers={providers} selectedIndex={selectedIndex} />
       {selectedProvider !== null && step === ConnectStep.ConnectedActions ? (
         <ConnectedActions actionIndex={actionIndex} confirmClear={confirmClear} provider={selectedProvider} />
