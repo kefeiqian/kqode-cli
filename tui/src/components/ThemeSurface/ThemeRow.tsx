@@ -1,20 +1,16 @@
 import { Text } from 'ink';
 import { useAtomValue } from 'jotai';
 import { activeThemeAtom } from '@state/global/index.ts';
-import { themeBaselineAtom } from '@state/ui/theme/index.ts';
 import type { ThemeDefinition } from '@theme/themeConfig.ts';
 
-const HIGHLIGHT_MARKER = '›';
+const SELECTED_MARKER = '●';
 const PLAIN_MARKER = ' ';
-const ACTIVE_MARKER = '●';
-const INACTIVE_MARKER = ' ';
 
 /**
- * Renders one catalog theme row. The highlight (`›`) glyph marks the focused
- * row while the active (`●`) glyph marks your real theme — the baseline you
- * opened with — so during a live preview the marker keeps pointing at your
- * theme even as the highlighted row recolors the popup. Row colors come from
- * the active theme so the whole picker previews the highlighted theme.
+ * Renders one catalog theme row. The focused row is marked with `●` on the left
+ * and drawn in the accent color; with live preview the focused row is also the
+ * theme being applied, so a single selection marker is enough. Row colors come
+ * from the active theme so the whole picker previews the highlighted theme.
  */
 export function ThemeRow({
   columns,
@@ -26,15 +22,12 @@ export function ThemeRow({
   highlighted: boolean;
 }) {
   const activeTheme = useAtomValue(activeThemeAtom);
-  const baselineTheme = useAtomValue(themeBaselineAtom);
-  const isActive = theme.id === baselineTheme.id;
-  const marker = highlighted ? HIGHLIGHT_MARKER : PLAIN_MARKER;
-  const active = isActive ? ACTIVE_MARKER : INACTIVE_MARKER;
+  const marker = highlighted ? SELECTED_MARKER : PLAIN_MARKER;
   const color = highlighted ? activeTheme.colors.accentBlue : activeTheme.colors.foreground;
 
   return (
     <Text color={color} wrap="truncate">
-      {truncate(`${marker}  ${active} ${theme.label}`, columns)}
+      {truncate(`${marker} ${theme.label}`, columns)}
     </Text>
   );
 }

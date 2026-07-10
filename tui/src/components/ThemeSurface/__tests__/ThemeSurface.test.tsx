@@ -67,17 +67,20 @@ describe('ThemeSurface', () => {
     expect(client.setTheme).not.toHaveBeenCalled(); // but not persisted until Enter
   });
 
-  it('keeps the ● active marker on the original theme while previewing another', async () => {
+  it('marks the focused row with ● and moves it as you navigate', async () => {
     const { stdin, lastFrame } = renderTheme(clientWithSetTheme(), { active: DEFAULT_THEME });
     await flushInput();
+
+    // Opens focused on the active theme.
+    expect(lastFrame() ?? '').toContain(`● ${DEFAULT_THEME.label}`);
 
     stdin.write(ARROW_DOWN);
     await flushInput();
 
     const frame = lastFrame() ?? '';
-    // The ● marker stays on the theme you opened with, not the previewed row.
-    expect(frame).toContain(`● ${DEFAULT_THEME.label}`);
-    expect(frame).not.toContain(`● ${secondTheme.label}`);
+    // The single selection marker follows the focused (previewed) row.
+    expect(frame).toContain(`● ${secondTheme.label}`);
+    expect(frame).not.toContain(`● ${DEFAULT_THEME.label}`);
   });
 
   it('reverts to the theme active before opening when the picker closes without saving', async () => {

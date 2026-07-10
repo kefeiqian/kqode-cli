@@ -23,13 +23,6 @@ export const themeHighlightIndexAtom = atom(0);
  */
 export const themePreviewOriginAtom = atom<ThemeDefinition | null>(null);
 
-/**
- * The theme the `●` active marker points at. While previewing it stays on the
- * baseline you opened with (so the marker keeps showing your real theme as the
- * preview recolors the popup); otherwise it tracks the applied theme.
- */
-export const themeBaselineAtom = atom((get) => get(themePreviewOriginAtom) ?? get(activeThemeAtom));
-
 /** Scroll-window offset over the catalog so the list stays within the cap. */
 export const themeWindowOffsetAtom = atom(0);
 
