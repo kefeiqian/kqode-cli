@@ -16,7 +16,7 @@ Create a new Rust `xtask` command for KQode from the user's description of what 
 5. Put reusable or non-trivial implementation logic in `xtask/src/support/` or another shared module instead of the command wrapper.
 6. Register the command with a `CommandSpec`, include it in the group's `COMMANDS`, and ensure `cargo xtask help` will list it.
 7. Add or update tests for command registry or helper behavior when the change has meaningful logic.
-8. Add a checked-in IDE run profile under `.run/` using the display name `xtask: <command>` and a file name like `xtask_<command-with-underscores>.run.xml`.
+8. Add a checked-in IDE run profile under `.run/` using the display name `xtask: <command>` and a file name like `xtask_<command-with-underscores>.run.xml`. Set its Cargo command to `xtask <command>` (not `run -p xtask -- <command>`) so it routes through the isolating alias and inherits the private `target/xtask` build dir; keep `workingDirectory` at `$PROJECT_DIR$`. For a long-running/server command (one that blocks for the session, like `blog-serve` or `tui-dev`), also document it as run via the launcher (`scripts/xtask.ps1` / `scripts/xtask.sh`), which runs a throwaway copy so it never holds the canonical binary.
 9. Validate with `cargo check -p xtask` and `cargo test -p xtask`. Run a targeted command invocation if it is safe and deterministic.
 
 ## Rules
@@ -27,3 +27,4 @@ Create a new Rust `xtask` command for KQode from the user's description of what 
 - Keep public/non-trivial Rust items documented with rustdoc and `# Errors` sections when failures are non-obvious.
 - Do not add external dependencies unless the command cannot reasonably be implemented with the standard library or existing dependencies.
 - Do not change unrelated xtask commands while adding the new one.
+- Route new `.run/` profiles through the `xtask` alias (`xtask <command>`) rather than open-coding `run -p xtask`, so IDE runs inherit the private-dir isolation that keeps `cargo xtask` parallel-safe on Windows (see `.cargo/config.toml` and the xtask section of `AGENTS.md`).
