@@ -17,3 +17,9 @@ All rendered glyph content uses a shared safe content width (`safeChromeColumnsA
 The prompt composer starts as one row and grows only when the current prompt text needs soft wrapping or validation feedback. When changing composer, body, header, or resize behavior, preserve this dynamic row shifting so long prompts expand the composer while short prompts keep the command/status row directly underneath.
 
 Prompt cursor placement is manually resolved with Ink's cursor API, so it can drift when vertical layout math changes. When changing body height, spacer rows, wrapping rows, validation rows, background rows, cwd/composer/status placement, or `cursorTop` math, explicitly verify the cursor still lands on the active composer text row rather than one row above or on the cwd row.
+
+## Command surfaces
+
+Command surfaces opened from slash commands (`/theme`, `/model`, `/login`, `/memory`, resume) render as bottom-docked popups: the transcript body stays visible above, and an accent-colored top separator rule marks the popup/body boundary. Every such popup occupies at most half the terminal height (`⌊rows/2⌋`, matching the composer's `COMPOSER_MAX_HEIGHT_DIVISOR` cap) — counting its separator, content, and footer together — and scrolls its content internally when it would exceed that cap rather than growing past half or pushing other chrome. While a popup is open, hide the cwd/composer/status rows (as the resume panel does) and let the popup own its footer hints.
+
+`/help` is the sole exception: it stays fullscreen so its reference pager can page through long content. When adding a new command surface, dock it and keep it at or below half height with internal scrolling unless it is explicitly a fullscreen pager like `/help`.
