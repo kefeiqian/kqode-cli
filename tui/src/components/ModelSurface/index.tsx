@@ -1,16 +1,20 @@
 import { Box, Text } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { MaskedInput } from '@components/MaskedInput/index.tsx';
 import { OutcomeMessage, RequestErrorMessage } from '@components/ConnectSurface/OutcomeMessage.tsx';
+import { DockDivider } from '@components/DockDivider.tsx';
 import { ModelRows } from '@components/ModelSurface/ModelRows.tsx';
 import { useInlineConnect } from '@components/ModelSurface/useInlineConnect.ts';
 import { useModelBackend } from '@components/ModelSurface/useModelBackend.ts';
 import { useModelInput } from '@components/ModelSurface/useModelInput.ts';
-import { columnsAtom, rowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
+import { windowProviderModelRows } from '@libs/providers/index.ts';
+import type { ProviderModelRow } from '@libs/providers/index.ts';
+import { dockedPanelRowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
 import { closeActiveSurfaceAtom, openConnectSurfaceAtom } from '@state/ui/surface/index.ts';
 import { PROVIDER_ID_CUSTOM } from '@state/ui/connect/index.ts';
 import {
+  MODEL_DOCK_CHROME_ROWS,
   modelHighlightAtom,
   inlineConnectInFlightAtom,
   inlineConnectOutcomeAtom,
@@ -19,23 +23,19 @@ import {
   modelRowsAtom,
   modelVisibleRowsAtom,
   modelWindowOffsetAtom,
-  visibleModelRowsAtom
+  scrollModelHighlightIntoViewAtom
 } from '@state/ui/model/index.ts';
+import type { ModelSurfaceRow } from '@state/ui/model/index.ts';
 import { activeThemeAtom } from '@state/global/index.ts';
 
-const HEADER_ROWS = 3;
-const FOOTER_ROWS = 1;
-const INLINE_CONNECT_ROWS = 3;
 const MODEL_FOOTER_HINT = '↑/↓ choose · enter select/connect · esc close';
 
-/** Fullscreen `/model` picker across connected providers. */
+/** Bottom-docked `/model` picker across connected providers. */
 export function ModelSurface() {
-  const columns = useAtomValue(columnsAtom);
   const safeChromeColumns = useAtomValue(safeChromeColumnsAtom);
-  const rows = useAtomValue(rowsAtom);
+  const panelRows = useAtomValue(dockedPanelRowsAtom);
   const windowOffset = useAtomValue(modelWindowOffsetAtom);
   const allRows = useAtomValue(modelRowsAtom);
-  const visibleRows = useAtomValue(visibleModelRowsAtom);
   const highlight = useAtomValue(modelHighlightAtom);
   const inlineProviderId = useAtomValue(inlineConnectProviderIdAtom);
   const inlineInFlight = useAtomValue(inlineConnectInFlightAtom);
@@ -43,12 +43,21 @@ export function ModelSurface() {
   const inlineRequestError = useAtomValue(inlineConnectRequestErrorAtom);
   const theme = useAtomValue(activeThemeAtom);
   const setVisibleRows = useSetAtom(modelVisibleRowsAtom);
+  const scrollHighlightIntoView = useSetAtom(scrollModelHighlightIntoViewAtom);
   const closeActiveSurface = useSetAtom(closeActiveSurfaceAtom);
   const openConnect = useSetAtom(openConnectSurfaceAtom);
   const { refreshModels, retryProvider, selectModel } = useModelBackend(closeActiveSurface);
   const { cancelInlineConnect, startInlineConnect, submitInlineKey } = useInlineConnect(refreshModels);
-  const inlineRows = inlineProviderId === null ? 0 : INLINE_CONNECT_ROWS;
-  const bodyRows = useMemo(() => Math.max(1, rows - HEADER_ROWS - FOOTER_ROWS - inlineRows), [inlineRows, rows]);
+  const listRows = Math.max(1, panelRows - MODEL_DOCK_CHROME_ROWS);
+  // Window the list at render time from `listRows` (derived from the docked cap)
+  // rather than the effect-set `modelVisibleRowsAtom`, which lags one render
+  // behind the async list load and would otherwise flash a mis-windowed frame.
+  const clampedOffset = Math.min(windowOffset, Math.max(0, allRows.length - listRows));
+  const visibleRows = windowProviderModelRows(
+    allRows as ProviderModelRow[],
+    clampedOffset,
+    listRows
+  ) as ModelSurfaceRow[];
 
   useModelInput({
     cancelInlineConnect,
@@ -59,21 +68,22 @@ export function ModelSurface() {
   });
 
   useEffect(() => {
-    setVisibleRows(bodyRows);
-  }, [bodyRows, setVisibleRows]);
+    setVisibleRows(listRows);
+    scrollHighlightIntoView();
+  }, [listRows, setVisibleRows, scrollHighlightIntoView]);
 
   useEffect(() => {
     void refreshModels();
   }, [refreshModels]);
 
   return (
-    <Box flexDirection="column" width={columns} height={rows} backgroundColor={theme.colors.bodyBackground}>
+    <Box flexDirection="column" height={panelRows}>
+      <DockDivider />
       <Text color={theme.colors.accentBlue}>/model</Text>
-      <Text color={theme.colors.muted}>Choose a model or connect a provider.</Text>
-      <Text> </Text>
-      <ModelRows columns={safeChromeColumns} highlight={highlight} rows={visibleRows} visibleRows={bodyRows} />
-      {inlineProviderId === null ? null : (
-        <Box flexDirection="column" width={safeChromeColumns}>
+      {inlineProviderId === null ? (
+        <ModelRows columns={safeChromeColumns} highlight={highlight} rows={visibleRows} visibleRows={listRows} />
+      ) : (
+        <Box flexDirection="column" height={listRows} width={safeChromeColumns}>
           <Box width={safeChromeColumns}>
             <Text color={theme.colors.accentBlue}>API key: </Text>
             <MaskedInput isActive={!inlineInFlight} onCancel={cancelInlineConnect} onSubmit={submitInlineKey} />
@@ -83,7 +93,7 @@ export function ModelSurface() {
           <RequestErrorMessage message={inlineRequestError} />
         </Box>
       )}
-      <ModelFooter columns={safeChromeColumns} offset={windowOffset} total={allRows.length} visible={bodyRows} />
+      <ModelFooter columns={safeChromeColumns} offset={clampedOffset} total={allRows.length} visible={listRows} />
     </Box>
   );
 }
@@ -101,7 +111,8 @@ function ModelFooter({
 }) {
   const theme = useAtomValue(activeThemeAtom);
   const maxOffset = Math.max(0, total - visible);
-  const position = maxOffset === 0 ? '' : offset <= 0 ? 'top' : offset >= maxOffset ? 'end' : 'more ↓';
+  const position =
+    maxOffset === 0 ? '' : offset <= 0 ? 'more ↓' : offset >= maxOffset ? 'more ↑' : 'more ↑↓';
   return (
     <Box width={columns}>
       <Text color={theme.colors.muted}>{MODEL_FOOTER_HINT}</Text>

@@ -7,6 +7,7 @@ import { Header } from '@components/Header.tsx';
 import { PromptComposer } from '@components/PromptComposer/index.tsx';
 import { ResumePanel } from '@components/ResumePanel/index.tsx';
 import { ThemeSurface } from '@components/ThemeSurface/index.tsx';
+import { ModelSurface } from '@components/ModelSurface/index.tsx';
 import { SlashCommandMenu } from '@components/SlashCommandMenu/index.tsx';
 import { StatusBar } from '@components/StatusBar.tsx';
 import {
@@ -230,6 +231,8 @@ function DockedSurface({ panel }: { panel: DockedPanel }) {
       return <ResumePanel />;
     case DockedPanel.Theme:
       return <ThemeSurface />;
+    case DockedPanel.Model:
+      return <ModelSurface />;
     default:
       return null;
   }

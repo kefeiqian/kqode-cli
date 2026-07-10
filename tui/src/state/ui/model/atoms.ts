@@ -13,7 +13,7 @@ import {
 } from '@libs/providers/index.ts';
 import type { ProviderModelGroup, ProviderModelRow } from '@libs/providers/index.ts';
 import { clamp } from '@libs/math/clamp.ts';
-import { MODEL_LOAD_STATUS_LOADING } from '@state/ui/model/constants.ts';
+import { MODEL_DOCK_CHROME_ROWS, INLINE_CONNECT_ROWS, MODEL_LOAD_STATUS_LOADING } from '@state/ui/model/constants.ts';
 import type { ModelLoadStatus, ProviderModelLoad } from '@state/ui/model/providerLoads.ts';
 import { identityEquals, rowIdentity, toWireList } from '@state/ui/model/rowIdentity.ts';
 import {
@@ -153,6 +153,35 @@ export const modelRowsAtom = atom<ModelSurfaceRow[]>((get) => {
 export const modelFocusableRowsAtom = atom((get) => {
   return get(modelRowsAtom).filter(
     (row) => row.type === 'model' || (row.type === 'status' && isFocusableModelStatus(row.status))
+  );
+});
+
+/**
+ * Content-derived desired popup height. When the inline provider-connect form is
+ * active it replaces the list, so the desire is chrome + the fixed form rows;
+ * otherwise it is chrome + one row per flattened provider/model row.
+ */
+export const modelDesiredRowsAtom = atom((get) => {
+  if (get(inlineConnectProviderIdAtom) !== null) {
+    return MODEL_DOCK_CHROME_ROWS + INLINE_CONNECT_ROWS;
+  }
+  return MODEL_DOCK_CHROME_ROWS + get(modelRowsAtom).length;
+});
+
+/**
+ * Re-clamps the window so the highlighted row stays visible after the visible-row
+ * budget changes (e.g. once the async model list loads and the docked cap
+ * settles). Mirrors `moveModelHighlightAtom`'s window math without moving focus.
+ */
+export const scrollModelHighlightIntoViewAtom = atom(null, (get, set) => {
+  const highlight = get(modelHighlightAtom);
+  if (highlight === null) {
+    return;
+  }
+  ensureVisible(
+    get,
+    set,
+    get(modelRowsAtom).findIndex((row) => identityEquals(row, highlight))
   );
 });
 

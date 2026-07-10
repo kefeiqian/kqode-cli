@@ -4,7 +4,6 @@ import { useLayoutEffect } from 'react';
 import { HelpScreen } from '@components/HelpScreen/index.tsx';
 import { HomeScreen } from '@components/HomeScreen/index.tsx';
 import { ConnectSurface } from '@components/ConnectSurface/index.tsx';
-import { ModelSurface } from '@components/ModelSurface/index.tsx';
 import { MemorySurface } from '@components/MemorySurface/index.tsx';
 import { TerminalTooSmall } from '@components/TerminalTooSmall.tsx';
 import { useGlobalKeys } from '@/useGlobalKeys.ts';
@@ -59,12 +58,11 @@ export function App() {
       return <HelpScreen />;
     case Surface.Connect:
       return <ConnectSurface />;
-    case Surface.Model:
-      return <ModelSurface />;
     case Surface.Memory:
       return <MemorySurface />;
     case Surface.Home:
     case Surface.Theme:
+    case Surface.Model:
       return <HomeScreen />;
   }
 }
