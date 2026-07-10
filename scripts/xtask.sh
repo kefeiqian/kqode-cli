@@ -4,9 +4,12 @@
 # `cargo xtask <cmd>` expands to `cargo run -p xtask`, which relinks the single
 # shared `target/debug/xtask` binary on every call. A long-running command such
 # as `blog-serve` or `tui-dev` keeps that binary locked (notably on Windows), so
-# a second invocation fails to replace it. This launcher builds xtask once, then
-# runs a unique per-invocation copy under `target/debug/xtask-run/`, leaving the
-# canonical binary free so any number of xtask commands can run in parallel.
+# a second invocation fails to replace it. This launcher builds xtask once into
+# the private `target/xtask` dir shared with the `cargo xtask` alias, then runs a
+# unique per-invocation copy under `target/xtask/debug/xtask-run/`, leaving the
+# canonical binary free so any number of xtask commands can run in parallel. The
+# private dir is passed as a --target-dir flag, never exported as CARGO_TARGET_DIR,
+# so it cannot leak into child builds (e.g. tui-prod's backend).
 #
 # `repo_root()` inside xtask is baked in at compile time (CARGO_MANIFEST_DIR), so
 # a relocated copy still resolves the real repository.
@@ -19,11 +22,10 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(dirname "$script_dir")"
 
-(cd "$repo_root" && cargo build -p xtask)
+# Private build dir shared with the `cargo xtask` alias (see .cargo/config.toml).
+target_dir="$repo_root/target/xtask"
+(cd "$repo_root" && cargo build -p xtask --target-dir "$target_dir")
 
-target_dir="${CARGO_TARGET_DIR:-$repo_root/target}"
-# A relative CARGO_TARGET_DIR is resolved by cargo against the build cwd (repo root), so anchor it there too.
-[[ "$target_dir" = /* ]] || target_dir="$repo_root/$target_dir"
 source_exe="$target_dir/debug/xtask"
 if [[ ! -x "$source_exe" ]]; then
     echo "xtask binary not found at $source_exe" >&2
