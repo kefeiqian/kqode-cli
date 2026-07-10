@@ -1,84 +1,113 @@
 import { Box, Text } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import type { MemoryInboxEntry, MemoryItem } from '@contracts/backend/index.ts';
+import { DockDivider } from '@components/DockDivider.tsx';
 import { InboxRows } from '@components/MemorySurface/InboxRows.tsx';
 import { MemoryForm } from '@components/MemorySurface/MemoryForm.tsx';
 import { MemoryRows } from '@components/MemorySurface/MemoryRows.tsx';
 import { useMemoryBackend } from '@components/MemorySurface/useMemoryBackend.ts';
 import { useMemoryFormInput } from '@components/MemorySurface/useMemoryFormInput.ts';
 import { useMemoryInput } from '@components/MemorySurface/useMemoryInput.ts';
-import { columnsAtom, rowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
+import { dockedPanelRowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
 import {
+  MEMORY_DOCK_LIST_CHROME_ROWS,
+  MEMORY_DOCK_SUBSTATE_CHROME_ROWS,
   MemoryMode,
   MemoryStatus,
   forgetConfirmAtom,
   highlightedInboxEntryAtom,
   highlightedMemoryItemAtom,
   memoryDetailBodyAtom,
+  memoryDetailOffsetAtom,
+  memoryDetailVisibleRowsAtom,
   memoryErrorAtom,
   memoryFormAtom,
+  memoryInboxAtom,
+  memoryItemsAtom,
   memoryModeAtom,
-  pendingMemoryItemActionAtom,
-  memoryStatusAtom,
+  memorySubStateActiveAtom,
   memoryVisibleRowsAtom,
-  visibleInboxEntriesAtom,
-  visibleMemoryItemsAtom
+  memoryWindowOffsetAtom,
+  pendingMemoryItemActionAtom,
+  memoryStatusAtom
 } from '@state/ui/memory/index.ts';
 import { activeThemeAtom } from '@state/global/index.ts';
 
-const HEADER_ROWS = 4;
-const FOOTER_ROWS = 1;
-
 export function MemorySurface() {
-  const columns = useAtomValue(columnsAtom);
   const safeChromeColumns = useAtomValue(safeChromeColumnsAtom);
-  const rows = useAtomValue(rowsAtom);
+  const panelRows = useAtomValue(dockedPanelRowsAtom);
   const mode = useAtomValue(memoryModeAtom);
   const status = useAtomValue(memoryStatusAtom);
   const error = useAtomValue(memoryErrorAtom);
-  const items = useAtomValue(visibleMemoryItemsAtom);
-  const entries = useAtomValue(visibleInboxEntriesAtom);
+  const allItems = useAtomValue(memoryItemsAtom);
+  const allEntries = useAtomValue(memoryInboxAtom);
+  const windowOffset = useAtomValue(memoryWindowOffsetAtom);
   const highlightedItem = useAtomValue(highlightedMemoryItemAtom);
   const highlightedEntry = useAtomValue(highlightedInboxEntryAtom);
   const detailBody = useAtomValue(memoryDetailBodyAtom);
+  const detailOffset = useAtomValue(memoryDetailOffsetAtom);
   const form = useAtomValue(memoryFormAtom);
   const pendingAction = useAtomValue(pendingMemoryItemActionAtom);
   const forgetConfirm = useAtomValue(forgetConfirmAtom);
+  const subStateActive = useAtomValue(memorySubStateActiveAtom);
   const theme = useAtomValue(activeThemeAtom);
   const setVisibleRows = useSetAtom(memoryVisibleRowsAtom);
+  const setDetailVisibleRows = useSetAtom(memoryDetailVisibleRowsAtom);
   const { refresh, showDetail, forgetItem, addItem, beginEdit, editItem, applyInbox, undoInbox } = useMemoryBackend();
-  const bodyRows = useMemo(() => Math.max(1, rows - HEADER_ROWS - FOOTER_ROWS), [rows]);
-  // The list area renders a table header on its first line, so the data-row
-  // capacity that drives the scroll window is one less than the rendered height.
-  const listRows = Math.max(1, bodyRows - 1);
-  const dataRows = Math.max(1, listRows - 1);
+
+  // Form/detail/confirm sub-states drop the tabs+status chrome so the sub-state
+  // keeps room within the half-height cap; the list keeps the full chrome.
+  const chromeRows = subStateActive ? MEMORY_DOCK_SUBSTATE_CHROME_ROWS : MEMORY_DOCK_LIST_CHROME_ROWS;
+  const bodyArea = Math.max(1, panelRows - chromeRows);
+  // The list renders a table header on its first line, so data rows are one fewer.
+  const dataRows = Math.max(1, bodyArea - 1);
+  const listLength = mode === MemoryMode.Active ? allItems.length : allEntries.length;
+  // Window at render time from `dataRows` (derived from the docked cap) so the
+  // list doesn't flash a mis-windowed frame while the async load settles.
+  const listOffset = Math.min(windowOffset, Math.max(0, listLength - dataRows));
+  const items = allItems.slice(listOffset, listOffset + dataRows);
+  const entries = allEntries.slice(listOffset, listOffset + dataRows);
 
   useMemoryInput({ refresh, showDetail, forgetItem, beginEdit, applyInbox, undoInbox });
   useMemoryFormInput({ addItem, editItem });
 
   useEffect(() => {
     setVisibleRows(dataRows);
-  }, [dataRows, setVisibleRows]);
+    setDetailVisibleRows(bodyArea);
+  }, [dataRows, bodyArea, setVisibleRows, setDetailVisibleRows]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
+  const detailLines = detailBody === null ? 0 : detailBody.split('\n').length;
+  const position = subStateActive
+    ? detailBody === null
+      ? ''
+      : positionIndicator(detailOffset, Math.max(0, detailLines - bodyArea))
+    : positionIndicator(listOffset, Math.max(0, listLength - dataRows));
+
   return (
-    <Box flexDirection="column" width={columns} height={rows} backgroundColor={theme.colors.bodyBackground}>
+    <Box flexDirection="column" height={panelRows}>
+      <DockDivider />
       <Text color={theme.colors.accentBlue}>/memory</Text>
-      <Text>{modeTabs(mode)}</Text>
-      <Text color={theme.colors.muted}>{statusLine(status, error, pendingAction)}</Text>
-      <Text> </Text>
-      {forgetConfirm !== null ? (
-        <ForgetConfirm columns={safeChromeColumns} item={forgetConfirm} />
-      ) : form !== null ? (
-        <MemoryForm columns={safeChromeColumns} form={form} />
-      ) : (
-        renderBody({ status, error, mode, detailBody, items, entries, highlightedItem, highlightedEntry, columns: safeChromeColumns, listRows })
+      {subStateActive ? null : <Text>{modeTabs(mode)}</Text>}
+      {subStateActive ? null : (
+        <Text color={theme.colors.muted}>{statusLine(status, error, pendingAction)}</Text>
       )}
-      <MemoryFooter columns={safeChromeColumns} mode={mode} detailOpen={detailBody !== null} />
+      <Box flexDirection="column" height={bodyArea} overflow="hidden">
+        {forgetConfirm !== null ? (
+          <ForgetConfirm columns={safeChromeColumns} item={forgetConfirm} />
+        ) : form !== null ? (
+          <MemoryForm columns={safeChromeColumns} form={form} />
+        ) : detailBody !== null ? (
+          <MemoryDetail columns={safeChromeColumns} rows={bodyArea} offset={detailOffset} body={detailBody} />
+        ) : (
+          renderBody({ status, error, mode, items, entries, highlightedItem, highlightedEntry, columns: safeChromeColumns, listRows: bodyArea })
+        )}
+      </Box>
+      <MemoryFooter columns={safeChromeColumns} mode={mode} detailOpen={detailBody !== null} position={position} />
     </Box>
   );
 }
@@ -87,7 +116,6 @@ type BodyProps = {
   status: MemoryStatus;
   error: string | null;
   mode: MemoryMode;
-  detailBody: string | null;
   items: readonly MemoryItem[];
   entries: readonly MemoryInboxEntry[];
   highlightedItem: MemoryItem | null;
@@ -97,10 +125,7 @@ type BodyProps = {
 };
 
 function renderBody(props: BodyProps) {
-  const { status, error, mode, detailBody, items, entries, highlightedItem, highlightedEntry, columns, listRows } = props;
-  if (detailBody !== null) {
-    return <MemoryDetail columns={columns} rows={listRows} body={detailBody} />;
-  }
+  const { status, error, mode, items, entries, highlightedItem, highlightedEntry, columns, listRows } = props;
   if (status !== MemoryStatus.Loaded) {
     return <BodyMessage columns={columns} rows={listRows} text={bodyMessage(status, error, mode)} />;
   }
@@ -111,12 +136,22 @@ function renderBody(props: BodyProps) {
   );
 }
 
-function MemoryDetail({ columns, rows, body }: { columns: number; rows: number; body: string }) {
+function MemoryDetail({
+  columns,
+  rows,
+  offset,
+  body
+}: {
+  columns: number;
+  rows: number;
+  offset: number;
+  body: string;
+}) {
   const lines = body.split('\n').map((line) => line.slice(0, columns));
   return (
     <Box flexDirection="column" height={rows}>
       {Array.from({ length: rows }, (_, index) => (
-        <Text key={index}>{lines[index] ?? ' '}</Text>
+        <Text key={index}>{lines[offset + index] ?? ' '}</Text>
       ))}
     </Box>
   );
@@ -144,14 +179,43 @@ function ForgetConfirm({ columns, item }: { columns: number; item: MemoryItem })
   );
 }
 
-function MemoryFooter({ columns, mode, detailOpen }: { columns: number; mode: MemoryMode; detailOpen: boolean }) {
+function MemoryFooter({
+  columns,
+  mode,
+  detailOpen,
+  position
+}: {
+  columns: number;
+  mode: MemoryMode;
+  detailOpen: boolean;
+  position: string;
+}) {
   const theme = useAtomValue(activeThemeAtom);
 
   return (
     <Box width={columns}>
       <Text color={theme.colors.muted}>{footerHint(mode, detailOpen).slice(0, columns)}</Text>
+      {position === '' ? null : (
+        <Box flexGrow={1} justifyContent="flex-end">
+          <Text color={theme.colors.muted}>{position}</Text>
+        </Box>
+      )}
     </Box>
   );
+}
+
+/** Standard docked-popup scroll indicator: `more ↓` / `more ↑` / `more ↑↓`. */
+function positionIndicator(offset: number, maxOffset: number): string {
+  if (maxOffset === 0) {
+    return '';
+  }
+  if (offset <= 0) {
+    return 'more ↓';
+  }
+  if (offset >= maxOffset) {
+    return 'more ↑';
+  }
+  return 'more ↑↓';
 }
 
 function modeTabs(mode: MemoryMode): string {

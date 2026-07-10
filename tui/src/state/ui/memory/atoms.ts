@@ -79,6 +79,51 @@ const currentListLengthAtom = atom((get) =>
   get(memoryModeAtom) === MemoryMode.Active ? get(memoryItemsAtom).length : get(memoryInboxAtom).length
 );
 
+/** Non-list chrome rows in the docked `/memory` popup while the list is showing. */
+export const MEMORY_DOCK_LIST_CHROME_ROWS = 5; // divider + title + tabs + status + footer
+/** Chrome rows while a form/detail/confirm sub-state replaces the list. */
+export const MEMORY_DOCK_SUBSTATE_CHROME_ROWS = 3; // divider + title + footer
+/** Row budget reserved for the add/edit form when it replaces the list. */
+export const MEMORY_FORM_ROWS = 6;
+
+/** Scroll-window offset over the read-only detail body. */
+export const memoryDetailOffsetAtom = atom(0);
+/** Visible detail lines supplied by the surface so the window math lives in atoms. */
+export const memoryDetailVisibleRowsAtom = atom(1);
+
+/** True while a form, detail view, or forget-confirm replaces the list. */
+export const memorySubStateActiveAtom = atom(
+  (get) =>
+    get(memoryFormAtom) !== null ||
+    get(memoryDetailBodyAtom) !== null ||
+    get(forgetConfirmAtom) !== null
+);
+
+/** Content-derived desired popup height for the docked `/memory` surface. */
+export const memoryDesiredRowsAtom = atom((get) => {
+  if (get(forgetConfirmAtom) !== null) {
+    return MEMORY_DOCK_SUBSTATE_CHROME_ROWS + 1;
+  }
+  if (get(memoryFormAtom) !== null) {
+    return MEMORY_DOCK_SUBSTATE_CHROME_ROWS + MEMORY_FORM_ROWS;
+  }
+  const detail = get(memoryDetailBodyAtom);
+  if (detail !== null) {
+    return MEMORY_DOCK_SUBSTATE_CHROME_ROWS + detail.split('\n').length;
+  }
+  return MEMORY_DOCK_LIST_CHROME_ROWS + 1 + get(currentListLengthAtom);
+});
+
+/** Scrolls the read-only detail view, clamped to its line count. */
+export const scrollMemoryDetailAtom = atom(null, (get, set, delta: number) => {
+  const body = get(memoryDetailBodyAtom);
+  if (body === null) {
+    return;
+  }
+  const maxOffset = Math.max(0, body.split('\n').length - get(memoryDetailVisibleRowsAtom));
+  set(memoryDetailOffsetAtom, clamp(get(memoryDetailOffsetAtom) + delta, 0, maxOffset));
+});
+
 export const highlightedMemoryItemAtom = atom(
   (get) => get(memoryItemsAtom)[get(memoryHighlightIndexAtom)] ?? null
 );
@@ -190,6 +235,7 @@ export const moveMemoryHighlightAtom = atom(null, (get, set, delta: number) => {
 
 export const setMemoryDetailAtom = atom(null, (_get, set, body: string | null) => {
   set(memoryDetailBodyAtom, body);
+  set(memoryDetailOffsetAtom, 0);
 });
 
 export const openAddMemoryFormAtom = atom(null, (_get, set) => {

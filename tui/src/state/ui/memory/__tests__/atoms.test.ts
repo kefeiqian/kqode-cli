@@ -31,7 +31,15 @@ import {
   setForgetConfirmAtom,
   setMemoryFailureAtom,
   switchMemoryModeAtom,
-  visibleMemoryItemsAtom
+  visibleMemoryItemsAtom,
+  MEMORY_DOCK_LIST_CHROME_ROWS,
+  MEMORY_DOCK_SUBSTATE_CHROME_ROWS,
+  MEMORY_FORM_ROWS,
+  memoryDesiredRowsAtom,
+  memoryDetailOffsetAtom,
+  memoryDetailVisibleRowsAtom,
+  scrollMemoryDetailAtom,
+  setMemoryDetailAtom
 } from '@state/ui/memory/index.ts';
 
 function item(id: string): MemoryItem {
@@ -219,5 +227,30 @@ describe('memory surface atoms', () => {
     store.set(moveMemoryHighlightAtom, 4);
     expect(store.get(memoryHighlightIndexAtom)).toBe(4);
     expect(store.get(visibleMemoryItemsAtom).map((entry) => entry.id)).toEqual(['d', 'e']);
+  });
+
+  it('desires list chrome plus header and one row per item, or the sub-state height', () => {
+    const store = createStore();
+    store.set(setMemoryDataAtom, { items: [item('a'), item('b')], inbox: [] });
+    expect(store.get(memoryDesiredRowsAtom)).toBe(MEMORY_DOCK_LIST_CHROME_ROWS + 1 + 2);
+
+    store.set(openAddMemoryFormAtom);
+    expect(store.get(memoryDesiredRowsAtom)).toBe(MEMORY_DOCK_SUBSTATE_CHROME_ROWS + MEMORY_FORM_ROWS);
+  });
+
+  it('scrolls the detail view within its line count and resets on open', () => {
+    const store = createStore();
+    store.set(memoryDetailVisibleRowsAtom, 2);
+    store.set(setMemoryDetailAtom, 'l1\nl2\nl3\nl4');
+    expect(store.get(memoryDetailOffsetAtom)).toBe(0);
+
+    store.set(scrollMemoryDetailAtom, 5);
+    expect(store.get(memoryDetailOffsetAtom)).toBe(2); // clamped to 4 lines - 2 visible
+
+    store.set(scrollMemoryDetailAtom, -1);
+    expect(store.get(memoryDetailOffsetAtom)).toBe(1);
+
+    store.set(setMemoryDetailAtom, 'again');
+    expect(store.get(memoryDetailOffsetAtom)).toBe(0);
   });
 });

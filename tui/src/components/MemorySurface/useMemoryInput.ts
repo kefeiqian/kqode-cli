@@ -14,6 +14,7 @@ import {
   memoryModeAtom,
   memoryStatusAtom,
   moveMemoryHighlightAtom,
+  scrollMemoryDetailAtom,
   setMemoryDetailAtom,
   memoryFormAtom,
   pendingMemoryItemActionAtom,
@@ -44,6 +45,7 @@ export function useMemoryInput(actions: MemoryInputActions) {
   const moveHighlight = useSetAtom(moveMemoryHighlightAtom);
   const switchMode = useSetAtom(switchMemoryModeAtom);
   const setDetail = useSetAtom(setMemoryDetailAtom);
+  const scrollDetail = useSetAtom(scrollMemoryDetailAtom);
   const setPendingAction = useSetAtom(setPendingMemoryItemActionAtom);
   const setForgetConfirm = useSetAtom(setForgetConfirmAtom);
 
@@ -66,9 +68,17 @@ export function useMemoryInput(actions: MemoryInputActions) {
       }
       return;
     }
-    // While an item detail is open, enter/q closes it and other keys are inert
-    // (esc still falls through to the global handler that closes the surface).
+    // While an item detail is open, up/down scroll it, enter/q closes it, and
+    // other keys are inert (esc still falls through to the global close handler).
     if (detail.current !== null) {
+      if (key.upArrow) {
+        scrollDetail(-1);
+        return;
+      }
+      if (key.downArrow) {
+        scrollDetail(1);
+        return;
+      }
       if (key.return || input === 'q') {
         setDetail(null);
       }
