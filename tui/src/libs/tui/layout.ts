@@ -1,7 +1,9 @@
 import {
   COMPOSER_BACKGROUND_PADDING_ROWS,
-  COMPOSER_MAX_HEIGHT_DIVISOR
+  COMPOSER_MAX_HEIGHT_DIVISOR,
+  POPUP_MAX_HEIGHT_DIVISOR
 } from '@constants/ui.ts';
+import { clamp } from '@libs/math/clamp.ts';
 
 /**
  * Rows occupied by the always-visible home-screen header (product name +
@@ -9,6 +11,13 @@ import {
  * longer degrades to a compact or hidden variant and always takes one row.
  */
 export const HEADER_ROWS = 1;
+
+/**
+ * Alias for the home-screen header height, used by the docked-popup cap formula
+ * and named to disambiguate it from the per-surface header rows (theme/model = 3,
+ * memory = 4) that live as module-local constants inside each surface component.
+ */
+export const HOME_HEADER_ROWS = HEADER_ROWS;
 
 export const DEFAULT_COMPOSER_ROWS = 3;
 export const BODY_CWD_GAP_ROWS = 1;
@@ -75,4 +84,49 @@ export function resolveHomeScreenLayout(
     composerVisibleRows: maxComposerVisibleRows,
     cwdRows: resolvedCwdRows
   };
+}
+
+/**
+ * Caps a docked command popup's total height (accent separator + content +
+ * footer) to at most half the terminal (`⌊rows / POPUP_MAX_HEIGHT_DIVISOR⌋`),
+ * never below one row and never so tall that fewer than one transcript row
+ * remains above it. `desiredRows` is the panel's content-derived height; the
+ * result is the rows actually reserved for the panel (`0` when nothing is
+ * docked).
+ */
+export function resolveDockedPanelRows({
+  rows,
+  desiredRows
+}: {
+  rows: number;
+  desiredRows: number;
+}): number {
+  if (desiredRows <= 0) {
+    return 0;
+  }
+  const halfCap = Math.floor(rows / POPUP_MAX_HEIGHT_DIVISOR);
+  const bodyPreservingCap = rows - HOME_HEADER_ROWS - 1;
+  return clamp(Math.min(desiredRows, halfCap), 1, Math.max(1, bodyPreservingCap));
+}
+
+/**
+ * Minimal scroll offset that keeps `index` visible inside a `visible`-row window
+ * over `total` items: unchanged while the index is already in view, otherwise
+ * scrolled just far enough to bring it to the nearest edge, clamped to
+ * `[0, maxOffset]`. Extracted from the identical clamp expression previously
+ * duplicated across the resume/memory/model highlight movers.
+ */
+export function resolveWindowOffset({
+  index,
+  offset,
+  visible,
+  total
+}: {
+  index: number;
+  offset: number;
+  visible: number;
+  total: number;
+}): number {
+  const maxOffset = Math.max(0, total - visible);
+  return clamp(index < offset ? index : Math.max(offset, index - visible + 1), 0, maxOffset);
 }

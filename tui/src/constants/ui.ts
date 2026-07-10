@@ -56,6 +56,17 @@ export const CARET_SCROLL_SETTLE_MS = 100;
  */
 export const COMMAND_MENU_PANEL_ROWS = 7;
 
+// --- Command surface popups ---
+
+/**
+ * Divisor bounding every docked command popup (theme/model/login/memory and the
+ * resume panel) to at most half the terminal height (`2` = half), mirroring the
+ * composer's `COMPOSER_MAX_HEIGHT_DIVISOR`. The whole popup box — accent
+ * separator, content, and footer — stays within `⌊rows / DIVISOR⌋`; `/help` is
+ * the sole exception and renders full-screen.
+ */
+export const POPUP_MAX_HEIGHT_DIVISOR = 2;
+
 // --- Resume panel ---
 
 /** Maximum number of session rows shown in the docked resume panel. */

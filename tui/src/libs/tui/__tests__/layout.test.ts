@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveHomeScreenLayout } from '@libs/tui/layout.ts';
+import { resolveHomeScreenLayout, resolveDockedPanelRows, resolveWindowOffset } from '@libs/tui/layout.ts';
 import {
   COMPOSER_BACKGROUND_PADDING_ROWS,
   COMPOSER_MAX_HEIGHT_DIVISOR
@@ -60,5 +60,48 @@ describe('resolveHomeScreenLayout composer height cap', () => {
 
     expect(long.composerVisibleRows).toBe(short.composerVisibleRows);
     expect(long.composerVisibleRows).toBe(expected);
+  });
+});
+
+describe('resolveDockedPanelRows', () => {
+  it('caps a tall desired height at half the terminal', () => {
+    expect(resolveDockedPanelRows({ rows: 24, desiredRows: 14 })).toBe(12);
+  });
+
+  it('sizes to content when shorter than the cap', () => {
+    expect(resolveDockedPanelRows({ rows: 40, desiredRows: 6 })).toBe(6);
+  });
+
+  it('never exceeds half and keeps a body row at the minimum terminal height', () => {
+    const rows = 15;
+    const panel = resolveDockedPanelRows({ rows, desiredRows: 20 });
+    expect(panel).toBe(Math.floor(rows / 2));
+    expect(panel).toBeLessThanOrEqual(rows - 1 - 1);
+  });
+
+  it('returns zero when nothing is desired', () => {
+    expect(resolveDockedPanelRows({ rows: 24, desiredRows: 0 })).toBe(0);
+  });
+
+  it('floors at one row for a positive desire', () => {
+    expect(resolveDockedPanelRows({ rows: 15, desiredRows: 1 })).toBe(1);
+  });
+});
+
+describe('resolveWindowOffset', () => {
+  it('leaves a visible index unchanged', () => {
+    expect(resolveWindowOffset({ index: 3, offset: 2, visible: 4, total: 20 })).toBe(2);
+  });
+
+  it('scrolls up to reveal an index above the window', () => {
+    expect(resolveWindowOffset({ index: 1, offset: 5, visible: 4, total: 20 })).toBe(1);
+  });
+
+  it('scrolls down to reveal an index below the window', () => {
+    expect(resolveWindowOffset({ index: 10, offset: 2, visible: 4, total: 20 })).toBe(7);
+  });
+
+  it('clamps to the last full window', () => {
+    expect(resolveWindowOffset({ index: 19, offset: 0, visible: 4, total: 20 })).toBe(16);
   });
 });
