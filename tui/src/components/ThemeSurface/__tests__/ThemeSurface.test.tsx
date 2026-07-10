@@ -227,6 +227,17 @@ describe('ThemeSurface', () => {
     expect(store.get(activeThemeAtom).id).toBe(THEME_CATALOG[2].id);
   });
 
+  it('renders a blank gap row between the last theme and the footer when the panel fits', async () => {
+    const { lastFrame } = renderTheme(clientWithSetTheme(), { active: DEFAULT_THEME, rows: 20 });
+    await flushInput();
+
+    const lines = (lastFrame() ?? '').split('\n');
+    const footerIndex = lines.findIndex((line) => line.includes('esc close'));
+    expect(footerIndex).toBeGreaterThan(0);
+    // The row directly above the shortcut footer is the blank breathing-room gap.
+    expect(lines[footerIndex - 1]?.trim()).toBe('');
+  });
+
   it('caps the docked popup and scrolls the catalog at the minimum terminal height (covers AE2, AE3)', async () => {
     const { stdin, store, lastFrame } = renderTheme(clientWithSetTheme(), {
       active: DEFAULT_THEME,

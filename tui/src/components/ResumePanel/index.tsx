@@ -5,6 +5,7 @@ import { DockDivider } from '@components/DockDivider.tsx';
 import { ResumeRows } from '@components/ResumeSurface/ResumeRows.tsx';
 import { useResumeBackend } from '@components/ResumeSurface/useResumeBackend.ts';
 import { useResumeInput } from '@components/ResumeSurface/useResumeInput.ts';
+import { resolveDockedFooterGap } from '@libs/tui/layout.ts';
 import {
   RESUME_PANEL_CHROME_ROWS,
   RESUME_PANEL_SESSION_ROWS
@@ -15,6 +16,7 @@ import {
   highlightedResumeSessionAtom,
   ResumeStatus,
   resumeErrorAtom,
+  resumePanelDesiredRowsAtom,
   resumeSessionsAtom,
   resumeStatusAtom,
   resumeVisibleRowsAtom,
@@ -35,12 +37,15 @@ export function ResumePanel() {
   const error = useAtomValue(resumeErrorAtom);
   const windowOffset = useAtomValue(resumeWindowOffsetAtom);
   const theme = useAtomValue(activeThemeAtom);
+  const desiredRows = useAtomValue(resumePanelDesiredRowsAtom);
   const setVisibleRows = useSetAtom(resumeVisibleRowsAtom);
   const { refreshSessions, resumeSelected } = useResumeBackend();
-  const sessionRows = Math.max(
-    1,
-    Math.min(RESUME_PANEL_SESSION_ROWS, panelRows - RESUME_PANEL_CHROME_ROWS)
-  );
+  const { showFooterGap, chromeRows } = resolveDockedFooterGap({
+    panelRows,
+    desiredRows,
+    chromeWithGap: RESUME_PANEL_CHROME_ROWS
+  });
+  const sessionRows = Math.max(1, Math.min(RESUME_PANEL_SESSION_ROWS, panelRows - chromeRows));
   const hiddenCurrentDraft =
     status === ResumeStatus.Loaded &&
     allSessions.length > 0 &&
@@ -73,6 +78,7 @@ export function ResumePanel() {
       ) : (
         <PanelMessage rows={sessionRows + 1} text={bodyMessage(status, error)} />
       )}
+      {showFooterGap ? <Text> </Text> : null}
       <ResumeFooter
         offset={windowOffset}
         total={allSessions.length}

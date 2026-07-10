@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveHomeScreenLayout, resolveDockedPanelRows, resolveWindowOffset } from '@libs/tui/layout.ts';
+import { resolveHomeScreenLayout, resolveDockedPanelRows, resolveDockedFooterGap, resolveWindowOffset } from '@libs/tui/layout.ts';
 import {
   COMPOSER_BACKGROUND_PADDING_ROWS,
   COMPOSER_MAX_HEIGHT_DIVISOR
@@ -85,6 +85,22 @@ describe('resolveDockedPanelRows', () => {
 
   it('floors at one row for a positive desire', () => {
     expect(resolveDockedPanelRows({ rows: 15, desiredRows: 1 })).toBe(1);
+  });
+});
+
+describe('resolveDockedFooterGap', () => {
+  it('keeps the footer gap and full chrome when the panel fits its desired height', () => {
+    expect(resolveDockedFooterGap({ panelRows: 10, desiredRows: 10, chromeWithGap: 4 })).toEqual({
+      showFooterGap: true,
+      chromeRows: 4
+    });
+  });
+
+  it('drops the gap and reclaims its row for the list when the panel is capped', () => {
+    expect(resolveDockedFooterGap({ panelRows: 7, desiredRows: 10, chromeWithGap: 4 })).toEqual({
+      showFooterGap: false,
+      chromeRows: 3
+    });
   });
 });
 

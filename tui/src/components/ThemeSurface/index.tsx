@@ -5,6 +5,7 @@ import { DockDivider } from '@components/DockDivider.tsx';
 import { ThemeRows } from '@components/ThemeSurface/ThemeRows.tsx';
 import { useThemeBackend } from '@components/ThemeSurface/useThemeBackend.ts';
 import { useThemeInput } from '@components/ThemeSurface/useThemeInput.ts';
+import { resolveDockedFooterGap } from '@libs/tui/layout.ts';
 import { activeThemeAtom } from '@state/global/index.ts';
 import { dockedPanelRowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
 import { closeActiveSurfaceAtom } from '@state/ui/surface/index.ts';
@@ -13,6 +14,7 @@ import {
   revertThemePreviewAtom,
   scrollThemeHighlightIntoViewAtom,
   THEME_DOCK_CHROME_ROWS,
+  themeDesiredRowsAtom,
   themeHighlightIndexAtom,
   themeSaveWarningAtom,
   themeVisibleRowsAtom,
@@ -37,8 +39,14 @@ export function ThemeSurface() {
   const scrollHighlightIntoView = useSetAtom(scrollThemeHighlightIntoViewAtom);
   const closeActiveSurface = useSetAtom(closeActiveSurfaceAtom);
   const revertThemePreview = useSetAtom(revertThemePreviewAtom);
+  const desiredRows = useAtomValue(themeDesiredRowsAtom);
   const { selectTheme } = useThemeBackend(closeActiveSurface);
-  const listRows = Math.max(1, panelRows - THEME_DOCK_CHROME_ROWS);
+  const { showFooterGap, chromeRows } = resolveDockedFooterGap({
+    panelRows,
+    desiredRows,
+    chromeWithGap: THEME_DOCK_CHROME_ROWS
+  });
+  const listRows = Math.max(1, panelRows - chromeRows);
 
   useThemeInput({ selectTheme });
 
@@ -66,6 +74,7 @@ export function ThemeSurface() {
         highlightIndex={highlightIndex - windowOffset}
         visibleRows={listRows}
       />
+      {showFooterGap ? <Text> </Text> : null}
       <ThemeFooter
         columns={safeChromeColumns}
         warning={warning}

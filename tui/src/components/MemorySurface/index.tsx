@@ -9,6 +9,7 @@ import { MemoryRows } from '@components/MemorySurface/MemoryRows.tsx';
 import { useMemoryBackend } from '@components/MemorySurface/useMemoryBackend.ts';
 import { useMemoryFormInput } from '@components/MemorySurface/useMemoryFormInput.ts';
 import { useMemoryInput } from '@components/MemorySurface/useMemoryInput.ts';
+import { resolveDockedFooterGap } from '@libs/tui/layout.ts';
 import { dockedPanelRowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
 import {
   MEMORY_DOCK_LIST_CHROME_ROWS,
@@ -18,6 +19,7 @@ import {
   forgetConfirmAtom,
   highlightedInboxEntryAtom,
   highlightedMemoryItemAtom,
+  memoryDesiredRowsAtom,
   memoryDetailBodyAtom,
   memoryDetailOffsetAtom,
   memoryDetailVisibleRowsAtom,
@@ -52,13 +54,20 @@ export function MemorySurface() {
   const forgetConfirm = useAtomValue(forgetConfirmAtom);
   const subStateActive = useAtomValue(memorySubStateActiveAtom);
   const theme = useAtomValue(activeThemeAtom);
+  const desiredRows = useAtomValue(memoryDesiredRowsAtom);
   const setVisibleRows = useSetAtom(memoryVisibleRowsAtom);
   const setDetailVisibleRows = useSetAtom(memoryDetailVisibleRowsAtom);
   const { refresh, showDetail, forgetItem, addItem, beginEdit, editItem, applyInbox, undoInbox } = useMemoryBackend();
 
   // Form/detail/confirm sub-states drop the tabs+status chrome so the sub-state
-  // keeps room within the half-height cap; the list keeps the full chrome.
-  const chromeRows = subStateActive ? MEMORY_DOCK_SUBSTATE_CHROME_ROWS : MEMORY_DOCK_LIST_CHROME_ROWS;
+  // keeps room within the half-height cap; the list keeps the full chrome. The
+  // footer gap is only kept when the panel is at full height (not capped).
+  const fullChrome = subStateActive ? MEMORY_DOCK_SUBSTATE_CHROME_ROWS : MEMORY_DOCK_LIST_CHROME_ROWS;
+  const { showFooterGap, chromeRows } = resolveDockedFooterGap({
+    panelRows,
+    desiredRows,
+    chromeWithGap: fullChrome
+  });
   const bodyArea = Math.max(1, panelRows - chromeRows);
   // The list renders a table header on its first line, so data rows are one fewer.
   const dataRows = Math.max(1, bodyArea - 1);
@@ -109,6 +118,7 @@ export function MemorySurface() {
           renderBody({ status, error, mode, items, entries, highlightedItem, highlightedEntry, columns: safeChromeColumns, listRows: bodyArea })
         )}
       </Box>
+      {showFooterGap ? <Text> </Text> : null}
       <MemoryFooter columns={safeChromeColumns} mode={mode} detailOpen={detailBody !== null} position={position} />
     </Box>
   );

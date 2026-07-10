@@ -5,8 +5,8 @@ import { THEME_CATALOG } from '@theme/themeConfig.ts';
 import type { ThemeDefinition } from '@theme/themeConfig.ts';
 import { activeThemeAtom, applyThemeAtom } from '@state/global/index.ts';
 
-/** Non-list rows in the docked `/theme` popup: accent divider, title, footer. */
-export const THEME_DOCK_CHROME_ROWS = 3;
+/** Non-list rows in the docked `/theme` popup: accent divider, title, gap, footer. */
+export const THEME_DOCK_CHROME_ROWS = 4;
 
 /**
  * Picker-local highlight index into {@link THEME_CATALOG}. Moving the highlight

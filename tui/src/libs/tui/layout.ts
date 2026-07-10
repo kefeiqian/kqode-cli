@@ -110,6 +110,29 @@ export function resolveDockedPanelRows({
 }
 
 /**
+ * Splits a docked popup's chrome budget by whether the panel reached its full
+ * desired height. The footer gap — a blank spacer row above the shortcut hint —
+ * is only worth a row when the whole content fits (`panelRows >= desiredRows`);
+ * once the panel is capped by the half-height limit, the gap yields its row back
+ * to the list so cramped terminals keep every content row.
+ *
+ * `chromeWithGap` is the surface's chrome-row constant that counts the gap row;
+ * when the gap is dropped the list reclaims that row (`chromeWithGap - 1`).
+ */
+export function resolveDockedFooterGap({
+  panelRows,
+  desiredRows,
+  chromeWithGap
+}: {
+  panelRows: number;
+  desiredRows: number;
+  chromeWithGap: number;
+}): { showFooterGap: boolean; chromeRows: number } {
+  const showFooterGap = panelRows >= desiredRows;
+  return { showFooterGap, chromeRows: showFooterGap ? chromeWithGap : chromeWithGap - 1 };
+}
+
+/**
  * Minimal scroll offset that keeps `index` visible inside a `visible`-row window
  * over `total` items: unchanged while the index is already in view, otherwise
  * scrolled just far enough to bring it to the nearest edge, clamped to

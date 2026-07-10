@@ -10,11 +10,13 @@ import { useModelBackend } from '@components/ModelSurface/useModelBackend.ts';
 import { useModelInput } from '@components/ModelSurface/useModelInput.ts';
 import { windowProviderModelRows } from '@libs/providers/index.ts';
 import type { ProviderModelRow } from '@libs/providers/index.ts';
+import { resolveDockedFooterGap } from '@libs/tui/layout.ts';
 import { dockedPanelRowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
 import { closeActiveSurfaceAtom, openConnectSurfaceAtom } from '@state/ui/surface/index.ts';
 import { PROVIDER_ID_CUSTOM } from '@state/ui/connect/index.ts';
 import {
   MODEL_DOCK_CHROME_ROWS,
+  modelDesiredRowsAtom,
   modelHighlightAtom,
   inlineConnectInFlightAtom,
   inlineConnectOutcomeAtom,
@@ -48,7 +50,13 @@ export function ModelSurface() {
   const openConnect = useSetAtom(openConnectSurfaceAtom);
   const { refreshModels, retryProvider, selectModel } = useModelBackend(closeActiveSurface);
   const { cancelInlineConnect, startInlineConnect, submitInlineKey } = useInlineConnect(refreshModels);
-  const listRows = Math.max(1, panelRows - MODEL_DOCK_CHROME_ROWS);
+  const desiredRows = useAtomValue(modelDesiredRowsAtom);
+  const { showFooterGap, chromeRows } = resolveDockedFooterGap({
+    panelRows,
+    desiredRows,
+    chromeWithGap: MODEL_DOCK_CHROME_ROWS
+  });
+  const listRows = Math.max(1, panelRows - chromeRows);
   // Window the list at render time from `listRows` (derived from the docked cap)
   // rather than the effect-set `modelVisibleRowsAtom`, which lags one render
   // behind the async list load and would otherwise flash a mis-windowed frame.
@@ -93,6 +101,7 @@ export function ModelSurface() {
           <RequestErrorMessage message={inlineRequestError} />
         </Box>
       )}
+      {showFooterGap ? <Text> </Text> : null}
       <ModelFooter columns={safeChromeColumns} offset={clampedOffset} total={allRows.length} visible={listRows} />
     </Box>
   );

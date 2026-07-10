@@ -72,8 +72,8 @@ export const POPUP_MAX_HEIGHT_DIVISOR = 2;
 /** Maximum number of session rows shown in the docked resume panel. */
 export const RESUME_PANEL_SESSION_ROWS = 10;
 
-/** Non-session rows in the docked resume panel: divider, label, header, footer. */
-export const RESUME_PANEL_CHROME_ROWS = 4;
+/** Non-session rows in the docked resume panel: divider, label, list header, gap, footer. */
+export const RESUME_PANEL_CHROME_ROWS = 5;
 
 /** Fixed desired height of the docked resume panel while open. */
 export const RESUME_PANEL_ROWS = RESUME_PANEL_SESSION_ROWS + RESUME_PANEL_CHROME_ROWS;

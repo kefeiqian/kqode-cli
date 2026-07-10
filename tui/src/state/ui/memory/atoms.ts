@@ -80,9 +80,9 @@ const currentListLengthAtom = atom((get) =>
 );
 
 /** Non-list chrome rows in the docked `/memory` popup while the list is showing. */
-export const MEMORY_DOCK_LIST_CHROME_ROWS = 5; // divider + title + tabs + status + footer
+export const MEMORY_DOCK_LIST_CHROME_ROWS = 6; // divider + title + tabs + status + gap + footer
 /** Chrome rows while a form/detail/confirm sub-state replaces the list. */
-export const MEMORY_DOCK_SUBSTATE_CHROME_ROWS = 3; // divider + title + footer
+export const MEMORY_DOCK_SUBSTATE_CHROME_ROWS = 4; // divider + title + gap + footer
 /** Row budget reserved for the add/edit form when it replaces the list. */
 export const MEMORY_FORM_ROWS = 6;
 
