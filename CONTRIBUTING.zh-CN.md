@@ -84,9 +84,12 @@ cargo xtask blog-preview
 
 ### Windows 注意事项
 
-在 Windows 上同时运行两个或更多 `cargo xtask` 命令会失败，因为每次调用都会重新
-链接共享的 `target\debug\xtask.exe`，而长时间运行的命令会一直锁定它。若要并行运行
-长时命令或多个命令，请使用启动器，它只构建一次，然后运行每次调用独立的副本：
+在 Windows 上，`cargo xtask` 已可并行运行：别名会把 xtask 构建并运行在私有的
+`target\xtask` 目录中（与工作区的 `target\` 分开），因此快速命令不会去重新链接
+其他进程正在占用的可执行文件。快速命令可以照常运行，也可以并行运行。长时间运行的
+服务器命令（`blog-serve`、`blog-serve-en`、`blog-preview`、`tui-dev`、`tui-prod`）
+会在整个会话期间占用该可执行文件，因此请通过启动器运行它们——启动器只构建一次，
+然后运行每次调用独立的副本，从而让规范可执行文件保持可被重新链接：
 
 ```powershell
 ./scripts/xtask.ps1 blog-serve   # Windows（PowerShell）
