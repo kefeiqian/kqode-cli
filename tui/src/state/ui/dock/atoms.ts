@@ -2,6 +2,8 @@ import { atom } from 'jotai';
 import { resolveDockedPanelRows } from '@libs/tui/layout.ts';
 import { rowsAtom } from '@state/ui/dimensions.ts';
 import { resumePanelDesiredRowsAtom, resumePanelOpenAtom } from '@state/ui/resume/index.ts';
+import { activeSurfaceAtom, Surface } from '@state/ui/surface/atoms.ts';
+import { themeDesiredRowsAtom } from '@state/ui/theme/atoms.ts';
 
 /**
  * The mutually exclusive bottom-docked command popups. The resume panel is
@@ -28,19 +30,29 @@ export type DockedPanel = (typeof DockedPanel)[keyof typeof DockedPanel];
  * budgeting, bottom-stack rendering, composer/status suppression, and the home
  * screen's wheel/click guards all key off this one predicate.
  */
-export const activeDockedPanelAtom = atom<DockedPanel | null>((get) =>
-  get(resumePanelOpenAtom) ? DockedPanel.Resume : null
-);
+export const activeDockedPanelAtom = atom<DockedPanel | null>((get) => {
+  if (get(resumePanelOpenAtom)) {
+    return DockedPanel.Resume;
+  }
+  switch (get(activeSurfaceAtom)) {
+    case Surface.Theme:
+      return DockedPanel.Theme;
+    default:
+      return null;
+  }
+});
 
 /**
  * The content-derived desired height of the active docked popup, dispatched by
- * panel id. Resume uses its fixed panel height; the theme/model/connect/memory
+ * panel id. Resume uses its fixed panel height; the model/connect/memory
  * branches are added as each surface is docked. `0` when nothing is docked.
  */
 export const dockedPanelDesiredRowsAtom = atom((get) => {
   switch (get(activeDockedPanelAtom)) {
     case DockedPanel.Resume:
       return get(resumePanelDesiredRowsAtom);
+    case DockedPanel.Theme:
+      return get(themeDesiredRowsAtom);
     default:
       return 0;
   }

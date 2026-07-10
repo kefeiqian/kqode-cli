@@ -6,7 +6,6 @@ import { HomeScreen } from '@components/HomeScreen/index.tsx';
 import { ConnectSurface } from '@components/ConnectSurface/index.tsx';
 import { ModelSurface } from '@components/ModelSurface/index.tsx';
 import { MemorySurface } from '@components/MemorySurface/index.tsx';
-import { ThemeSurface } from '@components/ThemeSurface/index.tsx';
 import { TerminalTooSmall } from '@components/TerminalTooSmall.tsx';
 import { useGlobalKeys } from '@/useGlobalKeys.ts';
 import {
@@ -56,8 +55,6 @@ export function App() {
   }
 
   switch (activeSurface) {
-    case Surface.Home:
-      return <HomeScreen />;
     case Surface.Help:
       return <HelpScreen />;
     case Surface.Connect:
@@ -66,7 +63,8 @@ export function App() {
       return <ModelSurface />;
     case Surface.Memory:
       return <MemorySurface />;
+    case Surface.Home:
     case Surface.Theme:
-      return <ThemeSurface />;
+      return <HomeScreen />;
   }
 }

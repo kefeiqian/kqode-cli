@@ -140,4 +140,26 @@ describe('ThemeSurface', () => {
     await waitUntil(() => store.get(activeSurfaceAtom) === Surface.Home, 'latest save closes');
     expect(store.get(activeThemeAtom).id).toBe(THEME_CATALOG[2].id);
   });
+
+  it('caps the docked popup and scrolls the catalog at the minimum terminal height (covers AE2, AE3)', async () => {
+    const { stdin, store, lastFrame } = renderTheme(clientWithSetTheme(), {
+      active: DEFAULT_THEME,
+      rows: 15
+    });
+    await flushInput();
+
+    // At MIN_ROWS the popup caps at <= floor(15/2) = 7 rows, so the 6-entry
+    // catalog cannot fully fit; navigate to the last theme and confirm it
+    // scrolls into view with a position indicator.
+    for (let i = 0; i < THEME_CATALOG.length - 1; i += 1) {
+      stdin.write(ARROW_DOWN);
+      await flushInput();
+    }
+
+    const frame = lastFrame() ?? '';
+    const lastTheme = THEME_CATALOG[THEME_CATALOG.length - 1];
+    expect(store.get(themeHighlightIndexAtom)).toBe(THEME_CATALOG.length - 1);
+    expect(frame).toContain(lastTheme.label);
+    expect(frame).toContain('more ↑');
+  });
 });

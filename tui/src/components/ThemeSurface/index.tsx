@@ -1,35 +1,42 @@
 import { Box, Text } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
+import { DockDivider } from '@components/DockDivider.tsx';
 import { ThemeRows } from '@components/ThemeSurface/ThemeRows.tsx';
 import { useThemeBackend } from '@components/ThemeSurface/useThemeBackend.ts';
 import { useThemeInput } from '@components/ThemeSurface/useThemeInput.ts';
 import { activeThemeAtom } from '@state/global/index.ts';
-import { columnsAtom, rowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
+import { dockedPanelRowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
 import { closeActiveSurfaceAtom } from '@state/ui/surface/index.ts';
 import {
   resetThemeSurfaceAtom,
+  scrollThemeHighlightIntoViewAtom,
+  THEME_DOCK_CHROME_ROWS,
   themeHighlightIndexAtom,
-  themeSaveWarningAtom
+  themeSaveWarningAtom,
+  themeVisibleRowsAtom,
+  themeWindowOffsetAtom,
+  visibleThemesAtom
 } from '@state/ui/theme/index.ts';
 import { THEME_CATALOG } from '@theme/themeConfig.ts';
 
-const HEADER_ROWS = 3;
-const FOOTER_ROWS = 1;
 const THEME_FOOTER_HINT = '↑/↓ choose · enter apply · esc close';
 
-/** Fullscreen `/theme` picker over the built-in dark preset catalog. */
+/** Bottom-docked `/theme` picker over the built-in dark preset catalog. */
 export function ThemeSurface() {
-  const columns = useAtomValue(columnsAtom);
   const safeChromeColumns = useAtomValue(safeChromeColumnsAtom);
-  const rows = useAtomValue(rowsAtom);
+  const panelRows = useAtomValue(dockedPanelRowsAtom);
   const theme = useAtomValue(activeThemeAtom);
   const highlightIndex = useAtomValue(themeHighlightIndexAtom);
+  const windowOffset = useAtomValue(themeWindowOffsetAtom);
+  const visibleThemes = useAtomValue(visibleThemesAtom);
   const warning = useAtomValue(themeSaveWarningAtom);
   const resetThemeSurface = useSetAtom(resetThemeSurfaceAtom);
+  const setVisibleRows = useSetAtom(themeVisibleRowsAtom);
+  const scrollHighlightIntoView = useSetAtom(scrollThemeHighlightIntoViewAtom);
   const closeActiveSurface = useSetAtom(closeActiveSurfaceAtom);
   const { selectTheme } = useThemeBackend(closeActiveSurface);
-  const bodyRows = useMemo(() => Math.max(1, rows - HEADER_ROWS - FOOTER_ROWS), [rows]);
+  const listRows = Math.max(1, panelRows - THEME_DOCK_CHROME_ROWS);
 
   useThemeInput({ selectTheme });
 
@@ -37,30 +44,60 @@ export function ThemeSurface() {
     resetThemeSurface();
   }, [resetThemeSurface]);
 
+  useEffect(() => {
+    setVisibleRows(listRows);
+    scrollHighlightIntoView();
+  }, [listRows, setVisibleRows, scrollHighlightIntoView]);
+
   return (
-    <Box flexDirection="column" width={columns} height={rows} backgroundColor={theme.colors.bodyBackground}>
+    <Box flexDirection="column" height={panelRows}>
+      <DockDivider />
       <Text color={theme.colors.accentBlue}>/theme</Text>
-      <Text color={theme.colors.muted}>Choose a color theme. Applies on Enter; Esc cancels.</Text>
-      <Text> </Text>
       <ThemeRows
         columns={safeChromeColumns}
-        themes={THEME_CATALOG}
-        highlightIndex={highlightIndex}
-        visibleRows={bodyRows}
+        themes={visibleThemes}
+        highlightIndex={highlightIndex - windowOffset}
+        visibleRows={listRows}
       />
-      <ThemeFooter columns={safeChromeColumns} warning={warning} />
+      <ThemeFooter
+        columns={safeChromeColumns}
+        warning={warning}
+        offset={windowOffset}
+        total={THEME_CATALOG.length}
+        visible={listRows}
+      />
     </Box>
   );
 }
 
-function ThemeFooter({ columns, warning }: { columns: number; warning: string | null }) {
+function ThemeFooter({
+  columns,
+  warning,
+  offset,
+  total,
+  visible
+}: {
+  columns: number;
+  warning: string | null;
+  offset: number;
+  total: number;
+  visible: number;
+}) {
   const theme = useAtomValue(activeThemeAtom);
+  const maxOffset = Math.max(0, total - visible);
+  const position =
+    maxOffset === 0 ? '' : offset <= 0 ? 'more ↓' : offset >= maxOffset ? 'more ↑' : 'more ↑↓';
 
   return (
     <Box width={columns}>
       <Text color={warning === null ? theme.colors.muted : theme.colors.warning} wrap="truncate">
         {warning ?? THEME_FOOTER_HINT}
       </Text>
+      {position === '' ? null : (
+        <Box flexGrow={1} justifyContent="flex-end">
+          <Text color={theme.colors.muted}>{position}</Text>
+        </Box>
+      )}
     </Box>
   );
 }
