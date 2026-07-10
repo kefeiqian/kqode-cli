@@ -165,7 +165,10 @@ export const modelDesiredRowsAtom = atom((get) => {
   if (get(inlineConnectProviderIdAtom) !== null) {
     return MODEL_DOCK_CHROME_ROWS + INLINE_CONNECT_ROWS;
   }
-  return MODEL_DOCK_CHROME_ROWS + get(modelRowsAtom).length;
+  // The list always renders >= 1 row (a blank when empty), so reserve for it —
+  // otherwise the rendered panel is one row taller than its budgeted height and
+  // over-subscribes the canvas while the provider list is empty/loading.
+  return MODEL_DOCK_CHROME_ROWS + Math.max(1, get(modelRowsAtom).length);
 });
 
 /**

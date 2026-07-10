@@ -110,5 +110,11 @@ describe('model atoms', () => {
 
     store.set(inlineConnectProviderIdAtom, 'a');
     expect(store.get(modelDesiredRowsAtom)).toBe(MODEL_DOCK_CHROME_ROWS + INLINE_CONNECT_ROWS);
+
+    // An empty provider list still reserves one row (the panel renders >= 1 row).
+    store.set(inlineConnectProviderIdAtom, null);
+    store.set(setModelProvidersLoadingAtom, []);
+    expect(store.get(modelRowsAtom)).toHaveLength(0);
+    expect(store.get(modelDesiredRowsAtom)).toBe(MODEL_DOCK_CHROME_ROWS + 1);
   });
 });
