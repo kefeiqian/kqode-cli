@@ -1,7 +1,7 @@
 ---
 title: Parallel-Safe cargo xtask Invocation on Windows
 type: fix
-status: active
+status: completed
 date: 2026-07-10
 origin: docs/brainstorms/2026-07-10-xtask-parallel-safe-invocation-requirements.md
 ---
