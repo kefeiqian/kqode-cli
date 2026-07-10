@@ -1,7 +1,7 @@
 ---
 title: "feat: Dock TUI command surfaces at half height with a clear border"
 type: feat
-status: active
+status: completed
 date: 2026-07-10
 origin: docs/brainstorms/2026-07-10-tui-command-surface-half-height-cap-requirements.md
 ---
