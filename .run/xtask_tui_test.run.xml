@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="xtask: tui-test" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
-    <option name="command" value="run -p xtask -- tui-test" />
+    <option name="command" value="xtask tui-test" />
     <option name="workingDirectory" value="$PROJECT_DIR$" />
     <method v="2" />
   </configuration>
