@@ -60,12 +60,16 @@ export function SlashCommandMenu() {
         const isHighlighted = start + index === highlighted;
         const marker = isHighlighted ? HIGHLIGHT_MARKER : PLAIN_MARKER;
         const paddedName = entryFullName(entry).padEnd(nameColumnWidth);
-        const line = truncate(`${marker}${paddedName}${NAME_DESCRIPTION_GAP}${entryDescription(entry)}`, columns);
+        const rawLine = `${marker}${paddedName}${NAME_DESCRIPTION_GAP}${entryDescription(entry)}`;
+        // Pad the selected row to the full safe width so its background reads as
+        // a full-row selection bar rather than a ragged highlight behind text.
+        const line = isHighlighted ? truncate(rawLine, columns).padEnd(columns) : truncate(rawLine, columns);
 
         return (
           <Text
             key={entryFullName(entry)}
             color={isHighlighted ? theme.colors.accentBlue : theme.colors.foreground}
+            backgroundColor={isHighlighted ? theme.colors.inputBackground : undefined}
           >
             {line}
           </Text>
