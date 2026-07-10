@@ -189,9 +189,19 @@ export const CONNECT_STEP_MAX_ROWS = 9;
 /**
  * Content-derived desired popup height for the docked `/connect` surface: the
  * provider list plus, when a provider step is open, a generous allowance for the
- * step form/key entry and its outcome/error feedback. Capped to half by the dock.
+ * step form/key entry and its outcome/error feedback. In the list step it also
+ * reserves a row for each visible feedback line (`Working…`, outcome, request
+ * error) so the docked panel never clips a set-key result. Capped to half by the
+ * dock.
  */
 export const connectDesiredRowsAtom = atom((get) => {
   const base = CONNECT_DOCK_CHROME_ROWS + Math.max(1, get(connectProvidersAtom).length);
-  return get(connectStepAtom) === ConnectStep.List ? base : base + CONNECT_STEP_MAX_ROWS;
+  if (get(connectStepAtom) !== ConnectStep.List) {
+    return base + CONNECT_STEP_MAX_ROWS;
+  }
+  const feedbackRows =
+    (get(connectInFlightAtom) ? 1 : 0) +
+    (get(connectLastOutcomeAtom) !== null ? 1 : 0) +
+    (get(connectRequestErrorAtom) !== null ? 1 : 0);
+  return base + feedbackRows;
 });

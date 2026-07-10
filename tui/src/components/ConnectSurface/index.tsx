@@ -62,27 +62,29 @@ export function ConnectSurface() {
 
   return (
     <Box flexDirection="column" height={panelRows} overflow="hidden">
-      <DockDivider />
-      <Text color={theme.colors.accentBlue}>/connect</Text>
-      <ProviderList providers={providers} selectedIndex={selectedIndex} />
-      {selectedProvider !== null && step === ConnectStep.ConnectedActions ? (
-        <ConnectedActions actionIndex={actionIndex} confirmClear={confirmClear} provider={selectedProvider} />
-      ) : null}
-      {selectedProvider?.providerId === PROVIDER_ID_CUSTOM && step !== ConnectStep.List && step !== ConnectStep.ConnectedActions ? (
-        <CustomForm baseUrl={baseUrl} baseUrlError={baseUrlError} label={label} labelError={labelError} step={step} />
-      ) : null}
-      {selectedProvider !== null && selectedProvider.providerId !== PROVIDER_ID_CUSTOM && step === ConnectStep.Key ? (
-        <Text color={theme.colors.muted}>Kimi base URL: {KIMI_BASE_URL}</Text>
-      ) : null}
-      {step === ConnectStep.Key ? (
-        <Box>
-          <Text color={theme.colors.accentBlue}>API key: </Text>
-          <MaskedInput isActive={!inFlight} onCancel={backStep} onSubmit={submitKey} />
-        </Box>
-      ) : null}
-      {inFlight ? <Text color={theme.colors.warning}>Working…</Text> : null}
-      <OutcomeMessage outcome={outcome?.outcome ?? null} providerId={outcome?.providerId ?? null} />
-      <RequestErrorMessage message={requestError} />
+      <Box flexDirection="column" flexShrink={0}>
+        <DockDivider />
+        <Text color={theme.colors.accentBlue}>/connect</Text>
+        <ProviderList providers={providers} selectedIndex={selectedIndex} />
+        {selectedProvider !== null && step === ConnectStep.ConnectedActions ? (
+          <ConnectedActions actionIndex={actionIndex} confirmClear={confirmClear} provider={selectedProvider} />
+        ) : null}
+        {selectedProvider?.providerId === PROVIDER_ID_CUSTOM && step !== ConnectStep.List && step !== ConnectStep.ConnectedActions ? (
+          <CustomForm baseUrl={baseUrl} baseUrlError={baseUrlError} label={label} labelError={labelError} step={step} />
+        ) : null}
+        {selectedProvider !== null && selectedProvider.providerId !== PROVIDER_ID_CUSTOM && step === ConnectStep.Key ? (
+          <Text color={theme.colors.muted}>Kimi base URL: {KIMI_BASE_URL}</Text>
+        ) : null}
+        {step === ConnectStep.Key ? (
+          <Box>
+            <Text color={theme.colors.accentBlue}>API key: </Text>
+            <MaskedInput isActive={!inFlight} onCancel={backStep} onSubmit={submitKey} />
+          </Box>
+        ) : null}
+        {inFlight ? <Text color={theme.colors.warning}>Working…</Text> : null}
+        <OutcomeMessage outcome={outcome?.outcome ?? null} providerId={outcome?.providerId ?? null} />
+        <RequestErrorMessage message={requestError} />
+      </Box>
     </Box>
   );
 }

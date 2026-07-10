@@ -11,7 +11,7 @@ import {
   SET_KEY_OUTCOME_STORE_FAILED,
   SET_KEY_OUTCOME_UNREACHABLE
 } from '@contracts/backend/index.ts';
-import { activeSurfaceAtom, Surface } from '@state/ui/index.ts';
+import { activeSurfaceAtom, rowsTestOverrideAtom, Surface } from '@state/ui/index.ts';
 import {
   ConnectStep,
   PROVIDER_ID_CUSTOM,
@@ -204,5 +204,24 @@ describe('ConnectSurface', () => {
     const values = Array.from(devStore.dev_get_mounted_atoms?.() ?? []).map((atom) => devStore.get(atom as never));
     expect(JSON.stringify(values)).not.toContain(secret);
     expect(lastFrame() ?? '').not.toContain(secret);
+  });
+
+  it('clips the docked panel top-down without squishing chrome at small terminals (P007 U6 review)', async () => {
+    const { store, lastFrame } = renderConnect(fakeClient(), (nextStore) => {
+      nextStore.set(rowsTestOverrideAtom, 15); // half-height cap = 7 rows
+    });
+    await waitForFrame(lastFrame, 'Kimi');
+
+    // Force the tall custom Key step so the content exceeds the 7-row cap.
+    store.set(connectSelectedIndexAtom, 1);
+    store.set(customBaseUrlAtom, 'https://ok.test/v1');
+    store.set(connectStepAtom, ConnectStep.Key);
+    await waitForFrame(lastFrame, 'Destination host');
+
+    const lines = (lastFrame() ?? '').split('\n');
+    const titleLine = lines.find((line) => line.includes('/connect'));
+    expect(lines.some((line) => /^─+\s*$/.test(line))).toBe(true); // divider is its own clean row
+    expect(titleLine).toBeDefined();
+    expect(titleLine).not.toMatch(/─/); // title not squished into the divider
   });
 });
