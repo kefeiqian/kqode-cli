@@ -20,6 +20,7 @@ import {
   customLabelAtom,
   connectReturnToModelAtom,
   connectLastOutcomeAtom,
+  connectRequestErrorAtom,
   connectSelectedIndexAtom,
   connectStepAtom,
   connectTargetProviderIdAtom
@@ -223,5 +224,21 @@ describe('ConnectSurface', () => {
     expect(lines.some((line) => /^─+\s*$/.test(line))).toBe(true); // divider is its own clean row
     expect(titleLine).toBeDefined();
     expect(titleLine).not.toMatch(/─/); // title not squished into the divider
+  });
+
+  it('renders the list-step request-error hint without dropping chrome or provider rows (P007 U6 review)', async () => {
+    const { store, lastFrame } = renderConnect();
+    await waitForFrame(lastFrame, 'Custom');
+
+    // Reachable when listProviders() fails on open: a hint is set while step stays List.
+    store.set(connectRequestErrorAtom, 'Could not read providers — ensure settings storage is available, then retry.');
+    const frame = await waitForFrame(lastFrame, 'Could not read providers');
+
+    const lines = frame.split('\n');
+    const titleLine = lines.find((line) => line.includes('/connect'));
+    expect(lines.some((line) => /^─+\s*$/.test(line))).toBe(true); // divider survives
+    expect(titleLine).not.toMatch(/─/); // title row intact, not merged into the divider
+    expect(frame).toContain('Kimi'); // neither provider row is clipped away
+    expect(frame).toContain('Custom');
   });
 });

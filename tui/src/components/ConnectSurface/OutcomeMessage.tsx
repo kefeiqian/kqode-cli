@@ -54,11 +54,19 @@ export function OutcomeMessage({ outcome, providerId }: { outcome: SetKeyOutcome
   }
 
   if (outcome === SET_KEY_OUTCOME_STORE_FAILED && providerId === PROVIDER_ID_CUSTOM) {
-    return <Text color={theme.colors.errorRed}>Custom can&apos;t be saved while settings storage is unavailable.</Text>;
+    return (
+      <Text color={theme.colors.errorRed} wrap="truncate">
+        Custom can&apos;t be saved while settings storage is unavailable.
+      </Text>
+    );
   }
 
   const message = OUTCOME_MESSAGES[outcome];
-  return <Text color={theme.colors[message.colorToken]}>{message.text}</Text>;
+  return (
+    <Text color={theme.colors[message.colorToken]} wrap="truncate">
+      {message.text}
+    </Text>
+  );
 }
 
 /** Sensible degraded-mode hint for backend request failures. */
@@ -69,5 +77,9 @@ export function RequestErrorMessage({ message }: { message: string | null }) {
     return null;
   }
 
-  return <Text color={theme.colors.warning}>{message}</Text>;
+  return (
+    <Text color={theme.colors.warning} wrap="truncate">
+      {message}
+    </Text>
+  );
 }
