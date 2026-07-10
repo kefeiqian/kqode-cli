@@ -7,9 +7,11 @@ import type { ThemeDefinition } from '@theme/themeConfig.ts';
 import { moveThemeHighlightAtom, themeHighlightIndexAtom } from '@state/ui/theme/index.ts';
 
 /**
- * Wires `/theme` navigation and confirm. Arrow keys move only the picker-local
- * highlight; Enter applies the highlighted theme. Esc close is owned by the App
- * shell, so pressing Esc leaves the active theme untouched.
+ * Wires `/theme` navigation and confirm. Arrow keys move the highlight and
+ * live-preview the highlighted theme (via {@link moveThemeHighlightAtom}); Enter
+ * persists the previewed theme. Esc close is owned by the App shell, and the
+ * ThemeSurface reverts the preview on unmount, so pressing Esc restores the
+ * theme that was active when the picker opened.
  */
 export function useThemeInput(actions: { selectTheme: (theme: ThemeDefinition) => Promise<void> }) {
   const highlightIndex = useAtomValue(themeHighlightIndexAtom);

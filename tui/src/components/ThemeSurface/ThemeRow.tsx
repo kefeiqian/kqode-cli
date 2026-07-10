@@ -1,6 +1,7 @@
 import { Text } from 'ink';
 import { useAtomValue } from 'jotai';
 import { activeThemeAtom } from '@state/global/index.ts';
+import { themeBaselineAtom } from '@state/ui/theme/index.ts';
 import type { ThemeDefinition } from '@theme/themeConfig.ts';
 
 const HIGHLIGHT_MARKER = '›';
@@ -9,10 +10,11 @@ const ACTIVE_MARKER = '●';
 const INACTIVE_MARKER = ' ';
 
 /**
- * Renders one catalog theme row. The highlight (`›`) and active (`●`) glyphs
- * keep the focused row and the applied theme legible without relying on color
- * alone. Row colors come from the active theme so the picker chrome stays
- * consistent (apply happens on Enter, not on highlight).
+ * Renders one catalog theme row. The highlight (`›`) glyph marks the focused
+ * row while the active (`●`) glyph marks your real theme — the baseline you
+ * opened with — so during a live preview the marker keeps pointing at your
+ * theme even as the highlighted row recolors the popup. Row colors come from
+ * the active theme so the whole picker previews the highlighted theme.
  */
 export function ThemeRow({
   columns,
@@ -24,7 +26,8 @@ export function ThemeRow({
   highlighted: boolean;
 }) {
   const activeTheme = useAtomValue(activeThemeAtom);
-  const isActive = theme.id === activeTheme.id;
+  const baselineTheme = useAtomValue(themeBaselineAtom);
+  const isActive = theme.id === baselineTheme.id;
   const marker = highlighted ? HIGHLIGHT_MARKER : PLAIN_MARKER;
   const active = isActive ? ACTIVE_MARKER : INACTIVE_MARKER;
   const color = highlighted ? activeTheme.colors.accentBlue : activeTheme.colors.foreground;

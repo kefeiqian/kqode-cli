@@ -10,6 +10,7 @@ import { dockedPanelRowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
 import { closeActiveSurfaceAtom } from '@state/ui/surface/index.ts';
 import {
   resetThemeSurfaceAtom,
+  revertThemePreviewAtom,
   scrollThemeHighlightIntoViewAtom,
   THEME_DOCK_CHROME_ROWS,
   themeHighlightIndexAtom,
@@ -35,6 +36,7 @@ export function ThemeSurface() {
   const setVisibleRows = useSetAtom(themeVisibleRowsAtom);
   const scrollHighlightIntoView = useSetAtom(scrollThemeHighlightIntoViewAtom);
   const closeActiveSurface = useSetAtom(closeActiveSurfaceAtom);
+  const revertThemePreview = useSetAtom(revertThemePreviewAtom);
   const { selectTheme } = useThemeBackend(closeActiveSurface);
   const listRows = Math.max(1, panelRows - THEME_DOCK_CHROME_ROWS);
 
@@ -42,7 +44,12 @@ export function ThemeSurface() {
 
   useEffect(() => {
     resetThemeSurface();
-  }, [resetThemeSurface]);
+    // A confirmed theme adopts itself as the baseline, so this revert only
+    // undoes an un-confirmed navigation preview (Esc/cancel).
+    return () => {
+      revertThemePreview();
+    };
+  }, [resetThemeSurface, revertThemePreview]);
 
   useEffect(() => {
     setVisibleRows(listRows);

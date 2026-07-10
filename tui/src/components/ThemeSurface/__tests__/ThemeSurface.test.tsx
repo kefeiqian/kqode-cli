@@ -53,7 +53,7 @@ describe('ThemeSurface', () => {
     expect(lastFrame() ?? '').not.toMatch(/light|custom|plugin|import|export/i);
   });
 
-  it('moves the highlight on arrow keys without applying or persisting a theme', async () => {
+  it('live-previews the highlighted theme on arrow keys without persisting', async () => {
     const client = clientWithSetTheme();
     const { stdin, store } = renderTheme(client, { active: DEFAULT_THEME });
     await flushInput();
@@ -63,8 +63,91 @@ describe('ThemeSurface', () => {
     await flushInput();
 
     expect(store.get(themeHighlightIndexAtom)).toBe(1);
-    expect(store.get(activeThemeAtom)).toBe(DEFAULT_THEME); // unchanged until Enter
+    expect(store.get(activeThemeAtom).id).toBe(secondTheme.id); // applied for preview
+    expect(client.setTheme).not.toHaveBeenCalled(); // but not persisted until Enter
+  });
+
+  it('keeps the ● active marker on the original theme while previewing another', async () => {
+    const { stdin, lastFrame } = renderTheme(clientWithSetTheme(), { active: DEFAULT_THEME });
+    await flushInput();
+
+    stdin.write(ARROW_DOWN);
+    await flushInput();
+
+    const frame = lastFrame() ?? '';
+    // The ● marker stays on the theme you opened with, not the previewed row.
+    expect(frame).toContain(`● ${DEFAULT_THEME.label}`);
+    expect(frame).not.toContain(`● ${secondTheme.label}`);
+  });
+
+  it('reverts to the theme active before opening when the picker closes without saving', async () => {
+    const client = clientWithSetTheme();
+    const { stdin, store, unmount } = renderTheme(client, { active: DEFAULT_THEME });
+    await flushInput();
+
+    stdin.write(ARROW_DOWN);
+    await flushInput();
+    expect(store.get(activeThemeAtom).id).toBe(secondTheme.id); // previewed
+
+    // The App shell closes the surface on Esc, which unmounts ThemeSurface.
+    unmount();
+
+    expect(store.get(activeThemeAtom)).toBe(DEFAULT_THEME); // reverted to the origin
     expect(client.setTheme).not.toHaveBeenCalled();
+  });
+
+  it('keeps the saved theme applied when the picker unmounts after a successful save', async () => {
+    const client = clientWithSetTheme();
+    const { stdin, store, unmount } = renderTheme(client, { active: DEFAULT_THEME });
+    await flushInput();
+
+    stdin.write(ARROW_DOWN);
+    await flushInput();
+    stdin.write(ENTER);
+    await waitUntil(() => store.get(activeSurfaceAtom) === Surface.Home, 'picker closes');
+
+    unmount();
+
+    expect(store.get(activeThemeAtom).id).toBe(secondTheme.id); // committed, not reverted
+  });
+
+  it('keeps the confirmed theme when the picker unmounts after a failed save', async () => {
+    const client = clientWithSetTheme(
+      vi.fn(async (): Promise<ThemeSetResult> => ({ outcome: THEME_SET_OUTCOME_STORE_FAILED }))
+    );
+    const { stdin, store, unmount } = renderTheme(client, { active: DEFAULT_THEME });
+    await flushInput();
+
+    stdin.write(ARROW_DOWN);
+    await flushInput();
+    stdin.write(ENTER);
+    await waitUntil(() => store.get(themeSaveWarningAtom) !== null, 'unsaved warning');
+
+    // Esc after a failed save must keep the confirmed theme, matching the
+    // "applied for this session" warning rather than reverting it.
+    unmount();
+
+    expect(store.get(activeThemeAtom).id).toBe(secondTheme.id);
+  });
+
+  it('keeps the saved theme when the picker unmounts before an in-flight save resolves', async () => {
+    const deferred = deferredSetTheme();
+    const client = clientWithSetTheme(deferred.setTheme);
+    const { stdin, store, unmount } = renderTheme(client, { active: DEFAULT_THEME });
+    await flushInput();
+
+    stdin.write(ARROW_DOWN);
+    await flushInput();
+    stdin.write(ENTER);
+    await waitUntil(() => deferred.setTheme.mock.calls.length === 1, 'save request');
+
+    // Close before the save resolves, then let it resolve saved: the persisted
+    // theme and the in-memory active theme must not diverge.
+    unmount();
+    deferred.resolve(0, { outcome: THEME_SET_OUTCOME_SAVED });
+    await flushInput();
+
+    expect(store.get(activeThemeAtom).id).toBe(secondTheme.id);
   });
 
   it('applies, persists, and closes on Enter for a saved theme (covers AE1)', async () => {
