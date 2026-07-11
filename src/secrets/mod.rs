@@ -15,6 +15,19 @@ use crate::provider::registry::{KeyResolver, KeySource};
 /// Stable OS-keychain service namespace for provider API keys.
 pub const KEYCHAIN_SERVICE: &str = "dev.kqode.providers";
 
+/// Environment variable selecting the keychain backend. Set to `mock` to use an
+/// in-memory keyring instead of the real OS keychain.
+///
+/// This is a **test/CI affordance only** — production never sets it. It lets
+/// integration tests that spawn the real backend binary run against an empty,
+/// isolated keychain, so they stay deterministic regardless of the developer's
+/// OS credentials (the OS keychain is process-global and is not scoped by the
+/// `HOME`/`USERPROFILE` overrides the test harness sets).
+pub const KEYCHAIN_BACKEND_ENV: &str = "KQODE_KEYCHAIN_BACKEND";
+
+/// Value of [`KEYCHAIN_BACKEND_ENV`] that selects the in-memory mock keyring.
+const KEYCHAIN_BACKEND_MOCK: &str = "mock";
+
 const REDACTED: &str = "<redacted>";
 
 /// A redacting, zeroizing provider API key.
@@ -128,6 +141,19 @@ pub fn clear_key(provider: ProviderId) -> Result<(), KeychainError> {
 #[must_use]
 pub fn resolve_key(provider: ProviderId) -> Option<ApiKey> {
     get_key(provider).ok().flatten()
+}
+
+/// Installs the in-memory mock keyring when [`KEYCHAIN_BACKEND_ENV`] is `mock`.
+///
+/// Call once at process startup, before any keychain access. It is a no-op
+/// unless the env var explicitly selects the mock backend, so production
+/// behavior is unchanged. With the mock installed, every key read returns "no
+/// entry" (the store starts empty) and writes stay in memory, isolating the
+/// process from the real OS keychain.
+pub fn init_keychain_backend() {
+    if std::env::var(KEYCHAIN_BACKEND_ENV).as_deref() == Ok(KEYCHAIN_BACKEND_MOCK) {
+        keyring::set_default_credential_builder(keyring::mock::default_credential_builder());
+    }
 }
 
 /// Real key-source resolver for provider status derivation.

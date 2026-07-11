@@ -72,6 +72,7 @@ impl Error for BackendError {
 /// fail, or a response cannot be written.
 pub fn run_stdio() -> Result<(), BackendError> {
     dotenvy::dotenv().ok();
+    crate::secrets::init_keychain_backend();
     let session_id = debug_log::new_session_id();
     // Hold the guard for the whole session so buffered log lines flush on exit;
     // `None` when debug logging is disabled.

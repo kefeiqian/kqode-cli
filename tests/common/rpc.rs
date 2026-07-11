@@ -19,8 +19,12 @@ pub fn backend_output_in(home: &Path, cwd: &Path, input: &[u8]) -> Output {
         .current_dir(cwd)
         .env("HOME", home)
         .env("USERPROFILE", home)
-        // The isolated home keeps provider credentials unavailable so integration
-        // tests are deterministic and never issue a live provider call.
+        // Use the in-memory mock keyring so the spawned backend never reads the
+        // developer's real OS keychain (which is process-global and not scoped
+        // by HOME/USERPROFILE). This keeps provider credentials unavailable, so
+        // integration tests are deterministic and never issue a live provider
+        // call, regardless of what the developer has connected via `/login`.
+        .env(kqode::secrets::KEYCHAIN_BACKEND_ENV, "mock")
         // Disable debug logging so the test-spawned backend never writes under
         // the real `~/.kqode/logs` (the dev build defaults it on).
         .env("KQODE_DEBUG", "0")
