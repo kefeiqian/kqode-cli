@@ -4,7 +4,7 @@ import { STREAM_RENDER_FLUSH_MS } from '@constants/backend.ts';
 import { SETTLED_KIND_COMPLETED } from '@contracts/backend/index.ts';
 import type { TranscriptEvent } from '@contracts/backend/index.ts';
 import type { SessionResumeResult } from '@contracts/backend/index.ts';
-import { backendClientAtom } from '@state/global/index.ts';
+import { backendClientAtom, currentSessionIdAtom } from '@state/global/index.ts';
 import { bodyScrollOffsetRowsAtom } from '@state/ui/index.ts';
 import { openConnectSurfaceAtom, openModelSurfaceAtom } from '@state/ui/surface/index.ts';
 import { refreshGitStatusAtom } from '@state/ui/index.ts';
@@ -102,6 +102,7 @@ export const clearTranscriptAtom = atom(null, (get, set) => {
   set(streamingTextByIdAtom, new Map());
   set(turnGenerationByIdAtom, new Map());
   set(bodyScrollOffsetRowsAtom, 0);
+  set(currentSessionIdAtom, undefined);
   void get(backendClientAtom)?.clearConversation().catch(() => undefined);
 });
 /** Bumps generation on backend respawn and drops backend-owned mirror rows. */
@@ -118,6 +119,7 @@ export const resetTranscriptMirrorAtom = atom(null, (get, set) => {
   );
   set(streamingTextByIdAtom, new Map());
   set(turnGenerationByIdAtom, new Map());
+  set(currentSessionIdAtom, undefined);
 });
 /** Rehydrates the backend-owned transcript mirror from a resumed session payload. */
 export const hydrateResumedTranscriptAtom = atom(

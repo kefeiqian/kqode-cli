@@ -7,6 +7,7 @@ import {
   enqueuePromptAtom,
   newTurnIdAtom,
   promptQueueAtom,
+  resetTranscriptMirrorAtom,
   restoreComposerDraftAtom,
   transcriptEventAtom
 } from '@state/promptQueue/index.ts';
@@ -15,7 +16,7 @@ import {
   PROVIDER_NOT_CONFIGURED_MESSAGE
 } from '@libs/promptQueue/promptQueue.ts';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
-import { backendClientAtom } from '@state/global/index.ts';
+import { backendClientAtom, currentSessionIdAtom } from '@state/global/index.ts';
 import { activeSurfaceAtom, bodyScrollOffsetRowsAtom, submittedPromptEntriesAtom, Surface } from '@state/ui/index.ts';
 import {
   SETTLED_KIND_NEEDS_CONFIGURATION,
@@ -218,5 +219,21 @@ describe('settled git status refresh', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(gitStatus).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('currentSessionIdAtom resets', () => {
+  it('clearTranscriptAtom clears the current session id', () => {
+    const store = createStore();
+    store.set(currentSessionIdAtom, 'conv-1');
+    store.set(clearTranscriptAtom);
+    expect(store.get(currentSessionIdAtom)).toBeUndefined();
+  });
+
+  it('resetTranscriptMirrorAtom clears the current session id', () => {
+    const store = createStore();
+    store.set(currentSessionIdAtom, 'conv-1');
+    store.set(resetTranscriptMirrorAtom);
+    expect(store.get(currentSessionIdAtom)).toBeUndefined();
   });
 });

@@ -2,6 +2,8 @@ import type { createStore } from 'jotai';
 import type { BackendClient } from '@contracts/backend/index.ts';
 import type { SessionLogger } from '@backend/log/sessionLogger.ts';
 import { backendClientAtom } from '@state/global/backend.ts';
+import { currentSessionIdAtom } from '@state/global/session.ts';
+import { selectCurrentSessionId } from '@libs/resume/currentSessionId.ts';
 import { resetTranscriptMirrorAtom, transcriptEventAtom } from '@state/promptQueue/atoms.ts';
 import { appendClientOnlyErrorAtom } from '@state/promptQueue/clientOnlyRows.ts';
 import { gitStatusLabelAtom } from '@state/ui/gitStatus.ts';
@@ -45,6 +47,12 @@ export function startBackendRuntime(
       // Safety net: a cancel mid-compaction never emits CompactionFinished, so
       // clear the "Auto compacting…" status on any terminal settle.
       store.set(compactionInProgressAtom, false);
+    }
+    // The session becomes resumable at its first accepted enqueue; capture its
+    // durable id from session.list so the exit summary can print the resume
+    // command. Guarded on `undefined` so it fetches only until the id is known.
+    if (event.type === 'enqueued' && store.get(currentSessionIdAtom) === undefined) {
+      void captureCurrentSessionId(store, client, () => disposed);
     }
     store.set(transcriptEventAtom, event);
   });
@@ -102,6 +110,22 @@ function startupFailureMessage(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+async function captureCurrentSessionId(
+  store: Store,
+  client: RuntimeBackendClient,
+  isDisposed: () => boolean
+): Promise<void> {
+  try {
+    const { sessions } = await client.listSessions();
+    const sessionId = selectCurrentSessionId(sessions);
+    if (sessionId !== undefined && !isDisposed()) {
+      store.set(currentSessionIdAtom, sessionId);
+    }
+  } catch {
+    // Best-effort capture: a missing id just omits the exit-card Resume row.
+  }
 }
 
 async function refreshGitStatusUnlessDisposed(

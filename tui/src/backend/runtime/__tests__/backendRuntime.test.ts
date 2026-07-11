@@ -1,7 +1,10 @@
 import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.ts';
+import { SESSION_STATUS_CURRENT } from '@contracts/backend/index.ts';
+import type { TranscriptEvent } from '@contracts/backend/index.ts';
 import { backendClientAtom } from '@state/global/backend.ts';
+import { currentSessionIdAtom } from '@state/global/session.ts';
 import { BACKEND_LOADING_HINT, startupStatusHintAtom } from '@state/ui/statusHint.ts';
 import { enqueuePromptAtom } from '@state/promptQueue/index.ts';
 import { bodyScrollOffsetRowsAtom, submittedPromptEntriesAtom } from '@state/ui/index.ts';
@@ -192,5 +195,60 @@ describe('startBackendRuntime', () => {
     const entries = store.get(submittedPromptEntriesAtom);
     expect(entries.some((entry) => entry.kind === 'error')).toBe(true);
     expect(client.submit).toHaveBeenCalledWith({ turnId: expect.any(String), text: 'still here?' });
+  });
+
+  it('captures the durable session id from session.list on the first enqueued event', async () => {
+    const store = createStore();
+    let transcriptHandler: ((event: TranscriptEvent) => void) | undefined;
+    const listSessions = vi.fn().mockResolvedValue({
+      sessions: [
+        {
+          sessionId: 'conv-1',
+          summary: 's',
+          status: SESSION_STATUS_CURRENT,
+          modifiedAt: 0,
+          createdAt: 0,
+          folder: 'f'
+        }
+      ]
+    });
+    const client = fakeClient({
+      onTranscriptEvent: vi.fn((handler: (event: TranscriptEvent) => void) => {
+        transcriptHandler = handler;
+        return () => undefined;
+      }),
+      listSessions
+    });
+
+    startBackendRuntime(store, client, fakeLogger());
+
+    transcriptHandler?.({ type: 'enqueued', turnId: 't1', seq: 0, state: 'active' });
+    await flushMicrotasks();
+
+    expect(listSessions).toHaveBeenCalledTimes(1);
+    expect(store.get(currentSessionIdAtom)).toBe('conv-1');
+
+    // A second enqueued while the id is known must not re-fetch.
+    transcriptHandler?.({ type: 'enqueued', turnId: 't2', seq: 1, state: 'pending' });
+    await flushMicrotasks();
+    expect(listSessions).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the session id unset when no session is Current', async () => {
+    const store = createStore();
+    let transcriptHandler: ((event: TranscriptEvent) => void) | undefined;
+    const client = fakeClient({
+      onTranscriptEvent: vi.fn((handler: (event: TranscriptEvent) => void) => {
+        transcriptHandler = handler;
+        return () => undefined;
+      }),
+      listSessions: vi.fn().mockResolvedValue({ sessions: [] })
+    });
+
+    startBackendRuntime(store, client, fakeLogger());
+    transcriptHandler?.({ type: 'enqueued', turnId: 't1', seq: 0, state: 'active' });
+    await flushMicrotasks();
+
+    expect(store.get(currentSessionIdAtom)).toBeUndefined();
   });
 });
