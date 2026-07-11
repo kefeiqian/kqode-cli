@@ -24,8 +24,8 @@ export function reduceTranscriptEvent(
   event: TranscriptEvent,
   currentGeneration: number
 ): TranscriptReduceResult {
-  if (event.type === 'compactionStatus') {
-    // Status-only event handled at the runtime layer; never a transcript row.
+  if (event.type === 'compactionStatus' || event.type === 'sessionSummaryUpdated') {
+    // Status/side-effect events handled at the runtime layer; never a transcript row.
     return { state };
   }
   if (state.settledTurnIds.has(event.turnId)) {
@@ -63,7 +63,13 @@ function stampTurnGeneration(
   return { ...state, generationByTurnId };
 }
 
-function ensureTurn(state: TranscriptReducerState, event: TranscriptEvent): TranscriptReducerState {
+/** Transcript events that carry a `turnId` (everything but runtime side-effects). */
+type TurnTranscriptEvent = Extract<TranscriptEvent, { turnId: string }>;
+
+function ensureTurn(
+  state: TranscriptReducerState,
+  event: TurnTranscriptEvent
+): TranscriptReducerState {
   if (state.queue.some((item) => item.turnId === event.turnId)) {
     return state;
   }

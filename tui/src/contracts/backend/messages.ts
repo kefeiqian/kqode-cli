@@ -66,6 +66,9 @@ export const TURN_SETTLED_METHOD = 'kqode/turnSettled';
 /** Must match `COMPACTION_STATUS_METHOD` in `src/protocol.rs`. */
 export const COMPACTION_STATUS_METHOD = 'kqode/compactionStatus';
 
+/** Must match `SESSION_SUMMARY_UPDATED_METHOD` in `src/protocol.rs`. */
+export const SESSION_SUMMARY_UPDATED_METHOD = 'kqode/sessionSummaryUpdated';
+
 /** Must match `TURN_STATE_ACTIVE` in `src/protocol.rs`. */
 export const TURN_STATE_ACTIVE = 'active';
 
@@ -157,6 +160,12 @@ export type ActivatedParams = {
 export type CompactionStatusParams = {
   turnId: string;
   active: boolean;
+};
+
+/** Payload for {@link SESSION_SUMMARY_UPDATED_METHOD}. Must match `SessionSummaryUpdatedParams` in `src/protocol.rs`. */
+export type SessionSummaryUpdatedParams = {
+  sessionId: string;
+  summary: string;
 };
 
 /** Payload for {@link TURN_SETTLED_METHOD}. Must match `SettledParams` in `src/protocol.rs`. */

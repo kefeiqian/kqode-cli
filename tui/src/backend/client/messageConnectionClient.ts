@@ -10,6 +10,7 @@ import {
   conversationClearRequest,
   gitStatusRequest,
   messageSubmitRequest,
+  sessionSummaryUpdatedNotification,
   tokenDeltaNotification,
   turnActivatedNotification,
   turnCancelRequest,
@@ -86,6 +87,9 @@ export function createMessageConnectionClient(
   );
   connection.onNotification(compactionStatusNotification, (event) =>
     emit({ type: 'compactionStatus', ...event })
+  );
+  connection.onNotification(sessionSummaryUpdatedNotification, (event) =>
+    emit({ type: 'sessionSummaryUpdated', ...event })
   );
   const failInFlight = (reason: string): void => {
     for (const turnId of [...inFlightTurnIds]) {

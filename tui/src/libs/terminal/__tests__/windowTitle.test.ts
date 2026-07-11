@@ -4,6 +4,7 @@ import {
   formatSessionWindowTitle,
   formatWindowTitle,
   resetTerminalWindowTitle,
+  sanitizeSessionTitle,
   setSessionWindowTitle,
   setTerminalWindowTitle
 } from '@libs/terminal/windowTitle.ts';
@@ -88,5 +89,29 @@ describe('windowTitle', () => {
     resetTerminalWindowTitle(stream);
 
     expect(write).not.toHaveBeenCalled();
+  });
+
+  it('strips control characters and collapses whitespace to a single line', () => {
+    expect(sanitizeSessionTitle('Fix\u0007\tthe\r\nparser\u202e   bug')).toBe('Fix the parser bug');
+  });
+
+  it('removes bidi/RTL override marks', () => {
+    expect(sanitizeSessionTitle('a\u202eb\u200fc')).toBe('abc');
+  });
+
+  it('returns an empty string for control-only input', () => {
+    expect(sanitizeSessionTitle('\u0001\u0007\u202e')).toBe('');
+  });
+
+  it('sanitizes the session title at the sink so no raw ESC/BEL reaches the terminal', () => {
+    const write = vi.fn();
+    const stream = { isTTY: true, write } as unknown as NodeJS.WriteStream;
+
+    setSessionWindowTitle('KQode', 'rm\u001b]0;evil\u0007 -rf', stream);
+
+    const written = write.mock.calls[0]?.[0] as string;
+    const payload = written.slice('\u001b]2;'.length, -1);
+    expect(payload).not.toContain('\u001b');
+    expect(payload).not.toContain('\u0007');
   });
 });

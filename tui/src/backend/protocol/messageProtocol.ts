@@ -5,6 +5,7 @@ import {
   CONVERSATION_CLEAR_METHOD,
   GIT_STATUS_METHOD,
   MESSAGE_SUBMIT_METHOD,
+  SESSION_SUMMARY_UPDATED_METHOD,
   TOKEN_DELTA_METHOD,
   TURN_ACTIVATED_METHOD,
   TURN_CANCEL_METHOD,
@@ -20,6 +21,7 @@ import type {
   GitStatusResult,
   MessageSubmitParams,
   MessageSubmitResult,
+  SessionSummaryUpdatedParams,
   SettledParams,
   TokenDeltaParams,
   TurnCancelParams,
@@ -86,4 +88,9 @@ export const turnSettledNotification = new NotificationType<SettledParams>(TURN_
 /** Toggles the "Auto compacting…" status while a turn's hidden compaction runs. */
 export const compactionStatusNotification = new NotificationType<CompactionStatusParams>(
   COMPACTION_STATUS_METHOD
+);
+
+/** Carries a session's generated summary so the TUI upgrades the live terminal title. */
+export const sessionSummaryUpdatedNotification = new NotificationType<SessionSummaryUpdatedParams>(
+  SESSION_SUMMARY_UPDATED_METHOD
 );

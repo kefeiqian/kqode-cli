@@ -8,6 +8,8 @@ import { resetTranscriptMirrorAtom, transcriptEventAtom } from '@state/promptQue
 import { appendClientOnlyErrorAtom } from '@state/promptQueue/clientOnlyRows.ts';
 import { gitStatusLabelAtom } from '@state/ui/gitStatus.ts';
 import { BACKEND_LOADING_HINT, compactionInProgressAtom, startupStatusHintAtom } from '@state/ui/statusHint.ts';
+import { setSessionWindowTitle } from '@libs/terminal/windowTitle.ts';
+import { PRODUCT_NAME } from '@constants/product.ts';
 
 type Store = ReturnType<typeof createStore>;
 
@@ -41,6 +43,12 @@ export function startBackendRuntime(
   const unsubscribeTranscript = client.onTranscriptEvent((event) => {
     if (event.type === 'compactionStatus') {
       store.set(compactionInProgressAtom, event.active);
+      return;
+    }
+    if (event.type === 'sessionSummaryUpdated') {
+      // The backend only generates for its current session, so upgrade the live
+      // terminal title from the placeholder on any summary from this connection.
+      setSessionWindowTitle(PRODUCT_NAME, event.summary);
       return;
     }
     if (event.type === 'settled') {

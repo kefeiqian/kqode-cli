@@ -14,21 +14,58 @@ export function formatWindowTitle(productName: string, productVersion: string): 
 /** Max characters of a session summary kept in the window title before clipping. */
 const SESSION_TITLE_MAX_LENGTH = 72;
 
+/** Bidi/RTL formatting marks that can visually spoof a persisted title or tab. */
+function isBidiControl(codePoint: number): boolean {
+  return (
+    codePoint === 0x200e ||
+    codePoint === 0x200f ||
+    codePoint === 0x061c ||
+    (codePoint >= 0x202a && codePoint <= 0x202e) ||
+    (codePoint >= 0x2066 && codePoint <= 0x2069)
+  );
+}
+
 /**
- * Formats the terminal window title for a resumed session, e.g.
- * `Fix the parser bug`. The title is just the session `summary` (no product
- * prefix); long summaries are clipped to `SESSION_TITLE_MAX_LENGTH` graphemes,
- * and an empty `summary` falls back to `productName` so the title never blanks.
+ * Sanitizes arbitrary text into a single-line session title safe to embed in an
+ * OSC 2 window-title sequence: whitespace (incl. `TAB`/`LF`/`CR`) becomes
+ * spaces, control characters (C0/C1, `DEL`, `ESC`, `BEL`) and bidi/RTL marks are
+ * removed, and runs of whitespace are collapsed. Mirrors the Rust
+ * `sanitize_session_title` so both sides share one policy; applied at the
+ * {@link setSessionWindowTitle} sink so the placeholder, generated summary, and
+ * resume callers cannot bypass it.
+ */
+export function sanitizeSessionTitle(raw: string): string {
+  let cleaned = '';
+  for (const char of raw) {
+    if (/\s/u.test(char)) {
+      cleaned += ' ';
+      continue;
+    }
+    const codePoint = char.codePointAt(0) ?? 0;
+    const isControl = codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f);
+    if (isControl || isBidiControl(codePoint)) {
+      continue;
+    }
+    cleaned += char;
+  }
+  return cleaned.replace(/\s+/gu, ' ').trim();
+}
+
+/**
+ * Formats the terminal window title for a resumed or in-progress session, e.g.
+ * `Fix the parser bug`. The title is the sanitized session `summary` (no product
+ * prefix); long summaries are clipped to `SESSION_TITLE_MAX_LENGTH`, and an empty
+ * `summary` falls back to `productName` so the title never blanks.
  */
 export function formatSessionWindowTitle(productName: string, summary: string): string {
-  const trimmed = summary.trim();
-  if (trimmed.length === 0) {
+  const sanitized = sanitizeSessionTitle(summary);
+  if (sanitized.length === 0) {
     return productName;
   }
 
-  return trimmed.length > SESSION_TITLE_MAX_LENGTH
-    ? `${trimmed.slice(0, SESSION_TITLE_MAX_LENGTH - 1)}…`
-    : trimmed;
+  return sanitized.length > SESSION_TITLE_MAX_LENGTH
+    ? `${sanitized.slice(0, SESSION_TITLE_MAX_LENGTH - 1)}…`
+    : sanitized;
 }
 
 /**

@@ -1,6 +1,8 @@
 import { atom } from 'jotai';
 import type { Getter, Setter } from 'jotai';
 import { STREAM_RENDER_FLUSH_MS } from '@constants/backend.ts';
+import { PRODUCT_NAME } from '@constants/product.ts';
+import { setSessionWindowTitle } from '@libs/terminal/windowTitle.ts';
 import { SETTLED_KIND_COMPLETED } from '@contracts/backend/index.ts';
 import type { TranscriptEvent } from '@contracts/backend/index.ts';
 import type { SessionResumeResult } from '@contracts/backend/index.ts';
@@ -51,7 +53,15 @@ export const newTurnIdAtom = atom({ newTurnId: () => `${localTurnIdPrefix}-${fal
 export const enqueuePromptAtom = atom(
   null,
   async (get, set, input: string | { text: string; submissionSequence: number }) => {
+    const isFirstPrompt = get(promptQueueAtom).length === 0;
     const { text: rawText, submissionSequence } = sequencedText(get, set, input);
+    if (isFirstPrompt) {
+      // First prompt of a fresh session: seed the terminal title from the
+      // truncated prompt immediately (sanitized at the sink). The backend
+      // upgrades it once the LLM summary lands. Resumed sessions hydrate a
+      // non-empty queue, so they are never re-seeded here.
+      setSessionWindowTitle(PRODUCT_NAME, rawText);
+    }
     const backendClient = get(backendClientAtom);
     const turnId = get(newTurnIdAtom).newTurnId();
     const item: QueueItem = {
@@ -81,6 +91,10 @@ export const enqueuePromptAtom = atom(
 export const transcriptEventAtom = atom(null, (get, set, event: TranscriptEvent) => {
   if (event.type === 'tokenDelta') {
     coalesceDelta(set, event);
+    return;
+  }
+  if (event.type === 'sessionSummaryUpdated') {
+    // Handled at the runtime layer (live terminal title); no transcript effect.
     return;
   }
   flushCoalescer(event.turnId);

@@ -269,7 +269,7 @@ describe('createBackendClient (fake backend)', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(ready).toEqual(['test-session', 'test-session']);
-    expect(events.some((event) => event.turnId === 'turn-2' && event.type === 'settled')).toBe(true);
+    expect(events.some((event) => event.type === 'settled' && event.turnId === 'turn-2')).toBe(true);
     client.dispose();
   });
 
