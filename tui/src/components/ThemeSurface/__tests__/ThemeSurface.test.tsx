@@ -7,7 +7,7 @@ import type { ThemeSetResult } from '@contracts/backend/index.ts';
 import { activeThemeAtom } from '@state/global/index.ts';
 import { activeSurfaceAtom, Surface } from '@state/ui/index.ts';
 import { themeHighlightIndexAtom, themeSaveWarningAtom } from '@state/ui/theme/index.ts';
-import { DEFAULT_THEME, THEME_CATALOG, ThemeId, findTheme } from '@theme/themeConfig.ts';
+import { THEME_CATALOG, ThemeId, findTheme } from '@theme/themeConfig.ts';
 import { flushInput } from '@test/flushInput.ts';
 import {
   ARROW_DOWN,
@@ -27,7 +27,8 @@ function requireTheme(id: string) {
 }
 
 const nord = requireTheme(ThemeId.Nord);
-const secondTheme = THEME_CATALOG[1]; // the row below the default (Dracula)
+const originTheme = THEME_CATALOG[0]; // open the picker on the first row so it can navigate down
+const secondTheme = THEME_CATALOG[1]; // the row directly below the origin
 
 describe('ThemeSurface', () => {
   it('opens without a backend and marks the active theme (covers AE1, AE5)', async () => {
@@ -47,7 +48,7 @@ describe('ThemeSurface', () => {
   });
 
   it('exposes no light/custom/plugin/import/export affordance (covers AE5)', async () => {
-    const { lastFrame } = renderTheme(undefined, { active: DEFAULT_THEME });
+    const { lastFrame } = renderTheme(undefined, { active: originTheme });
     await flushInput();
 
     expect(lastFrame() ?? '').not.toMatch(/light|custom|plugin|import|export/i);
@@ -55,7 +56,7 @@ describe('ThemeSurface', () => {
 
   it('live-previews the highlighted theme on arrow keys without persisting', async () => {
     const client = clientWithSetTheme();
-    const { stdin, store } = renderTheme(client, { active: DEFAULT_THEME });
+    const { stdin, store } = renderTheme(client, { active: originTheme });
     await flushInput();
     expect(store.get(themeHighlightIndexAtom)).toBe(0);
 
@@ -68,11 +69,11 @@ describe('ThemeSurface', () => {
   });
 
   it('marks the focused row with ● and moves it as you navigate', async () => {
-    const { stdin, lastFrame } = renderTheme(clientWithSetTheme(), { active: DEFAULT_THEME });
+    const { stdin, lastFrame } = renderTheme(clientWithSetTheme(), { active: originTheme });
     await flushInput();
 
     // Opens focused on the active theme.
-    expect(lastFrame() ?? '').toContain(`● ${DEFAULT_THEME.label}`);
+    expect(lastFrame() ?? '').toContain(`● ${originTheme.label}`);
 
     stdin.write(ARROW_DOWN);
     await flushInput();
@@ -80,12 +81,12 @@ describe('ThemeSurface', () => {
     const frame = lastFrame() ?? '';
     // The single selection marker follows the focused (previewed) row.
     expect(frame).toContain(`● ${secondTheme.label}`);
-    expect(frame).not.toContain(`● ${DEFAULT_THEME.label}`);
+    expect(frame).not.toContain(`● ${originTheme.label}`);
   });
 
   it('reverts to the theme active before opening when the picker closes without saving', async () => {
     const client = clientWithSetTheme();
-    const { stdin, store, unmount } = renderTheme(client, { active: DEFAULT_THEME });
+    const { stdin, store, unmount } = renderTheme(client, { active: originTheme });
     await flushInput();
 
     stdin.write(ARROW_DOWN);
@@ -95,13 +96,13 @@ describe('ThemeSurface', () => {
     // The App shell closes the surface on Esc, which unmounts ThemeSurface.
     unmount();
 
-    expect(store.get(activeThemeAtom)).toBe(DEFAULT_THEME); // reverted to the origin
+    expect(store.get(activeThemeAtom)).toBe(originTheme); // reverted to the origin
     expect(client.setTheme).not.toHaveBeenCalled();
   });
 
   it('keeps the saved theme applied when the picker unmounts after a successful save', async () => {
     const client = clientWithSetTheme();
-    const { stdin, store, unmount } = renderTheme(client, { active: DEFAULT_THEME });
+    const { stdin, store, unmount } = renderTheme(client, { active: originTheme });
     await flushInput();
 
     stdin.write(ARROW_DOWN);
@@ -118,7 +119,7 @@ describe('ThemeSurface', () => {
     const client = clientWithSetTheme(
       vi.fn(async (): Promise<ThemeSetResult> => ({ outcome: THEME_SET_OUTCOME_STORE_FAILED }))
     );
-    const { stdin, store, unmount } = renderTheme(client, { active: DEFAULT_THEME });
+    const { stdin, store, unmount } = renderTheme(client, { active: originTheme });
     await flushInput();
 
     stdin.write(ARROW_DOWN);
@@ -136,7 +137,7 @@ describe('ThemeSurface', () => {
   it('keeps the saved theme when the picker unmounts before an in-flight save resolves', async () => {
     const deferred = deferredSetTheme();
     const client = clientWithSetTheme(deferred.setTheme);
-    const { stdin, store, unmount } = renderTheme(client, { active: DEFAULT_THEME });
+    const { stdin, store, unmount } = renderTheme(client, { active: originTheme });
     await flushInput();
 
     stdin.write(ARROW_DOWN);
@@ -155,7 +156,7 @@ describe('ThemeSurface', () => {
 
   it('applies, persists, and closes on Enter for a saved theme (covers AE1)', async () => {
     const client = clientWithSetTheme();
-    const { stdin, store } = renderTheme(client, { active: DEFAULT_THEME });
+    const { stdin, store } = renderTheme(client, { active: originTheme });
     await flushInput();
 
     stdin.write(ARROW_DOWN);
@@ -172,7 +173,7 @@ describe('ThemeSurface', () => {
     const client = clientWithSetTheme(
       vi.fn(async (): Promise<ThemeSetResult> => ({ outcome: THEME_SET_OUTCOME_STORE_FAILED }))
     );
-    const { stdin, store, lastFrame } = renderTheme(client, { active: DEFAULT_THEME });
+    const { stdin, store, lastFrame } = renderTheme(client, { active: originTheme });
     await flushInput();
 
     stdin.write(ARROW_DOWN);
@@ -186,7 +187,7 @@ describe('ThemeSurface', () => {
   });
 
   it('applies and warns when there is no backend seam to persist to (covers AE4)', async () => {
-    const { stdin, store } = renderTheme(undefined, { active: DEFAULT_THEME });
+    const { stdin, store } = renderTheme(undefined, { active: originTheme });
     await flushInput();
 
     stdin.write(ARROW_DOWN);
@@ -201,7 +202,7 @@ describe('ThemeSurface', () => {
   it('lets only the latest save result close the picker (out-of-order guard)', async () => {
     const deferred = deferredSetTheme();
     const client = clientWithSetTheme(deferred.setTheme);
-    const { stdin, store } = renderTheme(client, { active: DEFAULT_THEME });
+    const { stdin, store } = renderTheme(client, { active: originTheme });
     await flushInput();
 
     // First selection (row 1) -> save request 0 (kept pending).
@@ -228,7 +229,7 @@ describe('ThemeSurface', () => {
   });
 
   it('renders a blank gap row between the last theme and the footer when the panel fits', async () => {
-    const { lastFrame } = renderTheme(clientWithSetTheme(), { active: DEFAULT_THEME, rows: 20 });
+    const { lastFrame } = renderTheme(clientWithSetTheme(), { active: originTheme, rows: 20 });
     await flushInput();
 
     const lines = (lastFrame() ?? '').split('\n');
@@ -240,7 +241,7 @@ describe('ThemeSurface', () => {
 
   it('caps the docked popup and scrolls the catalog at the minimum terminal height (covers AE2, AE3)', async () => {
     const { stdin, store, lastFrame } = renderTheme(clientWithSetTheme(), {
-      active: DEFAULT_THEME,
+      active: originTheme,
       rows: 15
     });
     await flushInput();

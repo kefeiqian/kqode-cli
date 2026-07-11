@@ -10,12 +10,12 @@ import { failingContrastChecks } from '@theme/themeContrast.ts';
 import type { ThemeColors } from '@theme/themeTypes.ts';
 
 const EXPECTED_IDS = [
+  ThemeId.CatppuccinMocha,
   ThemeId.Dracula,
-  ThemeId.OneDark,
-  ThemeId.Nord,
   ThemeId.GruvboxDark,
-  ThemeId.TokyoNight,
-  ThemeId.CatppuccinMocha
+  ThemeId.Nord,
+  ThemeId.OneDark,
+  ThemeId.TokyoNight
 ];
 
 const COLOR_TOKENS: Array<keyof ThemeColors> = [
@@ -33,20 +33,22 @@ const COLOR_TOKENS: Array<keyof ThemeColors> = [
 ];
 
 describe('THEME_CATALOG', () => {
-  it('ships the v1 built-in dark theme list in stable order', () => {
+  it('lists the built-in dark themes sorted alphabetically by label', () => {
     expect(THEME_CATALOG.map((theme) => theme.id)).toEqual(EXPECTED_IDS);
     expect(THEME_CATALOG.every((theme) => theme.isDark)).toBe(true);
+    const labels = THEME_CATALOG.map((theme) => theme.label);
+    expect(labels).toEqual([...labels].sort((left, right) => left.localeCompare(right)));
   });
 
-  it('keeps Dracula as the default theme with the existing tokens', () => {
-    expect(DEFAULT_THEME_ID).toBe(ThemeId.Dracula);
-    expect(DEFAULT_THEME).toBe(THEME_CATALOG[0]);
-    expect(DEFAULT_THEME.colors.foreground).toBe('#F8F8F2');
-    expect(DEFAULT_THEME.colors.muted).toBe('#6272A4');
-    expect(DEFAULT_THEME.colors.accentBlue).toBe('#8BE9FD');
-    expect(DEFAULT_THEME.colors.errorRed).toBe('#FF5555');
-    expect(DEFAULT_THEME.colors.messageBackground).toBe('#44475A');
-    expect(DEFAULT_THEME.colors.terminalBackground).toBe('#282A36');
+  it('uses Tokyo Night as the default theme with its tokens', () => {
+    expect(DEFAULT_THEME_ID).toBe(ThemeId.TokyoNight);
+    expect(DEFAULT_THEME.id).toBe(ThemeId.TokyoNight);
+    expect(DEFAULT_THEME.colors.foreground).toBe('#C0CAF5');
+    expect(DEFAULT_THEME.colors.muted).toBe('#A9B1D6');
+    expect(DEFAULT_THEME.colors.accentBlue).toBe('#7DCFFF');
+    expect(DEFAULT_THEME.colors.errorRed).toBe('#F7768E');
+    expect(DEFAULT_THEME.colors.messageBackground).toBe('#24283B');
+    expect(DEFAULT_THEME.colors.terminalBackground).toBe('#1A1B26');
   });
 
   it('defines complete truecolor semantic tokens for every preset', () => {

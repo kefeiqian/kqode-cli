@@ -1,9 +1,33 @@
 import { ThemeId } from '@theme/themeTypes.ts';
 import type { ThemeDefinition } from '@theme/themeTypes.ts';
 
-export const DEFAULT_THEME_ID = ThemeId.Dracula;
+export const DEFAULT_THEME_ID = ThemeId.TokyoNight;
 
-export const THEME_CATALOG = [
+const THEME_PRESETS = [
+  {
+    id: ThemeId.TokyoNight,
+    label: 'Tokyo Night',
+    isDark: true,
+    source: {
+      name: 'Tokyo Night VS Code Theme',
+      url: 'https://github.com/tokyo-night/tokyo-night-vscode-theme',
+      license: 'MIT',
+      notice: 'Tokyo Night VS Code Theme contributors'
+    },
+    colors: {
+      terminalBackground: '#1A1B26',
+      bodyBackground: '#1A1B26',
+      foreground: '#C0CAF5',
+      muted: '#A9B1D6',
+      accentBlue: '#7DCFFF',
+      accentGreen: '#9ECE6A',
+      warning: '#E0AF68',
+      errorRed: '#F7768E',
+      border: '#414868',
+      messageBackground: '#24283B',
+      inputBackground: '#24283B'
+    }
+  },
   {
     id: ThemeId.Dracula,
     label: 'Dracula',
@@ -101,30 +125,6 @@ export const THEME_CATALOG = [
     }
   },
   {
-    id: ThemeId.TokyoNight,
-    label: 'Tokyo Night',
-    isDark: true,
-    source: {
-      name: 'Tokyo Night VS Code Theme',
-      url: 'https://github.com/tokyo-night/tokyo-night-vscode-theme',
-      license: 'MIT',
-      notice: 'Tokyo Night VS Code Theme contributors'
-    },
-    colors: {
-      terminalBackground: '#1A1B26',
-      bodyBackground: '#1A1B26',
-      foreground: '#C0CAF5',
-      muted: '#A9B1D6',
-      accentBlue: '#7DCFFF',
-      accentGreen: '#9ECE6A',
-      warning: '#E0AF68',
-      errorRed: '#F7768E',
-      border: '#414868',
-      messageBackground: '#24283B',
-      inputBackground: '#24283B'
-    }
-  },
-  {
     id: ThemeId.CatppuccinMocha,
     label: 'Catppuccin Mocha',
     isDark: true,
@@ -150,9 +150,15 @@ export const THEME_CATALOG = [
   }
 ] as const satisfies readonly ThemeDefinition[];
 
-export type BuiltInTheme = (typeof THEME_CATALOG)[number];
+export type BuiltInTheme = (typeof THEME_PRESETS)[number];
 
-export const DEFAULT_THEME = THEME_CATALOG[0];
+/** Built-in presets shown in the `/theme` picker, sorted alphabetically by label. */
+export const THEME_CATALOG: readonly BuiltInTheme[] = [...THEME_PRESETS].sort((left, right) =>
+  left.label.localeCompare(right.label)
+);
+
+/** Active preset when no valid saved theme id exists (Tokyo Night). */
+export const DEFAULT_THEME = findTheme(DEFAULT_THEME_ID) ?? THEME_PRESETS[0];
 
 export function findTheme(themeId: string): BuiltInTheme | undefined {
   return THEME_CATALOG.find((theme) => theme.id === themeId);

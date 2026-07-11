@@ -126,12 +126,12 @@ describe('HomeScreen', () => {
     expect(output).not.toContain(path.join(displayCwd, 'tui'));
   });
 
-  it('centralizes Dracula theme tokens including error red', () => {
-    expect(theme.colors.foreground).toBe('#F8F8F2');
-    expect(theme.colors.muted).toBe('#6272A4');
-    expect(theme.colors.accentBlue).toBe('#8BE9FD');
-    expect(theme.colors.errorRed).toBe('#FF5555');
-    expect(theme.colors.messageBackground).toBe('#44475A');
+  it('centralizes Tokyo Night theme tokens including error red', () => {
+    expect(theme.colors.foreground).toBe('#C0CAF5');
+    expect(theme.colors.muted).toBe('#A9B1D6');
+    expect(theme.colors.accentBlue).toBe('#7DCFFF');
+    expect(theme.colors.errorRed).toBe('#F7768E');
+    expect(theme.colors.messageBackground).toBe('#24283B');
 
     const { lastFrame } = render(
       <BodyPane rows={3} columns={80} entries={[{ kind: 'error', text: 'backend failed' }]} />
