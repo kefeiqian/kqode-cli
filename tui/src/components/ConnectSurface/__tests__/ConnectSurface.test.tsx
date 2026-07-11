@@ -178,7 +178,7 @@ describe('ConnectSurface', () => {
     await flushInput();
     stdin.write('\n');
     frame = await waitForFrame(lastFrame, 'API key');
-    expect(frame).toContain('Label: optional');
+    expect(frame).toContain('Destination host: ok.test');
 
     stdin.write('\u001B[A');
     await flushInput();
@@ -321,5 +321,35 @@ describe('ConnectSurface', () => {
     expect(titleLine).not.toMatch(/─/); // title row intact, not merged into the divider
     expect(frame).toContain('Kimi'); // neither provider row is clipped away
     expect(frame).toContain('Custom');
+  });
+
+  it('identifies the active provider in the label and pins a footer with a gap on the key step', async () => {
+    const { stdin, lastFrame } = renderConnect(fakeClient());
+    await waitForFrame(lastFrame, 'Kimi');
+
+    stdin.write('\n'); // select Kimi → Key step
+    const frame = await waitForFrame(lastFrame, 'API key');
+
+    const lines = frame.split('\n');
+    const titleIdx = lines.findIndex((line) => line.includes('/connect · Kimi'));
+    const footerIdx = lines.findIndex((line) => line.includes('Enter submits'));
+    expect(titleIdx).toBeGreaterThanOrEqual(0); // provider stays identified while the list is hidden
+    expect(footerIdx).toBeGreaterThan(titleIdx); // footer pinned below the body
+    expect(lines[footerIdx - 1].trim()).toBe(''); // one blank gap row directly above the footer
+  });
+
+  it('keeps the active custom key input visible at the minimum terminal height', async () => {
+    const { store, lastFrame } = renderConnect(fakeClient(), (nextStore) => {
+      nextStore.set(rowsTestOverrideAtom, 15); // half-height cap = 7 rows, body ≈ 3
+    });
+    await waitForFrame(lastFrame, 'Kimi');
+
+    store.set(connectSelectedIndexAtom, 1); // Custom
+    store.set(customBaseUrlAtom, 'https://ok.test/v1');
+    store.set(connectStepAtom, ConnectStep.Key);
+    const frame = await waitForFrame(lastFrame, 'API key');
+
+    expect(frame).toContain('API key'); // active input not clipped at min height
+    expect(frame).toContain('/connect · Custom'); // provider still identified
   });
 });

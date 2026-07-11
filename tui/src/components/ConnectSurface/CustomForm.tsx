@@ -27,7 +27,6 @@ export function CustomForm({
   const theme = useAtomValue(activeThemeAtom);
   const baseUrlCursor = useAtomValue(customBaseUrlCursorAtom);
   const labelCursor = useAtomValue(customLabelCursorAtom);
-  const editing = step === ConnectStep.CustomUrl || step === ConnectStep.CustomLabel;
 
   return (
     <Box flexDirection="column">
@@ -48,9 +47,6 @@ export function CustomForm({
         value={label}
       />
       <InlineError message={labelError} />
-      {editing ? (
-        <Text color={theme.colors.muted}>Enter/↓ next · ↑/Shift+Tab back · ←/→ edit · Esc back</Text>
-      ) : null}
     </Box>
   );
 }
@@ -107,7 +103,7 @@ function InlineError({ message }: { message: string | null }) {
   return <Text color={theme.colors.errorRed}>  {message}</Text>;
 }
 
-function destinationHost(input: string): string {
+export function destinationHost(input: string): string {
   try {
     const parsed = new URL(input.trim());
     return parsed.host || 'enter a base URL';

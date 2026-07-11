@@ -193,6 +193,9 @@ export const didConnectAtom = atom((get) => {
   return get(connectLastOutcomeAtom)?.outcome === SET_KEY_OUTCOME_CONNECTED;
 });
 
+/** Frame chrome rows for the docked `/connect` shell: divider + label + gap + footer. */
+export const CONNECT_SHELL_CHROME_ROWS = 4;
+
 /** Non-list chrome rows in the docked `/connect` popup: accent divider + title. */
 export const CONNECT_DOCK_CHROME_ROWS = 2;
 /** Generous row allowance for the active step (form/key) plus its feedback. */
