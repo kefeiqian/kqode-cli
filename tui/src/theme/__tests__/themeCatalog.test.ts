@@ -29,7 +29,8 @@ const COLOR_TOKENS: Array<keyof ThemeColors> = [
   'errorRed',
   'border',
   'messageBackground',
-  'inputBackground'
+  'inputBackground',
+  'selectionBackground'
 ];
 
 describe('THEME_CATALOG', () => {

@@ -25,7 +25,8 @@ const THEME_PRESETS = [
       errorRed: '#F7768E',
       border: '#414868',
       messageBackground: '#24283B',
-      inputBackground: '#24283B'
+      inputBackground: '#24283B',
+      selectionBackground: '#33467C'
     }
   },
   {
@@ -49,7 +50,8 @@ const THEME_PRESETS = [
       errorRed: '#FF5555',
       border: '#44475A',
       messageBackground: '#44475A',
-      inputBackground: '#44475A'
+      inputBackground: '#44475A',
+      selectionBackground: '#414A63'
     }
   },
   {
@@ -73,7 +75,8 @@ const THEME_PRESETS = [
       errorRed: '#EF737D',
       border: '#3E4451',
       messageBackground: '#3A3F4B',
-      inputBackground: '#3A3F4B'
+      inputBackground: '#3A3F4B',
+      selectionBackground: '#454C59'
     }
   },
   {
@@ -97,7 +100,8 @@ const THEME_PRESETS = [
       errorRed: '#E78284',
       border: '#4C566A',
       messageBackground: '#3B4252',
-      inputBackground: '#3B4252'
+      inputBackground: '#3B4252',
+      selectionBackground: '#434C5E'
     }
   },
   {
@@ -121,7 +125,8 @@ const THEME_PRESETS = [
       errorRed: '#FF6E7A',
       border: '#504945',
       messageBackground: '#3C3836',
-      inputBackground: '#3C3836'
+      inputBackground: '#3C3836',
+      selectionBackground: '#4A453F'
     }
   },
   {
@@ -145,7 +150,8 @@ const THEME_PRESETS = [
       errorRed: '#F38BA8',
       border: '#45475A',
       messageBackground: '#313244',
-      inputBackground: '#313244'
+      inputBackground: '#313244',
+      selectionBackground: '#414356'
     }
   }
 ] as const satisfies readonly ThemeDefinition[];

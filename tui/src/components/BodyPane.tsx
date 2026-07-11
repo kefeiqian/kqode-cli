@@ -1,13 +1,16 @@
 import { Box, Text } from 'ink';
 import { useAtomValue } from 'jotai';
 import type { ReactNode } from 'react';
-import { DEFAULT_BODY_ENTRIES, resolveBodyRows } from '@libs/tui/bodyRows.ts';
+import { selectionBounds } from '@libs/selection/bounds.ts';
+import { rowHighlight, type RowHighlight } from '@libs/selection/highlightRow.ts';
+import { DEFAULT_BODY_ENTRIES } from '@libs/tui/bodyRows.ts';
 import type { BodyEntry, BodyRow } from '@libs/tui/bodyRows.ts';
-import { clamp } from '@libs/math/clamp.ts';
+import { resolveBodyRowWindow } from '@libs/tui/bodyWindow.ts';
 import { displayWidth, padEndToWidth } from '@libs/text/displayWidth.ts';
 import { isAllowedLinkHref, sanitizeLinkHref } from '@libs/markdown/linkSegment.ts';
 import {
   bodyScrollOffsetRowsAtom,
+  bodySelectionAtom,
   displayedBodyEntriesAtom,
   layoutAtom,
   safeChromeColumnsAtom
@@ -48,6 +51,7 @@ export function BodyPane({
   const atomSafeColumns = useAtomValue(safeChromeColumnsAtom);
   const atomScrollOffsetRows = useAtomValue(bodyScrollOffsetRowsAtom);
   const theme = useAtomValue(activeThemeAtom);
+  const selection = useAtomValue(bodySelectionAtom);
 
   const resolvedEntries = entries ?? atomEntries ?? DEFAULT_BODY_ENTRIES;
   const resolvedRows = rows ?? atomLayout.bodyRows;
@@ -55,17 +59,19 @@ export function BodyPane({
   const resolvedScrollOffsetRows = scrollOffsetRows ?? atomScrollOffsetRows;
   const visibleRows = Math.max(1, resolvedRows);
   const visibleColumns = Math.max(1, resolvedColumns);
-  const allRows = resolveBodyRows(resolvedEntries, visibleColumns, visibleRows, theme);
-  const maxScrollOffset = Math.max(0, allRows.length - visibleRows);
-  const scrollOffset = clamp(resolvedScrollOffsetRows, 0, maxScrollOffset);
-  // Offset counts rows back from the newest content at the bottom, matching
-  // terminal transcript behavior where scroll offset 0 means "stick to bottom".
-  const end = allRows.length - scrollOffset;
-  const start = Math.max(0, end - visibleRows);
-  const isScrollable = maxScrollOffset > 0;
+  // Resolve the wrapped rows and scroll slice through the same pure window helper
+  // the selection atoms use (`visibleBodyRowsAtom`), so mouse coordinates, the
+  // highlight, and this render never disagree about which rows are where.
+  const {
+    allRows,
+    startIndex: start,
+    visibleRows: visibleRowsForOffset
+  } = resolveBodyRowWindow(resolvedEntries, visibleColumns, visibleRows, resolvedScrollOffsetRows, theme);
+  const isScrollable = allRows.length > visibleRows;
   const renderedRows = isScrollable ? visibleRows : Math.min(visibleRows, allRows.length + 1);
   const contentColumns = isScrollable ? Math.max(1, visibleColumns - 1) : visibleColumns;
-  const visibleRowsForOffset = allRows.slice(start, end);
+  const selectionBoundsValue =
+    selection === null ? null : selectionBounds(selection.anchor, selection.focus);
   const scrollbarCells = isScrollable
     ? renderScrollbar({
         rows: visibleRows,
@@ -85,9 +91,14 @@ export function BodyPane({
         const marker = row.marker ?? '';
         const paddedTextColumns = Math.max(1, contentColumns - marker.length);
         const shouldPadText = isScrollable || row.fillColumns === true;
-        const segmentDisplay = renderSegments(row, paddedTextColumns, shouldPadText);
+        const highlight =
+          selectionBoundsValue === null
+            ? null
+            : rowHighlight(row.text, start + index, selectionBoundsValue, displayWidth(marker));
+        const segmentDisplay =
+          highlight === null ? renderSegments(row, paddedTextColumns, shouldPadText) : undefined;
         const displayText =
-          segmentDisplay === undefined
+          highlight === null && segmentDisplay === undefined
             ? shouldPadText
               ? padBodyText(row.text, paddedTextColumns)
               : row.text || ' '
@@ -100,11 +111,19 @@ export function BodyPane({
                 {marker}
               </Text>
             ) : null}
-            {segmentDisplay ?? (
-              <Text backgroundColor={row.backgroundColor} color={row.color}>
-                {displayText}
-              </Text>
-            )}
+            {highlight !== null
+              ? renderHighlightedContent(
+                  highlight,
+                  row,
+                  paddedTextColumns,
+                  shouldPadText,
+                  theme.colors.selectionBackground
+                )
+              : segmentDisplay ?? (
+                  <Text backgroundColor={row.backgroundColor} color={row.color}>
+                    {displayText}
+                  </Text>
+                )}
             {isScrollable ? (
               <Text color={scrollbarCells[index]?.color ?? theme.colors.border}>
                 {scrollbarCells[index]?.text ?? SCROLLBAR_TRACK}
@@ -148,6 +167,41 @@ function renderScrollbar({
 
 function padBodyText(text: string, contentColumns: number): string {
   return text.padEnd(contentColumns, ' ');
+}
+
+function renderHighlightedContent(
+  highlight: RowHighlight,
+  row: BodyRow,
+  paddedTextColumns: number,
+  shouldPadText: boolean,
+  selectionColor: string
+): ReactNode {
+  const padding = shouldPadText
+    ? ' '.repeat(Math.max(0, paddedTextColumns - row.text.length))
+    : '';
+
+  return (
+    <>
+      {highlight.pre.length > 0 ? (
+        <Text backgroundColor={row.backgroundColor} color={row.color}>
+          {sanitizeRenderedText(highlight.pre)}
+        </Text>
+      ) : null}
+      <Text backgroundColor={selectionColor} color={row.color}>
+        {sanitizeRenderedText(highlight.selected)}
+      </Text>
+      {highlight.post.length > 0 ? (
+        <Text backgroundColor={row.backgroundColor} color={row.color}>
+          {sanitizeRenderedText(highlight.post)}
+        </Text>
+      ) : null}
+      {padding.length > 0 ? (
+        <Text backgroundColor={row.backgroundColor} color={row.color}>
+          {padding}
+        </Text>
+      ) : null}
+    </>
+  );
 }
 
 const RENDER_CONTROL_CHAR_PATTERN = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g;

@@ -23,6 +23,7 @@ export type ThemeColors = {
   border: string;
   messageBackground: string;
   inputBackground: string;
+  selectionBackground: string;
 };
 
 export type ThemeSource = {
