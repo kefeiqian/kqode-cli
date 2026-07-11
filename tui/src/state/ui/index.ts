@@ -1,5 +1,6 @@
 export * from '@state/ui/atoms.ts';
 export * from '@state/ui/body.ts';
+export * from '@state/ui/bodyViewport.ts';
 export * from '@state/ui/composerCaret.ts';
 export * from '@state/ui/copyMode.ts';
 export * from '@state/ui/dimensions.ts';
@@ -8,5 +9,6 @@ export * from '@state/ui/gitStatus.ts';
 export * from '@state/ui/inputLock.ts';
 export * from '@state/ui/keyArm.ts';
 export * from '@state/ui/resume/index.ts';
+export * from '@state/ui/selection.ts';
 export * from '@state/ui/statusHint.ts';
 export * from '@state/ui/surface/index.ts';
