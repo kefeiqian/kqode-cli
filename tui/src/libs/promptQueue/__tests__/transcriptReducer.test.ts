@@ -108,7 +108,7 @@ describe('reduceTranscriptEvent', () => {
     expect(state.queue[0]?.result).toEqual({ kind: BodyEntryKind.Muted, text: 'Cancelled' });
   });
 
-  it('keeps needsConfiguration in the transcript and emits a model reroute', () => {
+  it('keeps needsConfiguration in the transcript without a reroute effect', () => {
     const result = reduceTranscriptEvent(
       base(),
       {
@@ -129,6 +129,6 @@ describe('reduceTranscriptEvent', () => {
       kind: BodyEntryKind.System,
       text: 'Use /connect to add a provider.'
     });
-    expect(result.effect).toEqual({ type: 'needsConfiguration', turnText: 'hello' });
+    expect(result.effect).toBeUndefined();
   });
 });

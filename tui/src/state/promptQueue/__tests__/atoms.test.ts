@@ -88,7 +88,7 @@ describe('enqueuePromptAtom', () => {
     expect(store.get(submittedPromptEntriesAtom)[0]).toMatchObject({ kind: 'user', text: 'hello' });
   });
 
-  it('routes needsConfiguration settled events to Model with the draft restored', async () => {
+  it('keeps unconfigured turns on the home screen without opening a surface', async () => {
     const store = createStore();
     store.set(newTurnIdAtom, { newTurnId: () => 'turn-1' });
     store.set(backendClientAtom, clientWithSubmit(async () => undefined));
@@ -96,15 +96,15 @@ describe('enqueuePromptAtom', () => {
     await store.set(enqueuePromptAtom, 'configure me');
     store.set(transcriptEventAtom, needsConfiguration('turn-1'));
 
-    expect(store.get(activeSurfaceAtom)).toBe(Surface.Model);
-    expect(store.get(restoreComposerDraftAtom)).toBe('configure me');
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Home);
+    expect(store.get(restoreComposerDraftAtom)).toBe('');
     expect(store.get(promptQueueAtom)).toHaveLength(1);
     expect(store.get(submittedPromptEntriesAtom)).toContainEqual(
       expect.objectContaining({ kind: BodyEntryKind.System, text: PROVIDER_NOT_CONFIGURED_MESSAGE })
     );
   });
 
-  it('does not overwrite an existing restored draft for repeated unconfigured turns', async () => {
+  it('leaves repeated unconfigured turns on the home screen with an empty draft', async () => {
     const store = createStore();
     let nextId = 0;
     store.set(newTurnIdAtom, { newTurnId: () => `turn-${++nextId}` });
@@ -115,8 +115,8 @@ describe('enqueuePromptAtom', () => {
     store.set(transcriptEventAtom, needsConfiguration('turn-1'));
     store.set(transcriptEventAtom, needsConfiguration('turn-2'));
 
-    expect(store.get(activeSurfaceAtom)).toBe(Surface.Model);
-    expect(store.get(restoreComposerDraftAtom)).toBe('first');
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Home);
+    expect(store.get(restoreComposerDraftAtom)).toBe('');
     expect(
       store
         .get(submittedPromptEntriesAtom)
