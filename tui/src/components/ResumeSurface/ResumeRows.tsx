@@ -1,5 +1,7 @@
 import os from 'node:os';
 import { Box, Text } from 'ink';
+import { SelectableRow } from '@components/SelectableRow/index.tsx';
+import { SELECTION_GUTTER, SELECTION_GUTTER_WIDTH } from '@constants/ui.ts';
 import type { SessionSummary } from '@contracts/backend/index.ts';
 import { formatResumeHeader, formatResumeRow } from '@libs/resume/formatSessionRows.ts';
 
@@ -17,22 +19,23 @@ export function ResumeRows({
   startIndex?: number;
 }) {
   const homeDir = os.homedir();
-  const lines = [
-    formatResumeHeader(columns),
-    ...sessions.map((session, index) => formatResumeRow(session, startIndex + index, columns, homeDir))
-  ];
+  const contentColumns = columns - SELECTION_GUTTER_WIDTH;
   return (
     <Box flexDirection="column" height={visibleRows + 1}>
       {Array.from({ length: visibleRows + 1 }, (_, index) => {
-        const line = lines[index];
-        if (line === undefined) {
+        if (index === 0) {
+          return <Text key="header">{`${SELECTION_GUTTER}${formatResumeHeader(contentColumns)}`}</Text>;
+        }
+        const session = sessions[index - 1];
+        if (session === undefined) {
           return <Text key={index}> </Text>;
         }
-        const session = index === 0 ? null : sessions[index - 1];
         return (
-          <Text key={session?.sessionId ?? 'header'} inverse={session?.sessionId === highlightedSessionId}>
-            {line}
-          </Text>
+          <SelectableRow
+            key={session.sessionId}
+            highlighted={session.sessionId === highlightedSessionId}
+            content={formatResumeRow(session, startIndex + index - 1, contentColumns, homeDir)}
+          />
         );
       })}
     </Box>

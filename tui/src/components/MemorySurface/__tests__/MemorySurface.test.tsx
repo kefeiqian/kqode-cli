@@ -113,6 +113,9 @@ describe('MemorySurface', () => {
     expect(frame).toContain('Title');
     expect(frame).toContain('decision');
     expect(frame).toContain('user');
+    // The highlighted (first) row now carries the shared chevron marker, which —
+    // unlike the old reverse-video highlight — is directly visible in the frame.
+    expect(frame).toContain('❯');
   });
 
   it('renders inbox rows with review status', async () => {

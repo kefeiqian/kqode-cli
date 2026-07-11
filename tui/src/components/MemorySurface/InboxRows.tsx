@@ -1,4 +1,6 @@
 import { Box, Text } from 'ink';
+import { SelectableRow } from '@components/SelectableRow/index.tsx';
+import { SELECTION_GUTTER, SELECTION_GUTTER_WIDTH } from '@constants/ui.ts';
 import type { MemoryInboxEntry } from '@contracts/backend/index.ts';
 import { formatInboxHeader, formatInboxRow } from '@libs/memory/formatInboxRows.ts';
 
@@ -13,19 +15,23 @@ export function InboxRows({
   visibleRows: number;
   highlightedId: string | null;
 }) {
-  const lines = [formatInboxHeader(columns), ...entries.map((entry, index) => formatInboxRow(entry, index, columns))];
+  const contentColumns = columns - SELECTION_GUTTER_WIDTH;
   return (
     <Box flexDirection="column" height={visibleRows}>
       {Array.from({ length: visibleRows }, (_, index) => {
-        const line = lines[index];
-        if (line === undefined) {
+        if (index === 0) {
+          return <Text key="header">{`${SELECTION_GUTTER}${formatInboxHeader(contentColumns)}`}</Text>;
+        }
+        const entry = entries[index - 1];
+        if (entry === undefined) {
           return <Text key={index}> </Text>;
         }
-        const entry = index === 0 ? null : entries[index - 1];
         return (
-          <Text key={entry?.id ?? 'header'} inverse={entry?.id === highlightedId}>
-            {line}
-          </Text>
+          <SelectableRow
+            key={entry.id}
+            highlighted={entry.id === highlightedId}
+            content={formatInboxRow(entry, index - 1, contentColumns)}
+          />
         );
       })}
     </Box>
