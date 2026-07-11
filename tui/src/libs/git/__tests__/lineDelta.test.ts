@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { parseShortstat } from '@libs/git/lineDelta.ts';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { parseShortstat, readWorkingTreeLineDelta } from '@libs/git/lineDelta.ts';
+
+const execFileSyncMock = vi.hoisted(() => vi.fn());
+
+vi.mock('node:child_process', () => ({
+  execFileSync: execFileSyncMock
+}));
 
 describe('parseShortstat', () => {
   it('parses insertions and deletions from a full shortstat line', () => {
@@ -38,5 +44,20 @@ describe('parseShortstat', () => {
 
   it('returns undefined for output that is not shortstat', () => {
     expect(parseShortstat('fatal: not a git repository')).toBeUndefined();
+  });
+});
+
+describe('readWorkingTreeLineDelta', () => {
+  beforeEach(() => {
+    execFileSyncMock.mockReset();
+  });
+
+  it('spawns git hidden so the tool can never disturb the terminal title', () => {
+    execFileSyncMock.mockReturnValue('1 file changed, 2 insertions(+)');
+
+    readWorkingTreeLineDelta('/repo');
+
+    expect(execFileSyncMock).toHaveBeenCalledTimes(1);
+    expect(execFileSyncMock.mock.calls[0][2]).toMatchObject({ windowsHide: true });
   });
 });
