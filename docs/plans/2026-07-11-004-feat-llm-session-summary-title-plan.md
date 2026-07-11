@@ -1,7 +1,7 @@
 ---
 title: "feat: LLM Session Summary for Resume Label and Terminal Title"
 type: feat
-status: active
+status: completed
 date: 2026-07-11
 origin: docs/brainstorms/2026-07-11-llm-session-summary-and-title-requirements.md
 ---
