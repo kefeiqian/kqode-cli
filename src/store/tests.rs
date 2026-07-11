@@ -592,6 +592,46 @@ fn bootstrap_reindexes_sessions_from_saved_logs_after_db_reset() {
 }
 
 #[test]
+fn reindex_prefers_generated_summary_over_first_prompt() {
+    let (dir, path) = temp_db();
+    let sessions_dir = dir.path().join("sessions");
+    std::fs::create_dir_all(&sessions_dir).unwrap();
+    let log_path = sessions_dir.join("sess-1.jsonl");
+    let log = [
+        SessionLogEvent::SessionStarted {
+            session_id: "sess-1".to_owned(),
+            created_at_ms: 10,
+            workspace_cwd: "C:\\workspace".to_owned(),
+            canonical_workspace_cwd: "C:\\workspace".to_owned(),
+        },
+        SessionLogEvent::TurnEnqueued {
+            turn_id: "turn-1".to_owned(),
+            seq: 0,
+            prompt: "hello world".to_owned(),
+            at_ms: 11,
+        },
+        SessionLogEvent::SummaryGenerated {
+            summary: "Fix the parser bug".to_owned(),
+            at_ms: 13,
+        },
+    ]
+    .into_iter()
+    .map(|event| serde_json::to_string(&event).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n");
+    std::fs::write(&log_path, format!("{log}\n")).unwrap();
+
+    let store = Store::open_or_bootstrap_at(path).unwrap();
+    let sessions = store.list_resumable_sessions().unwrap();
+    assert_eq!(sessions.len(), 1);
+    assert_eq!(
+        sessions[0].first_prompt_summary.as_deref(),
+        Some("Fix the parser bug")
+    );
+    assert_eq!(sessions[0].modified_at, 13);
+}
+
+#[test]
 fn missing_prior_migration_refuses_to_bootstrap() {
     let (_dir, path) = temp_db();
     {

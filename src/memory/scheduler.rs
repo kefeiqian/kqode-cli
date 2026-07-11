@@ -174,7 +174,9 @@ fn eligible_rounds(session_log_path: &Path, after_seq: i64) -> Vec<ExtractionRou
                     });
                 }
             }
-            SessionLogEvent::SessionStarted { .. } | SessionLogEvent::Compacted { .. } => {}
+            SessionLogEvent::SessionStarted { .. }
+            | SessionLogEvent::Compacted { .. }
+            | SessionLogEvent::SummaryGenerated { .. } => {}
         }
     }
     rounds.sort_by_key(|round| round.seq);

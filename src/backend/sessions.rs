@@ -184,6 +184,8 @@ fn restore_turns(
                     covered_through_seq,
                 };
             }
+            // Metadata-only event; it does not affect restored turns.
+            SessionLogEvent::SummaryGenerated { .. } => {}
         }
     }
     let mut turns: Vec<_> = turns
@@ -311,6 +313,22 @@ mod tests {
         let dir = tempfile::tempdir().expect("temp dir");
         let mut events = vec![started()];
         events.extend(settled("t0", 0, "a0", 1));
+        let session = session_with_events(dir.path(), &events);
+
+        let (turns, compaction) = restore_turns(&session).expect("restore");
+        assert_eq!(turns.len(), 1);
+        assert_eq!(compaction, CompactionState::default());
+    }
+
+    #[test]
+    fn restore_turns_ignores_summary_generated_event() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let mut events = vec![started()];
+        events.extend(settled("t0", 0, "a0", 1));
+        events.push(SessionLogEvent::SummaryGenerated {
+            summary: "Fix the parser bug".to_owned(),
+            at_ms: 5,
+        });
         let session = session_with_events(dir.path(), &events);
 
         let (turns, compaction) = restore_turns(&session).expect("restore");
