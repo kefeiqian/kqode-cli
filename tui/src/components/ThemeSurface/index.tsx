@@ -1,13 +1,12 @@
-import { Box, Text } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect } from 'react';
-import { DockDivider } from '@components/DockDivider.tsx';
+import { CommandSurface } from '@components/CommandSurface/index.tsx';
+import { useCommandSurfaceLayout } from '@components/CommandSurface/useCommandSurfaceLayout.ts';
 import { ThemeRows } from '@components/ThemeSurface/ThemeRows.tsx';
 import { useThemeBackend } from '@components/ThemeSurface/useThemeBackend.ts';
 import { useThemeInput } from '@components/ThemeSurface/useThemeInput.ts';
-import { resolveDockedFooterGap } from '@libs/tui/layout.ts';
-import { activeThemeAtom } from '@state/global/index.ts';
-import { dockedPanelRowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
+import { positionIndicator } from '@libs/tui/layout.ts';
+import { dockedPanelRowsAtom } from '@state/ui/index.ts';
 import { closeActiveSurfaceAtom } from '@state/ui/surface/index.ts';
 import {
   resetThemeSurfaceAtom,
@@ -26,9 +25,7 @@ const THEME_FOOTER_HINT = '↑/↓ choose · enter apply · esc close';
 
 /** Bottom-docked `/theme` picker over the built-in dark preset catalog. */
 export function ThemeSurface() {
-  const safeChromeColumns = useAtomValue(safeChromeColumnsAtom);
   const panelRows = useAtomValue(dockedPanelRowsAtom);
-  const theme = useAtomValue(activeThemeAtom);
   const highlightIndex = useAtomValue(themeHighlightIndexAtom);
   const windowOffset = useAtomValue(themeWindowOffsetAtom);
   const visibleThemes = useAtomValue(visibleThemesAtom);
@@ -39,11 +36,8 @@ export function ThemeSurface() {
   const closeActiveSurface = useSetAtom(closeActiveSurfaceAtom);
   const revertThemePreview = useSetAtom(revertThemePreviewAtom);
   const { selectTheme } = useThemeBackend(closeActiveSurface);
-  const { showFooterGap, chromeRows } = resolveDockedFooterGap({
-    panelRows,
-    chromeWithGap: THEME_DOCK_CHROME_ROWS
-  });
-  const listRows = Math.max(1, panelRows - chromeRows);
+  const layout = useCommandSurfaceLayout({ panelRows, chromeWithGap: THEME_DOCK_CHROME_ROWS });
+  const listRows = layout.bodyRows;
 
   useThemeInput({ selectTheme });
 
@@ -62,54 +56,20 @@ export function ThemeSurface() {
   }, [listRows, setVisibleRows, scrollHighlightIntoView]);
 
   return (
-    <Box flexDirection="column" height={panelRows}>
-      <DockDivider />
-      <Text color={theme.colors.accentBlue}>/theme</Text>
+    <CommandSurface
+      panelRows={panelRows}
+      layout={layout}
+      label="/theme"
+      bodyRows={listRows}
+      footerHint={warning ?? THEME_FOOTER_HINT}
+      footerTone={warning === null ? 'muted' : 'warning'}
+      position={positionIndicator(windowOffset, Math.max(0, THEME_CATALOG.length - listRows))}
+    >
       <ThemeRows
         themes={visibleThemes}
         highlightIndex={highlightIndex - windowOffset}
         visibleRows={listRows}
       />
-      {showFooterGap ? <Text> </Text> : null}
-      <ThemeFooter
-        columns={safeChromeColumns}
-        warning={warning}
-        offset={windowOffset}
-        total={THEME_CATALOG.length}
-        visible={listRows}
-      />
-    </Box>
-  );
-}
-
-function ThemeFooter({
-  columns,
-  warning,
-  offset,
-  total,
-  visible
-}: {
-  columns: number;
-  warning: string | null;
-  offset: number;
-  total: number;
-  visible: number;
-}) {
-  const theme = useAtomValue(activeThemeAtom);
-  const maxOffset = Math.max(0, total - visible);
-  const position =
-    maxOffset === 0 ? '' : offset <= 0 ? 'more ↓' : offset >= maxOffset ? 'more ↑' : 'more ↑↓';
-
-  return (
-    <Box width={columns}>
-      <Text color={warning === null ? theme.colors.muted : theme.colors.warning} wrap="truncate">
-        {warning ?? THEME_FOOTER_HINT}
-      </Text>
-      {position === '' ? null : (
-        <Box flexGrow={1} justifyContent="flex-end">
-          <Text color={theme.colors.muted}>{position}</Text>
-        </Box>
-      )}
-    </Box>
+    </CommandSurface>
   );
 }
