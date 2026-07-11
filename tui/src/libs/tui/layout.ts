@@ -159,3 +159,23 @@ export function resolveWindowOffset({
   const maxOffset = Math.max(0, total - visible);
   return clamp(index < offset ? index : Math.max(offset, index - visible + 1), 0, maxOffset);
 }
+
+/**
+ * Standard docked-popup scroll indicator for a window at `offset` over a list
+ * with `maxOffset` (`= max(0, total - visible)`) scrollable rows: `''` when
+ * nothing scrolls, `more ↓` at the top, `more ↑` at the bottom, `more ↑↓` in
+ * between. Shared by every docked-surface footer so the indicator never drifts
+ * across surfaces.
+ */
+export function positionIndicator(offset: number, maxOffset: number): string {
+  if (maxOffset <= 0) {
+    return '';
+  }
+  if (offset <= 0) {
+    return 'more ↓';
+  }
+  if (offset >= maxOffset) {
+    return 'more ↑';
+  }
+  return 'more ↑↓';
+}

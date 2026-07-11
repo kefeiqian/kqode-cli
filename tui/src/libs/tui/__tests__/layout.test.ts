@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveHomeScreenLayout, resolveDockedPanelRows, resolveDockedFooterGap, resolveWindowOffset } from '@libs/tui/layout.ts';
+import { resolveHomeScreenLayout, resolveDockedPanelRows, resolveDockedFooterGap, resolveWindowOffset, positionIndicator } from '@libs/tui/layout.ts';
 import {
   COMPOSER_BACKGROUND_PADDING_ROWS,
   COMPOSER_MAX_HEIGHT_DIVISOR
@@ -135,5 +135,23 @@ describe('resolveWindowOffset', () => {
 
   it('clamps to the last full window', () => {
     expect(resolveWindowOffset({ index: 19, offset: 0, visible: 4, total: 20 })).toBe(16);
+  });
+});
+
+describe('positionIndicator', () => {
+  it('shows nothing when the list fits', () => {
+    expect(positionIndicator(0, 0)).toBe('');
+  });
+
+  it('shows more-down at the top of a scrollable list', () => {
+    expect(positionIndicator(0, 5)).toBe('more ↓');
+  });
+
+  it('shows more-up at the bottom of a scrollable list', () => {
+    expect(positionIndicator(5, 5)).toBe('more ↑');
+  });
+
+  it('shows both arrows in the middle of a scrollable list', () => {
+    expect(positionIndicator(2, 5)).toBe('more ↑↓');
   });
 });
