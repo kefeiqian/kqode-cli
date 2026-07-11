@@ -195,28 +195,3 @@ export const didConnectAtom = atom((get) => {
 
 /** Frame chrome rows for the docked `/connect` shell: divider + label + gap + footer. */
 export const CONNECT_SHELL_CHROME_ROWS = 4;
-
-/** Non-list chrome rows in the docked `/connect` popup: accent divider + title. */
-export const CONNECT_DOCK_CHROME_ROWS = 2;
-/** Generous row allowance for the active step (form/key) plus its feedback. */
-export const CONNECT_STEP_MAX_ROWS = 9;
-
-/**
- * Content-derived desired popup height for the docked `/connect` surface: the
- * provider list plus, when a provider step is open, a generous allowance for the
- * step form/key entry and its outcome/error feedback. In the list step it also
- * reserves a row for each visible feedback line (`Working…`, outcome, request
- * error) so the docked panel never clips a set-key result. Capped to half by the
- * dock.
- */
-export const connectDesiredRowsAtom = atom((get) => {
-  const base = CONNECT_DOCK_CHROME_ROWS + Math.max(1, get(connectProvidersAtom).length);
-  if (get(connectStepAtom) !== ConnectStep.List) {
-    return base + CONNECT_STEP_MAX_ROWS;
-  }
-  const feedbackRows =
-    (get(connectInFlightAtom) ? 1 : 0) +
-    (get(connectLastOutcomeAtom) !== null ? 1 : 0) +
-    (get(connectRequestErrorAtom) !== null ? 1 : 0);
-  return base + feedbackRows;
-});

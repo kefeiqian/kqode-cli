@@ -29,9 +29,6 @@ export const themeWindowOffsetAtom = atom(0);
 /** Visible list rows supplied by the surface so the window math lives in atoms. */
 export const themeVisibleRowsAtom = atom(1);
 
-/** Content-derived desired popup height: chrome plus one row per catalog entry. */
-export const themeDesiredRowsAtom = atom(() => THEME_DOCK_CHROME_ROWS + THEME_CATALOG.length);
-
 /** The catalog slice currently visible in the scroll window. */
 export const visibleThemesAtom = atom((get) => {
   const offset = get(themeWindowOffsetAtom);

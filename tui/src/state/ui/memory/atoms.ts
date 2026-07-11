@@ -83,8 +83,6 @@ const currentListLengthAtom = atom((get) =>
 export const MEMORY_DOCK_LIST_CHROME_ROWS = 6; // divider + title + tabs + status + gap + footer
 /** Chrome rows while a form/detail/confirm sub-state replaces the list. */
 export const MEMORY_DOCK_SUBSTATE_CHROME_ROWS = 4; // divider + title + gap + footer
-/** Row budget reserved for the add/edit form when it replaces the list. */
-export const MEMORY_FORM_ROWS = 6;
 
 /** Scroll-window offset over the read-only detail body. */
 export const memoryDetailOffsetAtom = atom(0);
@@ -98,21 +96,6 @@ export const memorySubStateActiveAtom = atom(
     get(memoryDetailBodyAtom) !== null ||
     get(forgetConfirmAtom) !== null
 );
-
-/** Content-derived desired popup height for the docked `/memory` surface. */
-export const memoryDesiredRowsAtom = atom((get) => {
-  if (get(forgetConfirmAtom) !== null) {
-    return MEMORY_DOCK_SUBSTATE_CHROME_ROWS + 1;
-  }
-  if (get(memoryFormAtom) !== null) {
-    return MEMORY_DOCK_SUBSTATE_CHROME_ROWS + MEMORY_FORM_ROWS;
-  }
-  const detail = get(memoryDetailBodyAtom);
-  if (detail !== null) {
-    return MEMORY_DOCK_SUBSTATE_CHROME_ROWS + detail.split('\n').length;
-  }
-  return MEMORY_DOCK_LIST_CHROME_ROWS + 1 + get(currentListLengthAtom);
-});
 
 /** Scrolls the read-only detail view, clamped to its line count. */
 export const scrollMemoryDetailAtom = atom(null, (get, set, delta: number) => {

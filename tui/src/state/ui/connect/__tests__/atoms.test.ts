@@ -7,10 +7,7 @@ import {
 } from '@contracts/backend/providerMessages.ts';
 import {
   ConnectStep,
-  CONNECT_DOCK_CHROME_ROWS,
-  CONNECT_STEP_MAX_ROWS,
   chooseSelectedProviderAtom,
-  connectDesiredRowsAtom,
   customBaseUrlAtom,
   customLabelAtom,
   connectProvidersAtom,
@@ -68,18 +65,5 @@ describe('Connect atoms', () => {
       store.get(connectSelectedIndexAtom)
     ];
     expect(JSON.stringify(values)).not.toContain(secret);
-  });
-
-  it('desires the provider list, plus a step allowance when a provider step is open', () => {
-    const store = createStore();
-    store.set(connectProvidersAtom, [
-      { providerId: PROVIDER_ID_KIMI, label: 'Kimi', baseUrl: null, defaultModel: null, status: PROVIDER_STATUS_NOT_CONFIGURED, credentialSource: null },
-      { providerId: PROVIDER_ID_CUSTOM, label: 'Custom', baseUrl: null, defaultModel: null, status: PROVIDER_STATUS_NOT_CONFIGURED, credentialSource: null }
-    ]);
-
-    expect(store.get(connectDesiredRowsAtom)).toBe(CONNECT_DOCK_CHROME_ROWS + 2);
-
-    store.set(connectStepAtom, ConnectStep.Key);
-    expect(store.get(connectDesiredRowsAtom)).toBe(CONNECT_DOCK_CHROME_ROWS + 2 + CONNECT_STEP_MAX_ROWS);
   });
 });

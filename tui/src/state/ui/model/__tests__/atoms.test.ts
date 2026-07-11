@@ -9,11 +9,8 @@ import {
 } from '@contracts/backend/providerMessages.ts';
 import type { ProviderStatusInfo } from '@contracts/backend/providerMessages.ts';
 import {
-  INLINE_CONNECT_ROWS,
-  MODEL_DOCK_CHROME_ROWS,
   inlineConnectProviderIdAtom,
   modelActiveSelectionAtom,
-  modelDesiredRowsAtom,
   modelHighlightAtom,
   modelRowsAtom,
   modelVisibleRowsAtom,
@@ -91,30 +88,5 @@ describe('model atoms', () => {
     });
     store.set(moveModelHighlightAtom, 1);
     expect(store.get(modelHighlightAtom)).toEqual({ providerId: 'custom', modelId: null });
-  });
-
-  it('desires docked chrome plus one row per model row, or the inline form height', () => {
-    const store = createStore();
-    store.set(setModelProvidersLoadingAtom, [provider('a')]);
-    store.set(setProviderModelLoadAtom, {
-      providerId: 'a',
-      load: {
-        status: MODEL_LIST_STATUS_LOADED,
-        models: [{ id: 'a1', ownedBy: null }, { id: 'a2', ownedBy: null }]
-      }
-    });
-
-    expect(store.get(modelDesiredRowsAtom)).toBe(
-      MODEL_DOCK_CHROME_ROWS + store.get(modelRowsAtom).length
-    );
-
-    store.set(inlineConnectProviderIdAtom, 'a');
-    expect(store.get(modelDesiredRowsAtom)).toBe(MODEL_DOCK_CHROME_ROWS + INLINE_CONNECT_ROWS);
-
-    // An empty provider list still reserves one row (the panel renders >= 1 row).
-    store.set(inlineConnectProviderIdAtom, null);
-    store.set(setModelProvidersLoadingAtom, []);
-    expect(store.get(modelRowsAtom)).toHaveLength(0);
-    expect(store.get(modelDesiredRowsAtom)).toBe(MODEL_DOCK_CHROME_ROWS + 1);
   });
 });

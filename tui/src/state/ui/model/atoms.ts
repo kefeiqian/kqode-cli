@@ -13,7 +13,7 @@ import {
 } from '@libs/providers/index.ts';
 import type { ProviderModelGroup, ProviderModelRow } from '@libs/providers/index.ts';
 import { clamp } from '@libs/math/clamp.ts';
-import { MODEL_DOCK_CHROME_ROWS, INLINE_CONNECT_ROWS, MODEL_LOAD_STATUS_LOADING } from '@state/ui/model/constants.ts';
+import { MODEL_LOAD_STATUS_LOADING } from '@state/ui/model/constants.ts';
 import type { ModelLoadStatus, ProviderModelLoad } from '@state/ui/model/providerLoads.ts';
 import { identityEquals, rowIdentity, toWireList } from '@state/ui/model/rowIdentity.ts';
 import {
@@ -154,21 +154,6 @@ export const modelFocusableRowsAtom = atom((get) => {
   return get(modelRowsAtom).filter(
     (row) => row.type === 'model' || (row.type === 'status' && isFocusableModelStatus(row.status))
   );
-});
-
-/**
- * Content-derived desired popup height. When the inline provider-connect form is
- * active it replaces the list, so the desire is chrome + the fixed form rows;
- * otherwise it is chrome + one row per flattened provider/model row.
- */
-export const modelDesiredRowsAtom = atom((get) => {
-  if (get(inlineConnectProviderIdAtom) !== null) {
-    return MODEL_DOCK_CHROME_ROWS + INLINE_CONNECT_ROWS;
-  }
-  // The list always renders >= 1 row (a blank when empty), so reserve for it —
-  // otherwise the rendered panel is one row taller than its budgeted height and
-  // over-subscribes the canvas while the provider list is empty/loading.
-  return MODEL_DOCK_CHROME_ROWS + Math.max(1, get(modelRowsAtom).length);
 });
 
 /**

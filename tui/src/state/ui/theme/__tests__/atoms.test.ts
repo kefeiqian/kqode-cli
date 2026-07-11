@@ -16,8 +16,6 @@ import {
   confirmThemeAtom,
   moveThemeHighlightAtom,
   revertThemePreviewAtom,
-  THEME_DOCK_CHROME_ROWS,
-  themeDesiredRowsAtom,
   themeHighlightIndexAtom,
   themePreviewOriginAtom,
   themeVisibleRowsAtom,
@@ -26,11 +24,6 @@ import {
 } from '@state/ui/theme/index.ts';
 
 describe('theme scroll window', () => {
-  it('desires chrome plus one row per catalog entry', () => {
-    const store = createStore();
-    expect(store.get(themeDesiredRowsAtom)).toBe(THEME_DOCK_CHROME_ROWS + THEME_CATALOG.length);
-  });
-
   it('scrolls the highlight into view when navigating past the window', () => {
     const store = createStore();
     store.set(themeVisibleRowsAtom, 3);
