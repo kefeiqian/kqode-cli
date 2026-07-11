@@ -5,6 +5,7 @@ import { createStore } from 'jotai';
 import type { BackendClientHandle } from '@backend/client/backendClient.ts';
 import { createSessionLogger } from '@backend/log/sessionLogger.ts';
 import { startBackendRuntime } from '@backend/runtime/backendRuntime.ts';
+import { applyBootResume } from '@backend/runtime/bootResume.ts';
 import { resolveRepoRoot, resolveWorkspaceCwd } from '@libs/path/runtimePaths.ts';
 import { systemClipboard } from '@libs/clipboard/systemClipboard.ts';
 import { PRODUCT_NAME } from '@constants/product.ts';
@@ -50,6 +51,8 @@ export type CreateAppRuntimeOptions = {
    * source mode never calls it.
    */
   loadPackagedAsset?: () => EmbeddedBackendAsset;
+  /** Optional `--resume=<id>` target reopened before the first frame renders. */
+  resumeSessionId?: string;
 };
 
 /**
@@ -67,7 +70,8 @@ export type CreateAppRuntimeOptions = {
  */
 export async function createAppRuntime({
   entryUrl,
-  loadPackagedAsset
+  loadPackagedAsset,
+  resumeSessionId
 }: CreateAppRuntimeOptions): Promise<AppRuntime> {
   const store = createStore();
   store.set(newTurnIdAtom, { newTurnId: randomUUID });
@@ -135,6 +139,11 @@ export async function createAppRuntime({
   // frame. On timeout, read failure, unset preference, or unknown id this falls
   // back to the default preset while normal backend startup continues.
   const initialTheme = await resolveInitialTheme(client, INITIAL_THEME_READ_DEADLINE_MS);
+
+  // Reopen a requested session before the first frame renders and before the
+  // alternate screen is entered, so an unknown id fails cleanly to the normal
+  // buffer (backend torn down, error rethrown) with no screen flash.
+  await applyBootResume({ store, client, resumeSessionId, onFailure: disposeBackend });
 
   // Enter the alternate screen buffer before any visual setup so the session
   // renders in a scrollback-less buffer: while the TUI owns the screen the
