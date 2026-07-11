@@ -99,7 +99,7 @@ export const PRESS_AGAIN_TO_CLEAR_HINT = 'esc again to clear input';
 export const PRESS_AGAIN_TO_EXIT_HINT = 'ctrl+c again to exit';
 
 /** Default left-aligned status-bar hints shown when no transient hint is active. */
-export const DEFAULT_STATUS_HINTS = '/ commands | @ mention | ? help';
+export const DEFAULT_STATUS_HINTS = '/ commands | @ mention';
 
 /** Milliseconds before a transient status-bar hint clears itself. */
 export const TRANSIENT_STATUS_HINT_MS = 1_500;

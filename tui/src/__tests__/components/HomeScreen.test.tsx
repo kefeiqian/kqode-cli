@@ -108,7 +108,6 @@ describe('HomeScreen', () => {
     expect(output).not.toContain('Ask KQode...');
     expect(output).toContain('/ commands');
     expect(output).toContain('@ mention');
-    expect(output).toContain('? help');
     expect(output).not.toContain('tab next tab');
     // The model label stays hidden until the backend resolves it, so the first
     // frame must not flash "not configured".
@@ -192,7 +191,7 @@ describe('HomeScreen', () => {
     expect(outputRows.at(cwdRow + 1)).toContain('▄');
     expect(outputRows.at(cwdRow + 2)).toContain('>');
     expect(outputRows.at(cwdRow + 3)).toContain('▀');
-    expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
+    expect(outputRows.at(-1)).toContain('/ commands | @ mention');
   });
 
   it('keeps multiline body entries on separate rows', () => {
@@ -285,7 +284,7 @@ describe('HomeScreen', () => {
       path.join(displayCwd, 'target', 'kqode-test-workspaces', 'workspace', 'dummy-react-app')
     );
     expect(output.split('\n')).toHaveLength(16);
-    expect(output.split('\n').at(-1)).toContain('/ commands | @ mention | ? help');
+    expect(output.split('\n').at(-1)).toContain('/ commands | @ mention');
   });
 
   it('keeps one blank separator row between body output and cwd', () => {
@@ -316,7 +315,7 @@ describe('HomeScreen', () => {
     expect(openOutput).toContain('/clear');
     expect(openOutput).toContain('/exit');
     expect(openOutput).toContain('/help');
-    expect(openOutput.split('\n').at(-1)).toContain('/ commands | @ mention | ? help');
+    expect(openOutput.split('\n').at(-1)).toContain('/ commands | @ mention');
   });
 
   it('keeps cwd, composer, and status hints visible with the model label hidden until resolved at the minimum 61x16', async () => {
@@ -331,7 +330,7 @@ describe('HomeScreen', () => {
     expect(output).not.toContain(NOT_CONFIGURED_MODEL_LABEL);
     const outputRows = output.split('\n');
     expect(outputRows).toHaveLength(16);
-    expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
+    expect(outputRows.at(-1)).toContain('/ commands | @ mention');
 
     const typed = 'a long prompt that wraps across several visible composer rows';
     stdin.write(typed);
@@ -352,7 +351,7 @@ describe('HomeScreen', () => {
     expect(composerFlattened).toContain(typed);
     expect(wrappedRows).toHaveLength(16);
     expect(wrappedRows.at(-2)).toContain('▀');
-    expect(wrappedRows.at(-1)).toContain('/ commands | @ mention | ? help');
+    expect(wrappedRows.at(-1)).toContain('/ commands | @ mention');
   });
 
   it('soft-wraps long prompts instead of truncating them with an ellipsis', async () => {
@@ -373,7 +372,7 @@ describe('HomeScreen', () => {
     expect(output).not.toContain('...');
     expect(composerFlattened).toContain(longPrompt);
     expect(outputRows.at(-2)).toContain('▀');
-    expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
+    expect(outputRows.at(-1)).toContain('/ commands | @ mention');
   });
 
   it('adds submitted prompts to the body when Enter is pressed', async () => {
@@ -586,6 +585,6 @@ describe('HomeScreen', () => {
     expect(errorOutput).toContain('65536 bytes.');
     const errorRows = errorOutput.split('\n');
     expect(errorRows).toHaveLength(16);
-    expect(errorRows.at(-1)).toContain('/ commands | @ mention | ? help');
+    expect(errorRows.at(-1)).toContain('/ commands | @ mention');
   });
 });

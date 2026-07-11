@@ -80,7 +80,7 @@ describe('App', () => {
     const outputRows = (lastFrame() ?? '').split('\n');
     // The UI reserves the configured physical guard rows below the Ink canvas.
     expect(outputRows).toHaveLength(18 - FULLSCREEN_GUARD_ROWS);
-    expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
+    expect(outputRows.at(-1)).toContain('/ commands | @ mention');
   });
 
   it('shows the enlarge notice when the terminal shrinks below the usable height', async () => {
@@ -209,14 +209,14 @@ describe('App', () => {
     const helpFrame = lastFrame() ?? '';
     expect(helpFrame).toContain('↑/↓ scroll · q/esc close');
     expect(helpFrame).toContain('COMMANDS');
-    expect(helpFrame).not.toContain('/ commands | @ mention | ? help');
+    expect(helpFrame).not.toContain('/ commands | @ mention');
 
     stdin.write('\u001B');
     await new Promise((resolve) => setTimeout(resolve, 80));
 
     expect(store.get(helpVisibleAtom)).toBe(false);
     const homeFrame = lastFrame() ?? '';
-    expect(homeFrame).toContain('/ commands | @ mention | ? help');
+    expect(homeFrame).toContain('/ commands | @ mention');
     expect(homeFrame).not.toContain('↑/↓ scroll · q/esc close');
   });
 
