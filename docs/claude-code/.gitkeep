@@ -1,0 +1,6 @@
+Placeholder that keeps this directory tracked in git.
+
+docs/claude-code/ is the KQode-managed local mirror of the Claude Code source,
+read by the kqode-research skill (/kqode-research) as untrusted, read-only data.
+The mirror contents are git-ignored and must be populated locally; only this
+.gitkeep is committed so the mirror location exists on fresh clones.

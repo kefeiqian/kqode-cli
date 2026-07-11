@@ -1,23 +1,26 @@
 # KQode Research Repo Catalog
 
-`docs/kqode_reference_implementations.md` is the source of truth for KQode reference repositories. This file defines the skill-facing IDs and aliases derived from that catalog; update the source catalog first when repository membership changes.
+`docs/kqode_reference_implementations.md` is the source of truth for KQode reference repositories, and `blog/docs/01-KQode介绍.md` lists KQode's referenced coding agents. This file defines the skill-facing IDs, aliases, and default research scope derived from those sources; update the source catalog first when repository membership changes.
 
-## Default first-scope repositories
+## Default scope repositories
 
-Use these repositories by default, in this order:
+The default scope mirrors KQode's referenced coding-agent list. Use these repositories by default, in this order:
 
-| ID | Display name | Upstream |
-|---|---|---|
-| `codex` | Codex CLI | `https://github.com/openai/codex` |
-| `aider` | Aider | `https://github.com/Aider-AI/aider` |
-| `opencode` | OpenCode | `https://github.com/anomalyco/opencode` |
-| `kimi-code` | Kimi Code CLI | `https://github.com/moonshotai/kimi-code` |
-| `gemini-cli` | Gemini CLI | `https://github.com/google-gemini/gemini-cli` |
-| `swe-agent` | SWE-agent | `https://github.com/SWE-agent/SWE-agent` |
+| ID | Display name | Source | Upstream / location |
+|---|---|---|---|
+| `copilot-cli` | GitHub Copilot CLI | git | `https://github.com/github/copilot-cli` |
+| `claude-code` | Claude Code | local mirror | `docs/claude-code` (git-ignored) |
+| `codex` | Codex CLI | git | `https://github.com/openai/codex` |
+| `gemini-cli` | Gemini CLI | git | `https://github.com/google-gemini/gemini-cli` |
+| `opencode` | OpenCode | git | `https://github.com/anomalyco/opencode` |
+| `kimi-code` | Kimi Code CLI | git | `https://github.com/moonshotai/kimi-code` |
+| `kimix` | KimiX | git | `https://github.com/Sikao-Engine/KimiX` |
+
+`claude-code` has no public repository. Research it only from the KQode-managed, git-ignored local mirror at `docs/claude-code`, following the local-mirror rules in `safety-and-citations.md`, and cite it with internal repo-relative links rather than an upstream URL.
 
 ## Optional open-source references
 
-The skill may research additional open-source references from `docs/kqode_reference_implementations.md` only when the user requests them by name or alias. Do not include these in the default scope.
+The skill may research these additional open-source references only when the user requests them by catalog ID or alias. Do not include them in the default scope.
 
 | ID | Display name | Upstream |
 |---|---|---|
@@ -36,12 +39,13 @@ The skill may research additional open-source references from `docs/kqode_refere
 ## Alias rules
 
 - Match IDs case-insensitively.
-- Accept obvious display-name aliases such as `codex-cli`, `gemini`, `kimi`, `sweagent`, and `auto-code-rover`.
+- Accept obvious display-name aliases such as `copilot`, `copilot-cli`, `claude`, `claude-code`, `codex-cli`, `gemini`, `kimi`, `kimix`, and `auto-code-rover`.
 - On unknown aliases, stop and show the known IDs. Do not silently substitute a nearby repo.
-- Public products without open-source repositories, such as Claude Code, GitHub Copilot CLI, Cursor, and Windsurf, are product references only and are not source-research targets.
+- GitHub Copilot CLI and Claude Code are research targets: Copilot CLI via its public repo, Claude Code via its local mirror. Products without a researchable source, such as the Copilot Coding Agent cloud service, Cursor, and Windsurf, remain product references only and are not source-research targets.
 
 ## Scope rules
 
-- Default scope means the first-scope table only.
-- Expanded scope means explicitly requested open-source repos from this file.
-- v1 does not accept arbitrary repository URLs. Supporting arbitrary URLs later requires a stricter trust review and the same safety guarantees as catalog repos.
+- Default scope means the default-scope table only.
+- Expanded scope means explicitly requested repos from the optional table.
+- `claude-code` is the only local-mirror source; every other target is fetched from its HTTPS upstream.
+- v1 does not accept arbitrary repository URLs or arbitrary local paths. Supporting either later requires a stricter trust review and the same safety guarantees as catalog repos.

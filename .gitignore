@@ -25,6 +25,12 @@
 /tests/fixtures/dummy-react-app/.vite/
 /target/kqode-test-workspaces/
 
+# Local reference-implementation mirror for the kqode-research skill.
+# Keep the directory tracked via .gitkeep so /kqode-research has a stable mirror
+# location on fresh clones, but never commit the untrusted mirror contents.
+/docs/claude-code/*
+!/docs/claude-code/.gitkeep
+
 # Local environment and logs
 .env
 .env.*

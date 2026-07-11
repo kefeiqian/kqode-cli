@@ -18,14 +18,14 @@ No selected repository produced material evidence. This blocked fixture records 
 | Repo | Requested URL | Resolved URL | Branch | SHA | Status | Notes |
 |---|---|---|---|---|---|---|
 | codex | https://github.com/openai/codex |  |  |  | policy_blocked | fixture denial |
-| aider | https://github.com/Aider-AI/aider |  |  |  | policy_blocked | fixture denial |
+| copilot-cli | https://github.com/github/copilot-cli |  |  |  | policy_blocked | fixture denial |
 
 ---
 
 ## Method
 
 - Question: What happens after a user submits a prompt?
-- Repo scope: default first-scope fixture subset.
+- Repo scope: default-scope fixture subset.
 - Safety posture: read/search only; no code execution.
 
 ---
@@ -33,7 +33,7 @@ No selected repository produced material evidence. This blocked fixture records 
 ## Evidence Gaps
 
 - `codex`: `policy_blocked`.
-- `aider`: `policy_blocked`.
+- `copilot-cli`: `policy_blocked`.
 - `no_evidence`: no selected repo produced material evidence.
 
 ---
