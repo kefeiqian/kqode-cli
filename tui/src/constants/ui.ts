@@ -152,7 +152,7 @@ export const COPY_MODE_INPUT_KEY = 'r';
 
 /** Persistent status hint shown while terminal-native Copy Mode is active. */
 export const COPY_MODE_HINT =
-  'copy mode: terminal drag-copy; PageUp/PageDown/End scroll; any key exits';
+  'copy mode: drag to select & copy; PgUp/PgDn/End scroll; any key exits';
 
 /** Transient hint shown after the last assistant response is copied. */
 export const COPY_LAST_RESPONSE_SUCCEEDED_HINT = 'copied';

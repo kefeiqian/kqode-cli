@@ -8,6 +8,12 @@ origin: docs/brainstorms/2026-07-05-tui-copy-paste-and-selection-requirements.md
 
 # feat: TUI copy, paste, and text selection
 
+> **Superseded (2026-07-11):** the "Copy Mode delegates selection to the terminal" decision
+> (R6, and the "No custom in-app selection rendering/highlight" scope boundary) is reversed by
+> `docs/plans/2026-07-11-001-feat-tui-in-app-selection-copy-plan.md`, which owns selection and
+> copy in-app (drag to select, release to copy). Paste, `Ctrl+O`, and the injected clipboard
+> seam from this plan still stand.
+
 ## Summary
 
 Add clipboard ergonomics to the Ink TUI: paste into the composer via Ink's built-in `usePaste` (bracketed paste) plus app-level `Ctrl+V`/`Alt+V` and right-click; copy the last assistant response with `Ctrl+O`; and a `Alt+R` "Copy Mode" toggle that disables SGR mouse tracking so the terminal's own native selection/copy works. Clipboard I/O lives behind an injected seam owned at `tui/src/bootstrap.ts`, mirroring the backend-client pattern. `Ctrl+C` remains the two-step armed exit. Keybindings align to Codex CLI conventions.
