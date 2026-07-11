@@ -2,11 +2,11 @@ import { atom } from 'jotai';
 import type { Getter, Setter } from 'jotai';
 import { STREAM_RENDER_FLUSH_MS } from '@constants/backend.ts';
 import { PRODUCT_NAME } from '@constants/product.ts';
-import { setSessionWindowTitle } from '@libs/terminal/windowTitle.ts';
+import { setSessionWindowTitle, setTerminalWindowTitle } from '@libs/terminal/windowTitle.ts';
 import { SETTLED_KIND_COMPLETED } from '@contracts/backend/index.ts';
 import type { TranscriptEvent } from '@contracts/backend/index.ts';
 import type { SessionResumeResult } from '@contracts/backend/index.ts';
-import { backendClientAtom, currentSessionIdAtom } from '@state/global/index.ts';
+import { backendClientAtom, currentSessionIdAtom, productVersionAtom } from '@state/global/index.ts';
 import { bodyScrollOffsetRowsAtom } from '@state/ui/index.ts';
 import { openConnectSurfaceAtom } from '@state/ui/surface/index.ts';
 import { refreshGitStatusAtom } from '@state/ui/index.ts';
@@ -117,6 +117,11 @@ export const clearTranscriptAtom = atom(null, (get, set) => {
   set(turnGenerationByIdAtom, new Map());
   set(bodyScrollOffsetRowsAtom, 0);
   set(currentSessionIdAtom, undefined);
+  // Reset the terminal title from the prior session's summary back to the
+  // product title (`KQode v<version>`), matching the startup title so a cleared
+  // session never leaves a stale summary in the tab. The next prompt re-seeds it
+  // as the fresh session's first prompt.
+  setTerminalWindowTitle(PRODUCT_NAME, get(productVersionAtom));
   void get(backendClientAtom)?.clearConversation().catch(() => undefined);
 });
 /** Bumps generation on backend respawn and drops backend-owned mirror rows. */

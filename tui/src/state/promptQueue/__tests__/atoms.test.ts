@@ -1,5 +1,15 @@
 import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
+
+const { mockSetTerminalWindowTitle } = vi.hoisted(() => ({
+  mockSetTerminalWindowTitle: vi.fn()
+}));
+
+vi.mock('@libs/terminal/windowTitle.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@libs/terminal/windowTitle.ts')>()),
+  setTerminalWindowTitle: mockSetTerminalWindowTitle
+}));
+
 import {
   appendUnknownCommandNoticeAtom,
   clientOnlyRowsAtom,
@@ -17,7 +27,7 @@ import {
   PROVIDER_NOT_CONFIGURED_MESSAGE
 } from '@libs/promptQueue/promptQueue.ts';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
-import { backendClientAtom, currentSessionIdAtom } from '@state/global/index.ts';
+import { backendClientAtom, currentSessionIdAtom, productVersionAtom } from '@state/global/index.ts';
 import { activeSurfaceAtom, bodyScrollOffsetRowsAtom, submittedPromptEntriesAtom, Surface } from '@state/ui/index.ts';
 import {
   SETTLED_KIND_NEEDS_CONFIGURATION,
@@ -26,6 +36,7 @@ import {
 } from '@contracts/backend/index.ts';
 import { memoryBackendStub } from '@test/backendMemoryStub.ts';
 import { themeBackendStub } from '@test/backendThemeStub.ts';
+import { PRODUCT_NAME } from '@constants/product.ts';
 
 function clientWithSubmit(submit: BackendClient['submit']): BackendClient {
   return {
@@ -201,6 +212,15 @@ describe('clearTranscriptAtom', () => {
 
     expect(clearConversation).toHaveBeenCalledTimes(1);
     expect(store.get(submittedPromptEntriesAtom)).toEqual([]);
+  });
+
+  it('resets the terminal title to the product version', () => {
+    const store = createStore();
+    store.set(productVersionAtom, '1.2.3');
+
+    store.set(clearTranscriptAtom);
+
+    expect(mockSetTerminalWindowTitle).toHaveBeenCalledWith(PRODUCT_NAME, '1.2.3');
   });
 });
 
