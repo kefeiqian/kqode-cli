@@ -12,9 +12,13 @@ import type { ThemeColors } from '@theme/themeTypes.ts';
 const EXPECTED_IDS = [
   ThemeId.CatppuccinMocha,
   ThemeId.Dracula,
+  ThemeId.Everforest,
   ThemeId.GruvboxDark,
+  ThemeId.Monokai,
   ThemeId.Nord,
   ThemeId.OneDark,
+  ThemeId.RosePine,
+  ThemeId.SolarizedDark,
   ThemeId.TokyoNight
 ];
 

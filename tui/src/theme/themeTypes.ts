@@ -5,7 +5,11 @@ export const ThemeId = {
   Nord: 'nord',
   GruvboxDark: 'gruvbox-dark',
   TokyoNight: 'tokyo-night',
-  CatppuccinMocha: 'catppuccin-mocha'
+  CatppuccinMocha: 'catppuccin-mocha',
+  SolarizedDark: 'solarized-dark',
+  Monokai: 'monokai',
+  RosePine: 'rose-pine',
+  Everforest: 'everforest'
 } as const;
 
 export type ThemeId = (typeof ThemeId)[keyof typeof ThemeId];
