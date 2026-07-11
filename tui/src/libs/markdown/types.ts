@@ -28,6 +28,8 @@ export type RenderedStyledSegment = Omit<
 export type MarkdownContentRow = {
   backgroundColorToken?: ThemeColorToken;
   colorToken?: ThemeColorToken;
+  /** Soft-wrap rejoin separator (see `BodyRow.continuesPrevious`): `''` mid-word, `' '` word-wrap. */
+  continuesPrevious?: string;
   fillColumns?: boolean;
   segments?: StyledSegment[];
   text: string;

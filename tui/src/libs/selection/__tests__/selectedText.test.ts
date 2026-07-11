@@ -37,7 +37,15 @@ describe('selectedText', () => {
   });
 
   it('rejoins soft-wrapped rows into one logical line', () => {
-    const rows = [row('hello '), row('world', { continuesPrevious: true })];
+    const rows = [row('hello '), row('world', { continuesPrevious: '' })];
+    expect(selectedText(rows, { rowIndex: 0, column: 0 }, { rowIndex: 1, column: 5 })).toBe(
+      'hello world'
+    );
+  });
+
+  it('reinserts a word-wrap separator when rejoining trimmed rows', () => {
+    // Word-wrap trims the boundary space, so the continuation carries a ' ' separator.
+    const rows = [row('hello'), row('world', { continuesPrevious: ' ' })];
     expect(selectedText(rows, { rowIndex: 0, column: 0 }, { rowIndex: 1, column: 5 })).toBe(
       'hello world'
     );

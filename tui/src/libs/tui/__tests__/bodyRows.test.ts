@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
 import { resolveBodyRows } from '@libs/tui/bodyRows.ts';
+import { selectedText } from '@libs/selection/selectedText.ts';
 import { DEFAULT_THEME, ThemeId, findTheme } from '@theme/themeConfig.ts';
 
 const WIDE_COLUMNS = 80;
@@ -160,7 +161,7 @@ describe('resolveBodyRows theming and wrapping', () => {
 });
 
 describe('resolveBodyRows soft-wrap continuation flags', () => {
-  it('marks soft-wrap slices of a long line as continuations', () => {
+  it('marks char-wrapped slices of a long plain line with an empty-separator continuation', () => {
     const rows = resolveBodyRows(
       [{ kind: BodyEntryKind.Success, text: 'y'.repeat(WIDE_COLUMNS + 5) }],
       WIDE_COLUMNS,
@@ -169,8 +170,8 @@ describe('resolveBodyRows soft-wrap continuation flags', () => {
     );
 
     expect(rows.length).toBeGreaterThan(1);
-    expect(rows[0].continuesPrevious ?? false).toBe(false);
-    expect(rows[1].continuesPrevious).toBe(true);
+    expect(rows[0].continuesPrevious).toBeUndefined();
+    expect(rows[1].continuesPrevious).toBe('');
   });
 
   it('does not mark a hard line break as a continuation', () => {
@@ -185,6 +186,39 @@ describe('resolveBodyRows soft-wrap continuation flags', () => {
       (row) => row.text.includes('alpha') || row.text.includes('beta')
     );
     expect(textRows).toHaveLength(2);
-    expect(textRows.every((row) => (row.continuesPrevious ?? false) === false)).toBe(true);
+    expect(textRows.every((row) => row.continuesPrevious === undefined)).toBe(true);
+  });
+
+  it('marks assistant markdown word-wraps with a space separator', () => {
+    const paragraph = Array.from({ length: 40 }, (_, index) => `word${index}`).join(' ');
+    const rows = resolveBodyRows(
+      [{ kind: BodyEntryKind.Assistant, text: paragraph }],
+      WIDE_COLUMNS,
+      TALL_ROWS,
+      DEFAULT_THEME
+    );
+
+    expect(rows.length).toBeGreaterThan(1);
+    expect(rows[0].continuesPrevious).toBeUndefined();
+    expect(rows[1].continuesPrevious).toBe(' ');
+  });
+
+  it('rejoins a wrapped assistant paragraph back to one logical line on copy', () => {
+    const paragraph = Array.from({ length: 40 }, (_, index) => `word${index}`).join(' ');
+    const rows = resolveBodyRows(
+      [{ kind: BodyEntryKind.Assistant, text: paragraph }],
+      WIDE_COLUMNS,
+      TALL_ROWS,
+      DEFAULT_THEME
+    );
+
+    const copied = selectedText(
+      rows,
+      { rowIndex: 0, column: 0 },
+      { rowIndex: rows.length - 1, column: 999 }
+    );
+
+    expect(copied).toBe(paragraph);
+    expect(copied).not.toContain('\n');
   });
 });

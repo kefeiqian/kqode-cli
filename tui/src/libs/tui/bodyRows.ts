@@ -20,7 +20,12 @@ export type BodyEntry = {
 export type BodyRow = {
   backgroundColor?: string;
   color?: string;
-  continuesPrevious?: boolean;
+  /**
+   * When set, this row is a soft-wrap continuation of the previous row's logical
+   * line; the value is the separator to reinsert when rejoining on copy (`''` for
+   * a char/mid-word split, `' '` for a word-wrap boundary).
+   */
+  continuesPrevious?: string;
   fillColumns?: boolean;
   marker?: string;
   markerColor?: string;
@@ -34,7 +39,7 @@ export type BodyRow = {
 export type BodyRowStructure = {
   backgroundColorToken?: ThemeColorToken;
   colorToken?: ThemeColorToken;
-  continuesPrevious?: boolean;
+  continuesPrevious?: string;
   fillColumns?: boolean;
   marker?: string;
   markerColorToken?: ThemeColorToken;
@@ -263,27 +268,31 @@ function labelForEntry(entry: BodyEntry): string {
   return entry.text;
 }
 
-type WrappedBodyLine = { text: string; continuesPrevious: boolean };
+type WrappedBodyLine = { text: string; continuesPrevious: string | undefined };
 
 // Splits on hard line breaks (`\n`, normalizing `\r\n`/`\r` first) so multi-line
 // backend output, errors, and prompts all keep their author-intended rows, then
 // wraps each line to `columns`. `continuesPrevious` marks the soft-wrap slices
-// (every slice after the first within one hard line) so copy/selection can
-// rejoin a wrapped logical line while hard line breaks start a fresh line. The
-// display sanitizer preserves `\n` as a real layout character, so newlines here
-// are trusted content rather than escaped.
+// (every slice after the first within one hard line) with `''` — a character
+// split rejoins by direct concatenation — so copy/selection rejoins a wrapped
+// logical line while hard line breaks start a fresh line. The display sanitizer
+// preserves `\n` as a real layout character, so newlines here are trusted
+// content rather than escaped.
 function wrapBodyLines(text: string, columns: number): WrappedBodyLine[] {
   const wrapped: WrappedBodyLine[] = [];
   const hardLines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
 
   for (const line of hardLines) {
     if (line.length === 0) {
-      wrapped.push({ text: '', continuesPrevious: false });
+      wrapped.push({ text: '', continuesPrevious: undefined });
       continue;
     }
 
     for (let start = 0; start < line.length; start += columns) {
-      wrapped.push({ text: line.slice(start, start + columns), continuesPrevious: start > 0 });
+      wrapped.push({
+        text: line.slice(start, start + columns),
+        continuesPrevious: start > 0 ? '' : undefined
+      });
     }
   }
 

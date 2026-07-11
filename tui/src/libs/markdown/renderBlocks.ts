@@ -113,11 +113,27 @@ function renderBlockquote(token: Tokens.Blockquote, columns: number, depth: numb
 }
 
 function wrappedRows(segments: StyledSegment[], columns: number): MarkdownContentRow[] {
-  const rows = splitHardBreaks(segments).flatMap((line) => wrapSegments(line, columns));
-  return rows.map((row) => ({
-    segments: row.length === 0 ? [{ text: '' }] : row,
-    text: row.map((segment) => segment.text).join('')
-  }));
+  return splitHardBreaks(segments).flatMap((line) => {
+    // `wrapSegments` breaks at word boundaries (consuming the whitespace) or,
+    // for words wider than `columns`, mid-word. Recover the separator each break
+    // consumed by matching every wrapped row back into the original line: the gap
+    // is `' '` for a word-wrap boundary and empty for a mid-word split, so copy
+    // rejoins the logical line faithfully.
+    const originalText = line.map((segment) => segment.text).join('');
+    let cursor = 0;
+    return wrapSegments(line, columns).map((row, index): MarkdownContentRow => {
+      const text = row.map((segment) => segment.text).join('');
+      const foundAt = text.length === 0 ? cursor : originalText.indexOf(text, cursor);
+      const start = foundAt < 0 ? cursor : foundAt;
+      const continuesPrevious = index === 0 ? undefined : originalText.slice(cursor, start);
+      cursor = start + text.length;
+      return {
+        continuesPrevious,
+        segments: row.length === 0 ? [{ text: '' }] : row,
+        text
+      };
+    });
+  });
 }
 
 function splitHardBreaks(segments: StyledSegment[]): StyledSegment[][] {

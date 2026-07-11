@@ -42,8 +42,8 @@ export function selectedText(
     const endChar = indexAtDisplayColumn(row.text, Math.max(0, endColumn - markerWidth));
     const fragment = row.text.slice(startChar, endChar);
 
-    if (row.continuesPrevious === true && logicalLines.length > 0) {
-      logicalLines[logicalLines.length - 1] += fragment;
+    if (row.continuesPrevious !== undefined && logicalLines.length > 0) {
+      logicalLines[logicalLines.length - 1] += row.continuesPrevious + fragment;
     } else {
       logicalLines.push(fragment);
     }
