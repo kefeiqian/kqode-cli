@@ -1,7 +1,7 @@
 ---
 title: "feat: Exit-card resume command and --resume=<id> CLI entry"
 type: feat
-status: active
+status: completed
 date: 2026-07-11
 origin: docs/brainstorms/2026-07-11-exit-card-resume-command-requirements.md
 ---
