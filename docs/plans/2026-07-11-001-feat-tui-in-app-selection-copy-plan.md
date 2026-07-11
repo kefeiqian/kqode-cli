@@ -1,7 +1,7 @@
 ---
 title: "feat: In-app text selection and lossless copy/paste round-trip in the TUI"
 type: feat
-status: active
+status: completed
 date: 2026-07-11
 ---
 
