@@ -1,12 +1,13 @@
 //! Per-session identity, manifest, and retention for backend debug logs.
 //!
-//! A session corresponds to one backend process spawn. The id is short,
-//! sortable, and filesystem-safe: the millisecond epoch plus the process id.
+//! A session corresponds to one backend process spawn. The id is a UUIDv7 —
+//! time-sortable (it embeds a millisecond timestamp) and filesystem-safe.
 
 use std::fs;
 use std::path::Path;
 
 use serde::Serialize;
+use uuid::Uuid;
 
 use super::epoch_millis;
 
@@ -19,12 +20,13 @@ pub(super) const BACKEND_LOG_FILENAME: &str = "backend.jsonl";
 /// Filename of the per-session manifest.
 const SESSION_MANIFEST_FILENAME: &str = "session.json";
 
-/// Mints a session id for this backend spawn: `<epoch_millis>-<pid_hex>`.
+/// Mints a session id for this backend spawn: a UUIDv7 string.
 ///
-/// Sortable by start time and unique per spawn (one backend process is one
-/// session), and safe as a path component on every platform.
+/// UUIDv7 embeds a millisecond timestamp, so ids sort by start time while a
+/// random tail keeps each spawn unique; the canonical hyphenated-hex form is
+/// safe as a path component on every platform.
 pub(super) fn generate_session_id() -> String {
-    format!("{}-{:x}", epoch_millis(), std::process::id())
+    Uuid::now_v7().to_string()
 }
 
 /// The `session.json` manifest describing one session.

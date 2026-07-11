@@ -6,8 +6,9 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+use uuid::Uuid;
 
 use super::TurnResult;
 use super::session_log::{SessionLogEvent, append_event};
@@ -16,8 +17,6 @@ use crate::store::{Store, StoredSession};
 
 const SESSIONS_DIRNAME: &str = "sessions";
 const SESSION_LOG_EXTENSION: &str = "jsonl";
-
-static SESSION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Persistence behavior the coordinator can invoke while handling turn state.
 pub trait ConversationPersistence: Send {
@@ -275,9 +274,13 @@ impl ConversationPersistence for SessionPersistence {
     }
 }
 
+/// Mints the durable conversation/resume id, lazily at first enqueue.
+///
+/// The `conv-` prefix marks it as a resumable-conversation id — distinct from
+/// the backend debug-log session id in the `ready` notification. The UUIDv7 body
+/// is time-sortable and unique, so no separate counter is needed.
 fn new_conversation_session_id() -> String {
-    let counter = SESSION_COUNTER.fetch_add(1, Ordering::Relaxed);
-    format!("conv-{}-{:x}-{}", now_ms(), std::process::id(), counter)
+    format!("conv-{}", Uuid::now_v7())
 }
 
 fn now_ms() -> i64 {
