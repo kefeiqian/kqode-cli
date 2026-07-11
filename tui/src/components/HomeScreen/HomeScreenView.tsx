@@ -16,12 +16,11 @@ import {
   DISABLE_SGR_MOUSE_TRACKING,
   ENABLE_SGR_MOUSE_TRACKING,
   parseMouseButtonEvent,
-  parseMouseClickEvent,
-  parseMouseWheelEvent
+  parseMouseClickEvent
 } from '@libs/terminal/mouse.ts';
 import { handleRightClickPaste } from '@components/HomeScreen/rightClickPaste.ts';
 import { handleSelectionGesture } from '@components/HomeScreen/selectionInput.ts';
-import { resolveWheelTarget } from '@components/HomeScreen/wheelRouting.ts';
+import { handleWheelScroll } from '@components/HomeScreen/wheelScroll.ts';
 import { useCaretScrollSuppression } from '@components/HomeScreen/useCaretScrollSuppression.ts';
 import { resolveClickResult } from '@libs/composer/composerWindow.ts';
 import { isInsideSafeChromeBounds } from '@libs/tui/safeCanvas.ts';
@@ -29,12 +28,10 @@ import { BODY_CWD_GAP_ROWS } from '@libs/tui/layout.ts';
 import {
   bottomSpacerRowsAtom,
   composerInputColumnsAtom,
-  composerCanScrollAtom,
   composerTopAtom,
   layoutAtom,
   safeChromeColumnsAtom,
-  scrollBodyByRowsAtom,
-  scrollComposerByRowsAtom
+  scrollBodyByRowsAtom
 } from '@state/ui/index.ts';
 import { columnsAtom, copyModeActiveAtom, rowsAtom } from '@state/ui/index.ts';
 import { commandMenuOpenAtom } from '@state/ui/commands/index.ts';
@@ -47,7 +44,6 @@ import {
 import { activeThemeAtom } from '@state/global/index.ts';
 import {
   COMPOSER_BACKGROUND_TOP_PADDING_ROWS,
-  MOUSE_WHEEL_SCROLL_ROWS,
   PROMPT_PREFIX
 } from '@constants/ui.ts';
 
@@ -57,7 +53,6 @@ export function HomeScreenView() {
   const rows = useAtomValue(rowsAtom);
   const copyModeActive = useAtomValue(copyModeActiveAtom);
   const scrollBodyByRows = useSetAtom(scrollBodyByRowsAtom);
-  const scrollComposerByRows = useSetAtom(scrollComposerByRowsAtom);
   const notifyScroll = useCaretScrollSuppression();
   const store = useStore();
   const theme = useAtomValue(activeThemeAtom);
@@ -88,39 +83,7 @@ export function HomeScreenView() {
       }
     }
 
-    const wheel = parseMouseWheelEvent(input);
-    if (wheel !== null) {
-      if (store.get(activeDockedPanelAtom) !== null) {
-        notifyScroll();
-        scrollBodyByRows(
-          wheel.direction === 'up' ? MOUSE_WHEEL_SCROLL_ROWS : -MOUSE_WHEEL_SCROLL_ROWS
-        );
-        return;
-      }
-
-      const currentRows = store.get(rowsAtom);
-      const currentSafeChromeColumns = store.get(safeChromeColumnsAtom);
-      const target = resolveWheelTarget({
-        mouseRow: wheel.row,
-        mouseColumn: wheel.column,
-        composerTop: store.get(composerTopAtom),
-        rows: currentRows,
-        columns: currentSafeChromeColumns,
-        composerCanScroll: store.get(composerCanScrollAtom)
-      });
-      if (target === 'none') {
-        return;
-      }
-      notifyScroll();
-      if (target === 'composer') {
-        // A body-sized notch is near-full-page in a small composer; clamp it.
-        const step = Math.max(1, Math.min(MOUSE_WHEEL_SCROLL_ROWS, store.get(layoutAtom).composerVisibleRows - 1));
-        scrollComposerByRows(wheel.direction === 'up' ? step : -step);
-      } else {
-        scrollBodyByRows(
-          wheel.direction === 'up' ? MOUSE_WHEEL_SCROLL_ROWS : -MOUSE_WHEEL_SCROLL_ROWS
-        );
-      }
+    if (handleWheelScroll(store, input, notifyScroll)) {
       return;
     }
 
