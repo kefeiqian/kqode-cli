@@ -1,16 +1,19 @@
 import { Box, Text } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect } from 'react';
-import { DockDivider } from '@components/DockDivider.tsx';
+import { CommandSurface } from '@components/CommandSurface/index.tsx';
+import { useCommandSurfaceLayout } from '@components/CommandSurface/useCommandSurfaceLayout.ts';
 import { ResumeRows } from '@components/ResumeSurface/ResumeRows.tsx';
 import { useResumeBackend } from '@components/ResumeSurface/useResumeBackend.ts';
 import { useResumeInput } from '@components/ResumeSurface/useResumeInput.ts';
-import { resolveDockedFooterGap } from '@libs/tui/layout.ts';
+import { positionIndicator } from '@libs/tui/layout.ts';
 import {
   RESUME_PANEL_CHROME_ROWS,
-  RESUME_PANEL_SESSION_ROWS
+  RESUME_PANEL_SESSION_ROWS,
+  SELECTION_GUTTER,
+  SELECTION_GUTTER_WIDTH
 } from '@constants/ui.ts';
-import { activeThemeAtom } from '@state/global/index.ts';
+import { formatResumeHeader } from '@libs/resume/formatSessionRows.ts';
 import { resumePanelRowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
 import {
   highlightedResumeSessionAtom,
@@ -35,18 +38,23 @@ export function ResumePanel() {
   const status = useAtomValue(resumeStatusAtom);
   const error = useAtomValue(resumeErrorAtom);
   const windowOffset = useAtomValue(resumeWindowOffsetAtom);
-  const theme = useAtomValue(activeThemeAtom);
   const setVisibleRows = useSetAtom(resumeVisibleRowsAtom);
   const { refreshSessions, resumeSelected } = useResumeBackend();
-  const { showFooterGap, chromeRows } = resolveDockedFooterGap({
-    panelRows,
-    chromeWithGap: RESUME_PANEL_CHROME_ROWS
-  });
-  const sessionRows = Math.max(1, Math.min(RESUME_PANEL_SESSION_ROWS, panelRows - chromeRows));
+  const layout = useCommandSurfaceLayout({ panelRows, chromeWithGap: RESUME_PANEL_CHROME_ROWS });
+  const sessionRows = Math.max(1, Math.min(RESUME_PANEL_SESSION_ROWS, layout.bodyRows));
   const hiddenCurrentDraft =
     status === ResumeStatus.Loaded &&
     allSessions.length > 0 &&
     !allSessions.some((session) => session.status === 'Current');
+  // The session table's column header lives in the shell header slot (counted in
+  // RESUME_PANEL_CHROME_ROWS) so the fixed-height body holds only session rows; a
+  // blank row keeps the same budget in the non-loaded states.
+  const header =
+    status === ResumeStatus.Loaded ? (
+      <Text>{`${SELECTION_GUTTER}${formatResumeHeader(safeChromeColumns - SELECTION_GUTTER_WIDTH)}`}</Text>
+    ) : (
+      <Text> </Text>
+    );
 
   useResumeInput(resumeSelected);
 
@@ -59,11 +67,15 @@ export function ResumePanel() {
   }, [refreshSessions]);
 
   return (
-    <Box flexDirection="column" height={panelRows}>
-      <DockDivider />
-      <Text color={theme.colors.accentBlue}>
-        {truncate(labelText(status, error, hiddenCurrentDraft), safeChromeColumns)}
-      </Text>
+    <CommandSurface
+      panelRows={panelRows}
+      layout={layout}
+      label={truncate(labelText(status, error, hiddenCurrentDraft), safeChromeColumns)}
+      header={header}
+      bodyRows={sessionRows}
+      footerHint={RESUME_FOOTER_HINT}
+      position={positionIndicator(windowOffset, Math.max(0, allSessions.length - sessionRows))}
+    >
       {status === ResumeStatus.Loaded ? (
         <ResumeRows
           columns={safeChromeColumns}
@@ -73,15 +85,9 @@ export function ResumePanel() {
           visibleRows={sessionRows}
         />
       ) : (
-        <PanelMessage rows={sessionRows + 1} text={bodyMessage(status, error)} />
+        <PanelMessage rows={sessionRows} text={bodyMessage(status, error)} />
       )}
-      {showFooterGap ? <Text> </Text> : null}
-      <ResumeFooter
-        offset={windowOffset}
-        total={allSessions.length}
-        visible={sessionRows}
-      />
-    </Box>
+    </CommandSurface>
   );
 }
 
@@ -94,32 +100,6 @@ function PanelMessage({ rows, text }: { rows: number; text: string }) {
       {Array.from({ length: Math.max(0, rows - 1) }, (_, index) => (
         <Text key={index}> </Text>
       ))}
-    </Box>
-  );
-}
-
-function ResumeFooter({
-  offset,
-  total,
-  visible
-}: {
-  offset: number;
-  total: number;
-  visible: number;
-}) {
-  const columns = useAtomValue(safeChromeColumnsAtom);
-  const theme = useAtomValue(activeThemeAtom);
-  const maxOffset = Math.max(0, total - visible);
-  const position = maxOffset === 0 ? '' : offset <= 0 ? 'more ↓' : offset >= maxOffset ? 'more ↑' : 'more ↑↓';
-
-  return (
-    <Box width={columns}>
-      <Text color={theme.colors.muted}>{RESUME_FOOTER_HINT}</Text>
-      {position === '' ? null : (
-        <Box flexGrow={1} justifyContent="flex-end">
-          <Text color={theme.colors.muted}>{position}</Text>
-        </Box>
-      )}
     </Box>
   );
 }
