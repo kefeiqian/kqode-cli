@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { computeExitSummary } from '@components/AppExitSummary/computeExitSummary.ts';
 import type { GitLineDelta } from '@libs/git/lineDelta.ts';
 import {
+  currentSessionIdAtom,
   sessionGitBaselineAtom,
   sessionStartedAtAtom,
   workspaceCwdAtom
@@ -12,13 +13,15 @@ type StoreSeed = {
   startedAt?: number;
   baseline?: GitLineDelta;
   cwd?: string;
+  sessionId?: string;
 };
 
-function seededStore({ startedAt = 0, baseline, cwd = '/repo' }: StoreSeed) {
+function seededStore({ startedAt = 0, baseline, cwd = '/repo', sessionId }: StoreSeed) {
   const store = createStore();
   store.set(sessionStartedAtAtom, startedAt);
   store.set(sessionGitBaselineAtom, baseline);
   store.set(workspaceCwdAtom, cwd);
+  store.set(currentSessionIdAtom, sessionId);
   return store;
 }
 
@@ -32,7 +35,11 @@ describe('computeExitSummary', () => {
       readLineDelta: () => ({ insertions: 12, deletions: 4 })
     });
 
-    expect(data).toEqual({ durationMs: 125_000, changes: { insertions: 10, deletions: 3 } });
+    expect(data).toEqual({
+      durationMs: 125_000,
+      changes: { insertions: 10, deletions: 3 },
+      resumeCommand: undefined
+    });
   });
 
   it('renders Changes as undefined when there is no baseline', () => {
@@ -77,5 +84,21 @@ describe('computeExitSummary', () => {
     });
 
     expect(data.durationMs).toBeUndefined();
+  });
+
+  it('builds the resume command when the session is resumable', () => {
+    const store = seededStore({ startedAt: 1_000, sessionId: 'conv-42' });
+
+    const data = computeExitSummary({ store, now: () => 2_000, readLineDelta: () => undefined });
+
+    expect(data.resumeCommand).toBe('kqode --resume=conv-42');
+  });
+
+  it('leaves the resume command undefined when there is no resumable session', () => {
+    const store = seededStore({ startedAt: 1_000 });
+
+    const data = computeExitSummary({ store, now: () => 2_000, readLineDelta: () => undefined });
+
+    expect(data.resumeCommand).toBeUndefined();
   });
 });

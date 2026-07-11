@@ -90,6 +90,10 @@ function renderValue(
     return data.durationMs === undefined ? undefined : formatDuration(data.durationMs);
   }
 
-  // Cost, Tokens, and Resume have no data source yet — omitted until they do.
+  if (label === 'Resume') {
+    return data.resumeCommand;
+  }
+
+  // Cost and Tokens have no data source yet — omitted until they do.
   return undefined;
 }
