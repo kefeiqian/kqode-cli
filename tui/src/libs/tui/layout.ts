@@ -20,7 +20,8 @@ export const HEADER_ROWS = 1;
 export const HOME_HEADER_ROWS = HEADER_ROWS;
 
 export const DEFAULT_COMPOSER_ROWS = 3;
-export const BODY_CWD_GAP_ROWS = 1;
+/** Blank separator rows kept between the body area and the cwd row. */
+export const BODY_CWD_GAP_ROWS = 2;
 
 const COMPOSER_ERROR_RESERVE_ROWS = 1;
 

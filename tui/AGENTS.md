@@ -8,7 +8,7 @@ Prefer Jotai atoms/selectors over drilling HomeScreen config or shared TUI state
 
 ## Terminal layout
 
-Keep the cwd row, prompt composer, and command/status row stuck to the bottom of the terminal for every shell window size. Keep exactly one blank separator row between the body area and cwd row, but do not let body, preview, or header content push gaps between the composer and the command/status row.
+Keep the cwd row, prompt composer, and command/status row stuck to the bottom of the terminal for every shell window size. Keep exactly two blank separator rows between the body area and cwd row, but do not let body, preview, or header content push gaps between the composer and the command/status row.
 
 The render canvas now fills the terminal's physical last row (`FULLSCREEN_GUARD_ROWS = 0` in `src/state/ui/dimensions.ts`), so Ink runs on its fullscreen cursor baseline and `INK_CURSOR_ROW_ORIGIN_OFFSET = 1` in `src/constants/ui.ts`. Keep `render()` on `incrementalRendering: true` (`src/cli/kqodeCli.tsx`), and treat the guard↔offset pair as one coupled knob: changing one without the other drifts the caret off the composer row. This edge-to-edge posture assumes WezTerm-on-Windows is out of KQode's support matrix; if it returns, re-evaluate the fullscreen flicker trade-off before reintroducing or removing any guard.
 

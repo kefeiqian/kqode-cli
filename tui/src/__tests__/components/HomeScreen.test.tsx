@@ -288,7 +288,7 @@ describe('HomeScreen', () => {
     expect(output.split('\n').at(-1)).toContain('/ commands | @ mention');
   });
 
-  it('keeps one blank separator row between body output and cwd', () => {
+  it('keeps two blank separator rows between body output and cwd', () => {
     const entries = Array.from({ length: 10 }, (_, index) => ({
       kind: 'assistant' as const,
       text: `entry ${index + 1}`
@@ -298,7 +298,8 @@ describe('HomeScreen', () => {
     const cwdRow = outputRows.findIndex((row) => row.includes(projectsKQode));
 
     expect(outputRows.at(cwdRow - 1)).toBe('');
-    expect(outputRows.at(cwdRow - 2)).toContain('entry 10');
+    expect(outputRows.at(cwdRow - 2)).toBe('');
+    expect(outputRows.at(cwdRow - 3)).toContain('entry 10');
     expect(outputRows.at(cwdRow + 1)).toContain('▄');
     expect(outputRows.at(cwdRow + 2)).toContain('>');
   });
