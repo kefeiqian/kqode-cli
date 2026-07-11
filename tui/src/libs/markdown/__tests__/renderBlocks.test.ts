@@ -35,18 +35,16 @@ describe('renderMarkdownContentRows', () => {
     expect(rows[0]?.segments?.[0]).toMatchObject({ colorToken: 'muted' });
     expect(rows.some((row) => row.text === '─'.repeat(20))).toBe(true);
     expect(rows.some((row) => row.segments?.some((segment) => segment.bold))).toBe(true);
-    expect(rows.some((row) => row.segments?.some((segment) => segment.backgroundColorToken))).toBe(
-      true
-    );
+    expect(
+      rows.some((row) => row.segments?.some((segment) => segment.colorToken === 'accentGreen'))
+    ).toBe(true);
   });
 
   it('renders code blocks and tables in-place with specialized renderers', () => {
     const rows = renderMarkdownContentRows('## A\n\n```js\nconst x = 1;\n```\n\n| A | B |\n| - | - |', 40);
 
     expect(rows.map((row) => row.text)).toContain('const x = 1;');
-    expect(rows.find((row) => row.text === 'const x = 1;')?.backgroundColorToken).toBe(
-      'messageBackground'
-    );
+    expect(rows.find((row) => row.text === 'const x = 1;')?.backgroundColorToken).toBeUndefined();
     expect(rows.some((row) => row.text.startsWith('┌'))).toBe(true);
   });
 });

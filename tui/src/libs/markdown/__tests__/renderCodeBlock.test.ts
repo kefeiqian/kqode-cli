@@ -4,10 +4,11 @@ import { displayWidth } from '@libs/text/displayWidth.ts';
 import { renderCodeBlock } from '@libs/markdown/renderCodeBlock.ts';
 
 describe('renderCodeBlock', () => {
-  it('renders code with background fill and highlighted tokens', () => {
+  it('renders highlighted code tokens without a background', () => {
     const rows = renderCodeBlock(codeToken('const x = "ok";', 'js'), 40);
 
-    expect(rows[0]).toMatchObject({ backgroundColorToken: 'messageBackground', fillColumns: true });
+    expect(rows[0]?.backgroundColorToken).toBeUndefined();
+    expect(rows[0]?.fillColumns).toBeUndefined();
     expect(rows[0]?.segments?.some((segment) => segment.colorToken === 'warning')).toBe(true);
     expect(rows[0]?.segments?.some((segment) => segment.colorToken === 'accentGreen')).toBe(true);
   });
@@ -16,7 +17,7 @@ describe('renderCodeBlock', () => {
     const rows = renderCodeBlock(codeToken('  plain\n\ttext', 'wat'), 40);
 
     expect(rows.map((row) => row.text)).toEqual(['  plain', '\ttext']);
-    expect(rows.every((row) => row.backgroundColorToken === 'messageBackground')).toBe(true);
+    expect(rows.every((row) => row.backgroundColorToken === undefined)).toBe(true);
   });
 
   it('grapheme-wraps over-wide lines without overflowing content width', () => {

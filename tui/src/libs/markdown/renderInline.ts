@@ -26,7 +26,6 @@ export function renderInlineTokens(tokens: readonly Token[], style: InlineStyle 
       case 'codespan':
         segments.push({
           ...style,
-          backgroundColorToken: 'messageBackground',
           colorToken: 'accentGreen',
           text: token.text
         });

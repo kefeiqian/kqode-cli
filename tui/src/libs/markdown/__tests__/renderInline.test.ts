@@ -12,7 +12,7 @@ describe('renderInline', () => {
       { colorToken: 'foreground', text: ' ' },
       { bold: true, colorToken: 'foreground', italic: true, text: 'both' },
       { colorToken: 'foreground', text: ' ' },
-      { backgroundColorToken: 'messageBackground', colorToken: 'accentGreen', text: 'code' }
+      { colorToken: 'accentGreen', text: 'code' }
     ]);
   });
 });

@@ -30,7 +30,9 @@ describe('streaming markdown blocks', () => {
     const closed = renderMarkdownContentRows('```rust\nfn main() {}\n```', 40, { streaming: true });
 
     expect(open.map((row) => row.text)).toContain('```rust');
-    expect(closed.some((row) => row.backgroundColorToken === 'messageBackground')).toBe(true);
+    expect(
+      closed.some((row) => row.segments?.some((segment) => segment.colorToken === 'warning'))
+    ).toBe(true);
   });
 
   it('does not grow the highlight cache for an already completed code block on later deltas', () => {
