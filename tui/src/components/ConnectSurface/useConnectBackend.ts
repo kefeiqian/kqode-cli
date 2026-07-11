@@ -70,7 +70,7 @@ export function useConnectBackend(baseUrl: string, label: string) {
         setInFlight(false);
       }
     },
-    [client, inFlight, openModel, refreshProviders, selectedProvider, setInFlight, setOutcome, setRequestError]
+    [baseUrl, label, client, inFlight, openModel, refreshProviders, selectedProvider, setInFlight, setOutcome, setRequestError]
   );
 
   const clearProvider = useCallback(async () => {

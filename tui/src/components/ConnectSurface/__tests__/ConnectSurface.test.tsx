@@ -352,4 +352,29 @@ describe('ConnectSurface', () => {
     expect(frame).toContain('API key'); // active input not clipped at min height
     expect(frame).toContain('/connect · Custom'); // provider still identified
   });
+
+  it('submits the typed Custom base URL through the keyboard flow (U6 review — stale-closure guard)', async () => {
+    const client = fakeClient({ outcome: SET_KEY_OUTCOME_CONNECTED });
+    const { store, stdin, lastFrame } = renderConnect(client);
+    await waitForFrame(lastFrame, 'Custom');
+
+    stdin.write('\u001B[B'); // select Custom
+    await flushInput();
+    stdin.write('\n'); // → CustomUrl
+    await flushInput();
+    stdin.write('https://ok.test/v1');
+    await waitForFrame(lastFrame, 'https://ok.test/v1');
+    stdin.write('\n'); // → CustomLabel
+    await flushInput();
+    stdin.write('\n'); // empty label → Key
+    await waitForFrame(lastFrame, 'API key');
+    stdin.write('sk-custom-key');
+    await flushInput();
+    stdin.write('\r'); // submit the typed drafts, not a stale empty baseUrl
+    await waitUntil(() => store.get(activeSurfaceAtom) === Surface.Model, 'custom connect lands in model');
+
+    expect(client.setProviderKey).toHaveBeenCalledWith(
+      expect.objectContaining({ providerId: PROVIDER_ID_CUSTOM, baseUrl: 'https://ok.test/v1', apiKey: 'sk-custom-key' })
+    );
+  });
 });

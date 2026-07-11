@@ -26,9 +26,7 @@ export function ConnectedActions({
       <ActionRow active={actionIndex === CONNECTED_ACTION_CLEAR_INDEX} text="[c] Clear saved key" />
       {confirmClear ? (
         <Text color={theme.colors.warning}>Press y to confirm clear, or n/Esc to cancel.</Text>
-      ) : (
-        <Text color={theme.colors.muted}>Enter chooses · ↑/↓ moves · Esc back</Text>
-      )}
+      ) : null}
     </Box>
   );
 }
