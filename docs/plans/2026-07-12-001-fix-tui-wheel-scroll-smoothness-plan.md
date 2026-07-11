@@ -1,7 +1,7 @@
 ---
 title: "fix: Smooth TUI wheel scroll by capturing every batched notch"
 type: fix
-status: active
+status: completed
 date: 2026-07-12
 origin: docs/brainstorms/2026-07-12-tui-wheel-scroll-smoothness-requirements.md
 ---
