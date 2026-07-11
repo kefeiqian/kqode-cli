@@ -163,6 +163,12 @@ export const COPY_LAST_RESPONSE_FAILED_HINT = 'copy failed';
 /** Transient hint shown when no assistant response can be copied. */
 export const COPY_LAST_RESPONSE_NOTHING_HINT = 'nothing to copy';
 
+/** Transient hint shown after the current transcript selection is copied. */
+export const SELECTION_COPIED_HINT = 'copied selection';
+
+/** Transient hint shown when copying the transcript selection fails. */
+export const SELECTION_COPY_FAILED_HINT = 'copy failed';
+
 // --- Status-bar loading spinner ---
 
 /** Milliseconds between animated dots in the status-bar loading hint. */
