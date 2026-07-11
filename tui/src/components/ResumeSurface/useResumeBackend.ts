@@ -12,6 +12,8 @@ import {
 } from '@state/ui/resume/index.ts';
 import { backendErrorMessage } from '@libs/promptQueue/promptQueue.ts';
 import { resumeSessionIntoRuntime } from '@backend/runtime/sessionResume.ts';
+import { setSessionWindowTitle } from '@libs/terminal/windowTitle.ts';
+import { PRODUCT_NAME } from '@constants/product.ts';
 import type { RuntimeBackendClient } from '@backend/runtime/backendRuntime.ts';
 
 function isRuntimeBackendClient(client: unknown): client is RuntimeBackendClient {
@@ -66,6 +68,7 @@ export function useResumeBackend() {
           workspaceCwd: session.folder
         });
         hydrateResumedTranscript(resumed);
+        setSessionWindowTitle(PRODUCT_NAME, session.summary);
         closeResumePanel();
       } catch (error) {
         setResumeFailure(backendErrorMessage(error));
