@@ -1,10 +1,10 @@
 import { Box, Text, useInput } from 'ink';
 import { useState } from 'react';
 import {
-  deleteMaskedCodePointBackward,
-  insertMaskedText,
-  moveMaskedCursor
-} from '@components/MaskedInput/inputText.ts';
+  deleteCodePointBackward,
+  insertText,
+  moveCursor
+} from '@libs/textField/singleLineText.ts';
 import { isMouseInput } from '@libs/terminal/mouse.ts';
 
 /** Default glyph used for the non-echoing masked display. */
@@ -59,17 +59,17 @@ export function MaskedInput({
       }
 
       if (key.backspace || key.delete) {
-        setState((current) => deleteMaskedCodePointBackward(current));
+        setState((current) => deleteCodePointBackward(current));
         return;
       }
 
       if (key.leftArrow) {
-        setState((current) => moveMaskedCursor(current, 'backward'));
+        setState((current) => moveCursor(current, 'backward'));
         return;
       }
 
       if (key.rightArrow) {
-        setState((current) => moveMaskedCursor(current, 'forward'));
+        setState((current) => moveCursor(current, 'forward'));
         return;
       }
 
@@ -77,7 +77,7 @@ export function MaskedInput({
         return;
       }
 
-      setState((current) => insertMaskedText(current, input));
+      setState((current) => insertText(current, input));
     },
     { isActive }
   );

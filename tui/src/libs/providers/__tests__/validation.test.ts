@@ -36,6 +36,13 @@ describe('validateBaseUrl', () => {
       error: BASE_URL_ERROR_MALFORMED
     });
   });
+
+  it('reports a friendly message for empty input instead of a raw parser error', () => {
+    const result = validateBaseUrl('   ');
+    expect(result).toMatchObject({ ok: false, error: BASE_URL_ERROR_MALFORMED });
+    expect(result.ok ? '' : result.message).toBe('base URL is required');
+    expect(result.ok ? '' : result.message).not.toContain('TypeError');
+  });
 });
 
 describe('validateLabel', () => {

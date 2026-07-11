@@ -32,14 +32,23 @@ export type LabelValidationError = typeof LABEL_ERROR_TOO_LONG;
 export function validateBaseUrl(
   input: string
 ): ProviderHelperResult<string, BaseUrlValidationError> {
-  let parsed: URL;
-  try {
-    parsed = new URL(input.trim());
-  } catch (error) {
+  const trimmed = input.trim();
+  if (trimmed.length === 0) {
     return {
       ok: false,
       error: BASE_URL_ERROR_MALFORMED,
-      message: `invalid base URL: ${String(error)}`
+      message: 'base URL is required'
+    };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return {
+      ok: false,
+      error: BASE_URL_ERROR_MALFORMED,
+      message: 'base URL must be a full https:// URL'
     };
   }
 

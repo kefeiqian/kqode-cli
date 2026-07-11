@@ -55,6 +55,12 @@ export const customBaseUrlAtom = atom('');
 /** Custom provider optional label draft. This atom never stores API keys. */
 export const customLabelAtom = atom('');
 
+/** Caret position (code-unit index) within the Custom base URL field. */
+export const customBaseUrlCursorAtom = atom(0);
+
+/** Caret position (code-unit index) within the Custom label field. */
+export const customLabelCursorAtom = atom(0);
+
 /** Inline validation message for the Custom base URL field. */
 export const customBaseUrlErrorAtom = atom<string | null>(null);
 
@@ -82,6 +88,8 @@ export const resetConnectSurfaceAtom = atom(null, (_get, set) => {
   set(connectRequestErrorAtom, null);
   set(customBaseUrlAtom, '');
   set(customLabelAtom, '');
+  set(customBaseUrlCursorAtom, 0);
+  set(customLabelCursorAtom, 0);
   set(customBaseUrlErrorAtom, null);
   set(customLabelErrorAtom, null);
   set(connectedActionIndexAtom, 0);
@@ -157,8 +165,12 @@ function setProviderFlow(set: Setter, provider: ProviderStatusInfo) {
 }
 
 function setCustomDrafts(set: Setter, provider: ProviderStatusInfo) {
-  set(customBaseUrlAtom, provider.baseUrl ?? '');
-  set(customLabelAtom, provider.baseUrl === null ? '' : provider.label);
+  const baseUrl = provider.baseUrl ?? '';
+  const label = provider.baseUrl === null ? '' : provider.label;
+  set(customBaseUrlAtom, baseUrl);
+  set(customLabelAtom, label);
+  set(customBaseUrlCursorAtom, baseUrl.length);
+  set(customLabelCursorAtom, label.length);
 }
 
 /** Backs out one visible connect step, returning to the list at the top. */

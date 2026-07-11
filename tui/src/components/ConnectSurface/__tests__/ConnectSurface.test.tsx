@@ -191,6 +191,87 @@ describe('ConnectSurface', () => {
     expect(frame).toContain('https://ok.test/v1');
   });
 
+  it('replaces the raw URL parser error with a friendly empty-field message', async () => {
+    const { stdin, lastFrame } = renderConnect();
+    await waitForFrame(lastFrame, 'Custom');
+
+    stdin.write('\u001B[B');
+    await flushInput();
+    stdin.write('\n');
+    await flushInput();
+    stdin.write('\r'); // submit an empty Base URL
+    const frame = await waitForFrame(lastFrame, 'base URL is required');
+
+    expect(frame).not.toContain('TypeError');
+  });
+
+  it('distinguishes the empty Base URL placeholder from typed input with a leading caret', async () => {
+    const { stdin, lastFrame } = renderConnect();
+    await waitForFrame(lastFrame, 'Custom');
+
+    stdin.write('\u001B[B');
+    await flushInput();
+    stdin.write('\n');
+    const frame = await waitForFrame(lastFrame, '▌ https://api.example.com/v1');
+
+    expect(frame).toContain('▌ https://api.example.com/v1');
+  });
+
+  it('edits the Base URL at the caret with arrow keys', async () => {
+    const { stdin, lastFrame } = renderConnect();
+    await waitForFrame(lastFrame, 'Custom');
+
+    stdin.write('\u001B[B');
+    await flushInput();
+    stdin.write('\n');
+    await flushInput();
+    stdin.write('hello');
+    await waitForFrame(lastFrame, 'hello▌');
+    stdin.write('\u001B[D');
+    await flushInput();
+    stdin.write('\u001B[D');
+    await flushInput();
+    stdin.write('X');
+    const frame = await waitForFrame(lastFrame, 'helX▌lo');
+
+    expect(frame).toContain('helX▌lo');
+  });
+
+  it('advances Base URL → Label on Down for consistent field navigation', async () => {
+    const { store, stdin, lastFrame } = renderConnect();
+    await waitForFrame(lastFrame, 'Custom');
+
+    stdin.write('\u001B[B');
+    await flushInput();
+    stdin.write('\n');
+    await flushInput();
+    stdin.write('https://ok.test/v1');
+    await waitForFrame(lastFrame, 'https://ok.test/v1');
+    stdin.write('\u001B[B'); // Down advances to the Label field
+    await waitForFrame(lastFrame, '› Label');
+
+    expect(store.get(connectStepAtom)).toBe(ConnectStep.CustomLabel);
+  });
+
+  it('shows an API-key hint and hides the field-nav footer on the key step', async () => {
+    const { stdin, lastFrame } = renderConnect();
+    await waitForFrame(lastFrame, 'Custom');
+
+    stdin.write('\u001B[B');
+    await flushInput();
+    stdin.write('\n');
+    await flushInput();
+    stdin.write('https://ok.test/v1');
+    await waitForFrame(lastFrame, 'https://ok.test/v1');
+    stdin.write('\n');
+    await flushInput();
+    stdin.write('\n');
+    const frame = await waitForFrame(lastFrame, 'API key');
+
+    expect(frame).toContain('Enter submits');
+    expect(frame).not.toContain('Enter/↓ next');
+  });
+
   it('keeps typed key material out of Jotai atom snapshots before submit', async () => {
     const secret = 'sk-local-only-Connect-secret';
     const { store, stdin, lastFrame } = renderConnect();

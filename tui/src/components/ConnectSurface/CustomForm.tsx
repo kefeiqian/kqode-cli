@@ -1,6 +1,10 @@
 import { Box, Text } from 'ink';
 import { useAtomValue } from 'jotai';
-import { ConnectStep } from '@state/ui/connect/index.ts';
+import {
+  ConnectStep,
+  customBaseUrlCursorAtom,
+  customLabelCursorAtom
+} from '@state/ui/connect/index.ts';
 import type { ConnectStep as ConnectStepValue } from '@state/ui/connect/index.ts';
 import { activeThemeAtom } from '@state/global/index.ts';
 
@@ -21,11 +25,15 @@ export function CustomForm({
   step: ConnectStepValue;
 }) {
   const theme = useAtomValue(activeThemeAtom);
+  const baseUrlCursor = useAtomValue(customBaseUrlCursorAtom);
+  const labelCursor = useAtomValue(customLabelCursorAtom);
+  const editing = step === ConnectStep.CustomUrl || step === ConnectStep.CustomLabel;
 
   return (
     <Box flexDirection="column">
       <FieldRow
         active={step === ConnectStep.CustomUrl}
+        cursorIndex={baseUrlCursor}
         label="Base URL"
         placeholder="https://api.example.com/v1"
         value={baseUrl}
@@ -34,32 +42,58 @@ export function CustomForm({
       <Text color={theme.colors.muted}>Destination host: {destinationHost(baseUrl)}</Text>
       <FieldRow
         active={step === ConnectStep.CustomLabel}
+        cursorIndex={labelCursor}
         label="Label"
         placeholder="optional"
         value={label}
       />
       <InlineError message={labelError} />
-      <Text color={theme.colors.muted}>Enter advances · ↑/Shift+Tab back · Esc back</Text>
+      {editing ? (
+        <Text color={theme.colors.muted}>Enter/↓ next · ↑/Shift+Tab back · ←/→ edit · Esc back</Text>
+      ) : null}
     </Box>
   );
 }
 
 function FieldRow({
   active,
+  cursorIndex,
   label,
   placeholder,
   value
 }: {
   active: boolean;
+  cursorIndex: number;
   label: string;
   placeholder: string;
   value: string;
 }) {
   const theme = useAtomValue(activeThemeAtom);
-  const rendered = value.length > 0 ? value : placeholder;
+  const lineColor = active ? theme.colors.accentBlue : theme.colors.foreground;
+  const prefix = active ? '›' : ' ';
+
+  if (value.length === 0) {
+    return (
+      <Text color={lineColor} wrap="truncate">
+        {prefix} {label}: <Text color={theme.colors.muted}>{active ? `${CARET} ${placeholder}` : placeholder}</Text>
+      </Text>
+    );
+  }
+
+  if (!active) {
+    return (
+      <Text color={lineColor} wrap="truncate">
+        {prefix} {label}: {value}
+      </Text>
+    );
+  }
+
+  const clamped = Math.max(0, Math.min(value.length, cursorIndex));
   return (
-    <Text color={active ? theme.colors.accentBlue : theme.colors.foreground} wrap="truncate">
-      {active ? '›' : ' '} {label}: {active ? `${rendered}${CARET}` : rendered}
+    <Text color={lineColor} wrap="truncate">
+      {prefix} {label}: {value.slice(0, clamped)}
+      {CARET}
+      {value.slice(clamped)}
     </Text>
   );
 }

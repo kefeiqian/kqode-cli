@@ -3,27 +3,24 @@ import { printableInput } from '@libs/composer/promptText.ts';
 const BRACKETED_PASTE_START = '\u001B[200~';
 const BRACKETED_PASTE_END = '\u001B[201~';
 
-type MaskedInputTextState = {
+/** Editable value plus caret position (UTF-16 code-unit index) for one line. */
+export type SingleLineTextState = {
   value: string;
   cursorIndex: number;
 };
 
 /**
  * Returns printable text from a raw Ink input event, including bracketed paste
- * payloads with their terminal delimiters removed.
+ * payloads with their terminal delimiters removed. Shared by masked key entry
+ * and plain provider fields so pasted URLs never keep their paste markers.
  */
-export function printableMaskedInput(input: string): string {
+export function printableFieldInput(input: string): string {
   return printableInput(stripBracketedPaste(input));
 }
 
-/**
- * Inserts printable text at the current cursor without echoing it to the UI.
- */
-export function insertMaskedText(
-  state: MaskedInputTextState,
-  input: string
-): MaskedInputTextState {
-  const text = printableMaskedInput(input);
+/** Inserts printable text at the current cursor, advancing the caret past it. */
+export function insertText(state: SingleLineTextState, input: string): SingleLineTextState {
+  const text = printableFieldInput(input);
   if (text.length === 0) {
     return state;
   }
@@ -36,7 +33,7 @@ export function insertMaskedText(
 }
 
 /** Deletes exactly one Unicode code point before the cursor. */
-export function deleteMaskedCodePointBackward(state: MaskedInputTextState): MaskedInputTextState {
+export function deleteCodePointBackward(state: SingleLineTextState): SingleLineTextState {
   const cursorIndex = clampCursorIndex(state.value, state.cursorIndex);
   if (cursorIndex === 0) {
     return state;
@@ -49,11 +46,11 @@ export function deleteMaskedCodePointBackward(state: MaskedInputTextState): Mask
   };
 }
 
-/** Moves the masked input cursor by one code point. */
-export function moveMaskedCursor(
-  state: MaskedInputTextState,
+/** Moves the caret by one code point without changing the value. */
+export function moveCursor(
+  state: SingleLineTextState,
   direction: 'backward' | 'forward'
-): MaskedInputTextState {
+): SingleLineTextState {
   const cursorIndex = clampCursorIndex(state.value, state.cursorIndex);
   const nextIndex =
     direction === 'backward'

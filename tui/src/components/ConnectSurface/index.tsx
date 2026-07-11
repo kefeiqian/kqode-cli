@@ -76,10 +76,13 @@ export function ConnectSurface() {
           <Text color={theme.colors.muted}>Kimi base URL: {KIMI_BASE_URL}</Text>
         ) : null}
         {step === ConnectStep.Key ? (
-          <Box>
-            <Text color={theme.colors.accentBlue}>API key: </Text>
-            <MaskedInput isActive={!inFlight} onCancel={backStep} onSubmit={submitKey} />
-          </Box>
+          <>
+            <Box>
+              <Text color={theme.colors.accentBlue}>API key: </Text>
+              <MaskedInput isActive={!inFlight} onCancel={backStep} onSubmit={submitKey} />
+            </Box>
+            <Text color={theme.colors.muted}>Enter submits · Esc back</Text>
+          </>
         ) : null}
         {inFlight ? <Text color={theme.colors.warning}>Working…</Text> : null}
         <OutcomeMessage outcome={outcome?.outcome ?? null} providerId={outcome?.providerId ?? null} />

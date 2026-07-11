@@ -1,9 +1,9 @@
 import { useInput } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useRef } from 'react';
-import { printableInput } from '@libs/composer/promptText.ts';
 import { isMouseInput } from '@libs/terminal/mouse.ts';
 import { validateBaseUrl, validateLabel } from '@libs/providers/index.ts';
+import { editField, isReturn, isShiftTab } from '@components/ConnectSurface/keyInput.ts';
 import {
   ConnectStep,
   PROVIDER_ID_CUSTOM,
@@ -13,8 +13,10 @@ import {
   connectedActionIndexAtom,
   connectReturnToModelAtom,
   customBaseUrlAtom,
+  customBaseUrlCursorAtom,
   customBaseUrlErrorAtom,
   customLabelAtom,
+  customLabelCursorAtom,
   customLabelErrorAtom,
   connectInFlightAtom,
   connectStepAtom,
@@ -28,8 +30,6 @@ import {
   CONNECTED_ACTION_REPLACE_INDEX
 } from '@components/ConnectSurface/ConnectedActions.tsx';
 
-const SHIFT_TAB_INPUT = '\u001B[Z';
-
 /** Wires `/connect` keybindings while `MaskedInput` owns secret text entry. */
 export function useConnectInput(clearProvider: () => Promise<void>) {
   const step = useAtomValue(connectStepAtom);
@@ -37,6 +37,8 @@ export function useConnectInput(clearProvider: () => Promise<void>) {
   const selectedProvider = useAtomValue(selectedProviderAtom);
   const baseUrl = useAtomValue(customBaseUrlAtom);
   const label = useAtomValue(customLabelAtom);
+  const baseUrlCursor = useAtomValue(customBaseUrlCursorAtom);
+  const labelCursor = useAtomValue(customLabelCursorAtom);
   const actionIndex = useAtomValue(connectedActionIndexAtom);
   const confirmClear = useAtomValue(clearConfirmAtom);
   const returnToModel = useAtomValue(connectReturnToModelAtom);
@@ -45,6 +47,8 @@ export function useConnectInput(clearProvider: () => Promise<void>) {
   const selectedProviderRef = useLatest(selectedProvider);
   const baseUrlRef = useLatest(baseUrl);
   const labelRef = useLatest(label);
+  const baseUrlCursorRef = useLatest(baseUrlCursor);
+  const labelCursorRef = useLatest(labelCursor);
   const actionIndexRef = useLatest(actionIndex);
   const confirmClearRef = useLatest(confirmClear);
   const returnToModelRef = useLatest(returnToModel);
@@ -52,6 +56,8 @@ export function useConnectInput(clearProvider: () => Promise<void>) {
   const setStep = useSetAtom(connectStepAtom);
   const setBaseUrl = useSetAtom(customBaseUrlAtom);
   const setLabel = useSetAtom(customLabelAtom);
+  const setBaseUrlCursor = useSetAtom(customBaseUrlCursorAtom);
+  const setLabelCursor = useSetAtom(customLabelCursorAtom);
   const setBaseUrlError = useSetAtom(customBaseUrlErrorAtom);
   const setLabelError = useSetAtom(customLabelErrorAtom);
   const setActionIndex = useSetAtom(connectedActionIndexAtom);
@@ -141,7 +147,7 @@ export function useConnectInput(clearProvider: () => Promise<void>) {
   }
 
   function handleUrlInput(input: string, key: Parameters<Parameters<typeof useInput>[0]>[1]) {
-    if (isReturn(input, key)) {
+    if (isReturn(input, key) || key.downArrow) {
       const result = validateBaseUrl(baseUrlRef.current);
       setBaseUrlError(result.ok ? null : result.message);
       if (result.ok) {
@@ -150,7 +156,13 @@ export function useConnectInput(clearProvider: () => Promise<void>) {
       return;
     }
     setBaseUrlError(null);
-    editText(input, key, baseUrlRef.current, setBaseUrl);
+    editField(
+      input,
+      key,
+      { value: baseUrlRef.current, cursorIndex: baseUrlCursorRef.current },
+      setBaseUrl,
+      setBaseUrlCursor
+    );
   }
 
   function handleLabelInput(input: string, key: Parameters<Parameters<typeof useInput>[0]>[1]) {
@@ -163,34 +175,14 @@ export function useConnectInput(clearProvider: () => Promise<void>) {
       return;
     }
     setLabelError(null);
-    editText(input, key, labelRef.current, setLabel);
+    editField(
+      input,
+      key,
+      { value: labelRef.current, cursorIndex: labelCursorRef.current },
+      setLabel,
+      setLabelCursor
+    );
   }
-}
-
-function editText(
-  input: string,
-  key: Parameters<Parameters<typeof useInput>[0]>[1],
-  value: string,
-  setValue: (value: string) => void
-) {
-  if (key.backspace || key.delete) {
-    const deleteCount = Math.max(1, Array.from(input).filter((char) => char === '\b' || char === '\u007F').length);
-    setValue(Array.from(value).slice(0, -deleteCount).join(''));
-    return;
-  }
-  const printable = printableInput(input);
-  if (printable.length > 0) {
-    setValue(value + printable);
-  }
-}
-
-function isReturn(input: string, key: Parameters<Parameters<typeof useInput>[0]>[1]) {
-  return key.return || input === '\r' || input === '\n';
-}
-
-function isShiftTab(input: string, key: Parameters<Parameters<typeof useInput>[0]>[1]) {
-  const extendedKey = key as typeof key & { shift?: boolean; shiftTab?: boolean };
-  return input === SHIFT_TAB_INPUT || extendedKey.shiftTab === true || (key.tab && extendedKey.shift === true);
 }
 
 function useLatest<T>(value: T) {
