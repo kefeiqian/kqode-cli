@@ -8,6 +8,9 @@ describe('HomeScreen mouse tracking', () => {
     vi.resetModules();
   });
 
+  // Re-imports the module graph via resetModules (below), which is slow under
+  // parallel-load contention (e.g. concurrent Rust backend builds), so allow
+  // headroom beyond vitest's 5s default. The assertion itself is fast.
   it('writes no mouse tracking sequences when stdout is not a TTY', async () => {
     const stdout = {
       isTTY: false,
@@ -39,5 +42,5 @@ describe('HomeScreen mouse tracking', () => {
     unmount();
 
     expect(stdout.write).not.toHaveBeenCalled();
-  });
+  }, 15_000);
 });
