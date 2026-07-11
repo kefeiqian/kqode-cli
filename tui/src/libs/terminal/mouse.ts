@@ -1,5 +1,9 @@
-export const ENABLE_SGR_MOUSE_TRACKING = '\u001B[?1000h\u001B[?1006h';
-export const DISABLE_SGR_MOUSE_TRACKING = '\u001B[?1006l\u001B[?1000l';
+// `?1002h` = SGR button-event tracking: reports press, release, AND drag-motion
+// while a button is held (a superset of `?1000h`); `?1006h` = SGR extended
+// coordinates. Drag reporting drives in-app text selection; the wheel/click
+// parsers are unaffected by the mode change.
+export const ENABLE_SGR_MOUSE_TRACKING = '\u001B[?1002h\u001B[?1006h';
+export const DISABLE_SGR_MOUSE_TRACKING = '\u001B[?1006l\u001B[?1002l';
 
 type MouseWheelDirection = 'up' | 'down';
 
@@ -102,6 +106,58 @@ export function parseMouseRightClickEvent(input: string): MouseClickEvent | null
   }
 
   return {
+    row: Number.parseInt(match.groups.row, 10),
+    column: Number.parseInt(match.groups.column, 10)
+  };
+}
+
+/** The three left-button gestures that drive in-app text selection. */
+export type MouseButtonEventKind = 'press' | 'drag' | 'release';
+
+/** A parsed left-button gesture with its 1-based pointer position. */
+export type MouseButtonEvent = {
+  kind: MouseButtonEventKind;
+  row: number;
+  column: number;
+};
+
+// SGR button-code bits: low two bits pick the button (0 = left); bit 5 (32) is
+// set on motion reports (a drag while a button is held).
+const MOUSE_MOTION_BIT = 32;
+const MOUSE_BUTTON_MASK = 0b11;
+
+/**
+ * Parses a left-button press/drag/release into a {@link MouseButtonEvent}, or
+ * `null` for wheel notches, non-left buttons, or non-mouse input. A `drag` is a
+ * motion report (`?1002h` sets the motion bit) while the left button is held; a
+ * `release` is the `m` terminator. Modifier bits (shift/meta/ctrl) are ignored,
+ * so a modified drag still selects.
+ */
+export function parseMouseButtonEvent(input: string): MouseButtonEvent | null {
+  const match = SGR_MOUSE_INPUT_PATTERN.exec(input);
+  if (match?.groups === undefined) {
+    return null;
+  }
+
+  const buttonCode = Number.parseInt(match.groups.buttonCode, 10);
+  // Wheel events set bit 6; they are handled by parseMouseWheelEvent.
+  if ((buttonCode & WHEEL_BUTTON_OFFSET) !== 0) {
+    return null;
+  }
+  // Only the left button drives selection.
+  if ((buttonCode & MOUSE_BUTTON_MASK) !== LEFT_BUTTON_CODE) {
+    return null;
+  }
+
+  const kind: MouseButtonEventKind =
+    match.groups.eventType === 'm'
+      ? 'release'
+      : (buttonCode & MOUSE_MOTION_BIT) !== 0
+        ? 'drag'
+        : 'press';
+
+  return {
+    kind,
     row: Number.parseInt(match.groups.row, 10),
     column: Number.parseInt(match.groups.column, 10)
   };

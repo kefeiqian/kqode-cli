@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isMouseInput,
   parseMouseClickEvent,
+  parseMouseButtonEvent,
   parseMouseRightClickEvent,
   parseMouseWheelEvent,
   parseMouseWheelInput
@@ -72,5 +73,25 @@ describe('parseMouseClickEvent', () => {
 
   it('returns null for non-mouse input', () => {
     expect(parseMouseClickEvent('hello')).toBeNull();
+  });
+});
+
+describe('parseMouseButtonEvent', () => {
+  it('parses left press, drag, and release with 1-based position', () => {
+    expect(parseMouseButtonEvent('\u001B[<0;12;5M')).toEqual({ kind: 'press', row: 5, column: 12 });
+    expect(parseMouseButtonEvent('\u001B[<32;14;5M')).toEqual({ kind: 'drag', row: 5, column: 14 });
+    expect(parseMouseButtonEvent('\u001B[<0;20;7m')).toEqual({ kind: 'release', row: 7, column: 20 });
+  });
+
+  it('classifies a modifier-held left drag as a drag', () => {
+    // 48 = left(0) | ctrl(16) | motion(32)
+    expect(parseMouseButtonEvent('\u001B[<48;3;9M')).toEqual({ kind: 'drag', row: 9, column: 3 });
+  });
+
+  it('ignores wheel, non-left buttons, and non-mouse input', () => {
+    expect(parseMouseButtonEvent('\u001B[<64;1;1M')).toBeNull(); // wheel
+    expect(parseMouseButtonEvent('\u001B[<2;5;3M')).toBeNull(); // right button
+    expect(parseMouseButtonEvent('\u001B[<33;5;3M')).toBeNull(); // middle-button drag
+    expect(parseMouseButtonEvent('hello')).toBeNull();
   });
 });
