@@ -70,7 +70,7 @@ function FieldRow({
 }) {
   const theme = useAtomValue(activeThemeAtom);
   const lineColor = active ? theme.colors.accentBlue : theme.colors.foreground;
-  const prefix = active ? '›' : ' ';
+  const prefix = active ? '❯' : ' ';
 
   if (value.length === 0) {
     return (

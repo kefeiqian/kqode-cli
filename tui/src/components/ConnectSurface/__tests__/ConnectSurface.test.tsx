@@ -164,7 +164,7 @@ describe('ConnectSurface', () => {
     await waitForFrame(first.lastFrame, 'http://bad.test');
     first.stdin.write('\r');
     let frame = await waitForFrame(first.lastFrame, 'base URL must use the https scheme');
-    expect(frame).toContain('› Base URL');
+    expect(frame).toContain('❯ Base URL');
 
     const { stdin, lastFrame } = renderConnect();
     await waitForFrame(lastFrame, 'Custom');
@@ -182,12 +182,12 @@ describe('ConnectSurface', () => {
 
     stdin.write('\u001B[A');
     await flushInput();
-    frame = await waitForFrame(lastFrame, '› Label');
+    frame = await waitForFrame(lastFrame, '❯ Label');
     expect(frame).toContain('Destination host: ok.test');
 
     stdin.write('\u001B[Z');
     await flushInput();
-    frame = await waitForFrame(lastFrame, '› Base URL');
+    frame = await waitForFrame(lastFrame, '❯ Base URL');
     expect(frame).toContain('https://ok.test/v1');
   });
 
@@ -248,7 +248,7 @@ describe('ConnectSurface', () => {
     stdin.write('https://ok.test/v1');
     await waitForFrame(lastFrame, 'https://ok.test/v1');
     stdin.write('\u001B[B'); // Down advances to the Label field
-    await waitForFrame(lastFrame, '› Label');
+    await waitForFrame(lastFrame, '❯ Label');
 
     expect(store.get(connectStepAtom)).toBe(ConnectStep.CustomLabel);
   });
