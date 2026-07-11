@@ -210,7 +210,11 @@ function toPromptRows(text: string, columns: number): BodyRowStructure[] {
   // continuation rows replace the visible prefix with spaces to align wrapped text.
   const textColumns = Math.max(1, columns - promptIndent - USER_MESSAGE_HORIZONTAL_PADDING);
   const continuationPrefix = ' '.repeat(promptIndent);
-  const wrappedText = wrapBodyLines(text, textColumns);
+  // Trailing newlines/whitespace (e.g. from a pasted line) would each wrap to an
+  // empty line and render as a blank `messageBackground` row, inflating the
+  // bubble so the same visible prompt looks a row taller. Trim the trailing run
+  // so bubble height tracks visible content only; interior blank lines survive.
+  const wrappedText = wrapBodyLines(text.replace(/\s+$/u, ''), textColumns);
   const textRows = wrappedText.map((line, index): BodyRowStructure => ({
     backgroundColorToken: 'messageBackground',
     colorToken: 'foreground',

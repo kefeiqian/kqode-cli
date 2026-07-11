@@ -222,3 +222,25 @@ describe('resolveBodyRows soft-wrap continuation flags', () => {
     expect(copied).not.toContain('\n');
   });
 });
+
+describe('resolveBodyRows user prompt trailing whitespace', () => {
+  const messageRowCount = (text: string): number =>
+    resolveBodyRows(
+      [{ kind: BodyEntryKind.User, text }],
+      WIDE_COLUMNS,
+      TALL_ROWS,
+      DEFAULT_THEME
+    ).filter((row) => row.backgroundColor === DEFAULT_THEME.colors.messageBackground).length;
+
+  it('does not add a phantom empty message row for a trailing newline', () => {
+    expect(messageRowCount('hello\n')).toBe(messageRowCount('hello'));
+  });
+
+  it('does not add phantom empty message rows for multiple trailing blank lines', () => {
+    expect(messageRowCount('hello\n\n\n')).toBe(messageRowCount('hello'));
+  });
+
+  it('preserves interior blank lines in a prompt', () => {
+    expect(messageRowCount('alpha\n\nbeta')).toBe(3);
+  });
+});
