@@ -262,7 +262,7 @@ fn v4_migration_checksum_is_pinned() {
 }
 
 #[test]
-fn divergent_applied_migration_surfaces_a_store_error() {
+fn divergent_applied_migration_points_to_the_safe_reset() {
     let (_dir, path) = temp_db();
     Store::open_or_bootstrap_at(path.clone()).expect("bootstrap");
     {
@@ -273,18 +273,29 @@ fn divergent_applied_migration_surfaces_a_store_error() {
         )
         .unwrap();
     }
-    let err = Store::open_or_bootstrap_at(path).unwrap_err();
+    let err = Store::open_or_bootstrap_at(path.clone()).unwrap_err();
     match err.root_cause() {
         StoreError::MigrationHistory(err) => {
             assert!(matches!(err.kind(), Kind::DivergentVersion(_, _)));
         }
         other => panic!("expected divergent migration history, got {other:?}"),
     }
+    // A divergent checksum is on a version this binary embeds (e.g. historical
+    // CRLF->LF line-ending drift on an immutable migration): no forward binary can
+    // ever match the stored checksum, so "upgrade" is a dead end. The remedy must
+    // point to the safe reset of the rebuildable index instead.
     let message = err.to_string().to_lowercase();
-    assert!(message.contains("upgrade"));
     assert!(
-        !message.contains("delete"),
-        "divergent-history remedy must not instruct deletion: {message}"
+        message.contains("delete") && message.contains("rebuilds from jsonl"),
+        "divergent-history remedy must point to the safe reset: {message}"
+    );
+    assert!(
+        !message.contains("upgrade"),
+        "divergent-history remedy must not send the user on a dead-end upgrade: {message}"
+    );
+    assert!(
+        path.exists(),
+        "a divergent-history failure must never auto-delete the DB"
     );
 }
 

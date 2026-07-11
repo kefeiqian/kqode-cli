@@ -1,9 +1,19 @@
 use std::path::{Path, PathBuf};
 
-/// Whether a refinery history error should direct the user to upgrade instead of reset.
+/// Whether a refinery history error should direct the user to upgrade rather than
+/// reset the rebuildable index.
+///
+/// Only a DB that is genuinely *ahead* of this binary is fixed by upgrading: an
+/// applied migration whose version this binary does not embed at all
+/// (`MissingVersion` above `latest_version`). Its data is intact and must not be
+/// deleted — a newer binary that knows the migration will accept it.
+///
+/// A `DivergentVersion` is a checksum mismatch on a version this binary *does*
+/// embed — e.g. historical CRLF-to-LF line-ending drift on an immutable migration.
+/// No forward binary can ever match the stored checksum, so upgrading is a dead
+/// end; the rebuildable index must be reset instead.
 pub(super) fn is_upgrade_only_history_error(err: &refinery::Error) -> bool {
     match err.kind() {
-        refinery::error::Kind::DivergentVersion(_, _) => true,
         refinery::error::Kind::MissingVersion(migration) => {
             i64::from(migration.version()) > super::migrations::latest_version()
         }
