@@ -16,7 +16,6 @@ import { closeActiveSurfaceAtom, openConnectSurfaceAtom } from '@state/ui/surfac
 import { PROVIDER_ID_CUSTOM } from '@state/ui/connect/index.ts';
 import {
   MODEL_DOCK_CHROME_ROWS,
-  modelDesiredRowsAtom,
   modelHighlightAtom,
   inlineConnectInFlightAtom,
   inlineConnectOutcomeAtom,
@@ -50,10 +49,8 @@ export function ModelSurface() {
   const openConnect = useSetAtom(openConnectSurfaceAtom);
   const { refreshModels, retryProvider, selectModel } = useModelBackend(closeActiveSurface);
   const { cancelInlineConnect, startInlineConnect, submitInlineKey } = useInlineConnect(refreshModels);
-  const desiredRows = useAtomValue(modelDesiredRowsAtom);
   const { showFooterGap, chromeRows } = resolveDockedFooterGap({
     panelRows,
-    desiredRows,
     chromeWithGap: MODEL_DOCK_CHROME_ROWS
   });
   const listRows = Math.max(1, panelRows - chromeRows);

@@ -40,7 +40,7 @@ describe('ModelSurface', () => {
         }
       }
     });
-    const { lastFrame } = renderModel(client, 7);
+    const { lastFrame } = renderModel(client, 20);
 
     const frame = await waitForFrame(lastFrame, '● c3');
 
@@ -65,7 +65,7 @@ describe('ModelSurface', () => {
       ],
       lists: { kimi: { status: MODEL_LIST_STATUS_LOADED, models: [{ id: 'k1', ownedBy: null }] } }
     });
-    const { lastFrame } = renderModel(client);
+    const { lastFrame } = renderModel(client, 20);
 
     const frame = await waitForFrame(lastFrame, '(not connected — enter to connect)');
     expect(frame).toContain('Kimi (via keychain)');
@@ -101,7 +101,7 @@ describe('ModelSurface', () => {
         b: { status: MODEL_LIST_STATUS_LOADED, models: [{ id: 'b1', ownedBy: null }, { id: 'b2', ownedBy: null }] }
       }
     });
-    const { store, lastFrame } = renderModel(client, 8);
+    const { store, lastFrame } = renderModel(client, 20);
     await waitForFrame(lastFrame, '● b2');
     const before = store.get(modelHighlightAtom);
 

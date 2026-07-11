@@ -1,12 +1,9 @@
 import { atom } from 'jotai';
+import { DOCKED_PANEL_ROWS } from '@constants/ui.ts';
 import { resolveDockedPanelRows } from '@libs/tui/layout.ts';
 import { rowsAtom } from '@state/ui/dimensions.ts';
-import { resumePanelDesiredRowsAtom, resumePanelOpenAtom } from '@state/ui/resume/index.ts';
+import { resumePanelOpenAtom } from '@state/ui/resume/index.ts';
 import { activeSurfaceAtom, Surface } from '@state/ui/surface/atoms.ts';
-import { themeDesiredRowsAtom } from '@state/ui/theme/atoms.ts';
-import { modelDesiredRowsAtom } from '@state/ui/model/atoms.ts';
-import { memoryDesiredRowsAtom } from '@state/ui/memory/atoms.ts';
-import { connectDesiredRowsAtom } from '@state/ui/connect/atoms.ts';
 
 /**
  * The mutually exclusive bottom-docked command popups. The resume panel is
@@ -52,26 +49,14 @@ export const activeDockedPanelAtom = atom<DockedPanel | null>((get) => {
 });
 
 /**
- * The content-derived desired height of the active docked popup, dispatched by
- * panel id. Resume uses its fixed panel height; the model/connect/memory
- * branches are added as each surface is docked. `0` when nothing is docked.
+ * The constant desired height of the active docked popup: `DOCKED_PANEL_ROWS`
+ * for every docked surface so switching between them never changes the popup
+ * height, or `0` when nothing is docked. `resolveDockedPanelRows` then caps it to
+ * at most half the terminal.
  */
-export const dockedPanelDesiredRowsAtom = atom((get) => {
-  switch (get(activeDockedPanelAtom)) {
-    case DockedPanel.Resume:
-      return get(resumePanelDesiredRowsAtom);
-    case DockedPanel.Theme:
-      return get(themeDesiredRowsAtom);
-    case DockedPanel.Model:
-      return get(modelDesiredRowsAtom);
-    case DockedPanel.Memory:
-      return get(memoryDesiredRowsAtom);
-    case DockedPanel.Connect:
-      return get(connectDesiredRowsAtom);
-    default:
-      return 0;
-  }
-});
+export const dockedPanelDesiredRowsAtom = atom((get) =>
+  get(activeDockedPanelAtom) === null ? 0 : DOCKED_PANEL_ROWS
+);
 
 /**
  * The rows actually reserved for the active docked popup: its desired height

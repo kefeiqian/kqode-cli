@@ -110,25 +110,31 @@ export function resolveDockedPanelRows({
 }
 
 /**
- * Splits a docked popup's chrome budget by whether the panel reached its full
- * desired height. The footer gap — a blank spacer row above the shortcut hint —
- * is only worth a row when the whole content fits (`panelRows >= desiredRows`);
- * once the panel is capped by the half-height limit, the gap yields its row back
- * to the list so cramped terminals keep every content row.
+ * Resolves the docked popup's footer-gap chrome. The blank spacer row above the
+ * shortcut hint is unconditional chrome, dropped only in the degenerate case
+ * where keeping it would leave zero selectable content rows — namely `/memory`
+ * at the hard half-cap, where the in-content table header (`reservedContentRows`)
+ * would consume the sole remaining row. There the gap yields its row so at least
+ * one selectable row always renders. All other surfaces keep the gap
+ * unconditionally (theme/model have no header; resume counts its header in
+ * `chromeWithGap`, so it keeps two rows and never yields).
  *
  * `chromeWithGap` is the surface's chrome-row constant that counts the gap row;
- * when the gap is dropped the list reclaims that row (`chromeWithGap - 1`).
+ * `reservedContentRows` (default 0) is any non-selectable content row the surface
+ * reserves inside its body (e.g. `/memory`'s table header). When the gap is
+ * dropped the list reclaims that row (`chromeWithGap - 1`).
  */
 export function resolveDockedFooterGap({
   panelRows,
-  desiredRows,
-  chromeWithGap
+  chromeWithGap,
+  reservedContentRows = 0
 }: {
   panelRows: number;
-  desiredRows: number;
   chromeWithGap: number;
+  reservedContentRows?: number;
 }): { showFooterGap: boolean; chromeRows: number } {
-  const showFooterGap = panelRows >= desiredRows;
+  const selectableRowsWithGap = panelRows - chromeWithGap - reservedContentRows;
+  const showFooterGap = selectableRowsWithGap >= 1;
   return { showFooterGap, chromeRows: showFooterGap ? chromeWithGap : chromeWithGap - 1 };
 }
 

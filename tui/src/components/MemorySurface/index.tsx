@@ -19,7 +19,6 @@ import {
   forgetConfirmAtom,
   highlightedInboxEntryAtom,
   highlightedMemoryItemAtom,
-  memoryDesiredRowsAtom,
   memoryDetailBodyAtom,
   memoryDetailOffsetAtom,
   memoryDetailVisibleRowsAtom,
@@ -54,19 +53,19 @@ export function MemorySurface() {
   const forgetConfirm = useAtomValue(forgetConfirmAtom);
   const subStateActive = useAtomValue(memorySubStateActiveAtom);
   const theme = useAtomValue(activeThemeAtom);
-  const desiredRows = useAtomValue(memoryDesiredRowsAtom);
   const setVisibleRows = useSetAtom(memoryVisibleRowsAtom);
   const setDetailVisibleRows = useSetAtom(memoryDetailVisibleRowsAtom);
   const { refresh, showDetail, forgetItem, addItem, beginEdit, editItem, applyInbox, undoInbox } = useMemoryBackend();
 
   // Form/detail/confirm sub-states drop the tabs+status chrome so the sub-state
   // keeps room within the half-height cap; the list keeps the full chrome. The
-  // footer gap is only kept when the panel is at full height (not capped).
+  // footer gap is unconditional except at the hard cap in list mode, where the
+  // table header (reservedContentRows: 1) would otherwise leave zero data rows.
   const fullChrome = subStateActive ? MEMORY_DOCK_SUBSTATE_CHROME_ROWS : MEMORY_DOCK_LIST_CHROME_ROWS;
   const { showFooterGap, chromeRows } = resolveDockedFooterGap({
     panelRows,
-    desiredRows,
-    chromeWithGap: fullChrome
+    chromeWithGap: fullChrome,
+    reservedContentRows: subStateActive ? 0 : 1
   });
   const bodyArea = Math.max(1, panelRows - chromeRows);
   // The list renders a table header on its first line, so data rows are one fewer.

@@ -91,6 +91,15 @@ export const RESUME_PANEL_CHROME_ROWS = 5;
 /** Fixed desired height of the docked resume panel while open. */
 export const RESUME_PANEL_ROWS = RESUME_PANEL_SESSION_ROWS + RESUME_PANEL_CHROME_ROWS;
 
+/**
+ * The single constant total height every docked command popup (`/theme`,
+ * `/model`, `/memory`, `/connect`, resume) renders at, capped to `⌊rows/2⌋` by
+ * `resolveDockedPanelRows`. Reuses the resume panel's height so switching between
+ * surfaces never changes the popup height (short surfaces pad blank; long ones
+ * scroll internally). At a given terminal size every docked popup is identical.
+ */
+export const DOCKED_PANEL_ROWS = RESUME_PANEL_ROWS;
+
 // --- Two-step key confirmations ---
 
 /**

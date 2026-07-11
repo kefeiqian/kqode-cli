@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createStore } from 'jotai';
-import { RESUME_PANEL_ROWS } from '@constants/ui.ts';
+import { DOCKED_PANEL_ROWS } from '@constants/ui.ts';
 import { resolveDockedPanelRows } from '@libs/tui/layout.ts';
 import { activeDockedPanelAtom, DockedPanel, dockedPanelRowsAtom } from '@state/ui/dock/atoms.ts';
 import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/dimensions.ts';
@@ -33,8 +33,20 @@ describe('dockedPanelRowsAtom', () => {
     store.set(rowsTestOverrideAtom, 24);
     store.set(resumePanelOpenAtom, true);
     expect(store.get(dockedPanelRowsAtom)).toBe(
-      resolveDockedPanelRows({ rows: 24, desiredRows: RESUME_PANEL_ROWS })
+      resolveDockedPanelRows({ rows: 24, desiredRows: DOCKED_PANEL_ROWS })
     );
+  });
+
+  it('gives every docked surface the same constant height so switching never jumps', () => {
+    const resumeStore = createStore();
+    resumeStore.set(rowsTestOverrideAtom, 24);
+    resumeStore.set(resumePanelOpenAtom, true);
+
+    const themeStore = createStore();
+    themeStore.set(rowsTestOverrideAtom, 24);
+    themeStore.set(activeSurfaceAtom, Surface.Theme);
+
+    expect(themeStore.get(dockedPanelRowsAtom)).toBe(resumeStore.get(dockedPanelRowsAtom));
   });
 
   it('reserves no rows when nothing is docked', () => {

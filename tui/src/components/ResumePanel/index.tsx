@@ -16,7 +16,6 @@ import {
   highlightedResumeSessionAtom,
   ResumeStatus,
   resumeErrorAtom,
-  resumePanelDesiredRowsAtom,
   resumeSessionsAtom,
   resumeStatusAtom,
   resumeVisibleRowsAtom,
@@ -37,12 +36,10 @@ export function ResumePanel() {
   const error = useAtomValue(resumeErrorAtom);
   const windowOffset = useAtomValue(resumeWindowOffsetAtom);
   const theme = useAtomValue(activeThemeAtom);
-  const desiredRows = useAtomValue(resumePanelDesiredRowsAtom);
   const setVisibleRows = useSetAtom(resumeVisibleRowsAtom);
   const { refreshSessions, resumeSelected } = useResumeBackend();
   const { showFooterGap, chromeRows } = resolveDockedFooterGap({
     panelRows,
-    desiredRows,
     chromeWithGap: RESUME_PANEL_CHROME_ROWS
   });
   const sessionRows = Math.max(1, Math.min(RESUME_PANEL_SESSION_ROWS, panelRows - chromeRows));

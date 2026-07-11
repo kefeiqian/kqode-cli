@@ -89,17 +89,33 @@ describe('resolveDockedPanelRows', () => {
 });
 
 describe('resolveDockedFooterGap', () => {
-  it('keeps the footer gap and full chrome when the panel fits its desired height', () => {
-    expect(resolveDockedFooterGap({ panelRows: 10, desiredRows: 10, chromeWithGap: 4 })).toEqual({
+  it('keeps the footer gap and full chrome by default', () => {
+    expect(resolveDockedFooterGap({ panelRows: 10, chromeWithGap: 4 })).toEqual({
       showFooterGap: true,
       chromeRows: 4
     });
   });
 
-  it('drops the gap and reclaims its row for the list when the panel is capped', () => {
-    expect(resolveDockedFooterGap({ panelRows: 7, desiredRows: 10, chromeWithGap: 4 })).toEqual({
+  it('keeps the gap even when capped, as long as a selectable row still fits', () => {
+    expect(resolveDockedFooterGap({ panelRows: 7, chromeWithGap: 4 })).toEqual({
+      showFooterGap: true,
+      chromeRows: 4
+    });
+  });
+
+  it('yields the gap only when a reserved header would leave zero selectable rows', () => {
+    // /memory at the hard cap: 7 - 6 - 1 = 0 < 1, so the gap yields its row.
+    expect(resolveDockedFooterGap({ panelRows: 7, chromeWithGap: 6, reservedContentRows: 1 })).toEqual({
       showFooterGap: false,
-      chromeRows: 3
+      chromeRows: 5
+    });
+  });
+
+  it('keeps the gap once a header-reserving surface has room for one data row', () => {
+    // 8 - 6 - 1 = 1 >= 1, so the gap stays.
+    expect(resolveDockedFooterGap({ panelRows: 8, chromeWithGap: 6, reservedContentRows: 1 })).toEqual({
+      showFooterGap: true,
+      chromeRows: 6
     });
   });
 });

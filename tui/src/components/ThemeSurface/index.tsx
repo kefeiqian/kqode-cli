@@ -14,7 +14,6 @@ import {
   revertThemePreviewAtom,
   scrollThemeHighlightIntoViewAtom,
   THEME_DOCK_CHROME_ROWS,
-  themeDesiredRowsAtom,
   themeHighlightIndexAtom,
   themeSaveWarningAtom,
   themeVisibleRowsAtom,
@@ -39,11 +38,9 @@ export function ThemeSurface() {
   const scrollHighlightIntoView = useSetAtom(scrollThemeHighlightIntoViewAtom);
   const closeActiveSurface = useSetAtom(closeActiveSurfaceAtom);
   const revertThemePreview = useSetAtom(revertThemePreviewAtom);
-  const desiredRows = useAtomValue(themeDesiredRowsAtom);
   const { selectTheme } = useThemeBackend(closeActiveSurface);
   const { showFooterGap, chromeRows } = resolveDockedFooterGap({
     panelRows,
-    desiredRows,
     chromeWithGap: THEME_DOCK_CHROME_ROWS
   });
   const listRows = Math.max(1, panelRows - chromeRows);
