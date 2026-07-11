@@ -72,11 +72,11 @@ describe('SlashCommandMenu', () => {
 
     // Only `/model` matches, but the panel keeps its fixed height so the
     // composer below never shifts as the query narrows.
-    expect(lines.length).toBe(COMMAND_MENU_PANEL_ROWS);
-    // The sole match sits on the top row; the rest are blank fillers.
-    expect(lines[0]).toContain('/model');
-    expect(lines[0]).toContain('\u276F');
-    for (const line of lines.slice(1)) {
+    // Row 0 is the accent top rule (U5); the sole match sits on row 1.
+    expect(lines.length).toBe(COMMAND_MENU_PANEL_ROWS + 1);
+    expect(lines[1]).toContain('/model');
+    expect(lines[1]).toContain('\u276F');
+    for (const line of lines.slice(2)) {
       expect(line.trim()).toBe('');
     }
   });

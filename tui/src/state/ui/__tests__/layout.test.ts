@@ -32,7 +32,7 @@ describe('command menu layout atoms', () => {
     pinViewport(store, 80, 24);
     setText(store, '/');
 
-    expect(store.get(commandMenuRowsAtom)).toBe(COMMAND_MENU_PANEL_ROWS);
+    expect(store.get(commandMenuRowsAtom)).toBe(COMMAND_MENU_PANEL_ROWS + 1);
   });
 
   it('collapses the cwd row while the menu is open without moving the composer', () => {

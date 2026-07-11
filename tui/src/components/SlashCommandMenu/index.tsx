@@ -2,6 +2,7 @@ import { Box, Text } from 'ink';
 import { useAtomValue } from 'jotai';
 import { clamp } from '@libs/math/clamp.ts';
 import { SelectableRow } from '@components/SelectableRow/index.tsx';
+import { DockDivider } from '@components/DockDivider.tsx';
 import {
   commandMenuHighlightIndexAtom,
   commandMenuMatchesAtom,
@@ -34,25 +35,30 @@ export function SlashCommandMenu() {
     return null;
   }
 
+  // The accent top rule (U5) occupies the first row; command rows fill the rest.
+  const contentRows = Math.max(0, menuRows - 1);
+
   if (matches.length === 0) {
     return (
       <Box flexDirection="column">
+        <DockDivider />
         <SelectableRow highlighted={false} color={theme.colors.muted} content={NO_MATCHES_LABEL} />
-        {blankRows(menuRows - 1)}
+        {blankRows(contentRows - 1)}
       </Box>
     );
   }
 
   const highlighted = clamp(highlightIndex, 0, matches.length - 1);
   const start = Math.min(
-    Math.max(0, highlighted - menuRows + 1),
-    Math.max(0, matches.length - menuRows)
+    Math.max(0, highlighted - contentRows + 1),
+    Math.max(0, matches.length - contentRows)
   );
-  const visible = matches.slice(start, start + menuRows);
+  const visible = matches.slice(start, start + contentRows);
   const nameColumnWidth = Math.max(...matches.map((entry) => entryFullName(entry).length));
 
   return (
     <Box flexDirection="column">
+      <DockDivider />
       {visible.map((entry, index) => {
         const isHighlighted = start + index === highlighted;
         const paddedName = entryFullName(entry).padEnd(nameColumnWidth);
@@ -60,7 +66,7 @@ export function SlashCommandMenu() {
 
         return <SelectableRow key={entryFullName(entry)} highlighted={isHighlighted} content={content} />;
       })}
-      {blankRows(menuRows - visible.length)}
+      {blankRows(contentRows - visible.length)}
     </Box>
   );
 }

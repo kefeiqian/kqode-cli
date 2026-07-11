@@ -40,7 +40,7 @@ describe('command menu atoms', () => {
       CommandId.Theme
     ]);
     expect(store.get(highlightedCommandAtom)?.id).toBe(CommandId.Clear);
-    expect(store.get(commandMenuDesiredRowsAtom)).toBe(COMMAND_MENU_PANEL_ROWS);
+    expect(store.get(commandMenuDesiredRowsAtom)).toBe(COMMAND_MENU_PANEL_ROWS + 1);
   });
 
   it('narrows matches as the query grows', () => {
@@ -79,7 +79,7 @@ describe('command menu atoms', () => {
     expect(store.get(commandMenuOpenAtom)).toBe(true);
     expect(store.get(commandMenuMatchesAtom)).toEqual([]);
     expect(store.get(highlightedCommandAtom)).toBeUndefined();
-    expect(store.get(commandMenuDesiredRowsAtom)).toBe(COMMAND_MENU_PANEL_ROWS);
+    expect(store.get(commandMenuDesiredRowsAtom)).toBe(COMMAND_MENU_PANEL_ROWS + 1);
   });
 
   it('is closed for non-slash text', () => {

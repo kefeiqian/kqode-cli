@@ -52,17 +52,17 @@ export const highlightedCommandAtom = atom<CommandDefinition | undefined>((get) 
 });
 
 /**
- * Rows the menu wants to render: the fixed panel height while open (matching
- * commands fill from the top, remaining rows stay blank, and the "No matching
- * commands" state occupies the top row), or zero when closed. U4 clamps this to
- * the space actually free above the composer.
+ * Rows the menu wants to render while open: the accent top rule (U5) plus the
+ * fixed command-list panel height (`COMMAND_MENU_PANEL_ROWS`), so the rule never
+ * eats a command row; zero when closed. Clamped downstream to the space actually
+ * free above the composer.
  */
 export const commandMenuDesiredRowsAtom = atom((get) => {
   if (!get(commandMenuOpenAtom)) {
     return 0;
   }
 
-  return COMMAND_MENU_PANEL_ROWS;
+  return COMMAND_MENU_PANEL_ROWS + 1;
 });
 
 /** Moves the highlight by `delta`, clamped to the current match range. */
