@@ -48,7 +48,7 @@ function resolveActiveModelLabel(
     if (provider?.status !== PROVIDER_STATUS_CONNECTED) {
       return NOT_CONFIGURED_HERE_MODEL_LABEL;
     }
-    return formatModelLabel(provider.label || provider.providerId, selection.modelId, provider.credentialSource);
+    return formatModelLabel(provider.label || provider.providerId, selection.modelId);
   }
 
   const defaultProvider = providers.find(
@@ -59,7 +59,6 @@ function resolveActiveModelLabel(
   }
   return formatModelLabel(
     defaultProvider.label || defaultProvider.providerId,
-    defaultProvider.defaultModel,
-    defaultProvider.credentialSource
+    defaultProvider.defaultModel
   );
 }

@@ -43,7 +43,24 @@ describe('activeModel atoms', () => {
 
     await store.set(refreshActiveModelAtom);
 
-    expect(store.get(activeModelLabelAtom)).toBe(formatModelLabel('Kimi', 'moonshot-v1', CREDENTIAL_SOURCE_KEYCHAIN));
+    expect(store.get(activeModelLabelAtom)).toBe(formatModelLabel('Kimi', 'moonshot-v1'));
+  });
+
+  it('omits the credential source (keychain) from the status-bar label', async () => {
+    const store = createStore();
+    store.set(
+      backendClientAtom,
+      clientWith({
+        providers: [provider('kimi', 'Kimi')],
+        active: { providerId: 'kimi', modelId: 'moonshot-v1' }
+      })
+    );
+
+    await store.set(refreshActiveModelAtom);
+
+    const label = store.get(activeModelLabelAtom);
+    expect(label).toBe('Kimi · moonshot-v1');
+    expect(label).not.toContain('keychain');
   });
 
   it('uses the first connected provider default model when the global selection is empty', async () => {
@@ -57,7 +74,7 @@ describe('activeModel atoms', () => {
 
     await store.set(refreshActiveModelAtom);
 
-    expect(store.get(activeModelLabelAtom)).toBe(formatModelLabel('Kimi', 'kimi-k2.7-code', CREDENTIAL_SOURCE_KEYCHAIN));
+    expect(store.get(activeModelLabelAtom)).toBe(formatModelLabel('Kimi', 'kimi-k2.7-code'));
   });
 
   it('shows not configured when no connected provider has a default model', async () => {
@@ -122,7 +139,7 @@ describe('activeModel atoms', () => {
     await client.setProviderKey({ providerId: 'kimi', baseUrl: null, label: null, apiKey: 'secret' });
     await store.set(refreshActiveModelAtom);
 
-    expect(store.get(activeModelLabelAtom)).toBe(formatModelLabel('Kimi', 'moonshot-v1', CREDENTIAL_SOURCE_KEYCHAIN));
+    expect(store.get(activeModelLabelAtom)).toBe(formatModelLabel('Kimi', 'moonshot-v1'));
   });
 });
 

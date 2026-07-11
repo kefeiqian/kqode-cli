@@ -83,7 +83,7 @@ describe('StatusBar', () => {
     const { lastFrame } = renderWithJotai(<StatusBar />, store);
 
     await vi.waitFor(() => {
-      expect(lastFrame() ?? '').toContain(formatModelLabel('Kimi', 'moonshot-v1', CREDENTIAL_SOURCE_KEYCHAIN));
+      expect(lastFrame() ?? '').toContain(formatModelLabel('Kimi', 'moonshot-v1'));
     });
   });
 
@@ -95,7 +95,7 @@ describe('StatusBar', () => {
 
     await vi.waitFor(() => {
       const output = lastFrame() ?? '';
-      expect(output).toContain(formatModelLabel('Kimi', 'moonshot-v1', CREDENTIAL_SOURCE_KEYCHAIN));
+      expect(output).toContain(formatModelLabel('Kimi', 'moonshot-v1'));
     });
   });
 
