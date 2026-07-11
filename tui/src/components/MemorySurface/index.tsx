@@ -2,14 +2,15 @@ import { Box, Text } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect } from 'react';
 import type { MemoryInboxEntry, MemoryItem } from '@contracts/backend/index.ts';
-import { DockDivider } from '@components/DockDivider.tsx';
+import { CommandSurface } from '@components/CommandSurface/index.tsx';
+import { useCommandSurfaceLayout } from '@components/CommandSurface/useCommandSurfaceLayout.ts';
 import { InboxRows } from '@components/MemorySurface/InboxRows.tsx';
 import { MemoryForm } from '@components/MemorySurface/MemoryForm.tsx';
 import { MemoryRows } from '@components/MemorySurface/MemoryRows.tsx';
 import { useMemoryBackend } from '@components/MemorySurface/useMemoryBackend.ts';
 import { useMemoryFormInput } from '@components/MemorySurface/useMemoryFormInput.ts';
 import { useMemoryInput } from '@components/MemorySurface/useMemoryInput.ts';
-import { resolveDockedFooterGap } from '@libs/tui/layout.ts';
+import { positionIndicator } from '@libs/tui/layout.ts';
 import { dockedPanelRowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
 import {
   MEMORY_DOCK_LIST_CHROME_ROWS,
@@ -62,12 +63,12 @@ export function MemorySurface() {
   // footer gap is unconditional except at the hard cap in list mode, where the
   // table header (reservedContentRows: 1) would otherwise leave zero data rows.
   const fullChrome = subStateActive ? MEMORY_DOCK_SUBSTATE_CHROME_ROWS : MEMORY_DOCK_LIST_CHROME_ROWS;
-  const { showFooterGap, chromeRows } = resolveDockedFooterGap({
+  const layout = useCommandSurfaceLayout({
     panelRows,
     chromeWithGap: fullChrome,
     reservedContentRows: subStateActive ? 0 : 1
   });
-  const bodyArea = Math.max(1, panelRows - chromeRows);
+  const bodyArea = layout.bodyRows;
   // The list renders a table header on its first line, so data rows are one fewer.
   const dataRows = Math.max(1, bodyArea - 1);
   const listLength = mode === MemoryMode.Active ? allItems.length : allEntries.length;
@@ -96,30 +97,35 @@ export function MemorySurface() {
       : positionIndicator(detailOffset, Math.max(0, detailLines - bodyArea))
     : positionIndicator(listOffset, Math.max(0, listLength - dataRows));
 
+  const header = subStateActive ? undefined : (
+    <>
+      <Text wrap="truncate">{modeTabs(mode)}</Text>
+      <Text color={theme.colors.muted} wrap="truncate">
+        {statusLine(status, error, pendingAction)}
+      </Text>
+    </>
+  );
+
   return (
-    <Box flexDirection="column" height={panelRows} overflow="hidden">
-      <DockDivider />
-      <Text color={theme.colors.accentBlue}>/memory</Text>
-      {subStateActive ? null : <Text wrap="truncate">{modeTabs(mode)}</Text>}
-      {subStateActive ? null : (
-        <Text color={theme.colors.muted} wrap="truncate">
-          {statusLine(status, error, pendingAction)}
-        </Text>
+    <CommandSurface
+      panelRows={panelRows}
+      layout={layout}
+      label="/memory"
+      header={header}
+      bodyRows={bodyArea}
+      footerHint={footerHint(mode, detailBody !== null)}
+      position={position}
+    >
+      {forgetConfirm !== null ? (
+        <ForgetConfirm columns={safeChromeColumns} item={forgetConfirm} />
+      ) : form !== null ? (
+        <MemoryForm columns={safeChromeColumns} form={form} />
+      ) : detailBody !== null ? (
+        <MemoryDetail columns={safeChromeColumns} rows={bodyArea} offset={detailOffset} body={detailBody} />
+      ) : (
+        renderBody({ status, error, mode, items, entries, highlightedItem, highlightedEntry, columns: safeChromeColumns, listRows: bodyArea })
       )}
-      <Box flexDirection="column" height={bodyArea} overflow="hidden">
-        {forgetConfirm !== null ? (
-          <ForgetConfirm columns={safeChromeColumns} item={forgetConfirm} />
-        ) : form !== null ? (
-          <MemoryForm columns={safeChromeColumns} form={form} />
-        ) : detailBody !== null ? (
-          <MemoryDetail columns={safeChromeColumns} rows={bodyArea} offset={detailOffset} body={detailBody} />
-        ) : (
-          renderBody({ status, error, mode, items, entries, highlightedItem, highlightedEntry, columns: safeChromeColumns, listRows: bodyArea })
-        )}
-      </Box>
-      {showFooterGap ? <Text> </Text> : null}
-      <MemoryFooter columns={safeChromeColumns} mode={mode} detailOpen={detailBody !== null} position={position} />
-    </Box>
+    </CommandSurface>
   );
 }
 
@@ -188,50 +194,6 @@ function ForgetConfirm({ columns, item }: { columns: number; item: MemoryItem })
       </Text>
     </Box>
   );
-}
-
-function MemoryFooter({
-  columns,
-  mode,
-  detailOpen,
-  position
-}: {
-  columns: number;
-  mode: MemoryMode;
-  detailOpen: boolean;
-  position: string;
-}) {
-  const theme = useAtomValue(activeThemeAtom);
-  // Reserve room for the right-aligned indicator so the (long) hint truncates
-  // instead of shrink-wrapping to a second row and over-subscribing the panel.
-  const hintWidth = position === '' ? columns : Math.max(0, columns - position.length - 1);
-
-  return (
-    <Box width={columns}>
-      <Text color={theme.colors.muted} wrap="truncate">
-        {footerHint(mode, detailOpen).slice(0, hintWidth)}
-      </Text>
-      {position === '' ? null : (
-        <Box flexGrow={1} justifyContent="flex-end">
-          <Text color={theme.colors.muted}>{position}</Text>
-        </Box>
-      )}
-    </Box>
-  );
-}
-
-/** Standard docked-popup scroll indicator: `more ↓` / `more ↑` / `more ↑↓`. */
-function positionIndicator(offset: number, maxOffset: number): string {
-  if (maxOffset === 0) {
-    return '';
-  }
-  if (offset <= 0) {
-    return 'more ↓';
-  }
-  if (offset >= maxOffset) {
-    return 'more ↑';
-  }
-  return 'more ↑↓';
 }
 
 function modeTabs(mode: MemoryMode): string {
