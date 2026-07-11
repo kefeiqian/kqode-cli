@@ -469,7 +469,8 @@ describe('HomeScreen', () => {
     await flushInput();
 
     expect(store.get(copyModeActiveAtom)).toBe(true);
-    expect(write.mock.calls.some(([chunk]) => chunk === DISABLE_SGR_MOUSE_TRACKING)).toBe(true);
+    // Entering selection mode keeps mouse tracking on (the selection is owned in-app).
+    expect(write.mock.calls.some(([chunk]) => chunk === DISABLE_SGR_MOUSE_TRACKING)).toBe(false);
     expect(store.get(composerStateAtom).text).toBe('');
 
     stdin.write('\u001B[5~');
@@ -494,7 +495,8 @@ describe('HomeScreen', () => {
     await flushInput();
 
     expect(store.get(copyModeActiveAtom)).toBe(false);
-    expect(write.mock.calls.some(([chunk]) => chunk === ENABLE_SGR_MOUSE_TRACKING)).toBe(true);
+    // Exiting selection mode does not re-enable tracking; it was never disabled.
+    expect(write.mock.calls.some(([chunk]) => chunk === ENABLE_SGR_MOUSE_TRACKING)).toBe(false);
   });
 
   it('exits Copy Mode on printable keys without inserting into the composer', async () => {

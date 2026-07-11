@@ -15,10 +15,12 @@ import { StatusBar } from '@components/StatusBar.tsx';
 import {
   DISABLE_SGR_MOUSE_TRACKING,
   ENABLE_SGR_MOUSE_TRACKING,
+  parseMouseButtonEvent,
   parseMouseClickEvent,
   parseMouseWheelEvent
 } from '@libs/terminal/mouse.ts';
 import { handleRightClickPaste } from '@components/HomeScreen/rightClickPaste.ts';
+import { handleSelectionGesture } from '@components/HomeScreen/selectionInput.ts';
 import { resolveWheelTarget } from '@components/HomeScreen/wheelRouting.ts';
 import { useCaretScrollSuppression } from '@components/HomeScreen/useCaretScrollSuppression.ts';
 import { resolveClickResult } from '@libs/composer/composerWindow.ts';
@@ -65,15 +67,25 @@ export function HomeScreenView() {
       return;
     }
 
-    stdout.write(copyModeActive ? DISABLE_SGR_MOUSE_TRACKING : ENABLE_SGR_MOUSE_TRACKING);
+    // Mouse tracking stays enabled for the whole session: selection mode now
+    // owns the mouse in-app (drag to select, release to copy) instead of
+    // releasing it to the terminal, so entering the mode no longer disables it.
+    stdout.write(ENABLE_SGR_MOUSE_TRACKING);
     return () => {
       stdout.write(DISABLE_SGR_MOUSE_TRACKING);
     };
-  }, [copyModeActive, stdout]);
+  }, [stdout]);
 
   useInput((input, key) => {
-    if (copyModeActive && !key.pageUp && !key.pageDown && !key.end) {
-      return;
+    // Selection mode owns the mouse: press/drag/release build the in-app
+    // selection and release copies it. Everything else falls through to the
+    // shared wheel/scroll handling below.
+    if (copyModeActive) {
+      const gesture = parseMouseButtonEvent(input);
+      if (gesture !== null) {
+        handleSelectionGesture(store, gesture);
+        return;
+      }
     }
 
     const wheel = parseMouseWheelEvent(input);
@@ -144,7 +156,7 @@ export function HomeScreenView() {
       return;
     }
 
-    if (handleRightClickPaste(input, store)) {
+    if (!copyModeActive && handleRightClickPaste(input, store)) {
       return;
     }
 

@@ -1,6 +1,7 @@
 import { useApp, useInput } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { ArmedAction, COPY_MODE_INPUT_KEY } from '@constants/ui.ts';
+import { isMouseInput } from '@libs/terminal/mouse.ts';
 import { armedActionAtom, copyModeActiveAtom } from '@state/ui/index.ts';
 
 /**
@@ -28,6 +29,10 @@ export function useGlobalKeys(): void {
 
     if (copyModeActive) {
       if (key.pageUp === true || key.pageDown === true || key.end === true) {
+        return;
+      }
+      // Mouse gestures drive the in-app selection; they must not exit the mode.
+      if (isMouseInput(input)) {
         return;
       }
       setCopyModeActive(false);
