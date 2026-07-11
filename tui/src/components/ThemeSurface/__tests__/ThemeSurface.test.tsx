@@ -43,8 +43,8 @@ describe('ThemeSurface', () => {
     expect(store.get(themeHighlightIndexAtom)).toBe(
       THEME_CATALOG.findIndex((theme) => theme.id === nord.id)
     );
-    // Active theme carries the non-color active marker.
-    expect(frame).toContain(`● ${nord.label}`);
+    // The highlighted (active on open) row carries the chevron marker.
+    expect(frame).toContain(`❯ ${nord.label}`);
   });
 
   it('exposes no light/custom/plugin/import/export affordance (covers AE5)', async () => {
@@ -68,20 +68,20 @@ describe('ThemeSurface', () => {
     expect(client.setTheme).not.toHaveBeenCalled(); // but not persisted until Enter
   });
 
-  it('marks the focused row with ● and moves it as you navigate', async () => {
+  it('marks the focused row with the chevron and moves it as you navigate', async () => {
     const { stdin, lastFrame } = renderTheme(clientWithSetTheme(), { active: originTheme });
     await flushInput();
 
     // Opens focused on the active theme.
-    expect(lastFrame() ?? '').toContain(`● ${originTheme.label}`);
+    expect(lastFrame() ?? '').toContain(`❯ ${originTheme.label}`);
 
     stdin.write(ARROW_DOWN);
     await flushInput();
 
     const frame = lastFrame() ?? '';
     // The single selection marker follows the focused (previewed) row.
-    expect(frame).toContain(`● ${secondTheme.label}`);
-    expect(frame).not.toContain(`● ${originTheme.label}`);
+    expect(frame).toContain(`❯ ${secondTheme.label}`);
+    expect(frame).not.toContain(`❯ ${originTheme.label}`);
   });
 
   it('reverts to the theme active before opening when the picker closes without saving', async () => {

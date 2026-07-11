@@ -81,7 +81,7 @@ describe('ModelSurface', () => {
       lists: { kimi: { status: MODEL_LIST_STATUS_FAILED, models: [] } }
     });
     const { stdin, lastFrame } = renderModel(client);
-    await waitForFrame(lastFrame, '›    failed to load ↻');
+    await waitForFrame(lastFrame, '❯   failed to load ↻');
 
     await flushInput();
     stdin.write('\n');
@@ -109,7 +109,7 @@ describe('ModelSurface', () => {
     await waitForFrame(lastFrame, 'a2');
 
     expect(store.get(modelHighlightAtom)).toEqual(before);
-    expect(lastFrame() ?? '').toContain('›  ● b2');
+    expect(lastFrame() ?? '').toContain('❯ ● b2');
   });
 
   it('renders control and ANSI model ids inert after sanitization', async () => {
@@ -142,7 +142,7 @@ describe('ModelSurface', () => {
     const client = fakeClient({ providers: [provider('kimi', 'Kimi', false)] });
     const { store, lastFrame } = renderModel(client);
 
-    const frame = await waitForFrame(lastFrame, '›    (not connected — enter to connect)');
+    const frame = await waitForFrame(lastFrame, '❯   (not connected — enter to connect)');
     expect(frame).toContain('Kimi');
     expect(store.get(activeSurfaceAtom)).toBe(Surface.Model);
   });
@@ -162,7 +162,7 @@ describe('ModelSurface', () => {
       .mockResolvedValueOnce({ providers: [connected] });
     vi.mocked(client.setProviderKey).mockResolvedValue({ outcome: SET_KEY_OUTCOME_CONNECTED, selectedModel: 'k1' });
     const { stdin, lastFrame } = renderModel(client);
-    await waitForFrame(lastFrame, '›    (not connected — enter to connect)');
+    await waitForFrame(lastFrame, '❯   (not connected — enter to connect)');
 
     stdin.write('\r');
     await waitForFrame(lastFrame, 'API key');
@@ -170,7 +170,7 @@ describe('ModelSurface', () => {
     await flushInput();
     stdin.write('\r');
 
-    const frame = await waitForFrame(lastFrame, '›  ● k1');
+    const frame = await waitForFrame(lastFrame, '❯ ● k1');
     expect(frame).toContain('Kimi (via keychain)');
     expect(client.setProviderKey).toHaveBeenCalledWith(expect.objectContaining({ providerId: 'kimi', apiKey: 'sk-inline-good' }));
     expect(client.listModels).toHaveBeenCalledWith('kimi');
@@ -213,7 +213,7 @@ describe('ModelSurface', () => {
   it('opens Connect for a not-connected Custom provider', async () => {
     const client = fakeClient({ providers: [provider('custom', 'Custom', false)] });
     const { store, stdin, lastFrame } = renderModel(client);
-    await waitForFrame(lastFrame, '›    (not connected — enter to connect)');
+    await waitForFrame(lastFrame, '❯   (not connected — enter to connect)');
 
     stdin.write('\r');
     await flushInput();

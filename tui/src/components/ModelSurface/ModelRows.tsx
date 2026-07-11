@@ -4,12 +4,10 @@ import type { ModelHighlightIdentity, ModelSurfaceRow } from '@state/ui/model/in
 
 /** Renders the already-windowed grouped model rows and pads unused body lines. */
 export function ModelRows({
-  columns,
   highlight,
   rows,
   visibleRows
 }: {
-  columns: number;
   highlight: ModelHighlightIdentity | null;
   rows: ModelSurfaceRow[];
   visibleRows: number;
@@ -18,7 +16,7 @@ export function ModelRows({
     <Box flexDirection="column" height={visibleRows}>
       {Array.from({ length: visibleRows }, (_, index) => {
         const row = rows[index];
-        return row === undefined ? <Text key={index}> </Text> : <ModelRow key={rowKey(row)} columns={columns} highlight={highlight} row={row} />;
+        return row === undefined ? <Text key={index}> </Text> : <ModelRow key={rowKey(row)} highlight={highlight} row={row} />;
       })}
     </Box>
   );

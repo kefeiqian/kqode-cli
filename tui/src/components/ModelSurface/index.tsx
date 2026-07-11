@@ -86,7 +86,7 @@ export function ModelSurface() {
       <DockDivider />
       <Text color={theme.colors.accentBlue}>/model</Text>
       {inlineProviderId === null ? (
-        <ModelRows columns={safeChromeColumns} highlight={highlight} rows={visibleRows} visibleRows={listRows} />
+        <ModelRows highlight={highlight} rows={visibleRows} visibleRows={listRows} />
       ) : (
         <Box flexDirection="column" height={listRows} width={safeChromeColumns}>
           <Box width={safeChromeColumns}>

@@ -1,5 +1,6 @@
 import { Box, Text } from 'ink';
 import { useAtomValue } from 'jotai';
+import { SelectableRow } from '@components/SelectableRow/index.tsx';
 import type { ProviderStatusInfo } from '@contracts/backend/providerMessages.ts';
 import { activeThemeAtom } from '@state/global/index.ts';
 
@@ -33,11 +34,5 @@ export function ConnectedActions({
 }
 
 function ActionRow({ active, text }: { active: boolean; text: string }) {
-  const theme = useAtomValue(activeThemeAtom);
-
-  return (
-    <Text color={active ? theme.colors.accentBlue : theme.colors.foreground}>
-      {active ? '›' : ' '} {text}
-    </Text>
-  );
+  return <SelectableRow highlighted={active} content={text} />;
 }

@@ -66,7 +66,6 @@ export function ThemeSurface() {
       <DockDivider />
       <Text color={theme.colors.accentBlue}>/theme</Text>
       <ThemeRows
-        columns={safeChromeColumns}
         themes={visibleThemes}
         highlightIndex={highlightIndex - windowOffset}
         visibleRows={listRows}

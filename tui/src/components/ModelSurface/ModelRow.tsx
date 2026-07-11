@@ -1,5 +1,6 @@
 import { Text } from 'ink';
 import { useAtomValue } from 'jotai';
+import { SelectableRow } from '@components/SelectableRow/index.tsx';
 import {
   MODEL_LIST_STATUS_EMPTY,
   MODEL_LIST_STATUS_FAILED
@@ -11,60 +12,66 @@ import {
 } from '@state/ui/model/index.ts';
 import { activeThemeAtom } from '@state/global/index.ts';
 
-const SELECTED_MARKER = '›';
-const PLAIN_MARKER = ' ';
 const ACTIVE_MARKER = '●';
 const INACTIVE_MARKER = ' ';
 
-/** Renders one flattened provider, model, or provider-status row. */
+/**
+ * Renders one flattened provider, model, or provider-status row. Provider
+ * headers stay bespoke accent section labels; model and status rows route
+ * through the shared `SelectableRow`. The active-model `●` lives inside the row
+ * content (after the chevron gutter), so it survives the selection unification.
+ */
 export function ModelRow({
-  columns,
   highlight,
   row
 }: {
-  columns: number;
   highlight: ModelHighlightIdentity | null;
   row: ModelSurfaceRow;
 }) {
   const theme = useAtomValue(activeThemeAtom);
 
   if (row.type === 'provider') {
-    return <Text color={theme.colors.accentBlue}>{truncate(row.label, columns)}</Text>;
+    return (
+      <Text color={theme.colors.accentBlue} wrap="truncate">
+        {row.label}
+      </Text>
+    );
   }
 
   const selected = isHighlighted(row, highlight);
-  const marker = selected ? SELECTED_MARKER : PLAIN_MARKER;
+  // Non-highlighted "not connected" rows read as muted; SelectableRow uses the
+  // accent color for the highlighted row regardless.
   const color =
-    selected ? theme.colors.accentBlue : row.type === 'status' && row.status === MODEL_LOAD_STATUS_NOT_CONNECTED ? theme.colors.muted : theme.colors.foreground;
-  const line = row.type === 'model' ? modelLine(row, marker) : statusLine(row, marker);
+    row.type === 'status' && row.status === MODEL_LOAD_STATUS_NOT_CONNECTED
+      ? theme.colors.muted
+      : undefined;
+  const content = row.type === 'model' ? modelContent(row) : statusContent(row);
 
-  return (
-    <Text color={color} wrap="truncate">
-      {truncate(line, columns)}
-    </Text>
-  );
+  return <SelectableRow highlighted={selected} color={color} content={content} />;
 }
 
-function modelLine(row: Extract<ModelSurfaceRow, { type: 'model' }>, marker: string) {
+function modelContent(row: Extract<ModelSurfaceRow, { type: 'model' }>) {
   const active = row.model.isActive ? ACTIVE_MARKER : INACTIVE_MARKER;
   const owner = row.model.ownedBy === null ? '' : `  ${row.model.ownedBy}`;
-  return `${marker}  ${active} ${row.model.id}${owner}`;
+  return `${active} ${row.model.id}${owner}`;
 }
 
-function statusLine(row: Extract<ModelSurfaceRow, { type: 'status' }>, marker: string) {
+function statusContent(row: Extract<ModelSurfaceRow, { type: 'status' }>) {
+  // Two leading spaces align the status text under the model-id column (past the
+  // active-marker slot).
   if (row.status === MODEL_LOAD_STATUS_LOADING) {
-    return `${marker}    loading…`;
+    return '  loading…';
   }
   if (row.status === MODEL_LIST_STATUS_FAILED) {
-    return `${marker}    failed to load ↻`;
+    return '  failed to load ↻';
   }
   if (row.status === MODEL_LIST_STATUS_EMPTY) {
-    return `${marker}    (no models)`;
+    return '  (no models)';
   }
   if (row.status === MODEL_LOAD_STATUS_NOT_CONNECTED) {
-    return `${marker}    (not connected — enter to connect)`;
+    return '  (not connected — enter to connect)';
   }
-  return `${marker}    ${row.status}`;
+  return `  ${row.status}`;
 }
 
 function isHighlighted(row: ModelSurfaceRow, highlight: ModelHighlightIdentity | null) {
@@ -73,8 +80,4 @@ function isHighlighted(row: ModelSurfaceRow, highlight: ModelHighlightIdentity |
   }
   const modelId = row.type === 'model' ? row.modelId : null;
   return highlight.providerId === row.providerId && highlight.modelId === modelId;
-}
-
-function truncate(text: string, columns: number) {
-  return text.slice(0, Math.max(0, columns));
 }

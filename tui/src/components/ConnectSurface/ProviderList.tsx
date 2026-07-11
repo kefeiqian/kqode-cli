@@ -1,5 +1,6 @@
 import { Box, Text } from 'ink';
 import { useAtomValue } from 'jotai';
+import { SelectableRow } from '@components/SelectableRow/index.tsx';
 import { statusLabel } from '@libs/providers/index.ts';
 import type { ProviderStatusInfo } from '@contracts/backend/providerMessages.ts';
 import { activeThemeAtom } from '@state/global/index.ts';
@@ -38,16 +39,6 @@ function ProviderRow({
   isSelected: boolean;
   provider: ProviderStatusInfo;
 }) {
-  const theme = useAtomValue(activeThemeAtom);
-  const prefix = isSelected ? '›' : ' ';
-  const color = isSelected ? theme.colors.accentBlue : theme.colors.foreground;
   const label = statusLabel(provider.status, provider.credentialSource);
-
-  return (
-    <Box>
-      <Text color={color} wrap="truncate">
-        {prefix} {provider.label} — {label}
-      </Text>
-    </Box>
-  );
+  return <SelectableRow highlighted={isSelected} content={`${provider.label} — ${label}`} />;
 }
