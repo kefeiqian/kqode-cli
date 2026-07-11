@@ -5,6 +5,7 @@ import {
   parseMouseButtonEvent,
   parseMouseRightClickEvent,
   parseMouseWheelEvent,
+  parseMouseWheelEvents,
   parseMouseWheelInput
 } from '@libs/terminal/mouse.ts';
 
@@ -93,5 +94,55 @@ describe('parseMouseButtonEvent', () => {
     expect(parseMouseButtonEvent('\u001B[<2;5;3M')).toBeNull(); // right button
     expect(parseMouseButtonEvent('\u001B[<33;5;3M')).toBeNull(); // middle-button drag
     expect(parseMouseButtonEvent('hello')).toBeNull();
+  });
+});
+
+describe('parseMouseWheelEvents (batched chunk scan)', () => {
+  it('captures every notch when a fast spin concatenates sequences', () => {
+    const one = '\u001B[<64;10;5M';
+    expect(parseMouseWheelEvents(one + one + one)).toEqual([
+      { direction: 'up', row: 5, column: 10 },
+      { direction: 'up', row: 5, column: 10 },
+      { direction: 'up', row: 5, column: 10 }
+    ]);
+  });
+
+  it('preserves notch order and per-notch direction in a mixed batch', () => {
+    const up = '\u001B[<64;1;1M';
+    const down = '\u001B[<65;1;1M';
+    expect(parseMouseWheelEvents(up + up + down).map((event) => event.direction)).toEqual([
+      'up',
+      'up',
+      'down'
+    ]);
+  });
+
+  it('returns a one-element array equal to the singular parser for one notch', () => {
+    const single = '\u001B[<64;10;5M';
+    expect(parseMouseWheelEvents(single)).toEqual([parseMouseWheelEvent(single)]);
+  });
+
+  it('returns an empty array for empty and non-mouse input', () => {
+    expect(parseMouseWheelEvents('')).toEqual([]);
+    expect(parseMouseWheelEvents('hello')).toEqual([]);
+  });
+
+  it('skips non-wheel reports mixed into the chunk', () => {
+    const wheel = '\u001B[<64;3;4M';
+    const leftPress = '\u001B[<0;3;4M';
+    const release = '\u001B[<0;3;4m';
+    expect(parseMouseWheelEvents(leftPress + wheel + release)).toEqual([
+      { direction: 'up', row: 4, column: 3 }
+    ]);
+  });
+
+  it('decodes modifier-carrying wheel buttons inside a batch', () => {
+    // 80 = 64 + 16 (Ctrl modifier bit); modulo keeps it wheel-up.
+    const modifierUp = '\u001B[<80;3;4M';
+    const plainDown = '\u001B[<65;3;4M';
+    expect(parseMouseWheelEvents(modifierUp + plainDown)).toEqual([
+      { direction: 'up', row: 4, column: 3 },
+      { direction: 'down', row: 4, column: 3 }
+    ]);
   });
 });

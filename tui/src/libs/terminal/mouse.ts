@@ -25,6 +25,12 @@ export type MouseClickEvent = {
 // SGR mouse reports are `ESC[<button;col;row(M|m)`; col/row are 1-based.
 const SGR_MOUSE_INPUT_PATTERN =
   /^(?:\u001B)?\[<(?<buttonCode>\d+);(?<column>\d+);(?<row>\d+)(?<eventType>[mM])$/;
+// Global, unanchored twin of `SGR_MOUSE_INPUT_PATTERN` for scanning a single
+// stdin chunk that batches several SGR reports: a fast wheel spin concatenates
+// notches into one chunk, which the anchored pattern would reject wholesale.
+// Keep the body in sync with `SGR_MOUSE_INPUT_PATTERN`.
+const SGR_MOUSE_INPUT_PATTERN_ALL =
+  /(?:\u001B)?\[<(?<buttonCode>\d+);(?<column>\d+);(?<row>\d+)(?<eventType>[mM])/g;
 const WHEEL_BUTTON_OFFSET = 64;
 const WHEEL_BUTTON_COUNT = 4;
 const LEFT_BUTTON_CODE = 0;
@@ -34,18 +40,26 @@ export function isMouseInput(input: string): boolean {
   return SGR_MOUSE_INPUT_PATTERN.test(input);
 }
 
+// The named groups captured by both SGR mouse patterns.
+type SgrMouseGroups = {
+  buttonCode: string;
+  column: string;
+  row: string;
+  eventType: string;
+};
+
 /**
- * Parses a wheel-button press into its direction and 1-based pointer row, or
- * `null` when `input` is not a wheel press (`M`) event. The row lets a caller
- * route the notch to whichever pane the pointer is over.
+ * Decodes one already-matched SGR report into a {@link MouseWheelEvent}, or
+ * `null` when it is not a wheel press (`M`) event. Shared by the single-shot
+ * {@link parseMouseWheelEvent} and the batch {@link parseMouseWheelEvents} so
+ * both decode wheel buttons identically.
  */
-export function parseMouseWheelEvent(input: string): MouseWheelEvent | null {
-  const match = SGR_MOUSE_INPUT_PATTERN.exec(input);
-  if (match?.groups === undefined || match.groups.eventType !== 'M') {
+function wheelEventFromGroups(groups: SgrMouseGroups): MouseWheelEvent | null {
+  if (groups.eventType !== 'M') {
     return null;
   }
 
-  const buttonCode = Number.parseInt(match.groups.buttonCode, 10);
+  const buttonCode = Number.parseInt(groups.buttonCode, 10);
   if (buttonCode < WHEEL_BUTTON_OFFSET) {
     return null;
   }
@@ -60,9 +74,46 @@ export function parseMouseWheelEvent(input: string): MouseWheelEvent | null {
 
   return {
     direction,
-    row: Number.parseInt(match.groups.row, 10),
-    column: Number.parseInt(match.groups.column, 10)
+    row: Number.parseInt(groups.row, 10),
+    column: Number.parseInt(groups.column, 10)
   };
+}
+
+/**
+ * Parses a wheel-button press into its direction and 1-based pointer row, or
+ * `null` when `input` is not a wheel press (`M`) event. The row lets a caller
+ * route the notch to whichever pane the pointer is over. For a single stdin
+ * chunk that may batch several notches, prefer {@link parseMouseWheelEvents}.
+ */
+export function parseMouseWheelEvent(input: string): MouseWheelEvent | null {
+  const match = SGR_MOUSE_INPUT_PATTERN.exec(input);
+  if (match?.groups === undefined) {
+    return null;
+  }
+  return wheelEventFromGroups(match.groups as SgrMouseGroups);
+}
+
+/**
+ * Parses every wheel notch in one input chunk, in source order. A fast wheel
+ * spin makes the terminal emit several SGR reports that arrive concatenated in
+ * a single stdin chunk; the anchored {@link parseMouseWheelEvent} matches none
+ * of them and the whole chunk is dropped, so scrolling stalls. This scans the
+ * chunk globally and returns one {@link MouseWheelEvent} per wheel press,
+ * skipping any non-wheel reports (clicks, releases, drags) in the same chunk.
+ * A chunk holding a single notch yields a one-element array.
+ */
+export function parseMouseWheelEvents(input: string): MouseWheelEvent[] {
+  const events: MouseWheelEvent[] = [];
+  for (const match of input.matchAll(SGR_MOUSE_INPUT_PATTERN_ALL)) {
+    if (match.groups === undefined) {
+      continue;
+    }
+    const wheel = wheelEventFromGroups(match.groups as SgrMouseGroups);
+    if (wheel !== null) {
+      events.push(wheel);
+    }
+  }
+  return events;
 }
 
 /** Back-compat helper: the wheel direction only. Prefer {@link parseMouseWheelEvent}. */
