@@ -6,8 +6,8 @@ use super::test_support::{
 };
 use super::transcript::{SettledKind, TurnResult, TurnState};
 use super::{
-    Command, ConversationEvent, ConversationPersistence, Coordinator, NEEDS_CONFIGURATION_MESSAGE,
-    TurnJob,
+    Command, ConversationEvent, ConversationPersistence, Coordinator, CoordinatorHandle,
+    NEEDS_CONFIGURATION_MESSAGE, SummaryJob, TurnJob,
 };
 
 struct FailSecondEnqueuePersistence {
@@ -33,6 +33,10 @@ impl ConversationPersistence for FailSecondEnqueuePersistence {
     }
 
     fn on_compacted(&mut self, _covered_through_seq: u64, _summary: &str) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn on_summary_generated(&mut self, _summary: &str) -> Result<(), String> {
         Ok(())
     }
 
@@ -296,4 +300,192 @@ fn queued_turn_with_persistence_failure_does_not_activate_later() {
     expect_settled(&event_rx, "A", SettledKind::Completed);
     assert!(started_rx.recv_timeout(Duration::from_millis(200)).is_err());
     handle.shutdown_and_join();
+}
+
+struct StubSessionPersistence {
+    session_id: String,
+    summaries: mpsc::Sender<String>,
+}
+
+impl ConversationPersistence for StubSessionPersistence {
+    fn on_enqueue(&mut self, _turn_id: &str, _seq: u64, _prompt: &str) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn on_settle(&mut self, _turn_id: &str, _result: &TurnResult) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn on_clear(&mut self, _turns: &[super::transcript::TranscriptTurn]) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn on_compacted(&mut self, _covered_through_seq: u64, _summary: &str) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn on_summary_generated(&mut self, summary: &str) -> Result<(), String> {
+        let _ = self.summaries.send(summary.to_owned());
+        Ok(())
+    }
+
+    fn current_session_id(&self) -> Option<String> {
+        Some(self.session_id.clone())
+    }
+
+    fn attach_session(&mut self, _session: crate::store::StoredSession) {}
+}
+
+struct SummaryHarness {
+    handle: CoordinatorHandle,
+    events: mpsc::Receiver<ConversationEvent>,
+    started: mpsc::Receiver<super::test_support::Started>,
+    summary_jobs: mpsc::Receiver<(String, String, String)>,
+    persisted: mpsc::Receiver<String>,
+}
+
+/// Builds a coordinator whose summary runner records each [`SummaryJob`] and
+/// reports a fixed generated title back, exercising the trigger + persist + emit
+/// path without a real provider.
+fn summary_harness() -> SummaryHarness {
+    let (event_tx, events) = mpsc::channel();
+    let (started_tx, started) = mpsc::channel();
+    let (job_tx, summary_jobs) = mpsc::channel();
+    let (persist_tx, persisted) = mpsc::channel();
+    let handle = Coordinator::start_with_runners(
+        move |event| event_tx.send(event).expect("event receiver alive"),
+        move |job: TurnJob| super::test_support::run_fake_turn(job, &started_tx),
+        move |job: SummaryJob| {
+            job_tx
+                .send((
+                    job.session_id.clone(),
+                    job.first_prompt.clone(),
+                    job.first_response.clone(),
+                ))
+                .expect("job receiver alive");
+            let _ = job.command_tx.send(Command::SetSessionSummary {
+                session_id: job.session_id,
+                summary: "Fix the parser bug".to_owned(),
+            });
+        },
+        Box::new(StubSessionPersistence {
+            session_id: "sess-1".to_owned(),
+            summaries: persist_tx,
+        }),
+    );
+    SummaryHarness {
+        handle,
+        events,
+        started,
+        summary_jobs,
+        persisted,
+    }
+}
+
+fn drain_until_settled(events: &mpsc::Receiver<ConversationEvent>, turn_id: &str) {
+    loop {
+        match events.recv_timeout(WAIT).unwrap() {
+            ConversationEvent::Settled { turn_id: id, .. } if id == turn_id => break,
+            _ => continue,
+        }
+    }
+}
+
+fn complete_turn(h: &SummaryHarness, id: &str, reply: &'static str) {
+    enqueue(&h.handle.sender(), id);
+    let started = h.started.recv_timeout(WAIT).unwrap();
+    started.actions.send(Action::Complete(reply)).unwrap();
+}
+
+fn stored_session(id: &str) -> crate::store::StoredSession {
+    crate::store::StoredSession {
+        id: id.to_owned(),
+        created_at: 0,
+        modified_at: 0,
+        workspace_cwd: "w".to_owned(),
+        canonical_workspace_cwd: "w".to_owned(),
+        session_log_path: "log".to_owned(),
+        first_prompt_summary: Some("first".to_owned()),
+    }
+}
+
+#[test]
+fn first_completed_turn_requests_summary_and_emits_update() {
+    let h = summary_harness();
+    complete_turn(&h, "t1", "created parser.rs");
+
+    let (session_id, first_prompt, first_response) = h.summary_jobs.recv_timeout(WAIT).unwrap();
+    assert_eq!(session_id, "sess-1");
+    assert_eq!(first_prompt, "prompt t1");
+    assert_eq!(first_response, "created parser.rs");
+
+    // U4: the generated summary is persisted and emitted for the live title.
+    assert_eq!(
+        h.persisted.recv_timeout(WAIT).unwrap(),
+        "Fix the parser bug"
+    );
+    let update = loop {
+        match h.events.recv_timeout(WAIT).unwrap() {
+            ConversationEvent::SummaryUpdated {
+                session_id,
+                summary,
+            } => break (session_id, summary),
+            _ => continue,
+        }
+    };
+    assert_eq!(
+        update,
+        ("sess-1".to_owned(), "Fix the parser bug".to_owned())
+    );
+    h.handle.shutdown_and_join();
+}
+
+#[test]
+fn summary_requested_only_once_per_session() {
+    let h = summary_harness();
+    complete_turn(&h, "t1", "r1");
+    let _ = h.summary_jobs.recv_timeout(WAIT).unwrap();
+
+    complete_turn(&h, "t2", "r2");
+    drain_until_settled(&h.events, "t2");
+    assert!(h.summary_jobs.try_recv().is_err());
+    h.handle.shutdown_and_join();
+}
+
+#[test]
+fn errored_first_turn_defers_summary_to_next_completed_turn() {
+    let h = summary_harness();
+    enqueue(&h.handle.sender(), "t1");
+    let started = h.started.recv_timeout(WAIT).unwrap();
+    started.actions.send(Action::Error).unwrap();
+    drain_until_settled(&h.events, "t1");
+    assert!(h.summary_jobs.try_recv().is_err());
+
+    complete_turn(&h, "t2", "r2");
+    let (session_id, first_prompt, first_response) = h.summary_jobs.recv_timeout(WAIT).unwrap();
+    assert_eq!(session_id, "sess-1");
+    assert_eq!(first_prompt, "prompt t2");
+    assert_eq!(first_response, "r2");
+    h.handle.shutdown_and_join();
+}
+
+#[test]
+fn resumed_session_does_not_request_summary() {
+    let h = summary_harness();
+    let (tx, rx) = mpsc::channel();
+    h.handle
+        .sender()
+        .send(Command::ResumeSession {
+            session: stored_session("sess-1"),
+            turns: vec![],
+            compaction: crate::chat::CompactionState::default(),
+            respond_to: tx,
+        })
+        .unwrap();
+    rx.recv_timeout(WAIT).unwrap();
+
+    complete_turn(&h, "t1", "r1");
+    drain_until_settled(&h.events, "t1");
+    assert!(h.summary_jobs.try_recv().is_err());
+    h.handle.shutdown_and_join();
 }

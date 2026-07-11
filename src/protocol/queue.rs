@@ -16,6 +16,11 @@ pub const TURN_SETTLED_METHOD: &str = "kqode/turnSettled";
 /// turn's hidden compaction runs. Mirrored in `tui/src/contracts/backend/messages.ts`.
 pub const COMPACTION_STATUS_METHOD: &str = "kqode/compactionStatus";
 
+/// Server→client notification carrying a session's generated summary so the TUI
+/// upgrades the live terminal title from the placeholder. Mirrored in
+/// `tui/src/contracts/backend/messages.ts`.
+pub const SESSION_SUMMARY_UPDATED_METHOD: &str = "kqode/sessionSummaryUpdated";
+
 /// Queue state for a turn that became the active head immediately on enqueue.
 pub const TURN_STATE_ACTIVE: &str = "active";
 
@@ -56,6 +61,14 @@ pub struct ActivatedParams {
 pub struct CompactionStatusParams {
     pub turn_id: String,
     pub active: bool,
+}
+
+/// Payload for [`SESSION_SUMMARY_UPDATED_METHOD`].
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionSummaryUpdatedParams {
+    pub session_id: String,
+    pub summary: String,
 }
 
 /// Payload for [`TURN_SETTLED_METHOD`].

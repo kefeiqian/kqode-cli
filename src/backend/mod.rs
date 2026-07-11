@@ -11,9 +11,10 @@ use crate::debug_log;
 use crate::protocol::{
     ActivatedParams, BACKEND_READY_METHOD, BackendReadyParams, COMPACTION_STATUS_METHOD,
     ClearKeyParams, CompactionStatusParams, ConversationClearResult, EnqueuedParams,
-    JSON_RPC_INVALID_PARAMS, JSON_RPC_METHOD_NOT_FOUND, RpcMethod, SelectionSetParams,
-    SettledParams, TOKEN_DELTA_METHOD, TURN_ACTIVATED_METHOD, TURN_ENQUEUED_METHOD,
-    TURN_SETTLED_METHOD, ThemeSetParams, TokenDeltaParams, TurnCancelParams, TurnCancelResult,
+    JSON_RPC_INVALID_PARAMS, JSON_RPC_METHOD_NOT_FOUND, RpcMethod, SESSION_SUMMARY_UPDATED_METHOD,
+    SelectionSetParams, SessionSummaryUpdatedParams, SettledParams, TOKEN_DELTA_METHOD,
+    TURN_ACTIVATED_METHOD, TURN_ENQUEUED_METHOD, TURN_SETTLED_METHOD, ThemeSetParams,
+    TokenDeltaParams, TurnCancelParams, TurnCancelResult,
 };
 use crate::store::{Store, StoreError};
 
@@ -301,6 +302,16 @@ fn notifications_for_event(event: ConversationEvent) -> Vec<Notification> {
         ConversationEvent::CompactionStatus { turn_id, active } => vec![Notification::new(
             COMPACTION_STATUS_METHOD.to_owned(),
             CompactionStatusParams { turn_id, active },
+        )],
+        ConversationEvent::SummaryUpdated {
+            session_id,
+            summary,
+        } => vec![Notification::new(
+            SESSION_SUMMARY_UPDATED_METHOD.to_owned(),
+            SessionSummaryUpdatedParams {
+                session_id,
+                summary,
+            },
         )],
     }
 }

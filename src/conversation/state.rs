@@ -10,12 +10,16 @@ use crate::config::KimiConfig;
 
 use super::persistence::ConversationPersistence;
 use super::transcript::{SettledKind, Transcript, TurnResult, TurnState};
-use super::{Command, ConversationEvent, ConversationStatus, NEEDS_CONFIGURATION_MESSAGE, TurnJob};
+use super::{
+    Command, ConversationEvent, ConversationStatus, NEEDS_CONFIGURATION_MESSAGE, SummaryJob,
+    TurnJob,
+};
 
 const PANIC_ERROR_KIND: &str = "panic";
 
 pub(super) type EventSink = Arc<dyn Fn(ConversationEvent) + Send + Sync + 'static>;
 pub(super) type TurnRunner = Arc<dyn Fn(TurnJob) + Send + Sync + 'static>;
+pub(super) type SummaryRunner = Arc<dyn Fn(SummaryJob) + Send + Sync + 'static>;
 
 pub(super) struct LoopState {
     transcript: Transcript,
@@ -29,6 +33,7 @@ pub(super) struct LoopState {
     command_tx: Sender<Command>,
     event_sink: EventSink,
     turn_runner: TurnRunner,
+    summary_runner: SummaryRunner,
     shutting_down: bool,
     shutdown_requested: Arc<AtomicBool>,
     persistence: Box<dyn ConversationPersistence>,
@@ -37,6 +42,12 @@ pub(super) struct LoopState {
     compaction: CompactionState,
     /// A compaction reported by the active turn, adopted only on its clean settle.
     pending_compaction: Option<(String, CompactionState)>,
+    /// Provider config used by the current session's turns, retained so the
+    /// post-settle summary task can reuse it. Reset when the session rolls over.
+    active_config: Option<KimiConfig>,
+    /// Whether a session-summary generation has already been requested for the
+    /// current session (one-shot; set on resume so resumed sessions never retitle).
+    summary_requested: bool,
 }
 
 impl LoopState {
@@ -44,6 +55,7 @@ impl LoopState {
         command_tx: Sender<Command>,
         event_sink: EventSink,
         turn_runner: TurnRunner,
+        summary_runner: SummaryRunner,
         shutdown_requested: Arc<AtomicBool>,
         persistence: Box<dyn ConversationPersistence>,
     ) -> Self {
@@ -56,11 +68,14 @@ impl LoopState {
             command_tx,
             event_sink,
             turn_runner,
+            summary_runner,
             shutting_down: false,
             shutdown_requested,
             persistence,
             compaction: CompactionState::default(),
             pending_compaction: None,
+            active_config: None,
+            summary_requested: false,
         }
     }
 
@@ -78,6 +93,12 @@ impl LoopState {
             }
             Command::CompactionStatus { turn_id, active } => {
                 (self.event_sink)(ConversationEvent::CompactionStatus { turn_id, active });
+            }
+            Command::SetSessionSummary {
+                session_id,
+                summary,
+            } => {
+                self.adopt_generated_summary(session_id, summary);
             }
             Command::Cancel { turn_id }
                 if self.transcript.active_id() == Some(turn_id.as_str()) =>
@@ -103,6 +124,7 @@ impl LoopState {
                 self.transcript.replace_with(turns);
                 self.compaction = compaction;
                 self.pending_compaction = None;
+                self.summary_requested = true;
                 let _ = respond_to.send(());
             }
             Command::Clear => self.clear(),
@@ -189,6 +211,7 @@ impl LoopState {
         if let Err(message) = self.persistence.on_settle(&turn_id, &result) {
             eprintln!("KQODE_SESSION_PERSISTENCE_ERROR: {message}");
         }
+        self.maybe_request_summary(&result);
         (self.event_sink)(ConversationEvent::Settled { turn_id, result });
         if self.is_shutting_down() {
             return;
@@ -209,6 +232,7 @@ impl LoopState {
             );
             return;
         };
+        self.active_config = Some(config.clone());
         let cancel = CancellationToken::new();
         self.active_cancel = Some(cancel.clone());
         let command_tx = self.command_tx.clone();
@@ -275,6 +299,49 @@ impl LoopState {
             .collect()
     }
 
+    /// Requests a background session-summary generation after the first completed
+    /// turn of a fresh session. One-shot: subsequent completed turns and resumed
+    /// sessions never re-request. A missing session id or provider config is a
+    /// no-op, so the first-prompt placeholder stands (see R8).
+    fn maybe_request_summary(&mut self, result: &TurnResult) {
+        if self.summary_requested || result.kind != SettledKind::Completed {
+            return;
+        }
+        let Some(session_id) = self.persistence.current_session_id() else {
+            return;
+        };
+        let Some(config) = self.active_config.clone() else {
+            return;
+        };
+        let Some(first) = self.completed_history().into_iter().next() else {
+            return;
+        };
+        self.summary_requested = true;
+        (self.summary_runner)(SummaryJob {
+            session_id,
+            first_prompt: first.user,
+            first_response: first.assistant,
+            config,
+            command_tx: self.command_tx.clone(),
+        });
+    }
+
+    /// Adopts a generated summary produced off-thread: persists it (best-effort)
+    /// and emits [`ConversationEvent::SummaryUpdated`] so the live title upgrades.
+    /// A summary for a session we have since left (resume/clear) is dropped.
+    fn adopt_generated_summary(&mut self, session_id: String, summary: String) {
+        if self.persistence.current_session_id().as_deref() != Some(session_id.as_str()) {
+            return;
+        }
+        if let Err(message) = self.persistence.on_summary_generated(&summary) {
+            eprintln!("KQODE_SESSION_PERSISTENCE_ERROR: {message}");
+        }
+        (self.event_sink)(ConversationEvent::SummaryUpdated {
+            session_id,
+            summary,
+        });
+    }
+
     fn clear(&mut self) {
         // Force the active turn (if any) to settle `cancelled` and suppress its
         // remaining events, matching the abandon-active semantics.
@@ -289,6 +356,8 @@ impl LoopState {
         }
         self.compaction = CompactionState::default();
         self.pending_compaction = None;
+        self.summary_requested = false;
+        self.active_config = None;
         self.configs.clear();
         self.transcript.drop_pending();
         self.transcript.drop_settled();

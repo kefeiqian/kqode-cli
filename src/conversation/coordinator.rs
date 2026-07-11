@@ -4,7 +4,10 @@ use std::sync::mpsc::{self, Sender};
 use std::thread::{self, JoinHandle};
 
 use super::state::LoopState;
-use super::{Command, ConversationEvent, ConversationPersistence, TurnJob, default_runner};
+use super::{
+    Command, ConversationEvent, ConversationPersistence, SummaryJob, TurnJob, default_runner,
+    default_summary_runner,
+};
 
 /// Handle used by backend request handlers to command the coordinator.
 pub struct CoordinatorHandle {
@@ -60,10 +63,31 @@ impl Coordinator {
         E: Fn(ConversationEvent) + Send + Sync + 'static,
         R: Fn(TurnJob) + Send + Sync + 'static,
     {
+        Self::start_with_runners(
+            event_sink,
+            turn_runner,
+            default_summary_runner(),
+            persistence,
+        )
+    }
+
+    #[must_use]
+    pub fn start_with_runners<E, R, S>(
+        event_sink: E,
+        turn_runner: R,
+        summary_runner: S,
+        persistence: Box<dyn ConversationPersistence>,
+    ) -> CoordinatorHandle
+    where
+        E: Fn(ConversationEvent) + Send + Sync + 'static,
+        R: Fn(TurnJob) + Send + Sync + 'static,
+        S: Fn(SummaryJob) + Send + Sync + 'static,
+    {
         let (sender, receiver) = mpsc::channel();
         let loop_sender = sender.clone();
         let sink = Arc::new(event_sink);
         let runner = Arc::new(turn_runner);
+        let summary = Arc::new(summary_runner);
         let shutdown_requested = Arc::new(AtomicBool::new(false));
         let loop_shutdown_requested = Arc::clone(&shutdown_requested);
         let join = thread::spawn(move || {
@@ -71,6 +95,7 @@ impl Coordinator {
                 loop_sender,
                 sink,
                 runner,
+                summary,
                 loop_shutdown_requested,
                 persistence,
             );

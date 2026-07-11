@@ -29,6 +29,9 @@ pub trait ConversationPersistence: Send {
     fn on_clear(&mut self, turns: &[TranscriptTurn]) -> Result<(), String>;
     /// Persists a compaction summary covering rounds up to `covered_through_seq`.
     fn on_compacted(&mut self, covered_through_seq: u64, summary: &str) -> Result<(), String>;
+    /// Persists a generated session summary as durable truth and updates the
+    /// index row so it survives a rebuild.
+    fn on_summary_generated(&mut self, summary: &str) -> Result<(), String>;
     /// Returns the durable session currently attached to new submits, if any.
     fn current_session_id(&self) -> Option<String>;
     /// Attaches future submits to `session`.
@@ -58,6 +61,10 @@ impl ConversationPersistence for NoopConversationPersistence {
     }
 
     fn on_compacted(&mut self, _covered_through_seq: u64, _summary: &str) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn on_summary_generated(&mut self, _summary: &str) -> Result<(), String> {
         Ok(())
     }
 
@@ -227,6 +234,25 @@ impl ConversationPersistence for SessionPersistence {
         self.update_modified()
     }
 
+    fn on_summary_generated(&mut self, summary: &str) -> Result<(), String> {
+        let Some(session) = self.current_session.as_mut() else {
+            return Ok(());
+        };
+        append_event(
+            std::path::Path::new(&session.session_log_path),
+            &SessionLogEvent::SummaryGenerated {
+                summary: summary.to_owned(),
+                at_ms: now_ms(),
+            },
+        )
+        .map_err(|error| format!("could not append summary-generated event: {error}"))?;
+        session.first_prompt_summary = Some(summary.to_owned());
+        session.modified_at = now_ms();
+        self.store
+            .upsert_session(session)
+            .map_err(|error| format!("could not update session row: {error}"))
+    }
+
     fn current_session_id(&self) -> Option<String> {
         self.current_session
             .as_ref()
@@ -332,6 +358,46 @@ mod tests {
             event,
             SessionLogEvent::Compacted { covered_through_seq: 0, summary, .. }
                 if summary == "SUMMARY of round 0"
+        )));
+    }
+
+    #[test]
+    fn on_summary_generated_overrides_placeholder_and_appends_event() {
+        let _lock = test_env::lock();
+        let dir = tempfile::tempdir().expect("temp dir");
+        let workspace = dir.path().join("workspace");
+        fs::create_dir_all(&workspace).unwrap();
+        let _cwd = switch_to(&workspace);
+        let store = Store::open_or_bootstrap_at(dir.path().join("kqode.db")).unwrap();
+        let mut persistence = SessionPersistence::new(store.clone());
+
+        persistence
+            .on_enqueue(
+                "turn-a",
+                0,
+                "a very long first prompt that makes a poor title",
+            )
+            .unwrap();
+        persistence
+            .on_settle("turn-a", &TurnResult::completed("done".to_owned(), None))
+            .unwrap();
+        persistence
+            .on_summary_generated("Fix the parser bug")
+            .unwrap();
+
+        // The stored summary is upgraded from the first-prompt placeholder (R14).
+        let sessions = store.list_resumable_sessions().unwrap();
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(
+            sessions[0].first_prompt_summary.as_deref(),
+            Some("Fix the parser bug")
+        );
+
+        // The generated summary is appended to the JSONL truth (R13).
+        let events = read_log(Path::new(&sessions[0].session_log_path));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            SessionLogEvent::SummaryGenerated { summary, .. } if summary == "Fix the parser bug"
         )));
     }
 
