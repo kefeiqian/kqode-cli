@@ -13,7 +13,11 @@ use crate::provider::ProviderId;
 use crate::provider::registry::{KeyResolver, KeySource};
 
 /// Stable OS-keychain service namespace for provider API keys.
-pub const KEYCHAIN_SERVICE: &str = "dev.kqode.providers";
+///
+/// Reverse-DNS for the product domain (`nincere.com`, app `kqode`), matching the
+/// platform convention for keychain service identifiers. Kept identical across
+/// dev and prod so a user's stored key resolves for every build.
+pub const KEYCHAIN_SERVICE: &str = "com.nincere.kqode.providers";
 
 /// Environment variable selecting the keychain backend. Set to `mock` to use an
 /// in-memory keyring instead of the real OS keychain.
