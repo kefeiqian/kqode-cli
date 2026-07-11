@@ -3,13 +3,25 @@ import { displayWidth, measureGraphemes } from '@libs/text/displayWidth.ts';
 const ELLIPSIS = '…';
 const MIDDLE_MARKER = '...';
 
-export function homeRelativePath(pathValue: string, homeDir: string, maxWidth: number): string {
+/**
+ * Home-relative display form of `pathValue`, without any width truncation.
+ *
+ * Paths under `homeDir` render with a leading `~`, the home directory itself
+ * collapses to `~`, and paths elsewhere stay absolute. Separators follow the
+ * platform implied by `pathValue`/`homeDir`. Callers that size a column measure
+ * this untruncated form first, then pass the resulting width to
+ * `homeRelativePath` so the column only collapses when it genuinely must.
+ */
+export function toHomeRelativeDisplay(pathValue: string, homeDir: string): string {
   const separator = preferredSeparator(pathValue, homeDir);
   const normalizedPath = normalizeSeparators(pathValue, separator);
   const normalizedHome = trimTrailingSeparator(normalizeSeparators(homeDir, separator), separator);
-  const homeRelative = toHomeRelative(normalizedPath, normalizedHome, separator);
+  return toHomeRelative(normalizedPath, normalizedHome, separator);
+}
 
-  return middleTruncate(homeRelative, separator, maxWidth);
+export function homeRelativePath(pathValue: string, homeDir: string, maxWidth: number): string {
+  const separator = preferredSeparator(pathValue, homeDir);
+  return middleTruncate(toHomeRelativeDisplay(pathValue, homeDir), separator, maxWidth);
 }
 
 function toHomeRelative(pathValue: string, homeDir: string, separator: string): string {

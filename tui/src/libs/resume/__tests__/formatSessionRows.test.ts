@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SessionSummary } from '@contracts/backend/index.ts';
 import { SESSION_STATUS_CURRENT, SESSION_STATUS_IDLE } from '@contracts/backend/index.ts';
 import { displayWidth } from '@libs/text/displayWidth.ts';
-import { formatResumeHeader, formatResumeRow } from '@libs/resume/formatSessionRows.ts';
+import { formatResumeHeader, formatResumeRow, resumeFolderContentWidth } from '@libs/resume/formatSessionRows.ts';
 
 const NOW = Date.UTC(2026, 6, 10, 3, 0, 0);
 const COLUMNS = 96;
@@ -32,6 +32,10 @@ function statusStart(line: string): number {
     : columnStart(line, SESSION_STATUS_IDLE);
 }
 
+function folderWidthFor(...sessions: SessionSummary[]): number {
+  return resumeFolderContentWidth(sessions, HOME_DIR);
+}
+
 describe('formatSessionRows', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -43,12 +47,16 @@ describe('formatSessionRows', () => {
   });
 
   it('aligns cells with the header across differing row content', () => {
-    const header = formatResumeHeader(COLUMNS);
-    const rows = [
-      formatResumeRow(session({ summary: 'Short', status: SESSION_STATUS_CURRENT, folder: 'C:\\repo' }), 0, COLUMNS, HOME_DIR),
-      formatResumeRow(session({ summary: 'A much longer summary value', folder: 'C:\\repo\\deep\\leaf' }), 1, COLUMNS, HOME_DIR),
-      formatResumeRow(session({ summary: 'Tabs\tand\nnewlines', folder: 'C:\\other' }), 2, COLUMNS, HOME_DIR)
+    const sessions = [
+      session({ summary: 'Short', status: SESSION_STATUS_CURRENT, folder: 'C:\\repo' }),
+      session({ summary: 'A much longer summary value', folder: 'C:\\repo\\deep\\leaf' }),
+      session({ summary: 'Tabs\tand\nnewlines', folder: 'C:\\other' })
     ];
+    const folderWidth = folderWidthFor(...sessions);
+    const header = formatResumeHeader(COLUMNS, folderWidth);
+    const rows = sessions.map((entry, index) =>
+      formatResumeRow(entry, index, COLUMNS, HOME_DIR, folderWidth)
+    );
 
     for (const row of rows) {
       expect(statusStart(row)).toBe(columnStart(header, 'Status'));
@@ -58,13 +66,10 @@ describe('formatSessionRows', () => {
   });
 
   it('keeps following columns aligned after truncating a long summary', () => {
-    const header = formatResumeHeader(72);
-    const row = formatResumeRow(
-      session({ summary: 'This summary is intentionally far too long for its column' }),
-      0,
-      72,
-      HOME_DIR
-    );
+    const entry = session({ summary: 'This summary is intentionally far too long for its column' });
+    const folderWidth = folderWidthFor(entry);
+    const header = formatResumeHeader(72, folderWidth);
+    const row = formatResumeRow(entry, 0, 72, HOME_DIR, folderWidth);
 
     expect(row).toContain('…');
     expect(columnStart(row, 'Idle')).toBe(columnStart(header, 'Status'));
@@ -72,28 +77,39 @@ describe('formatSessionRows', () => {
   });
 
   it('measures wide glyphs by display width when aligning columns', () => {
-    const header = formatResumeHeader(COLUMNS);
-    const row = formatResumeRow(session({ summary: '修复表格 😀 columns' }), 0, COLUMNS, HOME_DIR);
+    const entry = session({ summary: '修复表格 😀 columns' });
+    const folderWidth = folderWidthFor(entry);
+    const header = formatResumeHeader(COLUMNS, folderWidth);
+    const row = formatResumeRow(entry, 0, COLUMNS, HOME_DIR, folderWidth);
 
     expect(columnStart(row, 'Idle')).toBe(columnStart(header, 'Status'));
     expect(columnStart(row, '5m ago')).toBe(columnStart(header, 'Modified'));
   });
 
   it('clips rows to the requested safe width on narrow terminals', () => {
-    const row = formatResumeRow(session({ summary: 'Long summary', folder: 'C:\\very\\long\\folder' }), 0, 32, HOME_DIR);
+    const entry = session({ summary: 'Long summary', folder: 'C:\\very\\long\\folder' });
+    const row = formatResumeRow(entry, 0, 32, HOME_DIR, folderWidthFor(entry));
 
     expect(displayWidth(row)).toBeLessThanOrEqual(32);
     expect(row).toContain('Idle');
   });
 
-  it('renders the folder cell relative to home with a preserved tail', () => {
-    const row = formatResumeRow(
-      session({ folder: 'C:\\Users\\kefeiqian\\Projects\\KQode\\blog-v0.1' }),
-      0,
-      COLUMNS,
-      HOME_DIR
-    );
+  it('shows the full home-relative folder when the column has room', () => {
+    const entry = session({
+      folder: 'C:\\Users\\kefeiqian\\Projects\\KQode\\target\\kqode-test-workspaces\\workspace'
+    });
+    const row = formatResumeRow(entry, 0, 140, HOME_DIR, folderWidthFor(entry));
 
-    expect(row).toContain('~\\...\\blog-v0.1');
+    expect(row).toContain('~\\Projects\\KQode\\target\\kqode-test-workspaces\\workspace');
+    expect(row).not.toContain('\\...\\');
+  });
+
+  it('collapses the folder middle only when the column is too narrow', () => {
+    const entry = session({
+      folder: 'C:\\Users\\kefeiqian\\Projects\\KQode\\target\\kqode-test-workspaces\\workspace'
+    });
+    const row = formatResumeRow(entry, 0, 72, HOME_DIR, folderWidthFor(entry));
+
+    expect(row).toContain('~\\...\\workspace');
   });
 });

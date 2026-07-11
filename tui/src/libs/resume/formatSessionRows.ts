@@ -1,5 +1,5 @@
 import type { SessionSummary } from '@contracts/backend/index.ts';
-import { homeRelativePath } from '@libs/path/homeRelativePath.ts';
+import { homeRelativePath, toHomeRelativeDisplay } from '@libs/path/homeRelativePath.ts';
 import { displayWidth, measureGraphemes, padEndToWidth } from '@libs/text/displayWidth.ts';
 
 const STATUS_WIDTH = 8;
@@ -9,21 +9,49 @@ const RANK_WIDTH = 4;
 const GUTTER = 2;
 const MIN_SUMMARY_WIDTH = 12;
 const MIN_FOLDER_WIDTH = 10;
-const PREFERRED_FOLDER_WIDTH = 24;
 
-export function formatResumeHeader(columns: number): string {
-  return formatLine(columns, '#', 'Summary', 'Status', 'Modified', 'Created', 'Folder');
+/**
+ * Widest home-relative folder display width across `sessions`, in columns.
+ *
+ * The resume table sizes its shared Folder column to this so a folder path
+ * renders in full whenever the terminal has room, collapsing its middle only
+ * when the column must shrink below the path width on a narrow terminal.
+ */
+export function resumeFolderContentWidth(
+  sessions: readonly SessionSummary[],
+  homeDir: string
+): number {
+  let width = 0;
+  for (const session of sessions) {
+    width = Math.max(width, displayWidth(toHomeRelativeDisplay(session.folder, homeDir)));
+  }
+  return width;
+}
+
+export function formatResumeHeader(columns: number, folderContentWidth: number): string {
+  return formatLine(
+    columns,
+    folderContentWidth,
+    '#',
+    'Summary',
+    'Status',
+    'Modified',
+    'Created',
+    'Folder'
+  );
 }
 
 export function formatResumeRow(
   session: SessionSummary,
   index: number,
   columns: number,
-  homeDir: string
+  homeDir: string,
+  folderContentWidth: number
 ): string {
-  const { folderWidth } = resolveColumnWidths(columns);
+  const { folderWidth } = resolveColumnWidths(columns, folderContentWidth);
   return formatLine(
     columns,
+    folderContentWidth,
     `${index + 1}.`,
     session.summary,
     session.status,
@@ -35,6 +63,7 @@ export function formatResumeRow(
 
 function formatLine(
   columns: number,
+  folderContentWidth: number,
   rank: string,
   summary: string,
   status: string,
@@ -42,7 +71,7 @@ function formatLine(
   created: string,
   folder: string
 ): string {
-  const { safeColumns, summaryWidth, folderWidth } = resolveColumnWidths(columns);
+  const { safeColumns, summaryWidth, folderWidth } = resolveColumnWidths(columns, folderContentWidth);
   const row = [
     pad(truncate(rank, RANK_WIDTH), RANK_WIDTH),
     pad(truncate(summary, summaryWidth), summaryWidth),
@@ -54,7 +83,10 @@ function formatLine(
   return clipLine(row, safeColumns);
 }
 
-function resolveColumnWidths(columns: number): {
+function resolveColumnWidths(
+  columns: number,
+  folderContentWidth: number
+): {
   safeColumns: number;
   summaryWidth: number;
   folderWidth: number;
@@ -62,10 +94,8 @@ function resolveColumnWidths(columns: number): {
   const safeColumns = Math.max(1, columns);
   const fixedWidth = RANK_WIDTH + STATUS_WIDTH + MODIFIED_WIDTH + CREATED_WIDTH + GUTTER * 5;
   const flexibleWidth = safeColumns - fixedWidth;
-  const folderWidth = Math.max(
-    MIN_FOLDER_WIDTH,
-    Math.min(PREFERRED_FOLDER_WIDTH, flexibleWidth - MIN_SUMMARY_WIDTH)
-  );
+  const maxFolderWidth = flexibleWidth - MIN_SUMMARY_WIDTH;
+  const folderWidth = Math.max(MIN_FOLDER_WIDTH, Math.min(folderContentWidth, maxFolderWidth));
   const summaryWidth = Math.max(MIN_SUMMARY_WIDTH, flexibleWidth - folderWidth);
   return { safeColumns, summaryWidth, folderWidth };
 }

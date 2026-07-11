@@ -1,6 +1,8 @@
+import os from 'node:os';
 import { atom } from 'jotai';
 import type { SessionSummary } from '@contracts/backend/index.ts';
 import { clamp } from '@libs/math/clamp.ts';
+import { resumeFolderContentWidth } from '@libs/resume/formatSessionRows.ts';
 
 export const ResumeStatus = {
   Loading: 'loading',
@@ -81,3 +83,13 @@ export const visibleResumeSessionsAtom = atom((get) => {
   const offset = get(resumeWindowOffsetAtom);
   return sessions.slice(offset, offset + get(resumeVisibleRowsAtom));
 });
+
+/**
+ * Shared Folder-column content width for the resume table, derived from every
+ * loaded session (not just the visible window) so the column stays aligned and
+ * stable while the list scrolls. Both the table header and the session rows
+ * size their Folder column to this value.
+ */
+export const resumeFolderContentWidthAtom = atom((get) =>
+  resumeFolderContentWidth(get(resumeSessionsAtom), os.homedir())
+);

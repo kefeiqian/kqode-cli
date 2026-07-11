@@ -19,6 +19,7 @@ import {
   highlightedResumeSessionAtom,
   ResumeStatus,
   resumeErrorAtom,
+  resumeFolderContentWidthAtom,
   resumeSessionsAtom,
   resumeStatusAtom,
   resumeVisibleRowsAtom,
@@ -38,6 +39,7 @@ export function ResumePanel() {
   const status = useAtomValue(resumeStatusAtom);
   const error = useAtomValue(resumeErrorAtom);
   const windowOffset = useAtomValue(resumeWindowOffsetAtom);
+  const folderContentWidth = useAtomValue(resumeFolderContentWidthAtom);
   const setVisibleRows = useSetAtom(resumeVisibleRowsAtom);
   const { refreshSessions, resumeSelected } = useResumeBackend();
   const layout = useCommandSurfaceLayout({ panelRows, chromeWithGap: RESUME_PANEL_CHROME_ROWS });
@@ -51,7 +53,7 @@ export function ResumePanel() {
   // blank row keeps the same budget in the non-loaded states.
   const header =
     status === ResumeStatus.Loaded ? (
-      <Text>{`${SELECTION_GUTTER}${formatResumeHeader(safeChromeColumns - SELECTION_GUTTER_WIDTH)}`}</Text>
+      <Text>{`${SELECTION_GUTTER}${formatResumeHeader(safeChromeColumns - SELECTION_GUTTER_WIDTH, folderContentWidth)}`}</Text>
     ) : (
       <Text> </Text>
     );

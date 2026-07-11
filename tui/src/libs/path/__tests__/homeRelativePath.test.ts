@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { displayWidth } from '@libs/text/displayWidth.ts';
-import { homeRelativePath } from '@libs/path/homeRelativePath.ts';
+import { homeRelativePath, toHomeRelativeDisplay } from '@libs/path/homeRelativePath.ts';
 
 describe('homeRelativePath', () => {
+  it('exposes the untruncated home-relative display form for sizing', () => {
+    expect(
+      toHomeRelativeDisplay('C:\\Users\\kefeiqian\\Projects\\KQode\\deep\\leaf', 'C:\\Users\\kefeiqian')
+    ).toBe('~\\Projects\\KQode\\deep\\leaf');
+  });
+
   it('renders a path under home with a tilde and preserved tail segment', () => {
     const result = homeRelativePath(
       'C:\\Users\\kefeiqian\\Projects\\KQode\\blog-v0.1',
