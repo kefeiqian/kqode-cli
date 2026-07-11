@@ -2,7 +2,7 @@ import { createStore } from 'jotai';
 import { describe, expect, it } from 'vitest';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
 import { BodyPane } from '@components/BodyPane.tsx';
-import { bodySelectionAtom } from '@state/ui/index.ts';
+import { bodySelectionAtom, copyModeActiveAtom } from '@state/ui/index.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
 describe('BodyPane', () => {
@@ -45,6 +45,7 @@ describe('BodyPane', () => {
 
   it('preserves glyphs across the selection highlight split', () => {
     const store = createStore();
+    store.set(copyModeActiveAtom, true);
     store.set(bodySelectionAtom, {
       anchor: { rowIndex: 0, column: 0 },
       focus: { rowIndex: 0, column: 4 }

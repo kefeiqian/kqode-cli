@@ -11,6 +11,7 @@ import { isAllowedLinkHref, sanitizeLinkHref } from '@libs/markdown/linkSegment.
 import {
   bodyScrollOffsetRowsAtom,
   bodySelectionAtom,
+  copyModeActiveAtom,
   displayedBodyEntriesAtom,
   layoutAtom,
   safeChromeColumnsAtom
@@ -52,6 +53,7 @@ export function BodyPane({
   const atomScrollOffsetRows = useAtomValue(bodyScrollOffsetRowsAtom);
   const theme = useAtomValue(activeThemeAtom);
   const selection = useAtomValue(bodySelectionAtom);
+  const copyModeActive = useAtomValue(copyModeActiveAtom);
 
   const resolvedEntries = entries ?? atomEntries ?? DEFAULT_BODY_ENTRIES;
   const resolvedRows = rows ?? atomLayout.bodyRows;
@@ -70,8 +72,12 @@ export function BodyPane({
   const isScrollable = allRows.length > visibleRows;
   const renderedRows = isScrollable ? visibleRows : Math.min(visibleRows, allRows.length + 1);
   const contentColumns = isScrollable ? Math.max(1, visibleColumns - 1) : visibleColumns;
+  // Only paint the highlight while selection mode is active, so it never lingers
+  // over the transcript after exit or points at unrelated rows later.
   const selectionBoundsValue =
-    selection === null ? null : selectionBounds(selection.anchor, selection.focus);
+    !copyModeActive || selection === null
+      ? null
+      : selectionBounds(selection.anchor, selection.focus);
   const scrollbarCells = isScrollable
     ? renderScrollbar({
         rows: visibleRows,
@@ -177,7 +183,7 @@ function renderHighlightedContent(
   selectionColor: string
 ): ReactNode {
   const padding = shouldPadText
-    ? ' '.repeat(Math.max(0, paddedTextColumns - row.text.length))
+    ? ' '.repeat(Math.max(0, paddedTextColumns - displayWidth(row.text)))
     : '';
 
   return (

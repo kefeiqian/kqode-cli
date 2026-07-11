@@ -17,6 +17,7 @@ import {
 } from '@libs/terminal/mouse.ts';
 import {
   bodyEntriesAtom,
+  bodySelectionAtom,
   columnsTestOverrideAtom,
   copyModeActiveAtom,
   gitStatusLabelAtom,
@@ -507,11 +508,16 @@ describe('HomeScreen', () => {
     await flushInput();
     expect(store.get(copyModeActiveAtom)).toBe(true);
     expect(lastFrame() ?? '').toContain(COPY_MODE_HINT);
+    store.set(bodySelectionAtom, {
+      anchor: { rowIndex: 0, column: 0 },
+      focus: { rowIndex: 0, column: 3 }
+    });
 
     stdin.write('z');
     await flushInput();
 
     expect(store.get(copyModeActiveAtom)).toBe(false);
+    expect(store.get(bodySelectionAtom)).toBeNull();
     expect(store.get(composerStateAtom).text).toBe('');
     expect(lastFrame() ?? '').not.toContain(COPY_MODE_HINT);
   });

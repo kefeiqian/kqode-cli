@@ -2,7 +2,7 @@ import { useApp, useInput } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { ArmedAction, COPY_MODE_INPUT_KEY } from '@constants/ui.ts';
 import { isMouseInput } from '@libs/terminal/mouse.ts';
-import { armedActionAtom, copyModeActiveAtom } from '@state/ui/index.ts';
+import { armedActionAtom, clearBodySelectionAtom, copyModeActiveAtom } from '@state/ui/index.ts';
 
 /**
  * Global key handling that stays active in every state — the home screen, the
@@ -22,6 +22,7 @@ export function useGlobalKeys(): void {
   const setArmedAction = useSetAtom(armedActionAtom);
   const copyModeActive = useAtomValue(copyModeActiveAtom);
   const setCopyModeActive = useSetAtom(copyModeActiveAtom);
+  const clearBodySelection = useSetAtom(clearBodySelectionAtom);
 
   useInput((input, key) => {
     const isCtrlC = key.ctrl === true && input === 'c';
@@ -37,6 +38,7 @@ export function useGlobalKeys(): void {
       }
       setCopyModeActive(false);
       setArmedAction(null);
+      clearBodySelection();
       return;
     }
 
