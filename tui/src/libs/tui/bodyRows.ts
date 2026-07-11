@@ -20,6 +20,7 @@ export type BodyEntry = {
 export type BodyRow = {
   backgroundColor?: string;
   color?: string;
+  continuesPrevious?: boolean;
   fillColumns?: boolean;
   marker?: string;
   markerColor?: string;
@@ -33,6 +34,7 @@ export type BodyRow = {
 export type BodyRowStructure = {
   backgroundColorToken?: ThemeColorToken;
   colorToken?: ThemeColorToken;
+  continuesPrevious?: boolean;
   fillColumns?: boolean;
   marker?: string;
   markerColorToken?: ThemeColorToken;
@@ -90,6 +92,7 @@ function applyTheme(row: BodyRowStructure, theme: ThemeDefinition): BodyRow {
     backgroundColor:
       row.backgroundColorToken === undefined ? undefined : theme.colors[row.backgroundColorToken],
     color: row.colorToken === undefined ? undefined : theme.colors[row.colorToken],
+    continuesPrevious: row.continuesPrevious,
     fillColumns: row.fillColumns,
     marker: row.marker,
     markerColor:
@@ -160,9 +163,10 @@ function computeBodyRows(entry: BodyEntry, columns: number): BodyRowStructure[] 
     return toAssistantRows(entry.text, columns, entry.id?.startsWith('stream-') === true);
   }
 
-  return wrapBodyText(labelForEntry(entry), columns).map((text) => ({
+  return wrapBodyLines(labelForEntry(entry), columns).map((line) => ({
     colorToken: colorTokenForEntry(entry.kind),
-    text
+    continuesPrevious: line.continuesPrevious,
+    text: line.text
   }));
 }
 
@@ -183,14 +187,15 @@ function toAssistantRows(text: string, columns: number, streaming = false): Body
     // Fail safe: markdown parsing must never break transcript rendering.
   }
 
-  const wrappedText = wrapBodyText(text, contentColumns);
+  const wrappedText = wrapBodyLines(text, contentColumns);
 
   return wrappedText.map((line, index): BodyRowStructure => ({
     colorToken: 'foreground',
+    continuesPrevious: line.continuesPrevious,
     marker: index === 0 ? ASSISTANT_MESSAGE_PREFIX : continuationPrefix,
     markerColorToken: index === 0 ? 'accentBlue' : 'foreground',
-    segments: [{ colorToken: 'foreground', text: line }],
-    text: line
+    segments: [{ colorToken: 'foreground', text: line.text }],
+    text: line.text
   }));
 }
 
@@ -200,12 +205,13 @@ function toPromptRows(text: string, columns: number): BodyRowStructure[] {
   // continuation rows replace the visible prefix with spaces to align wrapped text.
   const textColumns = Math.max(1, columns - promptIndent - USER_MESSAGE_HORIZONTAL_PADDING);
   const continuationPrefix = ' '.repeat(promptIndent);
-  const wrappedText = wrapBodyText(text, textColumns);
+  const wrappedText = wrapBodyLines(text, textColumns);
   const textRows = wrappedText.map((line, index): BodyRowStructure => ({
     backgroundColorToken: 'messageBackground',
     colorToken: 'foreground',
+    continuesPrevious: line.continuesPrevious,
     fillColumns: true,
-    text: `${index === 0 ? promptPrefix() : continuationPrefix}${line}`
+    text: `${index === 0 ? promptPrefix() : continuationPrefix}${line.text}`
   }));
 
   return [
@@ -257,24 +263,29 @@ function labelForEntry(entry: BodyEntry): string {
   return entry.text;
 }
 
+type WrappedBodyLine = { text: string; continuesPrevious: boolean };
+
 // Splits on hard line breaks (`\n`, normalizing `\r\n`/`\r` first) so multi-line
 // backend output, errors, and prompts all keep their author-intended rows, then
-// wraps each line to `columns`. The display sanitizer preserves `\n` as a real
-// layout character, so newlines here are trusted content rather than escaped.
-function wrapBodyText(text: string, columns: number): string[] {
-  const wrappedRows: string[] = [];
+// wraps each line to `columns`. `continuesPrevious` marks the soft-wrap slices
+// (every slice after the first within one hard line) so copy/selection can
+// rejoin a wrapped logical line while hard line breaks start a fresh line. The
+// display sanitizer preserves `\n` as a real layout character, so newlines here
+// are trusted content rather than escaped.
+function wrapBodyLines(text: string, columns: number): WrappedBodyLine[] {
+  const wrapped: WrappedBodyLine[] = [];
   const hardLines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
 
   for (const line of hardLines) {
     if (line.length === 0) {
-      wrappedRows.push('');
+      wrapped.push({ text: '', continuesPrevious: false });
       continue;
     }
 
     for (let start = 0; start < line.length; start += columns) {
-      wrappedRows.push(line.slice(start, start + columns));
+      wrapped.push({ text: line.slice(start, start + columns), continuesPrevious: start > 0 });
     }
   }
 
-  return wrappedRows;
+  return wrapped;
 }

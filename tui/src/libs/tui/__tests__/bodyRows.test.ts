@@ -158,3 +158,33 @@ describe('resolveBodyRows theming and wrapping', () => {
     expect(settledRows.at(-1)?.segments?.[0]?.bold).toBe(true);
   });
 });
+
+describe('resolveBodyRows soft-wrap continuation flags', () => {
+  it('marks soft-wrap slices of a long line as continuations', () => {
+    const rows = resolveBodyRows(
+      [{ kind: BodyEntryKind.Success, text: 'y'.repeat(WIDE_COLUMNS + 5) }],
+      WIDE_COLUMNS,
+      TALL_ROWS,
+      DEFAULT_THEME
+    );
+
+    expect(rows.length).toBeGreaterThan(1);
+    expect(rows[0].continuesPrevious ?? false).toBe(false);
+    expect(rows[1].continuesPrevious).toBe(true);
+  });
+
+  it('does not mark a hard line break as a continuation', () => {
+    const rows = resolveBodyRows(
+      [{ kind: BodyEntryKind.User, text: 'alpha\nbeta' }],
+      WIDE_COLUMNS,
+      TALL_ROWS,
+      DEFAULT_THEME
+    );
+
+    const textRows = rows.filter(
+      (row) => row.text.includes('alpha') || row.text.includes('beta')
+    );
+    expect(textRows).toHaveLength(2);
+    expect(textRows.every((row) => (row.continuesPrevious ?? false) === false)).toBe(true);
+  });
+});
