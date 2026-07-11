@@ -148,6 +148,25 @@ describe('systemClipboard', () => {
     const [, args] = execFileMock.mock.calls[0];
     expect(args).toEqual([]);
   });
+
+  it('spawns the clipboard child hidden so it cannot revert the terminal title', async () => {
+    // On Windows, spawning `powershell.exe` as a console child that shares the
+    // TUI's ConPTY reverts the OSC 2 window title to the child's default
+    // ("Windows PowerShell"). `windowsHide: true` gives the child its own hidden
+    // console so it never clobbers the session title; it is a no-op elsewhere.
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    execFileMock.mockImplementation((_command, _args, _options, callback) => {
+      complete(callback, null, '');
+      return childProcess();
+    });
+
+    await systemClipboard.readText();
+    await systemClipboard.writeText('value');
+
+    for (const call of execFileMock.mock.calls) {
+      expect(call[2]).toMatchObject({ windowsHide: true });
+    }
+  });
 });
 
 function childProcess(stdinEnd = vi.fn()) {

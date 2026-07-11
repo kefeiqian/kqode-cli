@@ -128,7 +128,13 @@ function runClipboardCommand(command: ClipboardCommand, input: string | undefine
     const child = execFile(
       command.command,
       [...command.args],
-      { encoding: 'utf8', timeout: CLIPBOARD_TIMEOUT_MS },
+      // `windowsHide` gives the spawned child (e.g. `powershell.exe` for the
+      // Windows clipboard) its own hidden console instead of sharing the TUI's
+      // ConPTY. Without it, Windows sets the shared console title to the child's
+      // default and ConPTY emits it, reverting the OSC 2 session window title to
+      // "Windows PowerShell" on every copy/paste. It is a no-op on other
+      // platforms.
+      { encoding: 'utf8', timeout: CLIPBOARD_TIMEOUT_MS, windowsHide: true },
       (error, stdout) => {
         if (error) {
           reject(error);
