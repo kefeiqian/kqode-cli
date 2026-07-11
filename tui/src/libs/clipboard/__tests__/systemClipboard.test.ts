@@ -30,13 +30,35 @@ describe('resolveClipboardCommand', () => {
     expect(resolveClipboardCommand('win32')).toEqual({
       read: {
         command: POWERSHELL_COMMAND,
-        args: ['-NoProfile', '-Command', 'Get-Clipboard -Raw']
+        args: [
+          '-NoProfile',
+          '-Command',
+          '$t=Get-Clipboard -Raw; if($null -ne $t){$b=[System.Text.Encoding]::UTF8.GetBytes($t);$o=[Console]::OpenStandardOutput();$o.Write($b,0,$b.Length);$o.Flush()}'
+        ]
       },
       write: {
         command: POWERSHELL_COMMAND,
-        args: ['-NoProfile', '-Command', '$input | Set-Clipboard']
+        args: [
+          '-NoProfile',
+          '-Command',
+          '$in=[Console]::OpenStandardInput();$ms=[System.IO.MemoryStream]::new();$in.CopyTo($ms);Set-Clipboard -Value ([System.Text.Encoding]::UTF8.GetString($ms.ToArray()))'
+        ]
       }
     });
+  });
+
+  it('moves clipboard bytes as explicit UTF-8 on Windows in both directions', () => {
+    const commands = resolveClipboardCommand('win32');
+    const read = commands?.read.args.at(-1) ?? '';
+    const write = commands?.write.args.at(-1) ?? '';
+    // Read: clipboard text -> UTF-8 bytes -> raw stdout (bypasses OEM console encoding).
+    expect(read).toContain('Get-Clipboard -Raw');
+    expect(read).toContain('[System.Text.Encoding]::UTF8.GetBytes');
+    expect(read).toContain('OpenStandardOutput');
+    // Write: raw stdin bytes -> UTF-8 decode -> Set-Clipboard.
+    expect(write).toContain('OpenStandardInput');
+    expect(write).toContain('[System.Text.Encoding]::UTF8.GetString');
+    expect(write).toContain('Set-Clipboard');
   });
 
   it('returns wl-paste and wl-copy when Wayland is present', () => {

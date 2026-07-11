@@ -12,8 +12,18 @@ export const XSEL_COMMAND = 'xsel';
 
 const POWERSHELL_NO_PROFILE_ARG = '-NoProfile';
 const POWERSHELL_COMMAND_ARG = '-Command';
-const POWERSHELL_READ_SCRIPT = 'Get-Clipboard -Raw';
-const POWERSHELL_WRITE_SCRIPT = '$input | Set-Clipboard';
+// Windows PowerShell decodes piped stdin and encodes stdout with the OEM console
+// code page (e.g. GBK on zh-CN), while Node reads/writes these pipes as UTF-8, so
+// non-ASCII (CJK, emoji, box-drawing) corrupts on both copy and paste. Setting
+// `[Console]::InputEncoding`/`OutputEncoding` inside the `-Command` is too late:
+// `$input` and the redirected stdout handle are already bound before the script
+// runs. Instead move the bytes explicitly — read raw stdin and decode UTF-8 on
+// write, encode UTF-8 to raw stdout on read. Validated round-tripping CJK,
+// box-drawing, emoji, and accented text on a GBK console.
+const POWERSHELL_READ_SCRIPT =
+  '$t=Get-Clipboard -Raw; if($null -ne $t){$b=[System.Text.Encoding]::UTF8.GetBytes($t);$o=[Console]::OpenStandardOutput();$o.Write($b,0,$b.Length);$o.Flush()}';
+const POWERSHELL_WRITE_SCRIPT =
+  '$in=[Console]::OpenStandardInput();$ms=[System.IO.MemoryStream]::new();$in.CopyTo($ms);Set-Clipboard -Value ([System.Text.Encoding]::UTF8.GetString($ms.ToArray()))';
 const XCLIP_SELECTION_ARGS = ['-selection', 'clipboard'] as const;
 const XCLIP_READ_ARGS = ['-selection', 'clipboard', '-o'] as const;
 const XSEL_WRITE_ARGS = ['-ib'] as const;
