@@ -63,8 +63,11 @@ export function formatSessionWindowTitle(productName: string, summary: string): 
     return productName;
   }
 
-  return sanitized.length > SESSION_TITLE_MAX_LENGTH
-    ? `${sanitized.slice(0, SESSION_TITLE_MAX_LENGTH - 1)}…`
+  // Cap by code point (mirrors Rust `.chars().take(...)`) so an astral char at
+  // the boundary is never split into a lone surrogate.
+  const codePoints = Array.from(sanitized);
+  return codePoints.length > SESSION_TITLE_MAX_LENGTH
+    ? `${codePoints.slice(0, SESSION_TITLE_MAX_LENGTH - 1).join('')}…`
     : sanitized;
 }
 
