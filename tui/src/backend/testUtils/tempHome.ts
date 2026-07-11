@@ -21,11 +21,16 @@ export async function withTempHome<T>(
     'RUSTUP_HOME',
     ...(Object.keys(env) as EnvName[])
   ]);
+  // Derive the real home from HOME (Unix) or USERPROFILE (Windows, where HOME is
+  // usually unset) so the isolated run still points Cargo/Rustup at the real
+  // toolchain config rather than the empty temp home — otherwise a Windows build
+  // spawned by these tests fails with "rustup could not choose a version of cargo".
+  const realHome = previous.HOME ?? previous.USERPROFILE;
   process.env.HOME = home;
   process.env.USERPROFILE = home;
-  if (previous.HOME !== undefined) {
-    process.env.CARGO_HOME = previous.CARGO_HOME ?? path.join(previous.HOME, '.cargo');
-    process.env.RUSTUP_HOME = previous.RUSTUP_HOME ?? path.join(previous.HOME, '.rustup');
+  if (realHome !== undefined) {
+    process.env.CARGO_HOME = previous.CARGO_HOME ?? path.join(realHome, '.cargo');
+    process.env.RUSTUP_HOME = previous.RUSTUP_HOME ?? path.join(realHome, '.rustup');
   }
   for (const [name, value] of Object.entries(env)) {
     process.env[name as EnvName] = value;
