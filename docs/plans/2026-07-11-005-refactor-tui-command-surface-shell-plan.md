@@ -1,7 +1,7 @@
 ---
 title: "refactor: Shared command-surface shell"
 type: refactor
-status: active
+status: completed
 date: 2026-07-11
 origin: docs/brainstorms/2026-07-11-tui-command-surface-visual-consistency-requirements.md
 ---
