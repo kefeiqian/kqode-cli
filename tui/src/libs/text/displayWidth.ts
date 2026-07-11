@@ -54,6 +54,29 @@ export function padEndToWidth(text: string, width: number): string {
   return padding > 0 ? text + ' '.repeat(padding) : text;
 }
 
+/**
+ * Clips `text` to at most `width` display columns, never splitting a grapheme.
+ *
+ * Measures columns rather than code units, so a row of wide glyphs is cut at a
+ * clean grapheme boundary that fits the width instead of overflowing by a column
+ * per wide glyph. Text already within `width` is returned unchanged.
+ */
+export function clipToWidth(text: string, width: number): string {
+  if (displayWidth(text) <= width) {
+    return text;
+  }
+  let clipped = '';
+  let used = 0;
+  for (const grapheme of measureGraphemes(text)) {
+    if (used + grapheme.width > width) {
+      break;
+    }
+    clipped += grapheme.segment;
+    used += grapheme.width;
+  }
+  return clipped;
+}
+
 /** Previous grapheme boundary at or before `index`. */
 export function previousGraphemeStart(text: string, index: number): number {
   const safeIndex = Math.max(0, Math.min(index, text.length));

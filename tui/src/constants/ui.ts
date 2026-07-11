@@ -45,6 +45,19 @@ export const COMPOSER_MAX_HEIGHT_DIVISOR = 2;
  */
 export const CARET_SCROLL_SETTLE_MS = 100;
 
+// --- Selection rows ---
+
+/**
+ * Gutter glyphs prefixed to every selectable command-surface row by the shared
+ * `SelectableRow`. The chevron marks the highlighted row; the plain gutter keeps
+ * non-highlighted rows column-aligned with it. Both are `SELECTION_GUTTER_WIDTH`
+ * display columns wide, so columnar callers format their content at
+ * `safeChromeColumns - SELECTION_GUTTER_WIDTH` and let the row prepend the gutter.
+ */
+export const SELECTION_CHEVRON = '\u276F '; // "❯ "
+export const SELECTION_GUTTER = '  ';
+export const SELECTION_GUTTER_WIDTH = 2;
+
 // --- Slash commands ---
 
 /**

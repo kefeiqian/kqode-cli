@@ -1,19 +1,17 @@
 import { Box, Text } from 'ink';
 import { useAtomValue } from 'jotai';
 import { clamp } from '@libs/math/clamp.ts';
+import { SelectableRow } from '@components/SelectableRow/index.tsx';
 import {
   commandMenuHighlightIndexAtom,
   commandMenuMatchesAtom,
   commandMenuOpenAtom
 } from '@state/ui/commands/index.ts';
 import { entryDescription, entryFullName } from '@libs/commands/subcommands.ts';
-import { safeChromeColumnsAtom } from '@state/ui/index.ts';
 import { commandMenuRowsAtom } from '@state/ui/index.ts';
 import { activeThemeAtom } from '@state/global/index.ts';
 
 const NO_MATCHES_LABEL = 'No matching commands';
-const HIGHLIGHT_MARKER = '\u276F '; // "❯ "
-const PLAIN_MARKER = '  ';
 const NAME_DESCRIPTION_GAP = '  ';
 
 /**
@@ -30,7 +28,6 @@ export function SlashCommandMenu() {
   const matches = useAtomValue(commandMenuMatchesAtom);
   const highlightIndex = useAtomValue(commandMenuHighlightIndexAtom);
   const menuRows = useAtomValue(commandMenuRowsAtom);
-  const columns = useAtomValue(safeChromeColumnsAtom);
   const theme = useAtomValue(activeThemeAtom);
 
   if (!isOpen || menuRows === 0) {
@@ -40,7 +37,7 @@ export function SlashCommandMenu() {
   if (matches.length === 0) {
     return (
       <Box flexDirection="column">
-        <Text color={theme.colors.muted}>{truncate(`${PLAIN_MARKER}${NO_MATCHES_LABEL}`, columns)}</Text>
+        <SelectableRow highlighted={false} color={theme.colors.muted} content={NO_MATCHES_LABEL} />
         {blankRows(menuRows - 1)}
       </Box>
     );
@@ -58,22 +55,10 @@ export function SlashCommandMenu() {
     <Box flexDirection="column">
       {visible.map((entry, index) => {
         const isHighlighted = start + index === highlighted;
-        const marker = isHighlighted ? HIGHLIGHT_MARKER : PLAIN_MARKER;
         const paddedName = entryFullName(entry).padEnd(nameColumnWidth);
-        const rawLine = `${marker}${paddedName}${NAME_DESCRIPTION_GAP}${entryDescription(entry)}`;
-        // Pad the selected row to the full safe width so its background reads as
-        // a full-row selection bar rather than a ragged highlight behind text.
-        const line = isHighlighted ? truncate(rawLine, columns).padEnd(columns) : truncate(rawLine, columns);
+        const content = `${paddedName}${NAME_DESCRIPTION_GAP}${entryDescription(entry)}`;
 
-        return (
-          <Text
-            key={entryFullName(entry)}
-            color={isHighlighted ? theme.colors.accentBlue : theme.colors.foreground}
-            backgroundColor={isHighlighted ? theme.colors.inputBackground : undefined}
-          >
-            {line}
-          </Text>
-        );
+        return <SelectableRow key={entryFullName(entry)} highlighted={isHighlighted} content={content} />;
       })}
       {blankRows(menuRows - visible.length)}
     </Box>
@@ -91,9 +76,4 @@ function blankRows(count: number) {
   }
 
   return Array.from({ length: count }, (_unused, index) => <Text key={`blank-${index}`}> </Text>);
-}
-
-/** Keeps a row inside the shared safe chrome width. */
-function truncate(text: string, columns: number): string {
-  return text.slice(0, Math.max(0, columns));
 }
