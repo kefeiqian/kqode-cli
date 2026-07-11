@@ -5,6 +5,7 @@ import {
   clientOnlyRowsAtom,
   clearTranscriptAtom,
   enqueuePromptAtom,
+  hydrateResumedTranscriptAtom,
   newTurnIdAtom,
   promptQueueAtom,
   resetTranscriptMirrorAtom,
@@ -222,7 +223,18 @@ describe('settled git status refresh', () => {
   });
 });
 
-describe('currentSessionIdAtom resets', () => {
+describe('currentSessionIdAtom lifecycle', () => {
+  it('hydrateResumedTranscriptAtom sets the current session id from the resumed payload', () => {
+    const store = createStore();
+    store.set(hydrateResumedTranscriptAtom, {
+      sessionId: 'conv-7',
+      workspaceCwd: 'w',
+      canonicalWorkspaceCwd: 'w',
+      turns: []
+    });
+    expect(store.get(currentSessionIdAtom)).toBe('conv-7');
+  });
+
   it('clearTranscriptAtom clears the current session id', () => {
     const store = createStore();
     store.set(currentSessionIdAtom, 'conv-1');

@@ -11,7 +11,7 @@ import {
   setResumeRowsAtom
 } from '@state/ui/resume/index.ts';
 import { backendErrorMessage } from '@libs/promptQueue/promptQueue.ts';
-import { resumeSessionIntoRuntime } from '@backend/runtime/sessionResume.ts';
+import { resumeSessionById } from '@backend/runtime/sessionResume.ts';
 import { setSessionWindowTitle } from '@libs/terminal/windowTitle.ts';
 import { PRODUCT_NAME } from '@constants/product.ts';
 import type { RuntimeBackendClient } from '@backend/runtime/backendRuntime.ts';
@@ -56,17 +56,7 @@ export function useResumeBackend() {
       }
       setResumeResuming();
       try {
-        const sessions = await client.listSessions();
-        const session = sessions.sessions.find((candidate) => candidate.sessionId === sessionId);
-        if (session === undefined) {
-          throw new Error(`Unknown session: ${sessionId}`);
-        }
-        const resumed = await resumeSessionIntoRuntime({
-          store,
-          client,
-          sessionId,
-          workspaceCwd: session.folder
-        });
+        const { resumed, session } = await resumeSessionById({ store, client, sessionId });
         hydrateResumedTranscript(resumed);
         setSessionWindowTitle(PRODUCT_NAME, session.summary);
         closeResumePanel();

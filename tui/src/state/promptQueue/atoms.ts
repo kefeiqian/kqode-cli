@@ -136,6 +136,7 @@ export const hydrateResumedTranscriptAtom = atom(
     set(settledTurnIdsAtom, hydrated.settledTurnIds);
     set(nextQueueItemIdAtom, hydrated.nextQueueItemId);
     set(bodyScrollOffsetRowsAtom, 0);
+    set(currentSessionIdAtom, resumed.sessionId);
   }
 );
 function applyTranscriptEvent(get: Getter, set: Setter, event: TranscriptEvent): void {

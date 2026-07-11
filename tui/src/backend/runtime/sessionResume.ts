@@ -1,5 +1,5 @@
 import type { createStore } from 'jotai';
-import type { SessionResumeResult } from '@contracts/backend/index.ts';
+import type { SessionResumeResult, SessionSummary } from '@contracts/backend/index.ts';
 import type { RuntimeBackendClient } from '@backend/runtime/backendRuntime.ts';
 import { sessionGitBaselineAtom, sessionStartedAtAtom, workspaceCwdAtom } from '@state/global/index.ts';
 import { refreshGitStatusAtom } from '@state/ui/index.ts';
@@ -55,4 +55,54 @@ export async function resumeSessionIntoRuntime({
     }
     throw error;
   }
+}
+
+/** Thrown when a resume target id is not a known resumable session. */
+export class BootResumeError extends Error {
+  readonly sessionId: string;
+
+  constructor(sessionId: string) {
+    super(`No resumable session with id "${sessionId}".`);
+    this.name = 'BootResumeError';
+    this.sessionId = sessionId;
+  }
+}
+
+export type ResumeSessionByIdDeps = {
+  store: Store;
+  client: RuntimeBackendClient;
+  sessionId: string;
+};
+
+export type ResumeSessionByIdResult = {
+  resumed: SessionResumeResult;
+  session: SessionSummary;
+};
+
+/**
+ * Resolves `sessionId` against the durable session list, resumes it into the
+ * runtime, and returns both the restored payload and the matched summary.
+ *
+ * Shared by the `/resume` picker and the `--resume=<id>` boot path so both
+ * resolve, relaunch, and restore a session the same way. Throws
+ * {@link BootResumeError} when `sessionId` is not a known resumable session, and
+ * propagates any backend failure from the resume itself.
+ */
+export async function resumeSessionById({
+  store,
+  client,
+  sessionId
+}: ResumeSessionByIdDeps): Promise<ResumeSessionByIdResult> {
+  const { sessions } = await client.listSessions();
+  const session = sessions.find((candidate) => candidate.sessionId === sessionId);
+  if (session === undefined) {
+    throw new BootResumeError(sessionId);
+  }
+  const resumed = await resumeSessionIntoRuntime({
+    store,
+    client,
+    sessionId,
+    workspaceCwd: session.folder
+  });
+  return { resumed, session };
 }

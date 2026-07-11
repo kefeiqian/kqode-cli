@@ -1,9 +1,14 @@
 import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
-import type { SessionResumeResult } from '@contracts/backend/index.ts';
+import type { SessionResumeResult, SessionSummary } from '@contracts/backend/index.ts';
+import { SESSION_STATUS_IDLE } from '@contracts/backend/index.ts';
 import { workspaceCwdAtom } from '@state/global/index.ts';
 import { gitStatusLabelAtom } from '@state/ui/gitStatus.ts';
-import { resumeSessionIntoRuntime } from '@backend/runtime/sessionResume.ts';
+import {
+  BootResumeError,
+  resumeSessionById,
+  resumeSessionIntoRuntime
+} from '@backend/runtime/sessionResume.ts';
 import type { RuntimeBackendClient } from '@backend/runtime/backendRuntime.ts';
 
 function fakeClient(overrides: Partial<RuntimeBackendClient> = {}): RuntimeBackendClient {
@@ -87,5 +92,48 @@ describe('resumeSessionIntoRuntime', () => {
     expect(client.relaunch).toHaveBeenNthCalledWith(1, 'C:\\new');
     expect(client.relaunch).toHaveBeenNthCalledWith(2, 'C:\\old');
     expect(store.get(workspaceCwdAtom)).toBe('C:\\old');
+  });
+});
+
+describe('resumeSessionById', () => {
+  const summary: SessionSummary = {
+    sessionId: 'sess-1',
+    summary: 'first prompt',
+    status: SESSION_STATUS_IDLE,
+    modifiedAt: 0,
+    createdAt: 0,
+    folder: 'C:\\new'
+  };
+
+  it('resolves the id against the session list, resumes it, and returns the payload and summary', async () => {
+    const store = createStore();
+    store.set(workspaceCwdAtom, 'C:\\old');
+    const client = fakeClient({
+      listSessions: vi.fn(async () => ({ sessions: [summary] })),
+      relaunch: vi.fn(async () => undefined),
+      resumeSession: vi.fn(async () => resumed('C:\\new'))
+    });
+
+    const result = await resumeSessionById({ store, client, sessionId: 'sess-1' });
+
+    expect(client.relaunch).toHaveBeenCalledWith('C:\\new');
+    expect(client.resumeSession).toHaveBeenCalledWith({ sessionId: 'sess-1' });
+    expect(result.resumed.sessionId).toBe('sess-1');
+    expect(result.session).toBe(summary);
+  });
+
+  it('throws BootResumeError for an unknown id without attempting a resume', async () => {
+    const store = createStore();
+    const client = fakeClient({
+      listSessions: vi.fn(async () => ({ sessions: [] })),
+      relaunch: vi.fn(async () => undefined),
+      resumeSession: vi.fn(async () => resumed('C:\\new'))
+    });
+
+    await expect(
+      resumeSessionById({ store, client, sessionId: 'nope' })
+    ).rejects.toBeInstanceOf(BootResumeError);
+    expect(client.resumeSession).not.toHaveBeenCalled();
+    expect(client.relaunch).not.toHaveBeenCalled();
   });
 });
