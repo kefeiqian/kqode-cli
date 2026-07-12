@@ -16,6 +16,11 @@ describe('highlightCode', () => {
     expect(result.lines[0]?.some((segment) => segment.colorToken === 'muted')).toBe(true);
   });
 
+  it('highlights common-bundle languages beyond the original set', () => {
+    expect(highlightCode('def add(a, b):\n    return a + b  # sum', 'python').highlighted).toBe(true);
+    expect(highlightCode('package main\nfunc main() {}', 'go').highlighted).toBe(true);
+  });
+
   it('falls back to plain for unknown and oversized blocks', () => {
     expect(highlightCode('x', 'unknown').highlighted).toBe(false);
     expect(highlightCode('x'.repeat(MAX_HIGHLIGHT_CODE_UNITS + 1), 'js').highlighted).toBe(false);

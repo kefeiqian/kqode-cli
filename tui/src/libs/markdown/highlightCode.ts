@@ -1,11 +1,4 @@
-import { createLowlight } from 'lowlight';
-import javascript from 'highlight.js/lib/languages/javascript';
-import typescript from 'highlight.js/lib/languages/typescript';
-import rust from 'highlight.js/lib/languages/rust';
-import json from 'highlight.js/lib/languages/json';
-import bash from 'highlight.js/lib/languages/bash';
-import markdown from 'highlight.js/lib/languages/markdown';
-import diff from 'highlight.js/lib/languages/diff';
+import { common, createLowlight } from 'lowlight';
 import { tokenForHighlightClasses } from '@libs/markdown/highlightTheme.ts';
 import type { StyledSegment } from '@libs/markdown/types.ts';
 
@@ -23,15 +16,7 @@ export type HighlightedCode = {
   lines: StyledSegment[][];
 };
 
-const lowlight = createLowlight({
-  bash,
-  diff,
-  javascript,
-  json,
-  markdown,
-  rust,
-  typescript
-});
+const lowlight = createLowlight(common);
 
 lowlight.registerAlias({
   bash: ['sh', 'shell'],
