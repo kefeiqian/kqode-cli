@@ -20,10 +20,10 @@ const MASK_PATTERN = /\uE000(\d+)\uE000/g;
 
 // Fenced code blocks (``` / ~~~, closed within the completed slice). Bounded:
 // lazy body with an anchored, same-run closing fence.
-const FENCED_CODE_RE = /(?<=^|\n)[ \t]{0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n[ \t]{0,3}\1[^\S\n]*(?=\n|$)/g;
+const FENCED_CODE_RE = /(?<=^|\n)[ \t]{0,3}(?=(`{3,}|~{3,}))\1[^\n]*\n[\s\S]*?\n[ \t]{0,3}\1[^\S\n]*(?=\n|$)/g;
 
-// Inline code spans (matched backtick runs) and bare URLs.
-const INLINE_SPAN_RE = /(`+)([^`\n]+?)\1|https?:\/\/\S+/g;
+// Bare URLs (linear). Inline code spans are masked by the linear scan below.
+const URL_RE = /https?:\/\/\S+/g;
 
 /** Public entry: total (never throws) and bounded. */
 export function convertLatexToUnicode(text: string): string {
@@ -43,7 +43,54 @@ function maskSpans(text: string, preserved: string[]): string {
     const index = preserved.push(match) - 1;
     return `${MASK_SENTINEL}${index}${MASK_SENTINEL}`;
   };
-  return text.replace(FENCED_CODE_RE, mask).replace(INLINE_SPAN_RE, mask);
+  const withoutFences = text.replace(FENCED_CODE_RE, mask);
+  return maskInlineCode(withoutFences, mask).replace(URL_RE, mask);
+}
+
+/**
+ * Masks inline code spans in a single linear pass. A run of N backticks is
+ * closed by the next run of exactly N backticks on the same line (CommonMark).
+ * A manual scan is used instead of a lazy-inner + backreference regex, which
+ * backtracks quadratically on long unmatched backtick runs and would freeze the
+ * render path on adversarial input.
+ */
+function maskInlineCode(text: string, mask: (match: string) => string): string {
+  let out = '';
+  let index = 0;
+  while (index < text.length) {
+    if (text[index] !== '`') {
+      out += text[index];
+      index += 1;
+      continue;
+    }
+    let openLength = 0;
+    while (text[index + openLength] === '`') openLength += 1;
+    const closeIndex = findClosingRun(text, index + openLength, openLength);
+    if (closeIndex === -1) {
+      out += text.slice(index, index + openLength);
+      index += openLength;
+    } else {
+      out += mask(text.slice(index, closeIndex + openLength));
+      index = closeIndex + openLength;
+    }
+  }
+  return out;
+}
+
+/** Index of the next run of exactly `length` backticks before a newline, else -1. */
+function findClosingRun(text: string, from: number, length: number): number {
+  let index = from;
+  while (index < text.length && text[index] !== '\n') {
+    if (text[index] === '`') {
+      let runLength = 0;
+      while (text[index + runLength] === '`') runLength += 1;
+      if (runLength === length) return index;
+      index += runLength;
+    } else {
+      index += 1;
+    }
+  }
+  return -1;
 }
 
 function restoreSpans(text: string, preserved: string[]): string {

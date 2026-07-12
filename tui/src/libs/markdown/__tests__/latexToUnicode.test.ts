@@ -57,4 +57,12 @@ describe('convertLatexToUnicode', () => {
     expect(convertLatexToUnicode('')).toBe('');
     expect(convertLatexToUnicode('no math here at all')).toBe('no math here at all');
   });
+
+  it('handles long unmatched backtick runs quickly (no catastrophic backtracking)', () => {
+    const pathological = '`'.repeat(40_000) + ' text ' + '`'.repeat(20_000);
+    const start = Date.now();
+    const result = convertLatexToUnicode(pathological);
+    expect(Date.now() - start).toBeLessThan(500);
+    expect(result).toBe(pathological);
+  });
 });
