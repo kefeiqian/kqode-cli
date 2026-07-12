@@ -26,6 +26,13 @@ export type BodyRow = {
    * a char/mid-word split, `' '` for a word-wrap boundary).
    */
   continuesPrevious?: string;
+  /**
+   * When true, this row is pure visual chrome (e.g. a user message-bubble
+   * half-block edge) whose `text` holds decorative glyphs, not logical content.
+   * Excluded from copied/selected text so those block glyphs never reach the
+   * clipboard.
+   */
+  decorative?: boolean;
   fillColumns?: boolean;
   marker?: string;
   markerColor?: string;
@@ -40,6 +47,7 @@ export type BodyRowStructure = {
   backgroundColorToken?: ThemeColorToken;
   colorToken?: ThemeColorToken;
   continuesPrevious?: string;
+  decorative?: boolean;
   fillColumns?: boolean;
   marker?: string;
   markerColorToken?: ThemeColorToken;
@@ -98,6 +106,7 @@ function applyTheme(row: BodyRowStructure, theme: ThemeDefinition): BodyRow {
       row.backgroundColorToken === undefined ? undefined : theme.colors[row.backgroundColorToken],
     color: row.colorToken === undefined ? undefined : theme.colors[row.colorToken],
     continuesPrevious: row.continuesPrevious,
+    decorative: row.decorative,
     fillColumns: row.fillColumns,
     marker: row.marker,
     markerColor:
@@ -238,6 +247,7 @@ function halfLineRow(columns: number, glyph: string): BodyRowStructure {
   return {
     backgroundColorToken: 'bodyBackground',
     colorToken: 'messageBackground',
+    decorative: true,
     text: glyph.repeat(columns)
   };
 }

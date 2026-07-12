@@ -9,12 +9,15 @@ const TRAILING_WHITESPACE = /\s+$/;
  *
  * Reads each row's `text` (never the rendered cells), so KQode chrome — the
  * per-row scrollbar glyph and reserved gutter, painted separately at render —
- * and the full-width background padding are excluded by construction. A row's
- * leading `marker` (assistant `•`, list prefixes) is a separate render element,
- * so selection columns are offset past it. Soft-wrapped rows (`continuesPrevious`)
- * rejoin into one logical line, and trailing whitespace is trimmed per line.
- * Columns map to grapheme boundaries via `indexAtDisplayColumn`, so wide (CJK)
- * and multi-code-point (emoji) glyphs are never split.
+ * and the full-width background padding are excluded by construction. Rows
+ * flagged `decorative` (the user message-bubble half-block edges, whose `text`
+ * is pure `▄`/`▀` chrome) are skipped entirely so those block glyphs never reach
+ * the clipboard. A row's leading `marker` (assistant `•`, list prefixes) is a
+ * separate render element, so selection columns are offset past it. Soft-wrapped
+ * rows (`continuesPrevious`) rejoin into one logical line, and trailing
+ * whitespace is trimmed per line. Columns map to grapheme boundaries via
+ * `indexAtDisplayColumn`, so wide (CJK) and multi-code-point (emoji) glyphs are
+ * never split.
  */
 export function selectedText(
   allRows: readonly BodyRow[],
@@ -31,6 +34,13 @@ export function selectedText(
   for (let rowIndex = bounds.start.rowIndex; rowIndex <= bounds.end.rowIndex; rowIndex += 1) {
     const row = allRows[rowIndex];
     if (row === undefined) {
+      continue;
+    }
+
+    // Decorative chrome rows (message-bubble half-block edges) hold display-only
+    // glyphs in `text`; skip them so they contribute neither glyphs nor a blank
+    // line to the copied selection.
+    if (row.decorative === true) {
       continue;
     }
 

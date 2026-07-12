@@ -244,3 +244,19 @@ describe('resolveBodyRows user prompt trailing whitespace', () => {
     expect(messageRowCount('alpha\n\nbeta')).toBe(3);
   });
 });
+
+describe('resolveBodyRows user message-bubble decorative edges', () => {
+  const promptRows = (text: string) =>
+    resolveBodyRows([{ kind: BodyEntryKind.User, text }], WIDE_COLUMNS, TALL_ROWS, DEFAULT_THEME);
+
+  it('flags the top/bottom half-block edge rows as decorative and leaves text rows content', () => {
+    const rows = promptRows('hi there');
+    const first = rows[0];
+    const last = rows[rows.length - 1];
+
+    expect(first?.decorative).toBe(true);
+    expect(last?.decorative).toBe(true);
+    // Every non-edge row is real message content, not decorative chrome.
+    expect(rows.slice(1, -1).every((row) => row.decorative !== true)).toBe(true);
+  });
+});

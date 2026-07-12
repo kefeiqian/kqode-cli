@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { selectedText } from '@libs/selection/selectedText.ts';
-import type { BodyRow } from '@libs/tui/bodyRows.ts';
+import { resolveBodyRows, type BodyRow } from '@libs/tui/bodyRows.ts';
+import { BodyEntryKind } from '@constants/bodyEntry.ts';
+import { DEFAULT_THEME } from '@theme/themeConfig.ts';
 
 function row(text: string, extra: Partial<BodyRow> = {}): BodyRow {
   return { text, ...extra };
@@ -67,5 +69,36 @@ describe('selectedText', () => {
     expect(text).toBe('some content');
     expect(text).not.toContain('│');
     expect(text).not.toContain('┃');
+  });
+
+  it('excludes decorative chrome rows so they contribute no text and no blank line', () => {
+    const rows = [
+      row('▄▄▄▄▄▄', { decorative: true }),
+      row('  ❯ hi', { fillColumns: true }),
+      row('▀▀▀▀▀▀', { decorative: true })
+    ];
+    expect(selectedText(rows, { rowIndex: 0, column: 0 }, { rowIndex: 2, column: 999 })).toBe(
+      '  ❯ hi'
+    );
+  });
+
+  it('copies a real user message without the bubble block-edge glyphs', () => {
+    // Regression: the message-bubble top/bottom edges are half-block rows
+    // (`▄`/`▀`) whose glyphs live in `row.text`; selecting across the bubble
+    // must not paste those "blocks lines" into the clipboard.
+    const rows = resolveBodyRows(
+      [{ kind: BodyEntryKind.User, text: 'what is markov inequation?' }],
+      60,
+      40,
+      DEFAULT_THEME
+    );
+    const copied = selectedText(
+      rows,
+      { rowIndex: 0, column: 0 },
+      { rowIndex: rows.length - 1, column: 999 }
+    );
+    expect(copied).not.toContain('▄');
+    expect(copied).not.toContain('▀');
+    expect(copied).toContain('what is markov inequation?');
   });
 });
