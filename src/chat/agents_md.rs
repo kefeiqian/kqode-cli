@@ -112,7 +112,13 @@ fn read_guarded(candidate: &Path, canonical_root: &Path) -> Option<String> {
         return None;
     }
     let raw = std::fs::read_to_string(&canonical).ok()?;
-    Some(normalize_line_endings(&raw))
+    let normalized = normalize_line_endings(&raw);
+    // A blank or whitespace-only file carries no instructions; treat it as
+    // absent (R12) so we never emit an empty `<INSTRUCTIONS>` block every turn.
+    if normalized.trim().is_empty() {
+        return None;
+    }
+    Some(normalized)
 }
 
 /// Normalizes CRLF and lone CR to LF so a Windows working copy cannot change the
@@ -168,6 +174,14 @@ mod tests {
     fn returns_none_when_absent() {
         let dir = tempdir().unwrap();
         fs::create_dir(dir.path().join(".git")).unwrap();
+        assert!(discover(dir.path()).is_none());
+    }
+
+    #[test]
+    fn treats_a_blank_file_as_absent() {
+        let dir = tempdir().unwrap();
+        fs::create_dir(dir.path().join(".git")).unwrap();
+        fs::write(dir.path().join(BASE_FILE), "   \n\t\n").unwrap();
         assert!(discover(dir.path()).is_none());
     }
 
