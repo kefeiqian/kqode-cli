@@ -1,0 +1,51 @@
+# EvalPlus grader — container-only, isolated execution of untrusted, model-written
+# code for the KQode eval baseline (plan U6 / requirement R16).
+#
+# WHY A CONTAINER (not native Windows): EvalPlus's `reliability_guard` imports
+# Python's Unix-only `resource` module, so grading cannot run on Windows Python.
+# Docker Desktop runs this Linux container transparently through its WSL2 engine —
+# you invoke it from PowerShell; you never open a WSL shell yourself.
+#
+# HOW IT'S DRIVEN: the Rust eval runner (`kqode eval`, plan U6/U8) shells out to
+# `docker compose run` with this file as the isolation config. You can also run it
+# by hand for the Phase 2 feasibility spike:
+#
+#   # samples.jsonl (LF line endings!) lives in the run dir:
+#   $env:EVAL_RUN_DIR = "C:\Users\<you>\.kqode\eval\spike"
+#   docker compose -f evaluation/compose.yaml run --rm grader `
+#       evalplus.evaluate --dataset humaneval --samples /work/samples.jsonl
+#
+# Results (`*.eval_results.json`) are written back into EVAL_RUN_DIR.
+
+services:
+  grader:
+    # Pin by immutable digest once known (reproducibility + supply-chain safety):
+    #   docker inspect --format "{{index .RepoDigests 0}}" ganler/evalplus:latest
+    # then set EVALPLUS_IMAGE=ganler/evalplus@sha256:<digest>
+    image: ${EVALPLUS_IMAGE:-ganler/evalplus:latest}
+    working_dir: /work
+
+    # The run directory is the ONLY writable bind mount (samples in, results out).
+    volumes:
+      - ${EVAL_RUN_DIR:-./run}:/work
+    environment:
+      # Redirect any cache/home writes onto the tmpfs so read_only still holds.
+      HOME: /tmp
+
+    # ---- Isolation property set (plan F1 / R16). The feasibility spike verifies
+    # these hold with the image; relax only the minimum needed if grading fails. ----
+    network_mode: none            # no egress — datasets are baked into the image
+    read_only: true               # read-only container root filesystem
+    tmpfs:
+      - /tmp                      # writable scratch for compiling/running solutions
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 512
+    mem_limit: 4g
+    cpus: 2.0
+    # Non-root is the target, but WSL2 bind-mounts can surface as root-owned and
+    # block a non-root user from reading /work. If grading fails on permissions,
+    # the spike decides: fix the mount ownership, or (documented tradeoff) drop
+    # this line.
+    user: "1000:1000"
