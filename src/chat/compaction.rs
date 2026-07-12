@@ -43,9 +43,14 @@ pub enum CompactionResult {
 }
 
 /// Runs the compaction pre-step for one turn. `summarize` is called at most once
-/// with the prior summary and the head rounds to fold in.
+/// with the prior summary and the head rounds to fold in. `instructions`, when
+/// present, is the user-role AGENTS.md fragment; it is forwarded to both
+/// [`assemble`] calls so it participates in the token estimate as well as the
+/// final request.
+#[allow(clippy::too_many_arguments)]
 pub async fn run_compaction<S, Fut>(
     system: ChatMessage,
+    instructions: Option<ChatMessage>,
     history: &[HistoryRound],
     compaction: &CompactionState,
     prompt: &str,
@@ -57,7 +62,13 @@ where
     S: FnOnce(Option<String>, Vec<HistoryRound>) -> Fut,
     Fut: Future<Output = Result<String, ProviderError>>,
 {
-    let messages = assemble(system.clone(), history, compaction, prompt);
+    let messages = assemble(
+        system.clone(),
+        instructions.clone(),
+        history,
+        compaction,
+        prompt,
+    );
     if estimate_tokens(&messages) <= limits.threshold {
         return CompactionResult::Ready {
             messages,
@@ -86,7 +97,7 @@ where
         summary: Some(summary),
         covered_through_seq: plan.new_covered_through_seq,
     };
-    let messages = assemble(system, history, &new_state, prompt);
+    let messages = assemble(system, instructions, history, &new_state, prompt);
     if estimate_tokens(&messages) > limits.budget {
         // The verbatim tail + new prompt alone still overflow — fail cleanly
         // rather than dispatching a doomed call.
@@ -130,6 +141,7 @@ mod tests {
         let history = vec![round(0, 10), round(1, 10)];
         let result = run_compaction(
             system(),
+            None,
             &history,
             &CompactionState::default(),
             "hi",
@@ -154,6 +166,7 @@ mod tests {
         let history = vec![round(0, 200), round(1, 200), round(2, 200), round(3, 200)];
         let result = run_compaction(
             system(),
+            None,
             &history,
             &CompactionState::default(),
             "next",
@@ -183,6 +196,7 @@ mod tests {
         let history = vec![round(0, 200), round(1, 200), round(2, 200)];
         let result = run_compaction(
             system(),
+            None,
             &history,
             &CompactionState::default(),
             "next",
@@ -203,6 +217,7 @@ mod tests {
         let history = vec![round(0, 4_000)];
         let result = run_compaction(
             system(),
+            None,
             &history,
             &CompactionState::default(),
             "next",
@@ -224,6 +239,7 @@ mod tests {
         cancel.cancel();
         let result = run_compaction(
             system(),
+            None,
             &history,
             &CompactionState::default(),
             "next",

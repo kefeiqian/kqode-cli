@@ -62,17 +62,23 @@ impl CompactionState {
 /// Assembles the ordered message list: system prompt, optional conversation
 /// summary, the verbatim tail of prior completed rounds, then the new prompt.
 ///
-/// `history` must be ordered by ascending `seq`. Rounds covered by an active
-/// summary are skipped so they are never sent twice.
+/// `instructions`, when present, is a user-role project-instructions fragment
+/// (AGENTS.md) inserted immediately after the system message. `history` must be
+/// ordered by ascending `seq`. Rounds covered by an active summary are skipped
+/// so they are never sent twice.
 #[must_use]
 pub fn assemble(
     system: ChatMessage,
+    instructions: Option<ChatMessage>,
     history: &[HistoryRound],
     compaction: &CompactionState,
     new_prompt: &str,
 ) -> Vec<ChatMessage> {
-    let mut messages = Vec::with_capacity(history.len() * 2 + 2);
+    let mut messages = Vec::with_capacity(history.len() * 2 + 3);
     messages.push(system);
+    if let Some(instructions) = instructions {
+        messages.push(instructions);
+    }
     if let Some(summary) = compaction.summary.as_deref() {
         messages.push(summary_message(summary));
     }
@@ -112,6 +118,7 @@ mod tests {
     fn full_history_without_summary() {
         let messages = assemble(
             ChatMessage::system("SYSTEM"),
+            None,
             &rounds(),
             &CompactionState::default(),
             "third ask",
@@ -138,6 +145,7 @@ mod tests {
     fn no_prior_rounds_is_system_plus_new_prompt() {
         let messages = assemble(
             ChatMessage::system("SYSTEM"),
+            None,
             &[],
             &CompactionState::default(),
             "only ask",
@@ -157,6 +165,7 @@ mod tests {
 
         let messages = assemble(
             ChatMessage::system("SYSTEM"),
+            None,
             &rounds(),
             &compaction,
             "third ask",
@@ -175,5 +184,41 @@ mod tests {
             !messages.iter().any(|m| m.content == "first ask"),
             "round 0 is covered by the summary and must not be sent verbatim"
         );
+    }
+
+    #[test]
+    fn instructions_fragment_follows_system_before_history() {
+        let messages = assemble(
+            ChatMessage::system("SYSTEM"),
+            Some(ChatMessage::user("<INSTRUCTIONS>rules</INSTRUCTIONS>")),
+            &rounds(),
+            &CompactionState::default(),
+            "third ask",
+        );
+        assert_eq!(messages[0].role, Role::System);
+        assert_eq!(messages[1].role, Role::User);
+        assert_eq!(messages[1].content, "<INSTRUCTIONS>rules</INSTRUCTIONS>");
+        // The verbatim history begins only after the instructions fragment.
+        assert_eq!(messages[2].content, "first ask");
+    }
+
+    #[test]
+    fn instructions_precede_the_summary_when_both_present() {
+        let compaction = CompactionState {
+            summary: Some("earlier".to_owned()),
+            covered_through_seq: 1,
+        };
+        let messages = assemble(
+            ChatMessage::system("SYSTEM"),
+            Some(ChatMessage::user("INSTR")),
+            &rounds(),
+            &compaction,
+            "third ask",
+        );
+        assert_eq!(messages[0].role, Role::System);
+        assert_eq!(messages[1].content, "INSTR");
+        assert_eq!(messages[2].role, Role::System);
+        assert!(messages[2].content.contains("earlier"));
+        assert_eq!(messages.last().unwrap().content, "third ask");
     }
 }

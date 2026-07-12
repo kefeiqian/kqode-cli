@@ -20,7 +20,7 @@ use crate::chat::system_prompt::system_message;
 use crate::chat::{CancellationToken, TurnStreamEvent};
 use crate::config::KimiConfig;
 use crate::debug_log;
-use crate::provider::{KimiProvider, ProviderError, ProviderRequest, StreamEvent};
+use crate::provider::{ChatMessage, KimiProvider, ProviderError, ProviderRequest, StreamEvent};
 
 /// Maximum time to wait for the next streamed chunk before failing the turn.
 const NEXT_CHUNK_TIMEOUT: Duration = Duration::from_secs(120);
@@ -104,7 +104,7 @@ pub fn run_streaming_turn<E>(
 
 #[allow(clippy::too_many_arguments)]
 async fn stream_turn<E: Fn(TurnStreamEvent)>(
-    _turn_id: &str,
+    turn_id: &str,
     history: Vec<HistoryRound>,
     compaction: CompactionState,
     user_text: String,
@@ -116,6 +116,10 @@ async fn stream_turn<E: Fn(TurnStreamEvent)>(
     let model = config.model.clone();
     let git = crate::git::read_status_label().await;
     let system = system_message(&model, git.as_deref(), memory.as_deref());
+    let instructions = std::env::current_dir()
+        .ok()
+        .and_then(|cwd| super::agents_md::discover(&cwd))
+        .map(|body| ChatMessage::user(super::agents_md::wrap_instructions(&body, turn_id)));
 
     let limits = ContextLimits {
         threshold: context_budget::threshold(&model),
@@ -124,6 +128,7 @@ async fn stream_turn<E: Fn(TurnStreamEvent)>(
     let summary_config = config.clone();
     let messages = match run_compaction(
         system,
+        instructions,
         &history,
         &compaction,
         &user_text,
