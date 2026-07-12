@@ -281,7 +281,10 @@ describe('MemorySurface', () => {
     await waitForFrame(lastFrame, 'Use tabs in Go');
 
     store.set(setPendingMemoryItemActionAtom, PendingMemoryItemAction.Forget);
-    await flushInput();
+    // Wait for the pending-forget render (and the useMemoryInput highlight/ref)
+    // to commit before Enter, mirroring the edit-pick flow. A bare flush races
+    // that commit under load, so Enter falls through to showDetail (unstubbed).
+    await waitForFrame(lastFrame, 'Pick a memory to forget');
     stdin.write('\r');
     await waitForFrame(lastFrame, 'y forget');
     stdin.write('n');
@@ -289,7 +292,7 @@ describe('MemorySurface', () => {
     expect(forgetMemory).not.toHaveBeenCalled();
 
     store.set(setPendingMemoryItemActionAtom, PendingMemoryItemAction.Forget);
-    await flushInput();
+    await waitForFrame(lastFrame, 'Pick a memory to forget');
     stdin.write('\r');
     await waitForFrame(lastFrame, 'y forget');
     stdin.write('y');

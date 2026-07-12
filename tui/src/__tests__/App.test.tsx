@@ -263,14 +263,19 @@ describe('App', () => {
     expect(store.get(activeSurfaceAtom)).toBe(Surface.Theme);
     const themeFrame = lastFrame() ?? '';
     expect(themeFrame).toContain('/theme');
-    expect(themeFrame).toContain('Dracula');
+    // The picker opens scrolled to the active theme, so assert a row that is
+    // guaranteed visible (the default). The ten-theme catalog windows the
+    // eight-row body, so alphabetically-early rows (e.g. Dracula) are off-screen.
+    expect(themeFrame).toContain(DEFAULT_THEME.label);
     // No out-of-scope theme affordances leak into the picker.
     expect(themeFrame).not.toMatch(/light|custom|plugin|import|export/i);
 
     // Move the highlight off the active (default) row first, so "Esc did not
     // apply" is distinguishable from "Esc applied the highlighted theme" — an
     // Esc-applies regression would leave a non-default theme active below.
-    stdin.write('\u001B[B');
+    // The default (Tokyo Night) is the last catalog row, so move up: down would
+    // clamp to the end and preview nothing, making the check non-discriminating.
+    stdin.write('\u001B[A');
     await flushInput();
 
     stdin.write('\u001B');
