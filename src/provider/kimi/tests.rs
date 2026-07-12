@@ -3,6 +3,7 @@ use crate::provider::models::{ValidationOutcome, parse_models_response};
 use crate::provider::registry::{
     CredentialSource, KeySource, ProviderStatus, derive_status, validate_base_url,
 };
+use crate::provider::{ChatMessage, Sampling, Usage};
 use crate::provider::{ModelInfo, ProviderId};
 
 #[test]
@@ -10,7 +11,8 @@ fn done_sentinel_maps_to_done() {
     assert_eq!(
         parse_chunk("[DONE]").unwrap(),
         Some(StreamEvent::Done {
-            finish_reason: None
+            finish_reason: None,
+            usage: None,
         })
     );
 }
@@ -30,9 +32,59 @@ fn finish_reason_chunk_maps_to_done() {
     assert_eq!(
         parse_chunk(data).unwrap(),
         Some(StreamEvent::Done {
-            finish_reason: Some("stop".to_owned())
+            finish_reason: Some("stop".to_owned()),
+            usage: None,
         })
     );
+}
+
+#[test]
+fn usage_only_chunk_maps_to_usage_done() {
+    let data = r#"{"choices":[],"usage":{"prompt_tokens":12,"completion_tokens":34}}"#;
+    assert_eq!(
+        parse_chunk(data).unwrap(),
+        Some(StreamEvent::Done {
+            finish_reason: None,
+            usage: Some(Usage {
+                input: 12,
+                output: 34,
+            }),
+        })
+    );
+}
+
+#[test]
+fn request_body_includes_sampling_and_usage_when_set() {
+    let request = ProviderRequest {
+        model: "m".to_owned(),
+        messages: vec![ChatMessage::user("hi")],
+        sampling: Sampling {
+            temperature: Some(0.0),
+            seed: Some(7),
+        },
+        include_usage: true,
+    };
+    let body = request_body("m", &request);
+    assert_eq!(body["temperature"].as_f64(), Some(0.0));
+    assert_eq!(body["seed"].as_u64(), Some(7));
+    assert_eq!(
+        body["stream_options"]["include_usage"].as_bool(),
+        Some(true)
+    );
+}
+
+#[test]
+fn request_body_omits_sampling_and_usage_by_default() {
+    let request = ProviderRequest {
+        model: "m".to_owned(),
+        messages: vec![ChatMessage::user("hi")],
+        sampling: Sampling::default(),
+        include_usage: false,
+    };
+    let body = request_body("m", &request);
+    assert!(body.get("temperature").is_none());
+    assert!(body.get("seed").is_none());
+    assert!(body.get("stream_options").is_none());
 }
 
 #[test]

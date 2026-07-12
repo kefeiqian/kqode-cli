@@ -3,7 +3,7 @@
 use eventsource_stream::{Event, EventStreamError};
 use serde::Deserialize;
 
-use crate::provider::{ProviderError, StreamEvent};
+use crate::provider::{ProviderError, StreamEvent, Usage};
 
 /// SSE payload that marks the end of an OpenAI-compatible stream.
 const DONE_SENTINEL: &str = "[DONE]";
@@ -35,13 +35,20 @@ pub(super) fn parse_chunk(data: &str) -> Result<Option<StreamEvent>, ProviderErr
     if data == DONE_SENTINEL {
         return Ok(Some(StreamEvent::Done {
             finish_reason: None,
+            usage: None,
         }));
     }
 
     let chunk: ChatChunk =
         serde_json::from_str(data).map_err(|error| ProviderError::Decode(error.to_string()))?;
+    let usage = chunk.usage.map(Usage::from);
     let Some(choice) = chunk.choices.into_iter().next() else {
-        return Ok(None);
+        // A choiceless chunk is either the `stream_options.include_usage` usage
+        // report (emit a usage-only `Done`) or a keep-alive (drop it).
+        return Ok(usage.map(|usage| StreamEvent::Done {
+            finish_reason: None,
+            usage: Some(usage),
+        }));
     };
 
     if let Some(content) = choice.delta.content
@@ -52,6 +59,7 @@ pub(super) fn parse_chunk(data: &str) -> Result<Option<StreamEvent>, ProviderErr
 
     Ok(choice.finish_reason.map(|reason| StreamEvent::Done {
         finish_reason: Some(reason),
+        usage,
     }))
 }
 
@@ -59,6 +67,26 @@ pub(super) fn parse_chunk(data: &str) -> Result<Option<StreamEvent>, ProviderErr
 struct ChatChunk {
     #[serde(default)]
     choices: Vec<ChunkChoice>,
+    #[serde(default)]
+    usage: Option<UsageChunk>,
+}
+
+/// OpenAI-compatible usage payload from the final `include_usage` chunk.
+#[derive(Deserialize)]
+struct UsageChunk {
+    #[serde(default)]
+    prompt_tokens: u32,
+    #[serde(default)]
+    completion_tokens: u32,
+}
+
+impl From<UsageChunk> for Usage {
+    fn from(chunk: UsageChunk) -> Self {
+        Self {
+            input: chunk.prompt_tokens,
+            output: chunk.completion_tokens,
+        }
+    }
 }
 
 #[derive(Deserialize)]

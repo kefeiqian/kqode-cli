@@ -97,11 +97,7 @@ impl KimiProvider {
         } else {
             &request.model
         };
-        let body = json!({
-            "model": model,
-            "stream": true,
-            "messages": request.messages,
-        });
+        let body = request_body(model, &request);
 
         let response = self
             .client
@@ -168,6 +164,29 @@ fn classify_status(code: u16) -> ProviderError {
         429 => ProviderError::RateLimit,
         other => ProviderError::Network(format!("HTTP {other}")),
     }
+}
+
+/// Builds the OpenAI-compatible streaming request body.
+///
+/// Sampling fields and `stream_options.include_usage` are added only when set,
+/// so a default [`ProviderRequest`] (interactive path) yields the historical
+/// body unchanged.
+fn request_body(model: &str, request: &ProviderRequest) -> serde_json::Value {
+    let mut body = json!({
+        "model": model,
+        "stream": true,
+        "messages": request.messages,
+    });
+    if let Some(temperature) = request.sampling.temperature {
+        body["temperature"] = json!(temperature);
+    }
+    if let Some(seed) = request.sampling.seed {
+        body["seed"] = json!(seed);
+    }
+    if request.include_usage {
+        body["stream_options"] = json!({ "include_usage": true });
+    }
+    body
 }
 
 #[cfg(test)]

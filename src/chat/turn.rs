@@ -171,7 +171,12 @@ async fn stream_turn<E: Fn(TurnStreamEvent)>(
         Err(error) => return fail(&error, emit),
     };
 
-    let request = ProviderRequest { messages, model };
+    let request = ProviderRequest {
+        messages,
+        model,
+        sampling: Default::default(),
+        include_usage: false,
+    };
     let record_transcript = debug_log::transcript_enabled();
     if record_transcript {
         debug_log::log_request(&request.model, &request.messages);
@@ -214,6 +219,7 @@ async fn stream_turn<E: Fn(TurnStreamEvent)>(
                     }
                     Ok(Some(Ok(StreamEvent::Done {
                         finish_reason: reason,
+                        ..
                     }))) => {
                         if reason.is_some() {
                             finish_reason = reason;

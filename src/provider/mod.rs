@@ -68,6 +68,26 @@ impl ChatMessage {
     }
 }
 
+/// Sampling controls for a completion. `None` fields defer to the provider's own
+/// defaults; eval pins `temperature: Some(0.0)` (and `seed` when honored) for
+/// reproducibility, while the interactive path leaves both `None`.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Sampling {
+    /// Sampling temperature; `Some(0.0)` requests greedy decoding.
+    pub temperature: Option<f32>,
+    /// Deterministic sampling seed, when the provider honors it.
+    pub seed: Option<u64>,
+}
+
+/// Prompt/completion token counts reported by the provider.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct Usage {
+    /// Prompt (input) tokens.
+    pub input: u32,
+    /// Completion (output) tokens.
+    pub output: u32,
+}
+
 /// A normalized, vendor-independent chat-completion request.
 #[derive(Clone, Debug)]
 pub struct ProviderRequest {
@@ -75,6 +95,14 @@ pub struct ProviderRequest {
     pub model: String,
     /// Ordered messages (system prompt first, then history, then the new turn).
     pub messages: Vec<ChatMessage>,
+    /// Sampling controls; [`Sampling::default`] (all `None`) preserves the
+    /// provider's own defaults and the historical request body.
+    pub sampling: Sampling,
+    /// When `true`, request per-response token usage
+    /// (`stream_options.include_usage`) so [`StreamEvent::Done`] can carry a
+    /// [`Usage`]. Left `false` on the interactive path to keep the request body
+    /// byte-identical.
+    pub include_usage: bool,
 }
 
 /// An event produced while streaming a completion.
@@ -82,9 +110,13 @@ pub struct ProviderRequest {
 pub enum StreamEvent {
     /// A chunk of assistant text.
     Delta(String),
-    /// The stream reached its natural end, carrying the finish reason if known.
+    /// The stream reached its natural end, carrying the finish reason and/or the
+    /// token usage when the provider reports them. They may arrive in separate
+    /// terminal chunks, so either field can be `None` on a given `Done`.
     Done {
         /// Provider-reported reason the completion stopped, when present.
         finish_reason: Option<String>,
+        /// Token usage, present only on the usage-bearing terminal chunk.
+        usage: Option<Usage>,
     },
 }

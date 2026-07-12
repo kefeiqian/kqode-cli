@@ -50,6 +50,8 @@ pub async fn summarize(
     let request = ProviderRequest {
         messages: build_summary_messages(prior_summary, head),
         model,
+        sampling: Default::default(),
+        include_usage: false,
     };
 
     let stream = provider.stream(request).await?;

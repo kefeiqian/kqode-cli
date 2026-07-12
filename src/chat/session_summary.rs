@@ -48,6 +48,8 @@ pub async fn generate_session_summary(
     let request = ProviderRequest {
         messages: build_summary_messages(first_prompt, first_response),
         model,
+        sampling: Default::default(),
+        include_usage: false,
     };
 
     let stream = provider.stream(request).await?;
