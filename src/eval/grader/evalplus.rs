@@ -31,6 +31,7 @@ impl EvalPlusGrader {
 
     /// Runs one `docker compose run --rm grader <args>` with the run dir mounted.
     fn run_compose(&self, run_dir: &Path, args: &[&str]) -> Result<(), EvalError> {
+        let mount = mount_source(run_dir)?;
         let mut command = Command::new("docker");
         command
             .arg("compose")
@@ -39,7 +40,7 @@ impl EvalPlusGrader {
             .args(["run", "--rm", "grader"])
             .args(args)
             // The compose file mounts EVAL_RUN_DIR at /work and reads EVALPLUS_IMAGE.
-            .env("EVAL_RUN_DIR", run_dir);
+            .env("EVAL_RUN_DIR", &mount);
         if let Some(image) = &self.image {
             command.env("EVALPLUS_IMAGE", image);
         }
@@ -100,6 +101,22 @@ fn with_suffix(name: &str, suffix: &str) -> String {
     format!("{stem}{suffix}")
 }
 
+/// Resolves the run dir to an absolute bind-mount source for Docker.
+///
+/// Docker Compose resolves a *relative* bind-mount source against the compose
+/// **project directory** (the compose file's location), not this process's
+/// working directory — where the runner wrote `samples.jsonl`. An absolute path
+/// makes the mount land on the real run dir regardless of the caller's CWD.
+///
+/// # Errors
+///
+/// Returns [`EvalError::Io`] when the process working directory cannot be read
+/// (the only failure mode of path absolutization for a relative input).
+fn mount_source(run_dir: &Path) -> Result<PathBuf, EvalError> {
+    std::path::absolute(run_dir)
+        .map_err(|error| EvalError::Io(format!("resolving run dir {}: {error}", run_dir.display())))
+}
+
 /// The container-visible path for a file in the mounted run dir.
 fn container_path(name: &str) -> String {
     format!("/work/{name}")
@@ -137,6 +154,16 @@ mod tests {
         assert!(!clean.contains('\u{07}'));
         assert!(clean.contains("done"));
         assert!(clean.contains('\n'));
+    }
+
+    #[test]
+    fn mount_source_absolutizes_a_relative_run_dir() {
+        let resolved = mount_source(Path::new("reports/run-1")).expect("absolutize run dir");
+        assert!(
+            resolved.is_absolute(),
+            "Docker Compose resolves relative mounts against the project dir, not CWD"
+        );
+        assert!(resolved.ends_with(Path::new("reports/run-1")));
     }
 
     // Real grading, opt-in: set KQODE_EVAL_IT_RUNDIR to a dir holding a full

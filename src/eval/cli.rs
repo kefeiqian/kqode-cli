@@ -66,6 +66,12 @@ pub fn run_from_args(store: &Store, args: &[OsString]) -> Result<(), EvalError> 
         None => crate::paths::eval_dir()
             .ok_or_else(|| EvalError::Io("cannot resolve ~/.kqode/eval".to_owned()))?,
     };
+    // Absolutize so the runner's writes and the grader's Docker bind mount resolve
+    // to the same directory. Docker Compose resolves a relative mount source
+    // against the compose project dir, not this process's CWD (see the grader),
+    // which would otherwise diverge for a relative `--out`.
+    let base_dir = std::path::absolute(&base_dir)
+        .map_err(|error| EvalError::Io(format!("resolving output dir: {error}")))?;
 
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let loader = DockerTaskLoader::new(
