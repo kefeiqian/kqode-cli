@@ -14,11 +14,20 @@ use std::fmt;
 
 pub mod artifacts;
 pub mod benchmark;
+pub mod cli;
 pub mod grader;
 pub mod metrics;
+pub mod runner;
 
-pub use benchmark::{EvalBenchmark, Task};
+pub use benchmark::{EvalBenchmark, Task, parse_selection};
 pub use grader::{GradeReport, Grader, TaskResult, parse_eval_results};
+pub use runner::{ModelDriver, RunConfigBase, TaskLoader, run_benchmark};
+
+/// Pinned EvalPlus grader image (immutable digest), verified by the Phase 2
+/// feasibility spike. Recorded per run for reproducibility and supply-chain
+/// provenance.
+pub const DEFAULT_GRADER_IMAGE: &str =
+    "ganler/evalplus@sha256:26b118098bef281fe8dfe999bf05f1d5b45374b4e6c00161ec0f30592aef4740";
 
 /// Errors surfaced by the eval subsystem.
 #[derive(Debug)]

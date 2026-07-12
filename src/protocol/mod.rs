@@ -27,6 +27,10 @@ pub const PROMPT_FLAG: &str = "--prompt";
 /// (never the provider key). Rust-only, no TypeScript mirror.
 pub const JSON_FLAG: &str = "--json";
 
+/// Subcommand that runs the public-benchmark eval baseline (`kqode eval ...`).
+/// Rust-only, no TypeScript mirror.
+pub const EVAL_SUBCOMMAND: &str = "eval";
+
 /// JSON-RPC notification the backend emits exactly once, immediately after its
 /// stdio transport is live and before it handles any request.
 ///

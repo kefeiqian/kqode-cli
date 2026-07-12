@@ -6,7 +6,7 @@ use std::{
 
 use kqode::{
     backend::BackendError,
-    protocol::{BACKEND_MODE_ARG, JSON_FLAG, PROMPT_FLAG},
+    protocol::{BACKEND_MODE_ARG, EVAL_SUBCOMMAND, JSON_FLAG, PROMPT_FLAG},
     store::{STORE_FATAL_SENTINEL, Store, StoreError},
 };
 
@@ -44,7 +44,20 @@ fn run() -> Result<(), CliError> {
 
             kqode::backend::run_stdio().map_err(CliError::Backend)
         }
+        Some(arg) if arg.as_os_str() == OsStr::new(EVAL_SUBCOMMAND) => run_eval(&args[1..]),
         Some(_) => run_headless(&args),
+    }
+}
+
+/// Runs the `kqode eval` benchmark baseline.
+fn run_eval(args: &[OsString]) -> Result<(), CliError> {
+    kqode::secrets::init_keychain_backend();
+    let store = Store::open_or_bootstrap()
+        .map_err(|error| CliError::Backend(BackendError::Store(error)))?;
+    match kqode::eval::cli::run_from_args(&store, args) {
+        Ok(()) => Ok(()),
+        Err(kqode::eval::EvalError::NoProvider) => Err(CliError::NoProvider),
+        Err(error) => Err(CliError::Message(format!("eval failed: {error}"))),
     }
 }
 
