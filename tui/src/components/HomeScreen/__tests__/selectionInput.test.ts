@@ -2,6 +2,7 @@ import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
 import {
+  createSelectionGestureState,
   handleSelectionGesture,
   resolveGestureRegion
 } from '@components/HomeScreen/selectionInput.ts';
@@ -90,5 +91,116 @@ describe('resolveGestureRegion', () => {
     store.set(openResumePanelAtom);
 
     expect(resolveGestureRegion(store, store.get(bodyTopAtom) + 1)).toBeNull();
+  });
+});
+
+describe('handleSelectionGesture multi-click', () => {
+  function multiClickStore(text: string, kind: BodyEntryKind = BodyEntryKind.Success) {
+    const store = createStore();
+    store.set(columnsTestOverrideAtom, 80);
+    store.set(rowsTestOverrideAtom, 24);
+    store.set(bodyEntriesAtom, [{ kind, text }]);
+    const writeText = vi.fn().mockResolvedValue(true);
+    store.set(clipboardClientAtom, { readText: vi.fn(), writeText });
+    return { store, writeText };
+  }
+
+  // Drives a click at the given 1-based SGR cell: press then release, advancing
+  // the injected clock so successive calls classify as a multi-click cycle.
+  function clickAt(
+    store: ReturnType<typeof createStore>,
+    ctx: { state: ReturnType<typeof createSelectionGestureState>; now: () => number },
+    column: number,
+    releaseColumn = column
+  ): void {
+    handleSelectionGesture(store, { kind: 'press', row: 2, column }, ctx);
+    handleSelectionGesture(store, { kind: 'release', row: 2, column: releaseColumn }, ctx);
+  }
+
+  it('selects and copies the whitespace-delimited word on a double-click (AE5)', async () => {
+    const { store, writeText } = multiClickStore('error in src/main.rs line 4');
+    const state = createSelectionGestureState();
+    let clock = 0;
+    const ctx = { state, now: () => clock };
+
+    // '/' inside 'src/main.rs' is display column 12 → SGR column 13.
+    clickAt(store, ctx, 13);
+    clock = 120;
+    clickAt(store, ctx, 13);
+    await flushPromises();
+
+    expect(store.get(bodySelectionAtom)).toEqual({
+      anchor: { rowIndex: 0, column: 9 },
+      focus: { rowIndex: 0, column: 20 }
+    });
+    expect(writeText).toHaveBeenCalledWith('src/main.rs');
+  });
+
+  it('selects and copies the whole rendered line on a triple-click (AE5)', async () => {
+    const { store, writeText } = multiClickStore('error in src/main.rs line 4');
+    const state = createSelectionGestureState();
+    let clock = 0;
+    const ctx = { state, now: () => clock };
+
+    clickAt(store, ctx, 13);
+    clock = 100;
+    clickAt(store, ctx, 13);
+    clock = 200;
+    clickAt(store, ctx, 13);
+    await flushPromises();
+
+    expect(writeText).toHaveBeenLastCalledWith('error in src/main.rs line 4');
+  });
+
+  it('copies the full word even when the release drifts off the press cell', async () => {
+    const { store, writeText } = multiClickStore('error in src/main.rs line 4');
+    const state = createSelectionGestureState();
+    let clock = 0;
+    const ctx = { state, now: () => clock };
+
+    clickAt(store, ctx, 13);
+    clock = 100;
+    // The double-click's release lands one cell away; the locked word stands.
+    clickAt(store, ctx, 13, 14);
+    await flushPromises();
+
+    expect(writeText).toHaveBeenLastCalledWith('src/main.rs');
+  });
+
+  it('selects nothing when a double-click lands on whitespace', async () => {
+    const { store, writeText } = multiClickStore('error in src/main.rs line 4');
+    const state = createSelectionGestureState();
+    let clock = 0;
+    const ctx = { state, now: () => clock };
+
+    // Display column 5 is the space after 'error' → SGR column 6.
+    clickAt(store, ctx, 6);
+    clock = 100;
+    clickAt(store, ctx, 6);
+    await flushPromises();
+
+    expect(writeText).not.toHaveBeenCalled();
+    const selection = store.get(bodySelectionAtom);
+    expect(selection?.anchor).toEqual(selection?.focus);
+  });
+
+  it('offsets word bounds past the marker on a marker-bearing row', async () => {
+    const { store, writeText } = multiClickStore('hello world', BodyEntryKind.Assistant);
+    const state = createSelectionGestureState();
+    let clock = 0;
+    const ctx = { state, now: () => clock };
+
+    // Assistant rows render a '• ' marker (2 cols); 'hello' renders at screen cols
+    // [2, 7). Click 'e' at screen col 3 → SGR col 4.
+    clickAt(store, ctx, 4);
+    clock = 100;
+    clickAt(store, ctx, 4);
+    await flushPromises();
+
+    expect(store.get(bodySelectionAtom)).toEqual({
+      anchor: { rowIndex: 0, column: 2 },
+      focus: { rowIndex: 0, column: 7 }
+    });
+    expect(writeText).toHaveBeenLastCalledWith('hello');
   });
 });

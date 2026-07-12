@@ -18,6 +18,15 @@ export const updateBodySelectionAtom = atom(null, (get, set, point: SelectionPoi
   set(bodySelectionAtom, { anchor: current?.anchor ?? point, focus: point });
 });
 
+/**
+ * Replaces the selection with an explicit anchor/focus span. Used for word and
+ * line selection (double/triple-click), where both endpoints are computed up
+ * front rather than dragged out.
+ */
+export const setBodySelectionRangeAtom = atom(null, (_get, set, selection: BodySelection) => {
+  set(bodySelectionAtom, selection);
+});
+
 /** Clears the active selection. */
 export const clearBodySelectionAtom = atom(null, (_get, set) => {
   set(bodySelectionAtom, null);

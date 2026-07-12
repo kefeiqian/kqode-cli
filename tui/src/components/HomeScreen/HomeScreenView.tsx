@@ -21,6 +21,7 @@ import {
 } from '@libs/terminal/mouse.ts';
 import { handleRightClickPaste } from '@components/HomeScreen/rightClickPaste.ts';
 import {
+  createSelectionGestureState,
   handleSelectionGesture,
   resolveGestureRegion,
   type GestureRegion
@@ -54,6 +55,9 @@ import {
 } from '@constants/ui.ts';
 
 type Store = ReturnType<typeof createStore>;
+
+/** Wall clock for multi-click classification, injected so tests can fake it. */
+const nowMs = (): number => Date.now();
 
 /**
  * Positions the composer caret from a left press at 1-based SGR `row`/`column`.
@@ -103,6 +107,8 @@ export function HomeScreenView() {
   // Latches the region a left press started in so drag/release events stay with
   // that gesture regardless of where the pointer wanders (see resolveGestureRegion).
   const gestureRegionRef = useRef<GestureRegion | null>(null);
+  // Multi-click classification + word/line lock state, persisted across gestures.
+  const gestureStateRef = useRef(createSelectionGestureState());
 
   useEffect(() => {
     if (!stdout.isTTY) {
@@ -125,11 +131,12 @@ export function HomeScreenView() {
     // between regions keeps routing to the gesture that began.
     const gesture = parseMouseButtonEvent(input);
     if (gesture !== null) {
+      const multiClick = { state: gestureStateRef.current, now: nowMs };
       if (gesture.kind === 'press') {
         const region = resolveGestureRegion(store, gesture.row);
         gestureRegionRef.current = region;
         if (region === 'body') {
-          handleSelectionGesture(store, gesture);
+          handleSelectionGesture(store, gesture, multiClick);
         } else if (region === 'composer') {
           positionComposerCaret(store, gesture);
         }
@@ -140,7 +147,7 @@ export function HomeScreenView() {
       // drag keeps selecting even over the composer, and a composer press never
       // becomes a selection.
       if (gestureRegionRef.current === 'body') {
-        handleSelectionGesture(store, gesture);
+        handleSelectionGesture(store, gesture, multiClick);
       }
       if (gesture.kind === 'release') {
         gestureRegionRef.current = null;
