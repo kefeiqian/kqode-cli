@@ -479,6 +479,22 @@ describe('HomeScreen', () => {
     expect(store.get(composerStateAtom).text).toBe('z');
   });
 
+  it('dismisses an active highlight on Esc', async () => {
+    const { stdin, store } = renderHomeScreen({ columns: 100, rows: 16 });
+    await flushInput();
+    store.set(bodySelectionAtom, {
+      anchor: { rowIndex: 0, column: 0 },
+      focus: { rowIndex: 0, column: 3 }
+    });
+    await flushInput();
+
+    // A lone Esc byte is flushed only after Ink's escape-code timeout elapses.
+    stdin.write('\u001B');
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    expect(store.get(bodySelectionAtom)).toBeNull();
+  });
+
   it('keeps an active highlight while scroll keys page the transcript', async () => {
     const entries = Array.from({ length: 10 }, (_, index) => ({
       kind: 'assistant' as const,
@@ -501,6 +517,15 @@ describe('HomeScreen', () => {
     await flushInput();
 
     expect(lastFrame() ?? '').not.toBe(frameBefore);
+    expect(store.get(bodySelectionAtom)).not.toBeNull();
+
+    // PageDown and End keep the highlight too — none of the scroll keys dismiss.
+    stdin.write('\u001B[6~');
+    await flushInput();
+    expect(store.get(bodySelectionAtom)).not.toBeNull();
+
+    stdin.write('\u001B[F');
+    await flushInput();
     expect(store.get(bodySelectionAtom)).not.toBeNull();
   });
 
