@@ -36,6 +36,26 @@ fn default_invocation_stays_harmless() {
 }
 
 #[test]
+fn prompt_without_value_or_stdin_reports_missing_prompt() {
+    // `output()` gives the child an empty stdin, so `--prompt` with no inline
+    // value resolves to an empty prompt and fails before any provider work.
+    let output = run_cli(&["--prompt"]);
+
+    assert!(!output.status.success(), "{output:?}");
+    assert_ne!(output.status.code(), Some(STORE_FAILURE_EXIT_CODE));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("no prompt provided"));
+}
+
+#[test]
+fn json_flag_without_prompt_is_rejected() {
+    let output = run_cli(&["--json"]);
+
+    assert!(!output.status.success(), "{output:?}");
+    assert_ne!(output.status.code(), Some(STORE_FAILURE_EXIT_CODE));
+    assert!(!output.stderr.is_empty());
+}
+
+#[test]
 fn backend_store_failure_exits_with_store_code_without_ready() {
     let home = tempfile::tempdir().unwrap();
     let kqode_home = home.path().join(".kqode");

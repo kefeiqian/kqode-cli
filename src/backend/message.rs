@@ -2,7 +2,7 @@ use std::sync::mpsc::Sender;
 
 use lsp_server::{Request, Response};
 
-use super::resolve::resolve_submit_config;
+use crate::connect::resolve_submit_config;
 use crate::conversation::Command;
 use crate::protocol::{JSON_RPC_INVALID_PARAMS, MessageSubmitParams, MessageSubmitResult};
 use crate::store::Store;

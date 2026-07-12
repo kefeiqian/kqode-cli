@@ -7,6 +7,9 @@
 mod http;
 mod sanitize;
 mod selection;
+mod submit;
+
+pub(crate) use submit::resolve_submit_config;
 
 use crate::protocol::{
     MODEL_LIST_STATUS_EMPTY, MODEL_LIST_STATUS_FAILED, MODEL_LIST_STATUS_LOADED, ModelListResult,

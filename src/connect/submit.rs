@@ -1,10 +1,15 @@
 //! Submit-time provider selection and credential resolution.
+//!
+//! Lives in the neutral `connect` module (not `backend`) so the headless CLI and
+//! the eval runner can resolve the active provider/model/key without depending
+//! on the backend transport layer.
 
 use crate::config::KimiConfig;
 use crate::provider::ProviderId;
 use crate::provider::registry;
-use crate::secrets;
 use crate::store::Store;
+
+use super::resolve_base_url;
 
 /// Resolves the provider/model/key/base URL used by a submit request.
 ///
@@ -19,8 +24,8 @@ pub(crate) fn resolve_submit_config(store: &Store) -> Option<KimiConfig> {
         Some(choice) => choice,
         None => effective_default()?,
     };
-    let key = secrets::resolve_key(provider)?;
-    let base_url = crate::connect::resolve_base_url(store, provider)?;
+    let key = crate::secrets::resolve_key(provider)?;
+    let base_url = resolve_base_url(store, provider)?;
 
     Some(KimiConfig {
         api_key: key.expose().to_owned(),
@@ -40,7 +45,7 @@ fn active_choice(store: &Store) -> Option<(ProviderId, String)> {
 fn effective_default() -> Option<(ProviderId, String)> {
     registry::PROVIDERS.iter().find_map(|descriptor| {
         let model = registry::effective_default_model(descriptor.id)?;
-        secrets::resolve_key(descriptor.id)?;
+        crate::secrets::resolve_key(descriptor.id)?;
         Some((descriptor.id, model))
     })
 }

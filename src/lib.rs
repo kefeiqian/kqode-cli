@@ -6,6 +6,7 @@ pub mod connect;
 pub mod conversation;
 pub mod debug_log;
 pub mod git;
+pub mod headless;
 pub mod memory;
 pub mod paths;
 pub mod protocol;

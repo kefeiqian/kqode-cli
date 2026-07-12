@@ -16,6 +16,17 @@ pub use themes::*;
 /// Hidden argument that starts the internal JSON-RPC backend loop.
 pub const BACKEND_MODE_ARG: &str = "--__kqode-json-rpc-backend";
 
+/// Headless one-shot flag: `kqode --prompt <text>` resolves the active provider,
+/// prints a single completion, and exits. With no inline value (or the value
+/// `-`), the prompt is read from stdin. Rust-only (not part of the JSON-RPC
+/// protocol), so it has no TypeScript mirror.
+pub const PROMPT_FLAG: &str = "--prompt";
+
+/// Headless machine-readable output flag, paired with [`PROMPT_FLAG`]: emit one
+/// JSON object with the completion text, finish reason, model, and token usage
+/// (never the provider key). Rust-only, no TypeScript mirror.
+pub const JSON_FLAG: &str = "--json";
+
 /// JSON-RPC notification the backend emits exactly once, immediately after its
 /// stdio transport is live and before it handles any request.
 ///

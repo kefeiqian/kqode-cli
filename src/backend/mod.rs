@@ -23,7 +23,6 @@ mod git_status;
 mod memory;
 mod message;
 mod providers;
-mod resolve;
 mod sessions;
 #[cfg(test)]
 mod tests;
