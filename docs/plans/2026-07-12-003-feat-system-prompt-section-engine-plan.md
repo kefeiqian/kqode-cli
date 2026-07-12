@@ -1,7 +1,7 @@
 ---
 title: "feat: System prompt section engine"
 type: feat
-status: active
+status: completed
 date: 2026-07-12
 origin: docs/brainstorms/2026-07-12-system-prompt-section-engine-requirements.md
 ---
