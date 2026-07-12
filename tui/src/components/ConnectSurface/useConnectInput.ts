@@ -135,8 +135,16 @@ export function useConnectInput(clearProvider: () => Promise<void>) {
   }
 
   function handleCustomInput(input: string, key: Parameters<Parameters<typeof useInput>[0]>[1]) {
-    if (key.escape || isShiftTab(input, key) || key.upArrow) {
+    if (key.escape || isShiftTab(input, key)) {
       backStep();
+      return;
+    }
+    // Up moves to the previous field; on the first field (Base URL) it is a no-op
+    // so it never backs out of the Custom form into the provider list.
+    if (key.upArrow) {
+      if (stepRef.current === ConnectStep.CustomLabel) {
+        backStep();
+      }
       return;
     }
     if (stepRef.current === ConnectStep.CustomUrl) {

@@ -38,7 +38,9 @@ export function CustomForm({
         value={baseUrl}
       />
       <InlineError message={baseUrlError} />
+      <Text> </Text>
       <Text color={theme.colors.muted}>Destination host: {destinationHost(baseUrl)}</Text>
+      <Text> </Text>
       <FieldRow
         active={step === ConnectStep.CustomLabel}
         cursorIndex={labelCursor}
@@ -66,12 +68,12 @@ function FieldRow({
 }) {
   const theme = useAtomValue(activeThemeAtom);
   const lineColor = active ? theme.colors.accentBlue : theme.colors.foreground;
-  const prefix = active ? '❯' : ' ';
+  const gutter = active ? '❯ ' : '';
 
   if (value.length === 0) {
     return (
       <Text color={lineColor} wrap="truncate">
-        {prefix} {label}: <Text color={theme.colors.muted}>{active ? `${CARET} ${placeholder}` : placeholder}</Text>
+        {gutter}{label}: <Text color={theme.colors.muted}>{active ? `${CARET} ${placeholder}` : placeholder}</Text>
       </Text>
     );
   }
@@ -79,7 +81,7 @@ function FieldRow({
   if (!active) {
     return (
       <Text color={lineColor} wrap="truncate">
-        {prefix} {label}: {value}
+        {gutter}{label}: {value}
       </Text>
     );
   }
@@ -87,7 +89,7 @@ function FieldRow({
   const clamped = Math.max(0, Math.min(value.length, cursorIndex));
   return (
     <Text color={lineColor} wrap="truncate">
-      {prefix} {label}: {value.slice(0, clamped)}
+      {gutter}{label}: {value.slice(0, clamped)}
       {CARET}
       {value.slice(clamped)}
     </Text>

@@ -253,6 +253,42 @@ describe('ConnectSurface', () => {
     expect(store.get(connectStepAtom)).toBe(ConnectStep.CustomLabel);
   });
 
+  it('swallows Up on the first Custom field instead of returning to the provider list', async () => {
+    const { store, stdin, lastFrame } = renderConnect();
+    await waitForFrame(lastFrame, 'Custom');
+
+    stdin.write('\u001B[B'); // select Custom
+    await flushInput();
+    stdin.write('\n'); // → CustomUrl
+    await waitForFrame(lastFrame, '❯ Base URL');
+
+    stdin.write('\u001B[A'); // Up on the first field must not exit to the list
+    await flushInput();
+
+    expect(store.get(connectStepAtom)).toBe(ConnectStep.CustomUrl);
+    expect(lastFrame() ?? '').toContain('❯ Base URL');
+  });
+
+  it('renders the Label flush-left with a gap above Destination host and Label', async () => {
+    const { stdin, lastFrame } = renderConnect();
+    await waitForFrame(lastFrame, 'Custom');
+
+    stdin.write('\u001B[B'); // select Custom
+    await flushInput();
+    stdin.write('\n'); // → CustomUrl
+    const frame = await waitForFrame(lastFrame, 'Label: optional');
+
+    const lines = frame.split('\n');
+    const hostIdx = lines.findIndex((line) => line.startsWith('Destination host:'));
+    const labelIdx = lines.findIndex((line) => line.includes('Label: optional'));
+
+    expect(hostIdx).toBeGreaterThan(0);
+    expect(labelIdx).toBeGreaterThan(0);
+    expect(lines[labelIdx].startsWith('Label:')).toBe(true); // no leading indent
+    expect(lines[hostIdx - 1].trim()).toBe(''); // gap row above Destination host
+    expect(lines[labelIdx - 1].trim()).toBe(''); // gap row above Label
+  });
+
   it('shows an API-key hint and hides the field-nav footer on the key step', async () => {
     const { stdin, lastFrame } = renderConnect();
     await waitForFrame(lastFrame, 'Custom');
