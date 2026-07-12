@@ -47,4 +47,30 @@ describe('renderMarkdownContentRows', () => {
     expect(rows.find((row) => row.text === 'const x = 1;')?.backgroundColorToken).toBeUndefined();
     expect(rows.some((row) => row.text.startsWith('┌'))).toBe(true);
   });
+
+  it('renders inline and display LaTeX math as readable Unicode', () => {
+    const rows = renderMarkdownContentRows('The gradient $\\nabla_x f$ and $$\\alpha + \\beta$$ end', 80);
+    const text = rows.map((row) => row.text).join('\n');
+
+    expect(text).toContain('∇');
+    expect(text).toContain('α + β');
+    expect(text).not.toContain('$');
+    expect(text).not.toContain('\\nabla');
+  });
+
+  it('leaves currency and inline code spans untouched in rendered output', () => {
+    const rows = renderMarkdownContentRows('costs $5.99 and `$x$` stays', 80);
+    const text = rows.map((row) => row.text).join('\n');
+
+    expect(text).toContain('$5.99');
+    expect(text).toContain('$x$');
+  });
+
+  it('keeps converted math rows within the safe width', () => {
+    const rows = renderMarkdownContentRows('$\\nabla \\sum \\int \\leq \\top x^\\top_{ij}$', 12);
+
+    for (const row of rows) {
+      expect(displayWidth(row.text)).toBeLessThanOrEqual(12);
+    }
+  });
 });

@@ -47,4 +47,12 @@ describe('streaming markdown blocks', () => {
     expect(afterFirst).toBe(1);
     expect(highlightCodeCacheSize()).toBe(afterFirst);
   });
+
+  it('converts math in completed blocks but leaves trailing math raw while streaming', () => {
+    const rows = renderMarkdownContentRows('$\\alpha$ done\n\nnext $\\beta', 40, { streaming: true });
+    const text = rows.map((row) => row.text).join('\n');
+
+    expect(text).toContain('α done');
+    expect(text).toContain('$\\beta');
+  });
 });

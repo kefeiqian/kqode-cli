@@ -4,6 +4,7 @@ import {
   splitStreamingMarkdown,
   tokenPlainText
 } from '@libs/markdown/parseBlocks.ts';
+import { convertLatexToUnicode } from '@libs/markdown/latexToUnicode.ts';
 import { renderCodeBlock } from '@libs/markdown/renderCodeBlock.ts';
 import { renderTable } from '@libs/markdown/renderTable.ts';
 import { renderInline, renderInlineTokens } from '@libs/markdown/renderInline.ts';
@@ -22,11 +23,11 @@ export function renderMarkdownContentRows(
   if (options.streaming === true) {
     const { completed, trailing } = splitStreamingMarkdown(markdown);
     return [
-      ...(completed.length > 0 ? renderTokens(parseBlocks(completed), safeColumns, 0) : []),
+      ...(completed.length > 0 ? renderTokens(parseBlocks(convertLatexToUnicode(completed)), safeColumns, 0) : []),
       ...(trailing.length > 0 ? plainRows(trailing.replace(/^\n+/, ''), safeColumns) : [])
     ];
   }
-  return renderTokens(parseBlocks(markdown), safeColumns, 0);
+  return renderTokens(parseBlocks(convertLatexToUnicode(markdown)), safeColumns, 0);
 }
 
 function renderTokens(tokens: readonly Token[], columns: number, depth: number): MarkdownContentRow[] {
