@@ -38,7 +38,7 @@ import {
   composerStateAtom
 } from '@state/ui/composer/index.ts';
 import { composerInputColumnsAtom, composerRowsAtom, composerTopAtom, layoutAtom, scrollComposerCursorIntoViewAtom } from '@state/ui/index.ts';
-import { copyModeActiveAtom, inputLockedAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
+import { inputLockedAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
 
 type PromptComposerProps = {
   columns?: number;
@@ -73,7 +73,6 @@ export function PromptComposer({
   const atomColumns = useAtomValue(safeChromeColumnsAtom);
   const atomInputColumns = useAtomValue(composerInputColumnsAtom);
   const atomInputLocked = useAtomValue(inputLockedAtom);
-  const copyModeActive = useAtomValue(copyModeActiveAtom);
   const atomLayout = useAtomValue(layoutAtom);
   const atomComposerTop = useAtomValue(composerTopAtom);
   const restoreDraft = useAtomValue(restoreComposerDraftAtom);
@@ -106,7 +105,7 @@ export function PromptComposer({
             submissionSequence === undefined ? prompt : { text: prompt, submissionSequence }
           )
       : (prompt: string) => onSubmit(prompt);
-  const resolvedIsActive = isActive ?? (!atomInputLocked && !copyModeActive);
+  const resolvedIsActive = isActive ?? !atomInputLocked;
   const resolvedMaxVisibleLines = maxVisibleLines ?? atomLayout.composerVisibleRows ?? DEFAULT_COMPOSER_VISIBLE_LINES;
   const resolvedCursorTop = cursorTop ?? atomComposerTop;
   const resolvedVisibleRowsChange = onVisibleRowsChange ?? setComposerRows;
@@ -215,8 +214,7 @@ export function PromptComposer({
   // (backend loading) resolvedIsActive is false, so no position is set and the
   // terminal cursor stays hidden — useComposerCaretVisibility hides it
   // explicitly because Ink won't — and the caret returns once the backend is
-  // ready. Copy Mode also releases the caret to the terminal for native
-  // selection.
+  // ready.
   if (
     resolvedIsActive &&
     composerMetrics.hasMeasured &&

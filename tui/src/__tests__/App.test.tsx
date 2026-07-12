@@ -8,13 +8,13 @@ import {
   armedActionAtom,
   bodySelectionAtom,
   columnsTestOverrideAtom,
-  copyModeActiveAtom,
   FULLSCREEN_GUARD_ROWS,
   rowsTestOverrideAtom,
   Surface
 } from '@state/ui/index.ts';
 import { ArmedAction } from '@constants/ui.ts';
-import { activeThemeAtom, productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
+import { activeThemeAtom, clipboardClientAtom, productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
+import { composerStateAtom } from '@state/ui/composer/index.ts';
 import { helpVisibleAtom } from '@state/ui/help/index.ts';
 import { DEFAULT_THEME } from '@theme/themeConfig.ts';
 import { flushInput } from '@test/flushInput.ts';
@@ -157,32 +157,36 @@ describe('App', () => {
     expect(store.get(armedActionAtom)).toBeNull();
   });
 
-  it('lets Ctrl+C exit Copy Mode before arming the app exit', async () => {
+  it('clears an active selection and arms exit on the first Ctrl+C, exiting on the second', async () => {
     const { store, stdin } = renderApp({ columns: 100, rows: 20 });
     await flushInput();
 
-    stdin.write('\u0012');
+    store.set(bodySelectionAtom, {
+      anchor: { rowIndex: 0, column: 0 },
+      focus: { rowIndex: 0, column: 4 }
+    });
     await flushInput();
-    expect(store.get(copyModeActiveAtom)).toBe(true);
 
     stdin.write('\u0003');
     await flushInput();
 
-    expect(store.get(copyModeActiveAtom)).toBe(false);
-    expect(store.get(armedActionAtom)).toBeNull();
-
-    stdin.write('\u0003');
-    await flushInput();
+    // One Ctrl+C both dismisses the highlight and arms the exit — dismissal is
+    // non-consuming, so the armed-exit logic still runs on the same press.
+    expect(store.get(bodySelectionAtom)).toBeNull();
     expect(store.get(armedActionAtom)).toBe(ArmedAction.Exit);
+
+    stdin.write('\u0003');
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBeNull();
   });
 
-  it('clears the selection and exits Copy Mode on a right-click', async () => {
+  it('clears an active selection and still pastes on a right-click', async () => {
     const { store, stdin } = renderApp({ columns: 100, rows: 20 });
+    store.set(clipboardClientAtom, {
+      readText: vi.fn().mockResolvedValue('pasted'),
+      writeText: vi.fn()
+    });
     await flushInput();
-
-    stdin.write('\u0012');
-    await flushInput();
-    expect(store.get(copyModeActiveAtom)).toBe(true);
 
     store.set(bodySelectionAtom, {
       anchor: { rowIndex: 0, column: 0 },
@@ -194,8 +198,8 @@ describe('App', () => {
     stdin.write('\u001B[<2;10;5M');
     await flushInput();
 
-    expect(store.get(copyModeActiveAtom)).toBe(false);
     expect(store.get(bodySelectionAtom)).toBeNull();
+    expect(store.get(composerStateAtom).text).toBe('pasted');
   });
 
   it('disarms a pending Ctrl+C exit on another key outside the home screen', async () => {

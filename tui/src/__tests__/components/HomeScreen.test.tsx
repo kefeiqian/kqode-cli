@@ -9,17 +9,12 @@ import { formatDisplayCwd } from '@libs/tui/cwdLine.ts';
 import type { BodyEntry } from '@libs/tui/bodyRows.ts';
 import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import { NOT_CONFIGURED_MODEL_LABEL } from '@libs/model/index.ts';
-import { COPY_MODE_HINT, PASTE_FAILED_HINT } from '@constants/ui.ts';
+import { PASTE_FAILED_HINT } from '@constants/ui.ts';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
-import {
-  DISABLE_SGR_MOUSE_TRACKING,
-  ENABLE_SGR_MOUSE_TRACKING
-} from '@libs/terminal/mouse.ts';
 import {
   bodyEntriesAtom,
   bodySelectionAtom,
   columnsTestOverrideAtom,
-  copyModeActiveAtom,
   gitStatusLabelAtom,
   rowsTestOverrideAtom
 } from '@state/ui/index.ts';
@@ -452,75 +447,61 @@ describe('HomeScreen', () => {
     expect(bottomOutput).not.toContain('... newer output hidden ...');
   });
 
-  it('toggles Copy Mode with Ctrl+R and keeps scroll keys active', async () => {
-    const entries = Array.from({ length: 10 }, (_, index) => ({
-      kind: 'assistant' as const,
-      text: `entry ${index + 1}`
-    }));
-    const { lastFrame, stdin, stdout, store } = renderHomeScreen({
-      bodyEntries: entries,
-      columns: 100,
-      rows: 16
-    });
-    const write = vi.spyOn(stdout, 'write');
-    Object.defineProperty(stdout, 'isTTY', { configurable: true, value: true });
+  it('no longer treats Ctrl+R as a mode toggle and keeps the composer active', async () => {
+    const { stdin, store } = renderHomeScreen({ columns: 100, rows: 16 });
     await flushInput();
-    write.mockClear();
 
+    // Ctrl+R (DC2, \u0012) is unbound now: it enters no mode, so the composer
+    // stays active and the following text lands in it instead of being swallowed.
     stdin.write('\u0012');
     await flushInput();
-
-    expect(store.get(copyModeActiveAtom)).toBe(true);
-    // Entering selection mode keeps mouse tracking on (the selection is owned in-app).
-    expect(write.mock.calls.some(([chunk]) => chunk === DISABLE_SGR_MOUSE_TRACKING)).toBe(false);
-    expect(store.get(composerStateAtom).text).toBe('');
-
-    stdin.write('\u001B[5~');
+    stdin.write('hi');
     await flushInput();
 
-    expect(store.get(copyModeActiveAtom)).toBe(true);
-    expect(lastFrame() ?? '').toContain('entry 6');
-    expect(lastFrame() ?? '').toContain(COPY_MODE_HINT);
-
-    stdin.write('\u001B[6~');
-    await flushInput();
-    expect(store.get(copyModeActiveAtom)).toBe(true);
-    expect(lastFrame() ?? '').toContain('entry 10');
-
-    stdin.write('\u001B[F');
-    await flushInput();
-    expect(store.get(copyModeActiveAtom)).toBe(true);
-    expect(lastFrame() ?? '').toContain('entry 10');
-
-    write.mockClear();
-    stdin.write('\u0012');
-    await flushInput();
-
-    expect(store.get(copyModeActiveAtom)).toBe(false);
-    // Exiting selection mode does not re-enable tracking; it was never disabled.
-    expect(write.mock.calls.some(([chunk]) => chunk === ENABLE_SGR_MOUSE_TRACKING)).toBe(false);
+    expect(store.get(composerStateAtom).text).toBe('hi');
+    expect(store.get(bodySelectionAtom)).toBeNull();
   });
 
-  it('exits Copy Mode on printable keys without inserting into the composer', async () => {
-    const { lastFrame, stdin, store } = renderHomeScreen({ columns: 100, rows: 16 });
+  it('dismisses an active highlight on a printable key that still reaches the composer', async () => {
+    const { stdin, store } = renderHomeScreen({ columns: 100, rows: 16 });
     await flushInput();
-
-    stdin.write('\u0012');
-    await flushInput();
-    expect(store.get(copyModeActiveAtom)).toBe(true);
-    expect(lastFrame() ?? '').toContain(COPY_MODE_HINT);
     store.set(bodySelectionAtom, {
       anchor: { rowIndex: 0, column: 0 },
       focus: { rowIndex: 0, column: 3 }
     });
+    await flushInput();
 
     stdin.write('z');
     await flushInput();
 
-    expect(store.get(copyModeActiveAtom)).toBe(false);
+    // Non-consuming dismissal: the highlight clears and the key still inserts.
     expect(store.get(bodySelectionAtom)).toBeNull();
-    expect(store.get(composerStateAtom).text).toBe('');
-    expect(lastFrame() ?? '').not.toContain(COPY_MODE_HINT);
+    expect(store.get(composerStateAtom).text).toBe('z');
+  });
+
+  it('keeps an active highlight while scroll keys page the transcript', async () => {
+    const entries = Array.from({ length: 10 }, (_, index) => ({
+      kind: 'assistant' as const,
+      text: `entry ${index + 1}`
+    }));
+    const { lastFrame, stdin, store } = renderHomeScreen({
+      bodyEntries: entries,
+      columns: 100,
+      rows: 16
+    });
+    await flushInput();
+    store.set(bodySelectionAtom, {
+      anchor: { rowIndex: 0, column: 0 },
+      focus: { rowIndex: 1, column: 4 }
+    });
+    await flushInput();
+
+    const frameBefore = lastFrame() ?? '';
+    stdin.write('\u001B[5~');
+    await flushInput();
+
+    expect(lastFrame() ?? '').not.toBe(frameBefore);
+    expect(store.get(bodySelectionAtom)).not.toBeNull();
   });
 
   // --- Mode-less drag-to-copy selection (no Ctrl+R gate) ---

@@ -16,7 +16,8 @@ import { StatusBar } from '@components/StatusBar.tsx';
 import {
   DISABLE_SGR_MOUSE_TRACKING,
   ENABLE_SGR_MOUSE_TRACKING,
-  parseMouseButtonEvent
+  parseMouseButtonEvent,
+  parseMouseRightClickEvent
 } from '@libs/terminal/mouse.ts';
 import { handleRightClickPaste } from '@components/HomeScreen/rightClickPaste.ts';
 import {
@@ -31,13 +32,14 @@ import { isInsideSafeChromeBounds } from '@libs/tui/safeCanvas.ts';
 import { BODY_CWD_GAP_ROWS } from '@libs/tui/layout.ts';
 import {
   bottomSpacerRowsAtom,
+  clearBodySelectionAtom,
   composerInputColumnsAtom,
   composerTopAtom,
   layoutAtom,
   safeChromeColumnsAtom,
   scrollBodyByRowsAtom
 } from '@state/ui/index.ts';
-import { columnsAtom, copyModeActiveAtom, rowsAtom } from '@state/ui/index.ts';
+import { columnsAtom, rowsAtom } from '@state/ui/index.ts';
 import { commandMenuOpenAtom } from '@state/ui/commands/index.ts';
 import { activeDockedPanelAtom, DockedPanel } from '@state/ui/dock/atoms.ts';
 import {
@@ -94,7 +96,6 @@ export function HomeScreenView() {
   const { stdout } = useStdout();
   const columns = useAtomValue(columnsAtom);
   const rows = useAtomValue(rowsAtom);
-  const copyModeActive = useAtomValue(copyModeActiveAtom);
   const scrollBodyByRows = useSetAtom(scrollBodyByRowsAtom);
   const notifyScroll = useCaretScrollSuppression();
   const store = useStore();
@@ -151,7 +152,12 @@ export function HomeScreenView() {
       return;
     }
 
-    if (!copyModeActive && handleRightClickPaste(input, store)) {
+    // A right-click dismisses any active highlight, then pastes — the in-app
+    // selection never lingers while the paste runs. Dismissal lives here rather
+    // than in useGlobalKeys because the router owns all mouse input.
+    if (parseMouseRightClickEvent(input) !== null) {
+      store.set(clearBodySelectionAtom);
+      handleRightClickPaste(input, store);
       return;
     }
 

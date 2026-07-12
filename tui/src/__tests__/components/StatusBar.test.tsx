@@ -19,12 +19,11 @@ import {
   armedActionAtom,
   BACKEND_LOADING_HINT,
   columnsTestOverrideAtom,
-  copyModeActiveAtom,
   loadingFrameAtom,
   setTransientStatusHintAtom,
   startupStatusHintAtom
 } from '@state/ui/index.ts';
-import { ArmedAction, COPY_MODE_HINT } from '@constants/ui.ts';
+import { ArmedAction } from '@constants/ui.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
 const cwd = 'C:\\workspace';
@@ -57,15 +56,15 @@ describe('StatusBar', () => {
     expect(lastFrame() ?? '').toContain('ctrl+c again to exit');
   });
 
-  it('shows the Copy Mode banner ahead of transient hints without adding a row', () => {
+  it('shows a persistent hint ahead of transient hints without adding a row', () => {
     const store = makeStore();
-    store.set(copyModeActiveAtom, true);
+    store.set(startupStatusHintAtom, BACKEND_LOADING_HINT);
     store.set(setTransientStatusHintAtom, { text: 'copied' });
 
     const { lastFrame } = renderWithJotai(<StatusBar />, store);
     const output = lastFrame() ?? '';
 
-    expect(output).toContain(COPY_MODE_HINT);
+    expect(output).toContain(BACKEND_LOADING_HINT.text);
     expect(output).not.toContain('copied');
     expect(output.split('\n')).toHaveLength(1);
   });

@@ -8,7 +8,6 @@ import {
   armedActionAtom,
   AUTO_COMPACTING_HINT,
   compactionInProgressAtom,
-  copyModeActiveAtom,
   loadingFrameAtom,
   safeChromeColumnsAtom,
   setTransientStatusHintAtom,
@@ -19,7 +18,6 @@ import {
 } from '@state/ui/index.ts';
 import {
   ArmedAction,
-  COPY_MODE_HINT,
   DEFAULT_STATUS_HINTS,
   LOADING_FRAME_COUNT,
   LOADING_FRAME_INTERVAL_MS,
@@ -33,20 +31,18 @@ export function StatusBar() {
   const modelLabel = useAtomValue(activeModelLabelAtom);
   const startupStatusHint = useAtomValue(startupStatusHintAtom);
   const transientStatusHint = useAtomValue(transientStatusHintAtom);
-  const copyModeActive = useAtomValue(copyModeActiveAtom);
   const armedAction = useAtomValue(armedActionAtom);
   const turnInFlight = useAtomValue(turnInFlightAtom);
   const compactionInProgress = useAtomValue(compactionInProgressAtom);
   const theme = useAtomValue(activeThemeAtom);
   useActiveModelRefresh();
   useTransientStatusHintClear(transientStatusHint);
-  // Backend startup takes precedence over the working spinner, which in turn
-  // sits ahead of Copy Mode; a loading-kind hint drives the animated dots.
+  // Backend startup takes precedence over the working spinner; a loading-kind
+  // hint drives the animated dots.
   const persistentStatusHint =
     startupStatusHint ??
     (compactionInProgress ? AUTO_COMPACTING_HINT : undefined) ??
-    (turnInFlight ? WORKING_STATUS_HINT : undefined) ??
-    (copyModeActive ? { text: COPY_MODE_HINT } : undefined);
+    (turnInFlight ? WORKING_STATUS_HINT : undefined);
   const loadingFrame = useLoadingFrame(persistentStatusHint?.kind === 'loading');
   const baseHints = persistentStatusHint?.text ?? transientStatusHint?.text ?? DEFAULT_STATUS_HINTS;
   const armedHint =

@@ -1,8 +1,8 @@
 import { useApp, useInput } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { ArmedAction, COPY_MODE_INPUT_KEY } from '@constants/ui.ts';
-import { isMouseInput, parseMouseRightClickEvent } from '@libs/terminal/mouse.ts';
-import { armedActionAtom, clearBodySelectionAtom, copyModeActiveAtom } from '@state/ui/index.ts';
+import { ArmedAction } from '@constants/ui.ts';
+import { isMouseInput } from '@libs/terminal/mouse.ts';
+import { armedActionAtom, bodySelectionAtom, clearBodySelectionAtom } from '@state/ui/index.ts';
 
 /**
  * Global key handling that stays active in every state — the home screen, the
@@ -12,6 +12,14 @@ import { armedActionAtom, clearBodySelectionAtom, copyModeActiveAtom } from '@st
  * Any non-Ctrl+C key except Esc disarms a pending exit globally, so the arm
  * cannot persist across help or too-small screens where the composer is absent.
  *
+ * Also dismisses an active transcript selection: with `bodySelectionAtom` set,
+ * any key other than the body-scroll keys clears the highlight **without
+ * consuming the key**, so the key's normal action (composer input, the armed
+ * exit below) still runs — there is no selection mode to swallow it. Body-scroll
+ * keys keep the highlight so a highlighted transcript can still scroll, and mouse
+ * input passes through untouched because the home-screen router owns clicks,
+ * drags, and right-click dismissal.
+ *
  * Requires `exitOnCtrlC: false` on the Ink render so Ctrl+C reaches here as the
  * `\x03` byte instead of exiting immediately. The composer input hook ignores
  * Ctrl+C, so it is handled here exactly once.
@@ -20,44 +28,25 @@ export function useGlobalKeys(): void {
   const { exit } = useApp();
   const armedAction = useAtomValue(armedActionAtom);
   const setArmedAction = useSetAtom(armedActionAtom);
-  const copyModeActive = useAtomValue(copyModeActiveAtom);
-  const setCopyModeActive = useSetAtom(copyModeActiveAtom);
+  const bodySelection = useAtomValue(bodySelectionAtom);
   const clearBodySelection = useSetAtom(clearBodySelectionAtom);
-
-  const exitCopyMode = (): void => {
-    setCopyModeActive(false);
-    setArmedAction(null);
-    clearBodySelection();
-  };
 
   useInput((input, key) => {
     const isCtrlC = key.ctrl === true && input === 'c';
-    const isCopyModeToggle = key.ctrl === true && input === COPY_MODE_INPUT_KEY;
 
-    if (copyModeActive) {
-      if (key.pageUp === true || key.pageDown === true || key.end === true) {
-        return;
-      }
-      // A right-click ends selection: the in-app highlight disappears so it is
-      // never left standing while a terminal-level copy/paste takes over.
-      if (parseMouseRightClickEvent(input) !== null) {
-        exitCopyMode();
-        return;
-      }
-      // Left-button gestures drive the in-app selection; they must not exit.
-      if (isMouseInput(input)) {
-        return;
-      }
-      exitCopyMode();
-      return;
-    }
-
-    if (isCopyModeToggle) {
-      setCopyModeActive(true);
-      if (armedAction === ArmedAction.Exit) {
-        setArmedAction(null);
-      }
-      return;
+    // Dismiss an active highlight on any key press without returning, so the key
+    // still performs its normal action (non-consuming dismissal). Body-scroll
+    // keys keep the highlight, and mouse input is owned by the home-screen router
+    // (clicks/drags/right-click), so neither dismisses here. Esc dismisses too —
+    // the clear side effect runs while the composer keeps owning Esc's own action.
+    if (
+      bodySelection !== null &&
+      key.pageUp !== true &&
+      key.pageDown !== true &&
+      key.end !== true &&
+      !isMouseInput(input)
+    ) {
+      clearBodySelection();
     }
 
     if (!isCtrlC) {

@@ -22,8 +22,7 @@ import { composerChromeSignatureAtom, inputLockedAtom } from '@state/ui/index.ts
  *     explicit hide the hardware cursor is left blinking at the end of the last
  *     output row. Re-asserted on every chrome frame so a repaint cannot
  *     re-expose it; Ink re-shows the caret itself once the composer asserts a
- *     position after unlock. Copy Mode is intentionally NOT hidden here: it
- *     releases the cursor to the terminal for native selection.
+ *     position after unlock.
  */
 export function useComposerCaretVisibility(): void {
   const inputLocked = useAtomValue(inputLockedAtom);
