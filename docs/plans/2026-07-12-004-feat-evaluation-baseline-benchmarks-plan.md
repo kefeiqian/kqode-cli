@@ -1,7 +1,7 @@
 ---
 title: "feat: Evaluation baseline on public no-tool benchmarks"
 type: feat
-status: active
+status: completed
 date: 2026-07-12
 deepened: 2026-07-12
 origin: docs/brainstorms/2026-07-12-evaluation-baseline-public-benchmarks-requirements.md
