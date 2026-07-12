@@ -1,6 +1,7 @@
 import { Box, useInput, useStdout } from 'ink';
+import type { createStore } from 'jotai';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { BodyPane } from '@components/BodyPane.tsx';
 import { CwdLine } from '@components/CwdLine.tsx';
 import { Header } from '@components/Header.tsx';
@@ -15,11 +16,14 @@ import { StatusBar } from '@components/StatusBar.tsx';
 import {
   DISABLE_SGR_MOUSE_TRACKING,
   ENABLE_SGR_MOUSE_TRACKING,
-  parseMouseButtonEvent,
-  parseMouseClickEvent
+  parseMouseButtonEvent
 } from '@libs/terminal/mouse.ts';
 import { handleRightClickPaste } from '@components/HomeScreen/rightClickPaste.ts';
-import { handleSelectionGesture } from '@components/HomeScreen/selectionInput.ts';
+import {
+  handleSelectionGesture,
+  resolveGestureRegion,
+  type GestureRegion
+} from '@components/HomeScreen/selectionInput.ts';
 import { handleWheelScroll } from '@components/HomeScreen/wheelScroll.ts';
 import { useCaretScrollSuppression } from '@components/HomeScreen/useCaretScrollSuppression.ts';
 import { resolveClickResult } from '@libs/composer/composerWindow.ts';
@@ -47,6 +51,45 @@ import {
   PROMPT_PREFIX
 } from '@constants/ui.ts';
 
+type Store = ReturnType<typeof createStore>;
+
+/**
+ * Positions the composer caret from a left press at 1-based SGR `row`/`column`.
+ * The caller guarantees the press landed in the composer region; this still
+ * clamps to the safe chrome bounds and lets `resolveClickResult` reject columns
+ * past the text. Text rows start one row below `composerTop` (the top half-line
+ * cap) and the prompt prefix offsets columns.
+ */
+function positionComposerCaret(store: Store, point: { row: number; column: number }): void {
+  const rows = store.get(rowsAtom);
+  const safeChromeColumns = store.get(safeChromeColumnsAtom);
+  if (
+    !isInsideSafeChromeBounds({
+      row: point.row,
+      column: point.column,
+      rows,
+      columns: safeChromeColumns
+    })
+  ) {
+    return;
+  }
+
+  const composerTop = store.get(composerTopAtom);
+  const composerState = store.get(composerStateAtom);
+  const result = resolveClickResult({
+    text: composerState.text,
+    columns: store.get(composerInputColumnsAtom),
+    maxVisibleLines: store.get(layoutAtom).composerVisibleRows,
+    cursorIndex: composerState.cursorIndex,
+    offset: store.get(composerScrollOffsetRowsAtom),
+    visibleRow: point.row - 1 - (composerTop + COMPOSER_BACKGROUND_TOP_PADDING_ROWS),
+    column: point.column - 1 - PROMPT_PREFIX.length
+  });
+  if (result !== null) {
+    store.set(setComposerCursorWithOffsetAtom, result);
+  }
+}
+
 export function HomeScreenView() {
   const { stdout } = useStdout();
   const columns = useAtomValue(columnsAtom);
@@ -56,6 +99,9 @@ export function HomeScreenView() {
   const notifyScroll = useCaretScrollSuppression();
   const store = useStore();
   const theme = useAtomValue(activeThemeAtom);
+  // Latches the region a left press started in so drag/release events stay with
+  // that gesture regardless of where the pointer wanders (see resolveGestureRegion).
+  const gestureRegionRef = useRef<GestureRegion | null>(null);
 
   useEffect(() => {
     if (!stdout.isTTY) {
@@ -72,50 +118,36 @@ export function HomeScreenView() {
   }, [stdout]);
 
   useInput((input, key) => {
-    // Selection mode owns the mouse: press/drag/release build the in-app
-    // selection and release copies it. Everything else falls through to the
-    // shared wheel/scroll handling below.
-    if (copyModeActive) {
-      const gesture = parseMouseButtonEvent(input);
-      if (gesture !== null) {
-        handleSelectionGesture(store, gesture);
+    // A left press/drag/release drives either the in-app transcript selection or
+    // the composer caret, decided by the region the press started in — no mode
+    // toggle. The owning region is latched at press time so a drag that wanders
+    // between regions keeps routing to the gesture that began.
+    const gesture = parseMouseButtonEvent(input);
+    if (gesture !== null) {
+      if (gesture.kind === 'press') {
+        const region = resolveGestureRegion(store, gesture.row);
+        gestureRegionRef.current = region;
+        if (region === 'body') {
+          handleSelectionGesture(store, gesture);
+        } else if (region === 'composer') {
+          positionComposerCaret(store, gesture);
+        }
         return;
       }
-    }
 
-    if (handleWheelScroll(store, input, notifyScroll)) {
+      // Drags and the release route to whichever region owned the press: a body
+      // drag keeps selecting even over the composer, and a composer press never
+      // becomes a selection.
+      if (gestureRegionRef.current === 'body') {
+        handleSelectionGesture(store, gesture);
+      }
+      if (gesture.kind === 'release') {
+        gestureRegionRef.current = null;
+      }
       return;
     }
 
-    const click = parseMouseClickEvent(input);
-    if (click !== null) {
-      if (store.get(activeDockedPanelAtom) !== null) {
-        return;
-      }
-
-      const currentRows = store.get(rowsAtom);
-      const currentSafeChromeColumns = store.get(safeChromeColumnsAtom);
-      const currentComposerTop = store.get(composerTopAtom);
-      if (!isInsideSafeChromeBounds({ row: click.row, column: click.column, rows: currentRows, columns: currentSafeChromeColumns })) {
-        return;
-      }
-      // Map the click to a cursor index + the scroll offset that keeps the
-      // visible window fixed (clicking repositions the caret without scrolling).
-      // Text rows start one row below composerTop (the top half-line cap); the
-      // prompt prefix offsets columns.
-      const composerState = store.get(composerStateAtom);
-      const result = resolveClickResult({
-        text: composerState.text,
-        columns: store.get(composerInputColumnsAtom),
-        maxVisibleLines: store.get(layoutAtom).composerVisibleRows,
-        cursorIndex: composerState.cursorIndex,
-        offset: store.get(composerScrollOffsetRowsAtom),
-        visibleRow: click.row - 1 - (currentComposerTop + COMPOSER_BACKGROUND_TOP_PADDING_ROWS),
-        column: click.column - 1 - PROMPT_PREFIX.length
-      });
-      if (result !== null) {
-        store.set(setComposerCursorWithOffsetAtom, result);
-      }
+    if (handleWheelScroll(store, input, notifyScroll)) {
       return;
     }
 

@@ -1,12 +1,18 @@
 import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
-import { handleSelectionGesture } from '@components/HomeScreen/selectionInput.ts';
+import {
+  handleSelectionGesture,
+  resolveGestureRegion
+} from '@components/HomeScreen/selectionInput.ts';
 import { clipboardClientAtom } from '@state/global/index.ts';
 import {
   bodyEntriesAtom,
   bodySelectionAtom,
+  bodyTopAtom,
   columnsTestOverrideAtom,
+  composerTopAtom,
+  openResumePanelAtom,
   rowsTestOverrideAtom
 } from '@state/ui/index.ts';
 
@@ -57,5 +63,32 @@ describe('handleSelectionGesture', () => {
     handleSelectionGesture(store, { kind: 'press', row: 3, column: 2 });
 
     expect(store.get(bodySelectionAtom)).toBeNull();
+  });
+});
+
+describe('resolveGestureRegion', () => {
+  it('routes a press over the transcript body to the body region', () => {
+    const store = seededStore();
+    // SGR row `bodyTop + 1` maps to the first zero-based body row (bodyTop).
+    expect(resolveGestureRegion(store, store.get(bodyTopAtom) + 1)).toBe('body');
+  });
+
+  it('routes a press over the composer to the composer region', () => {
+    const store = seededStore();
+    // `composerTop + 2` (1-based) is a composer text row below the top padding.
+    expect(resolveGestureRegion(store, store.get(composerTopAtom) + 2)).toBe('composer');
+  });
+
+  it('returns null for a press on inert chrome above the body', () => {
+    const store = seededStore();
+    // SGR row 1 → zero-based row 0, the header row above the transcript.
+    expect(resolveGestureRegion(store, 1)).toBeNull();
+  });
+
+  it('returns null while a docked panel owns the screen', () => {
+    const store = seededStore();
+    store.set(openResumePanelAtom);
+
+    expect(resolveGestureRegion(store, store.get(bodyTopAtom) + 1)).toBeNull();
   });
 });

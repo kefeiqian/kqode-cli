@@ -37,7 +37,10 @@ describe('HomeScreen mouse tracking', () => {
 
     const { unmount } = renderWithJotai(<HomeScreenView />, store);
     await flushInput();
-    store.set(uiState.copyModeActiveAtom, true);
+    store.set(uiState.bodySelectionAtom, {
+      anchor: { rowIndex: 0, column: 0 },
+      focus: { rowIndex: 0, column: 4 }
+    });
     await flushInput();
     unmount();
 

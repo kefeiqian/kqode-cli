@@ -523,6 +523,154 @@ describe('HomeScreen', () => {
     expect(lastFrame() ?? '').not.toContain(COPY_MODE_HINT);
   });
 
+  // --- Mode-less drag-to-copy selection (no Ctrl+R gate) ---
+
+  it('drags over the body to select and copies on release with no mode toggle', async () => {
+    const entries = Array.from({ length: 10 }, (_, index) => ({
+      kind: 'assistant' as const,
+      text: `entry ${index + 1}`
+    }));
+    const writeText = vi.fn().mockResolvedValue(true);
+    const { stdin, store } = renderHomeScreen({ bodyEntries: entries, columns: 100, rows: 16 });
+    store.set(clipboardClientAtom, { readText: vi.fn(), writeText });
+    await flushInput();
+
+    // Body rows span SGR rows 2..9 at rows=16; press/drag/release on row 3 with
+    // no preceding Ctrl+R. Left press = button 0 `M`, drag = motion bit 32 `M`,
+    // release = `m`.
+    stdin.write('\u001B[<0;1;3M');
+    await flushInput();
+    stdin.write('\u001B[<32;40;3M');
+    await flushInput();
+    stdin.write('\u001B[<0;40;3m');
+    await flushInput();
+
+    expect(store.get(bodySelectionAtom)).not.toBeNull();
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('entry'));
+  });
+
+  it('positions the composer caret on a click without selecting or copying', async () => {
+    const writeText = vi.fn().mockResolvedValue(true);
+    const { stdin, store } = renderHomeScreen({ columns: 100, rows: 16 });
+    store.set(clipboardClientAtom, { readText: vi.fn(), writeText });
+    store.set(composerStateAtom, { text: 'hello world', cursorIndex: 11, validationError: null });
+    await flushInput();
+
+    // Composer text row 0 is SGR row 14 (composerTop=12 + top padding). Column 8
+    // lands inside the prompt text after the '> ' prefix.
+    stdin.write('\u001B[<0;8;14M');
+    await flushInput();
+    stdin.write('\u001B[<0;8;14m');
+    await flushInput();
+
+    expect(store.get(bodySelectionAtom)).toBeNull();
+    expect(writeText).not.toHaveBeenCalled();
+    expect(store.get(composerStateAtom).cursorIndex).toBeLessThan(11);
+  });
+
+  it('keeps scrolling and preserves the selection when the wheel turns mid-drag', async () => {
+    const entries = Array.from({ length: 10 }, (_, index) => ({
+      kind: 'assistant' as const,
+      text: `entry ${index + 1}`
+    }));
+    const { lastFrame, stdin, store } = renderHomeScreen({
+      bodyEntries: entries,
+      columns: 100,
+      rows: 16
+    });
+    await flushInput();
+
+    stdin.write('\u001B[<0;1;3M');
+    await flushInput();
+    stdin.write('\u001B[<32;10;3M');
+    await flushInput();
+    const selectionMidDrag = store.get(bodySelectionAtom);
+    expect(selectionMidDrag).not.toBeNull();
+
+    const frameBefore = lastFrame() ?? '';
+    stdin.write('\u001B[<64;1;3M');
+    await flushInput();
+
+    expect(lastFrame() ?? '').not.toBe(frameBefore);
+    // Selection is stored in absolute row indices, so scrolling does not lose it.
+    expect(store.get(bodySelectionAtom)).toEqual(selectionMidDrag);
+  });
+
+  it('clears a prior highlight and copies nothing on a click without a drag', async () => {
+    const entries = Array.from({ length: 10 }, (_, index) => ({
+      kind: 'assistant' as const,
+      text: `entry ${index + 1}`
+    }));
+    const writeText = vi.fn().mockResolvedValue(true);
+    const { stdin, store } = renderHomeScreen({ bodyEntries: entries, columns: 100, rows: 16 });
+    store.set(clipboardClientAtom, { readText: vi.fn(), writeText });
+    store.set(bodySelectionAtom, {
+      anchor: { rowIndex: 0, column: 0 },
+      focus: { rowIndex: 1, column: 5 }
+    });
+    await flushInput();
+
+    stdin.write('\u001B[<0;5;3M');
+    await flushInput();
+    stdin.write('\u001B[<0;5;3m');
+    await flushInput();
+
+    const selection = store.get(bodySelectionAtom);
+    expect(selection).not.toBeNull();
+    // A click without a drag leaves an empty selection (anchor === focus), so the
+    // old highlight is gone and nothing is copied.
+    expect(selection?.anchor).toEqual(selection?.focus);
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it('keeps a gesture with the region it started in', async () => {
+    const entries = Array.from({ length: 10 }, (_, index) => ({
+      kind: 'assistant' as const,
+      text: `entry ${index + 1}`
+    }));
+    const { stdin, store } = renderHomeScreen({ bodyEntries: entries, columns: 100, rows: 16 });
+    await flushInput();
+
+    // A drag that starts in the composer never creates a body selection.
+    stdin.write('\u001B[<0;8;14M');
+    await flushInput();
+    stdin.write('\u001B[<32;8;3M');
+    await flushInput();
+    expect(store.get(bodySelectionAtom)).toBeNull();
+    stdin.write('\u001B[<0;8;3m');
+    await flushInput();
+
+    // A drag that starts in the body never moves the composer caret.
+    const caretBefore = store.get(composerStateAtom).cursorIndex;
+    stdin.write('\u001B[<0;1;3M');
+    await flushInput();
+    stdin.write('\u001B[<32;40;14M');
+    await flushInput();
+    expect(store.get(composerStateAtom).cursorIndex).toBe(caretBefore);
+    expect(store.get(bodySelectionAtom)).not.toBeNull();
+  });
+
+  it('makes no selection on a body press while a docked panel is open', async () => {
+    const entries = Array.from({ length: 10 }, (_, index) => ({
+      kind: 'assistant' as const,
+      text: `entry ${index + 1}`
+    }));
+    const { stdin, store } = renderHomeScreen({
+      bodyEntries: entries,
+      columns: 100,
+      rows: 16,
+      resumeOpen: true
+    });
+    await flushInput();
+
+    stdin.write('\u001B[<0;1;3M');
+    await flushInput();
+    stdin.write('\u001B[<32;40;3M');
+    await flushInput();
+
+    expect(store.get(bodySelectionAtom)).toBeNull();
+  });
+
   it('scrolls body output with mouse wheel events', async () => {
     const entries = Array.from({ length: 10 }, (_, index) => ({
       kind: 'assistant' as const,

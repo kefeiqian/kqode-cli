@@ -11,7 +11,6 @@ import { isAllowedLinkHref, sanitizeLinkHref } from '@libs/markdown/linkSegment.
 import {
   bodyScrollOffsetRowsAtom,
   bodySelectionAtom,
-  copyModeActiveAtom,
   displayedBodyEntriesAtom,
   layoutAtom,
   safeChromeColumnsAtom
@@ -53,7 +52,6 @@ export function BodyPane({
   const atomScrollOffsetRows = useAtomValue(bodyScrollOffsetRowsAtom);
   const theme = useAtomValue(activeThemeAtom);
   const selection = useAtomValue(bodySelectionAtom);
-  const copyModeActive = useAtomValue(copyModeActiveAtom);
 
   const resolvedEntries = entries ?? atomEntries ?? DEFAULT_BODY_ENTRIES;
   const resolvedRows = rows ?? atomLayout.bodyRows;
@@ -72,12 +70,11 @@ export function BodyPane({
   const isScrollable = allRows.length > visibleRows;
   const renderedRows = isScrollable ? visibleRows : Math.min(visibleRows, allRows.length + 1);
   const contentColumns = isScrollable ? Math.max(1, visibleColumns - 1) : visibleColumns;
-  // Only paint the highlight while selection mode is active, so it never lingers
-  // over the transcript after exit or points at unrelated rows later.
+  // Paint the highlight whenever a selection exists — drag-to-select is always
+  // on, so the highlight follows `bodySelectionAtom` alone. An empty selection
+  // (a click without a drag) yields empty bounds and renders nothing.
   const selectionBoundsValue =
-    !copyModeActive || selection === null
-      ? null
-      : selectionBounds(selection.anchor, selection.focus);
+    selection === null ? null : selectionBounds(selection.anchor, selection.focus);
   const scrollbarCells = isScrollable
     ? renderScrollbar({
         rows: visibleRows,

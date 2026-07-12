@@ -3,13 +3,49 @@ import { copySelection } from '@components/HomeScreen/copySelection.ts';
 import { clamp } from '@libs/math/clamp.ts';
 import type { MouseButtonEvent } from '@libs/terminal/mouse.ts';
 import {
+  activeDockedPanelAtom,
   bodyTopAtom,
+  composerTopAtom,
+  layoutAtom,
+  rowsAtom,
   startBodySelectionAtom,
   updateBodySelectionAtom,
   visibleBodyRowsAtom
 } from '@state/ui/index.ts';
 
 type Store = ReturnType<typeof createStore>;
+
+/** The home-screen region a left-button gesture belongs to. */
+export type GestureRegion = 'body' | 'composer';
+
+/**
+ * Resolves which region a left press at 1-based SGR `row` belongs to, or `null`
+ * when it lands on inert chrome (header, spacer, cwd, status) or while a docked
+ * panel owns the screen. The body spans `[bodyTop, bodyTop + bodyRows)` and the
+ * composer block spans `[composerTop, rows - 1)` in Ink's zero-based rows; SGR
+ * rows are 1-based, so `row - 1` maps onto them (mirrors `bodyTopAtom` and
+ * `composerTopAtom`). The caller records the owning region at press time so a
+ * drag that wanders out of its region still routes to the gesture that began.
+ */
+export function resolveGestureRegion(store: Store, row: number): GestureRegion | null {
+  if (store.get(activeDockedPanelAtom) !== null) {
+    return null;
+  }
+
+  const pointerRow = row - 1;
+  const bodyTop = store.get(bodyTopAtom);
+  const bodyRows = store.get(layoutAtom).bodyRows;
+  if (pointerRow >= bodyTop && pointerRow < bodyTop + bodyRows) {
+    return 'body';
+  }
+
+  const composerTop = store.get(composerTopAtom);
+  if (pointerRow >= composerTop && pointerRow < store.get(rowsAtom) - 1) {
+    return 'composer';
+  }
+
+  return null;
+}
 
 /**
  * Maps an SGR mouse gesture (1-based screen coordinates) to a selection point in
