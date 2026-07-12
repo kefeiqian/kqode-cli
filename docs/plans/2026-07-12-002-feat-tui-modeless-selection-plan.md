@@ -58,7 +58,7 @@ Carried from origin:
 
 ## Prerequisite
 
-The working tree on `feat/tui-composer-scroll` holds uncommitted changes to the selection subsystem (`tui/src/state/ui/copyMode.ts`, `tui/src/useGlobalKeys.ts`, `tui/src/__tests__/App.test.tsx`, and others). **Commit them on this branch before starting implementation** — every unit below edits on top of them.
+The selection subsystem is fully committed on `feat/tui-composer-scroll` (through `feat(tui): exit Copy Mode and clear selection on right-click`); this plan's work branches from that tip. The main checkout's remaining uncommitted changes (`src/chat/system_prompt*`) belong to an unrelated feature — never stage them into this work.
 
 ---
 
@@ -114,12 +114,13 @@ Dependency order: U1 → U2 → U3 → U4 (each builds on the previous; U3 only 
 **Files:**
 - Modify: `tui/src/components/HomeScreen/HomeScreenView.tsx`
 - Modify: `tui/src/components/HomeScreen/selectionInput.ts`
-- Test: `tui/src/components/HomeScreen/__tests__/selectionInput.test.ts`, `tui/src/__tests__/components/HomeScreenMouseTracking.test.tsx`, `tui/src/__tests__/App.test.tsx`
+- Modify: `tui/src/components/BodyPane.tsx` (drop the `copyModeActive` gate on the highlight bounds so the highlight follows `bodySelectionAtom` alone — without this, drags select but nothing renders)
+- Test: `tui/src/components/HomeScreen/__tests__/selectionInput.test.ts`, `tui/src/__tests__/components/HomeScreenMouseTracking.test.tsx`, `tui/src/__tests__/App.test.tsx`, `tui/src/components/__tests__/BodyPane.test.tsx`
 
 **Approach:**
 - In the `useInput` router, replace the `copyModeActive` branch with region routing: left press whose row falls in the body viewport (between `bodyTopAtom` and the composer top) starts a selection gesture via `handleSelectionGesture`; a press in the composer region runs the existing caret positioning. Record the owning region of the in-flight gesture so drag/release events route to whichever gesture began, regardless of the pointer's current row.
 - A press in the body also clears any previous highlight before anchoring the new (empty) selection, making click the natural dismissal gesture too.
-- Wheel routing, right-click paste, and docked-panel guards are untouched.
+- Wheel routing and docked-panel guards are untouched; right-click paste behavior is unchanged until U2, which moves selection-dismissal into its path.
 
 **Patterns to follow:** the existing `useInput` mouse routing and bounds guards in `HomeScreenView.tsx`; `handleSelectionGesture`'s clamp-to-viewport behavior.
 
@@ -131,7 +132,7 @@ Dependency order: U1 → U2 → U3 → U4 (each builds on the previous; U3 only 
 - Edge case: a drag that starts in the composer and crosses into the body never creates a body selection; a body drag that crosses the composer never moves the caret.
 - Edge case: press with a docked panel open behaves as today (no selection under panels).
 
-**Verification:** Drag-to-copy works with no prior keypress; composer clicks, wheel, and right-click paste behave exactly as before.
+**Verification:** Drag-to-copy works with no prior keypress, including a visible highlight; composer clicks and wheel behave exactly as before (right-click changes land in U2).
 
 ---
 
@@ -146,12 +147,15 @@ Dependency order: U1 → U2 → U3 → U4 (each builds on the previous; U3 only 
 **Files:**
 - Modify: `tui/src/useGlobalKeys.ts`
 - Delete: `tui/src/state/ui/copyMode.ts`
-- Modify: `tui/src/state/ui/index.ts`, `tui/src/constants/ui.ts` (remove `COPY_MODE_INPUT_KEY`)
-- Test: `tui/src/__tests__/App.test.tsx`, `tui/src/__tests__/components/StatusBar.test.tsx`
+- Modify: `tui/src/state/ui/index.ts`, `tui/src/constants/ui.ts` (remove `COPY_MODE_INPUT_KEY` and the copy-mode hint constant)
+- Modify: `tui/src/components/StatusBar.tsx` (remove the `copyModeActiveAtom`/copy-mode-hint branch — it imports the atom and fails typecheck otherwise)
+- Modify: `tui/src/components/PromptComposer/index.tsx` (`resolvedIsActive` no longer consults the mode atom; deliberate behavior change — the composer stays active during selection drags)
+- Modify: `tui/src/components/HomeScreen/HomeScreenView.tsx` (right-click path: clear `bodySelectionAtom` before `handleRightClickPaste`; drop the `!copyModeActive` paste guard)
+- Test: `tui/src/__tests__/App.test.tsx`, `tui/src/__tests__/components/StatusBar.test.tsx`, `tui/src/__tests__/components/HomeScreen.test.tsx`, `tui/src/components/__tests__/BodyPane.test.tsx` (both set the atom today)
 
 **Approach:**
 - Remove the toggle branch and the mode block. New behavior when `bodySelectionAtom` is non-null: SGR mouse input passes through (routing owns it); scroll keys pass through; any other key clears the selection **without returning early**, so the key's normal handling (composer input, armed-exit logic) still runs. Keep the existing Esc carve-out (composer owns Esc) — the clear side effect still fires.
-- Right-click dismissal moves to the router (U1's right-click paste path clears the selection before pasting), since `useGlobalKeys` no longer intercepts mouse input.
+- Right-click dismissal moves to the router — this unit edits `HomeScreenView.tsx`'s right-click path to clear the selection before pasting — since `useGlobalKeys` no longer intercepts mouse input.
 - `Ctrl+C` armed-exit logic is untouched; first press may both clear a selection and arm exit — acceptable and covered by a scenario.
 
 **Patterns to follow:** the existing armed-action disarm-on-any-key pattern in `useGlobalKeys.ts`.
@@ -184,7 +188,8 @@ Dependency order: U1 → U2 → U3 → U4 (each builds on the previous; U3 only 
 **Approach:**
 - `multiClick.ts` (pure): given the previous press record `{ at, row, column, count }` and a new press, return the click count (1, 2, or 3, cycling back to 1) using a ~500 ms window and ±1-cell tolerance. Clock injected by the caller.
 - `wordBounds.ts` (pure): given a row's display text and a display column, return the `[startCol, endCol)` of the whitespace-delimited run containing that column (wide-char aware via `indexAtDisplayColumn` from `tui/src/libs/text/displayWidth.ts`); return `null` when the column sits on whitespace. Line bounds are `[0, rowDisplayWidth)` of the rendered row.
-- In `selectionInput.ts`: on a press classified as double, set anchor/focus to the word bounds; as triple, to the line bounds. The subsequent release flows through the existing `copySelection` call, so the copy needs no new wiring. Single press keeps today's anchor behavior.
+- In `selectionInput.ts`: on a press classified as double, set anchor/focus to the word bounds; as triple, to the line bounds, and record that the bounds are locked. The subsequent release must skip the focus update and only invoke `copySelection` — a plain release would drag the focus back to the pointer cell and copy a partial word. Single press keeps today's anchor behavior, where release updates focus then copies.
+- Word-bounds columns are marker-offset: subtract the row's marker display width before calling `wordBounds` on `row.text` and re-add it when writing anchor/focus (mirror `selectedText`'s marker handling).
 
 **Patterns to follow:** `libs/selection/` pure-helper style with colocated tests (atom-free, no barrel); `tui/src/libs/text/displayWidth.ts` (`indexAtDisplayColumn`) for display-column↔char-index mapping.
 
@@ -196,6 +201,8 @@ Dependency order: U1 → U2 → U3 → U4 (each builds on the previous; U3 only 
 - Edge case: double-click on whitespace → no selection, no copy.
 - Edge case: word bounds on a CJK/wide-char row land on grapheme boundaries (no split double-width cell).
 - Error path: double-click on a blank gap row → no selection, no crash.
+- Edge case: release at the press cell after a double-click copies the full word, not a fragment clipped to the pointer column.
+- Edge case: double-click on a marker-bearing row (assistant `•` prefix) selects the word at the correct columns, not shifted by the marker width.
 
 **Verification:** Double- and triple-click select and copy word/line; single-click behavior is unchanged; `detect-cycles.mjs` stays clean.
 
@@ -210,7 +217,7 @@ Dependency order: U1 → U2 → U3 → U4 (each builds on the previous; U3 only 
 **Dependencies:** U1, U2, U3
 
 **Files:**
-- Modify: `tui/src/constants/ui.ts` (drop/replace the copy-mode hint), `tui/src/components/HelpScreen/helpContent.ts`, `tui/src/components/StatusBar.tsx` (if it still renders a mode hint)
+- Modify: `tui/src/components/HelpScreen/helpContent.ts` (the constants/StatusBar edits land in U2)
 - Modify: `tui/AGENTS.md` (selection is always-on; drag copies on release; multi-click gestures)
 - Modify: `docs/plans/2026-07-11-001-feat-tui-in-app-selection-copy-plan.md` (note: the `Ctrl+R` entry decision is superseded by this plan)
 - Test: `tui/src/components/HelpScreen/__tests__/helpContent.test.ts`, `tui/src/__tests__/components/StatusBar.test.tsx`
@@ -227,7 +234,7 @@ Dependency order: U1 → U2 → U3 → U4 (each builds on the previous; U3 only 
 
 ## System-Wide Impact
 
-- **Interaction graph:** `HomeScreenView.useInput` (region routing), `useGlobalKeys` (dismissal), `BodyPane` (highlight — unchanged), `StatusBar`/help (strings). The two `useInput` sites must not double-handle: routing owns mouse, global keys own keyboard dismissal.
+- **Interaction graph:** `HomeScreenView.useInput` (region routing), `useGlobalKeys` (dismissal), `BodyPane` (highlight gate moves from the mode atom to `bodySelectionAtom` in U1), `StatusBar`/help (strings). The two `useInput` sites must not double-handle: routing owns mouse, global keys own keyboard dismissal.
 - **State lifecycle:** `bodySelectionAtom` becomes the only selection state; it must clear on new transcript submission (existing behavior) and now also on body click and key press. Mouse tracking stays always-on with symmetric teardown (unchanged from the 07-11 plan's U5).
 - **Unchanged invariants:** wheel scroll and smoothness work, click-to-caret, right-click paste, `Ctrl+O`, `Ctrl+C` armed exit, bracketed paste, theme restyle, pinned chrome, clipboard seam and its UTF-8 encoding fix.
 
