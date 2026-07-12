@@ -16,6 +16,7 @@ use crate::provider::ChatMessage;
 
 mod fragment;
 mod sections;
+mod stubs;
 
 /// Builds the system message for a turn: the ordered active sections plus a
 /// bounded environment/metadata block (OS, working directory, current UTC time,
@@ -35,6 +36,7 @@ pub fn system_message(model: &str, git: Option<&str>, memory: Option<&str>) -> C
 
     let mut fragments = vec![sections::identity(), sections::tone(), sections::safety()];
     fragments.extend(sections::memory(memory));
+    fragments.extend(stubs::deferred_fragments());
     fragments.push(sections::environment(
         model,
         &cwd,
