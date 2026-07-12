@@ -42,16 +42,28 @@ describe('helpContent', () => {
     const titles = buildHelpSections().map((section) => section.title);
 
     expect(titles[0]).toBe('COMMANDS');
-    expect(titles).toEqual(['COMMANDS', 'GLOBAL', 'INPUT', 'CLIPBOARD', 'COMMAND MENU', 'SCROLL']);
+    expect(titles).toEqual([
+      'COMMANDS',
+      'GLOBAL',
+      'INPUT',
+      'CLIPBOARD',
+      'SELECTION',
+      'COMMAND MENU',
+      'SCROLL'
+    ]);
   });
 
-  it('documents copy, paste, and Copy Mode shortcuts', () => {
+  it('documents copy, paste, and drag-to-copy selection shortcuts', () => {
     const joined = flattenHelpLines(buildHelpSections())
       .map((line) => line.text)
       .join('\n');
 
-    expect(joined).toContain('ctrl+r');
-    expect(joined).toContain('Copy Mode');
+    // Mode-less selection: drag-to-copy and multi-click, no Ctrl+R Copy Mode.
+    expect(joined).toContain('drag');
+    expect(joined).toContain('double-click');
+    expect(joined).toContain('triple-click');
+    expect(joined).not.toContain('ctrl+r');
+    expect(joined).not.toContain('Copy Mode');
     expect(joined).toContain('ctrl+o');
     expect(joined).toContain('Copy the last assistant response');
     expect(joined).toContain('ctrl+v / alt+v / right-click');

@@ -29,7 +29,6 @@ const KEYBINDING_SECTIONS: readonly HelpSection[] = [
     title: 'GLOBAL',
     entries: [
       { keys: '/', description: 'Open the command menu' },
-      { keys: 'ctrl+r', description: 'Toggle Copy Mode: drag to select and copy' },
       { keys: 'ctrl+c ×2', description: 'Exit KQode' },
       { keys: 'esc', description: 'Clear the prompt · close the command menu' }
     ]
@@ -48,6 +47,16 @@ const KEYBINDING_SECTIONS: readonly HelpSection[] = [
   {
     title: 'CLIPBOARD',
     entries: [{ keys: 'ctrl+o', description: 'Copy the last assistant response' }]
+  },
+  {
+    title: 'SELECTION',
+    entries: [
+      { keys: 'drag', description: 'Select transcript text; copies on release' },
+      { keys: 'double-click', description: 'Select and copy the word' },
+      { keys: 'triple-click', description: 'Select and copy the line' },
+      { keys: 'any key · right-click', description: 'Dismiss the highlight' },
+      { keys: 'shift+drag', description: 'Select with the terminal for native copy' }
+    ]
   },
   {
     title: 'COMMAND MENU',

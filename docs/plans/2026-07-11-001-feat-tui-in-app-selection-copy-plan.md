@@ -22,6 +22,8 @@ because owning the copy is the natural home for both: reconstruction inherently 
 (`│`/`┃`) — **Defect 1** — and a one-place fix to the shared clipboard helper makes non-ASCII (CJK / emoji /
 box-drawing) round-trip losslessly on Windows in **both** copy and paste — **Defect 2**.
 
+> **Partly superseded (2026-07-12):** the `Ctrl+R` "Copy Mode" gate this plan introduced (R3, and the "keep `Ctrl+R` as the selection-mode entry" key decision) is removed by `docs/plans/2026-07-12-002-feat-tui-modeless-selection-plan.md`, which makes drag-to-copy **always on** (no mode) and adds double-/triple-click word/line selection. The in-app selection engine, clean-text reconstruction, highlight, scroll-stability, and clipboard round-trip from this plan all remain in force.
+
 ---
 
 ## Problem Frame
