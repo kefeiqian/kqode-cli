@@ -18,11 +18,19 @@ export function printableInput(input: string): string {
   return input.replace(CONTROL_CHAR_PATTERN, '');
 }
 
+/**
+ * Validates a composer submit and returns the text that should actually be sent
+ * and queued. Leading and trailing whitespace (including newlines) is trimmed, so
+ * both the backend submit and the local prompt queue receive the trimmed text;
+ * interior whitespace is preserved. The empty and byte-limit checks apply to the
+ * trimmed value.
+ */
 export function validateComposerSubmit(
   text: string,
   maxBytes = PROMPT_MAX_BYTES
 ): SubmitValidation {
-  if (text.trim().length === 0) {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) {
     return {
       ok: false,
       reason: 'empty',
@@ -30,7 +38,7 @@ export function validateComposerSubmit(
     };
   }
 
-  const limitMessage = overLimitMessage(text, maxBytes);
+  const limitMessage = overLimitMessage(trimmed, maxBytes);
   if (limitMessage !== null) {
     return {
       ok: false,
@@ -41,7 +49,7 @@ export function validateComposerSubmit(
 
   return {
     ok: true,
-    text
+    text: trimmed
   };
 }
 

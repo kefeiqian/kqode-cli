@@ -28,8 +28,15 @@ describe('validateComposerSubmit', () => {
     expect(validateComposerSubmit('   ')).toEqual({ ok: false, reason: 'empty', message: '' });
   });
 
-  it('preserves the exact non-empty submit snapshot', () => {
-    expect(validateComposerSubmit('  hello  ')).toEqual({ ok: true, text: '  hello  ' });
+  it('trims leading and trailing whitespace from the submit snapshot', () => {
+    expect(validateComposerSubmit('  hello  ')).toEqual({ ok: true, text: 'hello' });
+  });
+
+  it('trims surrounding newlines while preserving interior whitespace', () => {
+    expect(validateComposerSubmit('\n  first\n  second  \n')).toEqual({
+      ok: true,
+      text: 'first\n  second'
+    });
   });
 
   it('reports over-limit prompts before backend submission', () => {

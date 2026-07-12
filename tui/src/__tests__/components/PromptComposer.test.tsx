@@ -189,7 +189,7 @@ describe('PromptComposer', () => {
     expect(resolveComposerCursorPosition('abcd', 38, 7, 2)).toEqual({ x: 4, y: 9 });
   });
 
-  it('submits exact non-empty text with leading and trailing spaces, then clears', async () => {
+  it('trims leading and trailing whitespace from submitted text, then clears', async () => {
     const onSubmit = vi.fn();
     const { lastFrame, stdin } = renderWithJotai(
       <PromptComposer columns={40} onSubmit={onSubmit} />
@@ -200,7 +200,7 @@ describe('PromptComposer', () => {
     stdin.write('\r');
     await flushInput();
 
-    expect(onSubmit).toHaveBeenCalledWith('  hello  ');
+    expect(onSubmit).toHaveBeenCalledWith('hello');
     expect(lastFrame() ?? '').not.toContain('Ask KQode...');
   });
 
