@@ -50,6 +50,22 @@ pub fn system_message(model: &str, git: Option<&str>, memory: Option<&str>) -> C
     ChatMessage::system(fragment::render(&ordered))
 }
 
+/// Builds the eval-mode system message: KQode's persona (identity, tone, safety)
+/// with **no** environment block (cwd/OS/time/git) and no memory.
+///
+/// Eval reports an environment-independent persona baseline. Omitting the
+/// volatile environment block — notably the per-turn timestamp — keeps two runs
+/// at the same config byte-identical (reproducibility), and stops
+/// benchmark-irrelevant repo state (working directory, git status) from leaking
+/// into a score.
+#[must_use]
+pub fn eval_system_message() -> ChatMessage {
+    let fragments = vec![sections::identity(), sections::tone(), sections::safety()];
+    let ordered = fragment::order_fragments(fragments);
+    trace_fragment_plan(&ordered);
+    ChatMessage::system(fragment::render(&ordered))
+}
+
 /// Emits one `trace`-level record per assembled fragment (source, volatility,
 /// persistence, priority, advisory token estimate) so a prompt's composition is
 /// visible in traces without logging any fragment bodies.
