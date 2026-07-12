@@ -6,6 +6,7 @@ import { App } from '@/App.tsx';
 import {
   activeSurfaceAtom,
   armedActionAtom,
+  bodySelectionAtom,
   columnsTestOverrideAtom,
   copyModeActiveAtom,
   FULLSCREEN_GUARD_ROWS,
@@ -173,6 +174,28 @@ describe('App', () => {
     stdin.write('\u0003');
     await flushInput();
     expect(store.get(armedActionAtom)).toBe(ArmedAction.Exit);
+  });
+
+  it('clears the selection and exits Copy Mode on a right-click', async () => {
+    const { store, stdin } = renderApp({ columns: 100, rows: 20 });
+    await flushInput();
+
+    stdin.write('\u0012');
+    await flushInput();
+    expect(store.get(copyModeActiveAtom)).toBe(true);
+
+    store.set(bodySelectionAtom, {
+      anchor: { rowIndex: 0, column: 0 },
+      focus: { rowIndex: 0, column: 4 }
+    });
+    expect(store.get(bodySelectionAtom)).not.toBeNull();
+
+    // SGR right-button press (button 2) at column 10, row 5.
+    stdin.write('\u001B[<2;10;5M');
+    await flushInput();
+
+    expect(store.get(copyModeActiveAtom)).toBe(false);
+    expect(store.get(bodySelectionAtom)).toBeNull();
   });
 
   it('disarms a pending Ctrl+C exit on another key outside the home screen', async () => {

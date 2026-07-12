@@ -1,7 +1,7 @@
 import { useApp, useInput } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { ArmedAction, COPY_MODE_INPUT_KEY } from '@constants/ui.ts';
-import { isMouseInput } from '@libs/terminal/mouse.ts';
+import { isMouseInput, parseMouseRightClickEvent } from '@libs/terminal/mouse.ts';
 import { armedActionAtom, clearBodySelectionAtom, copyModeActiveAtom } from '@state/ui/index.ts';
 
 /**
@@ -24,6 +24,12 @@ export function useGlobalKeys(): void {
   const setCopyModeActive = useSetAtom(copyModeActiveAtom);
   const clearBodySelection = useSetAtom(clearBodySelectionAtom);
 
+  const exitCopyMode = (): void => {
+    setCopyModeActive(false);
+    setArmedAction(null);
+    clearBodySelection();
+  };
+
   useInput((input, key) => {
     const isCtrlC = key.ctrl === true && input === 'c';
     const isCopyModeToggle = key.ctrl === true && input === COPY_MODE_INPUT_KEY;
@@ -32,13 +38,17 @@ export function useGlobalKeys(): void {
       if (key.pageUp === true || key.pageDown === true || key.end === true) {
         return;
       }
-      // Mouse gestures drive the in-app selection; they must not exit the mode.
+      // A right-click ends selection: the in-app highlight disappears so it is
+      // never left standing while a terminal-level copy/paste takes over.
+      if (parseMouseRightClickEvent(input) !== null) {
+        exitCopyMode();
+        return;
+      }
+      // Left-button gestures drive the in-app selection; they must not exit.
       if (isMouseInput(input)) {
         return;
       }
-      setCopyModeActive(false);
-      setArmedAction(null);
-      clearBodySelection();
+      exitCopyMode();
       return;
     }
 
