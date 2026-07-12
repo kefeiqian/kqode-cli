@@ -110,7 +110,17 @@ impl KimiProvider {
 
         let status = response.status();
         if !status.is_success() {
-            return Err(classify_status(status.as_u16()));
+            let code = status.as_u16();
+            // Auth/rate-limit stay opaque; other statuses (e.g. 400 parameter
+            // rejections) carry the provider's own error text, which is the
+            // fastest way to diagnose a rejected request.
+            return Err(match classify_status(code) {
+                ProviderError::Network(_) => {
+                    let body = response.text().await.unwrap_or_default();
+                    ProviderError::Network(http_error_detail(code, &body))
+                }
+                typed => typed,
+            });
         }
 
         let events = response
@@ -163,6 +173,18 @@ fn classify_status(code: u16) -> ProviderError {
         401 | 403 => ProviderError::Auth,
         429 => ProviderError::RateLimit,
         other => ProviderError::Network(format!("HTTP {other}")),
+    }
+}
+
+/// Builds a `HTTP <code>` network-error detail, appending a bounded snippet of
+/// the response `body` when the server returned one (e.g. a JSON validation
+/// error). The snippet is trimmed and capped so logs stay readable.
+fn http_error_detail(code: u16, body: &str) -> String {
+    let snippet: String = body.trim().chars().take(300).collect();
+    if snippet.is_empty() {
+        format!("HTTP {code}")
+    } else {
+        format!("HTTP {code}: {snippet}")
     }
 }
 

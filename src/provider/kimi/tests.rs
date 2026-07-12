@@ -111,6 +111,19 @@ fn status_codes_classify_into_kinds() {
 }
 
 #[test]
+fn http_error_detail_appends_body_snippet() {
+    assert_eq!(http_error_detail(400, ""), "HTTP 400");
+    assert_eq!(http_error_detail(400, "  \n "), "HTTP 400");
+    assert_eq!(
+        http_error_detail(400, "  invalid temperature  "),
+        "HTTP 400: invalid temperature"
+    );
+    let long = "x".repeat(500);
+    let detail = http_error_detail(400, &long);
+    assert_eq!(detail.chars().count(), "HTTP 400: ".len() + 300);
+}
+
+#[test]
 fn validation_outcome_maps_status_codes() {
     assert_eq!(
         ValidationOutcome::from_response(401, "{}"),
