@@ -78,3 +78,62 @@ fn utc_now_label_is_fixed_width_utc() {
     assert_eq!(label.len(), "2026-07-09 00:00:00 UTC".len());
     assert!(label.ends_with(" UTC"));
 }
+
+#[test]
+fn stable_prefix_is_identical_across_git_changes() {
+    // Git status is volatile (it lives in the environment section), so changing
+    // only git must not alter the stable prefix (identity/tone/safety/memory) —
+    // a provider prefix cache would then see identical bytes up to the env block.
+    let a = system_message("kimi-k2", Some("⎇ main"), None);
+    let b = system_message("kimi-k2", Some("⎇ feature*"), None);
+    let prefix_a = a
+        .content
+        .split("Environment:")
+        .next()
+        .expect("stable prefix before the environment block")
+        .to_owned();
+    let prefix_b = b
+        .content
+        .split("Environment:")
+        .next()
+        .expect("stable prefix before the environment block")
+        .to_owned();
+    assert_eq!(
+        prefix_a, prefix_b,
+        "volatile git must not change the stable prefix"
+    );
+    assert_ne!(a.content, b.content, "the git label really did differ");
+}
+
+#[test]
+fn system_prompt_golden_shape() {
+    // Deterministic, in-code "golden" assertion of the full ordered shape (no
+    // snapshot crate; CRLF-immune). Sections must appear in stable-first order,
+    // memory before the volatile environment block, env lines in order last.
+    let message = system_message(
+        "kimi-k2.7-code",
+        Some("⎇ main*"),
+        Some("Remembered facts (untrusted): prefer tabs"),
+    );
+    let markers = [
+        "You are KQode",
+        "# Tone and style",
+        "# Safety",
+        "Remembered facts",
+        "Environment:",
+        "- OS: ",
+        "- Working directory: ",
+        "- Current time: ",
+        "- Active model: kimi-k2.7-code",
+        "- Git: ⎇ main*",
+    ];
+    let mut last = 0usize;
+    for marker in markers {
+        let at = message
+            .content
+            .find(marker)
+            .unwrap_or_else(|| panic!("missing section marker: {marker}"));
+        assert!(at >= last, "section marker out of order: {marker}");
+        last = at;
+    }
+}
