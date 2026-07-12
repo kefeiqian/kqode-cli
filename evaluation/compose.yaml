@@ -29,8 +29,22 @@ services:
     volumes:
       - ${EVAL_RUN_DIR:-./run}:/work
     environment:
-      # Redirect any cache/home writes onto the tmpfs so read_only still holds.
+      # evalplus reads datasets from and writes its groundtruth cache under
+      # $HOME/.cache/evalplus. HOME points at the writable tmpfs; the entrypoint
+      # seeds it from the image's baked cache (see the entrypoint + note below).
       HOME: /tmp
+
+    # The image bakes the datasets under /root/.cache (root-only, mode 700) and
+    # evalplus writes a groundtruth .pkl into $HOME/.cache — which the read-only
+    # root fs forbids. As root we copy the baked cache onto the /tmp tmpfs once at
+    # startup, then exec the requested evalplus command with HOME=/tmp, so both the
+    # dataset reads and the cache write land on tmpfs. `exec "$@"` runs the args
+    # docker appends from `compose run grader <args>` ("sh" is the $0 placeholder).
+    entrypoint:
+      - /bin/sh
+      - -c
+      - mkdir -p /tmp/.cache && cp -r /root/.cache/evalplus /tmp/.cache/evalplus 2>/dev/null; exec "$@"
+      - sh
 
     # ---- Isolation property set (plan F1 / R16). The feasibility spike verifies
     # these hold with the image; relax only the minimum needed if grading fails. ----
@@ -44,8 +58,11 @@ services:
     pids_limit: 512
     mem_limit: 4g
     cpus: 2.0
-    # Non-root is the target, but WSL2 bind-mounts can surface as root-owned and
-    # block a non-root user from reading /work. If grading fails on permissions,
-    # the spike decides: fix the mount ownership, or (documented tradeoff) drop
-    # this line.
-    user: "1000:1000"
+    # NOTE: runs as root inside the container — a documented isolation tradeoff
+    # (plan F5). The image bakes the HumanEval+/MBPP+ datasets under /root/.cache
+    # (mode 700), so a non-root user (1000:1000) cannot reach them and
+    # evalplus.sanitize tries to re-download both datasets, failing under
+    # `network_mode: none`. Root here is still strongly isolated: no network,
+    # read-only root fs (with only /work and the /tmp tmpfs writable), all caps
+    # dropped, no-new-privileges, and resource-limited. The spike verified
+    # sanitize + evaluate both succeed offline in exactly this configuration.

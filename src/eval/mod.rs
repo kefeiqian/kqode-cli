@@ -13,8 +13,10 @@ use std::error::Error;
 use std::fmt;
 
 pub mod benchmark;
+pub mod grader;
 
 pub use benchmark::{EvalBenchmark, Task};
+pub use grader::{GradeReport, Grader, TaskResult, parse_eval_results};
 
 /// Errors surfaced by the eval subsystem.
 #[derive(Debug)]
