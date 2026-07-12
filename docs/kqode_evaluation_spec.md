@@ -8,6 +8,7 @@ KQode evaluation must prove more than "the model answered." It must show that th
 
 - Evaluate the harness, not only the LLM.
 - Start with local deterministic tests before public benchmarks.
+- Establish a provider/model capability baseline from no-tool public benchmarks early; measure harness gains as lift above that baseline.
 - Record every run as a replayable trajectory.
 - Report pass rate, cost, runtime, and failure categories together.
 - Keep test tasks small enough to debug manually.
@@ -61,6 +62,34 @@ kqode eval provider --provider <name>
 ```
 
 **Pass condition:** provider can complete a simple read/search/complete loop.
+
+### Layer 1b. Provider/model capability baseline (no-tool public benchmarks)
+
+These runs measure raw provider/model coding capability with no KQode tools, sandbox, or plugins in the loop. They are the comparability floor against frontier-lab reports (which report saturated general benchmarks alongside agentic ones) and the growth carrier for harness work: as tools, sandbox, and plugins land, the same benchmarks should rise, and the delta is the harness's contribution.
+
+Run these early — they depend only on a connected provider (Layer 1), not on the harness maturity that later layers assume. They do not prove harness quality; keep them separate from the harness signal (see the non-goals).
+
+**What to test (NOW — general, no-tool):**
+- EvalPlus **HumanEval+** — function-completion correctness under augmented tests.
+- EvalPlus **MBPP+** — basic-programming correctness under augmented tests.
+
+**Deferred (DEFER — blocked on systems KQode does not have yet):**
+- Tool-use / agentic repair benchmarks — need the tool registry + sandbox.
+- Vision / multimodal benchmarks — need image input.
+- Long-context retrieval benchmarks — need the context builder at scale.
+
+Each deferred family is unlocked by the milestone that adds its missing capability; see `docs/kqode_build_path.md`. The agentic, repository-scale benchmarks live in Layer 7.
+
+**Isolation:** model-written solutions are graded inside the pinned EvalPlus container with no network, a read-only root, dropped capabilities, and cpu/mem/pid/wall-clock limits — never in-process (see Layer 4 rationale and the plan's risk table).
+
+**Minimum command:**
+
+```bash
+kqode eval humaneval+          # or: mbpp+, or: evalplus (both)
+kqode eval humaneval+ --limit 10
+```
+
+**Pass condition:** the run produces a reproducible pass@1 report (base and plus) with the provider/model, KQode commit, and grader image digest recorded. Because the active coding model may lock sampling (for example, temperature fixed at 1), treat single-run pass@1 as an estimate carrying sampling variance rather than an exact, reproducible constant.
 
 ### Layer 2. Local golden task suite
 
@@ -196,13 +225,15 @@ kqode eval swarm
 
 **Pass condition:** delegation improves or preserves task success without hiding work.
 
-### Layer 7. Public benchmark adapters
+### Layer 7. Agentic public benchmark adapters
 
-Add only after the local suite is stable.
+These are the **tool-requiring / repository-scale** public benchmarks, distinct from the no-tool provider baseline in Layer 1b. Add them only after the local suite is stable and the tool registry, VFS, and sandbox exist — they assume an agent that edits repositories, runs tests, and iterates.
+
+**Graduation target:** **SWE-bench Verified** is the headline agentic metric KQode graduates toward. The Layer 1b no-tool baseline is what rises first as tools land; SWE-bench Verified is what becomes runnable — and then the primary external scorecard — once the agentic loop is complete.
 
 **Targets:**
-- SWE-bench Lite subset.
-- SWE-bench Verified subset.
+- SWE-bench Verified (headline graduation target).
+- SWE-bench Lite subset (cheaper iteration).
 - Aider-style polyglot editing tasks.
 - AutoCodeRover-style GitHub issue tasks.
 
@@ -325,14 +356,15 @@ Start with 10 tasks:
 
 1. Build Layer 0 with fake providers.
 2. Add Layer 1 provider smoke tests.
-3. Add first 3 local golden tasks.
-4. Add trace assertions.
-5. Add badcase capture.
-6. Add safety tests.
-7. Add replay tests.
-8. Add multi-agent tests.
-9. Publish local benchmark report.
-10. Add SWE-bench adapter only after local reports are stable.
+3. Add the Layer 1b no-tool public-benchmark baseline (EvalPlus HumanEval+/MBPP+) as the provider/model floor.
+4. Add first 3 local golden tasks.
+5. Add trace assertions.
+6. Add badcase capture.
+7. Add safety tests.
+8. Add replay tests.
+9. Add multi-agent tests.
+10. Publish local benchmark report.
+11. Add the SWE-bench (Verified) agentic adapter only after local reports are stable and the tool/sandbox loop exists.
 
 ## Portfolio report
 
@@ -354,6 +386,7 @@ The public report should include:
 ## Non-goals for early evaluation
 
 - Do not start with full SWE-bench.
+- Do not read the no-tool benchmark baseline (Layer 1b) as harness quality; it is the provider/model floor, and harness gains are the lift above it.
 - Do not compare against every public coding agent.
 - Do not hide failures behind aggregate pass rate.
 - Do not run evals without preserving traces.
