@@ -1,7 +1,7 @@
 ---
 title: "feat: Mode-less in-app selection — drag-to-copy by default in the TUI"
 type: feat
-status: active
+status: completed
 date: 2026-07-12
 ---
 
