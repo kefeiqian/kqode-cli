@@ -1,5 +1,4 @@
 import type { createStore } from 'jotai';
-import { copySelection } from '@components/HomeScreen/copySelection.ts';
 import { clamp } from '@libs/math/clamp.ts';
 import { classifyClick, type PressRecord } from '@libs/selection/multiClick.ts';
 import { wordBounds } from '@libs/selection/wordBounds.ts';
@@ -78,16 +77,18 @@ export type MultiClickContext = {
 /**
  * Maps an SGR mouse gesture (1-based screen coordinates) to a selection point in
  * absolute body-row space, then drives the in-app selection: `press` starts it,
- * `drag` extends the focus, `release` extends and copies. The point is clamped to
+ * `drag` extends the focus, `release` finalizes it. The point is clamped to
  * the visible body window, so a drag past the viewport edges selects to the
- * nearest on-screen row rather than escaping the transcript.
+ * nearest on-screen row rather than escaping the transcript. Copying is a
+ * separate manual gesture — a right-click (see `HomeScreenView`) — so a drag
+ * only ever highlights; the release never touches the clipboard.
  *
  * When a {@link MultiClickContext} is supplied, a press is classified against the
  * previous one: a double-click selects the whitespace-delimited word under the
  * pointer and a triple-click the whole rendered line, both locking the bounds so
- * the trailing release only copies (a plain release would drag the focus back to
- * the pointer and copy a partial word). Without the context, every press is a
- * single click.
+ * the trailing release keeps them (a plain release would drag the focus back to
+ * the pointer and shrink the selection to a partial word). Without the context,
+ * every press is a single click.
  */
 export function handleSelectionGesture(
   store: Store,
@@ -110,19 +111,16 @@ export function handleSelectionGesture(
   }
 
   // A word/line selection is locked to fixed bounds; a drag or release must not
-  // pull the focus back to the pointer cell, which would copy a partial word.
+  // pull the focus back to the pointer cell, which would shrink it to a partial
+  // word. The release only unlocks — copying is a manual right-click.
   if (multiClick?.state.boundsLocked === true) {
     if (gesture.kind === 'release') {
-      copySelection(store);
       multiClick.state.boundsLocked = false;
     }
     return;
   }
 
   store.set(updateBodySelectionAtom, { rowIndex, column });
-  if (gesture.kind === 'release') {
-    copySelection(store);
-  }
 }
 
 /**

@@ -9,7 +9,6 @@ import { formatDisplayCwd } from '@libs/tui/cwdLine.ts';
 import type { BodyEntry } from '@libs/tui/bodyRows.ts';
 import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import { NOT_CONFIGURED_MODEL_LABEL } from '@libs/model/index.ts';
-import { PASTE_FAILED_HINT } from '@constants/ui.ts';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
 import {
   bodyEntriesAtom,
@@ -20,7 +19,6 @@ import {
 } from '@state/ui/index.ts';
 import { clipboardClientAtom, productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
 import { composerStateAtom } from '@state/ui/composer/index.ts';
-import { transientStatusHintAtom } from '@state/ui/index.ts';
 import { openResumePanelAtom } from '@state/ui/resume/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
@@ -529,9 +527,9 @@ describe('HomeScreen', () => {
     expect(store.get(bodySelectionAtom)).not.toBeNull();
   });
 
-  // --- Mode-less drag-to-copy selection (no Ctrl+R gate) ---
+  // --- Mode-less drag-to-select + right-click copy (no Ctrl+R gate) ---
 
-  it('drags over the body to select and copies on release with no mode toggle', async () => {
+  it('drags to select without copying, then copies and clears on right-click', async () => {
     const entries = Array.from({ length: 10 }, (_, index) => ({
       kind: 'assistant' as const,
       text: `entry ${index + 1}`
@@ -541,9 +539,8 @@ describe('HomeScreen', () => {
     store.set(clipboardClientAtom, { readText: vi.fn(), writeText });
     await flushInput();
 
-    // Body rows span SGR rows 2..9 at rows=16; press/drag/release on row 3 with
-    // no preceding Ctrl+R. Left press = button 0 `M`, drag = motion bit 32 `M`,
-    // release = `m`.
+    // Body rows span SGR rows 2..9 at rows=16; press/drag/release on row 3.
+    // Left press = button 0 `M`, drag = motion bit 32 `M`, release = `m`.
     stdin.write('\u001B[<0;1;3M');
     await flushInput();
     stdin.write('\u001B[<32;40;3M');
@@ -551,8 +548,16 @@ describe('HomeScreen', () => {
     stdin.write('\u001B[<0;40;3m');
     await flushInput();
 
+    // The drag-release only highlights — nothing is copied yet.
     expect(store.get(bodySelectionAtom)).not.toBeNull();
+    expect(writeText).not.toHaveBeenCalled();
+
+    // A right-click (button 2) copies the selection, then clears the highlight.
+    stdin.write('\u001B[<2;40;3M');
+    await flushInput();
+
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining('entry'));
+    expect(store.get(bodySelectionAtom)).toBeNull();
   });
 
   it('positions the composer caret on a click without selecting or copying', async () => {
@@ -698,40 +703,44 @@ describe('HomeScreen', () => {
     expect(bottomOutput).toContain('entry 10');
   });
 
-  it('pastes clipboard text into the composer on right-click', async () => {
-    const { lastFrame, stdin, store } = renderHomeScreen({ columns: 80, rows: 16 });
-    store.set(clipboardClientAtom, {
-      readText: vi.fn().mockResolvedValue('right\r\npaste'),
-      writeText: vi.fn()
+  it('copies the active selection to the clipboard on right-click, then clears the highlight', async () => {
+    const { stdin, store } = renderHomeScreen({
+      bodyEntries: [{ kind: BodyEntryKind.Success, text: 'selectable line' }],
+      columns: 80,
+      rows: 16
     });
-
-    stdin.write('\u001B[<2;5;13M');
+    const writeText = vi.fn().mockResolvedValue(true);
+    store.set(clipboardClientAtom, { readText: vi.fn(), writeText });
+    store.set(bodySelectionAtom, {
+      anchor: { rowIndex: 0, column: 0 },
+      focus: { rowIndex: 0, column: 10 }
+    });
     await flushInput();
 
-    expect(store.get(composerStateAtom).text).toBe('right\npaste');
-    expect(lastFrame() ?? '').toContain('> right');
+    // SGR right-button press (button 2).
+    stdin.write('\u001B[<2;5;3M');
+    await flushInput();
+
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('selectable'));
+    expect(store.get(bodySelectionAtom)).toBeNull();
+    // The clipboard is copied into, never pasted back into the composer.
+    expect(store.get(composerStateAtom).text).toBe('');
   });
 
-  it('shows a paste-failed hint when right-click clipboard read is unavailable', async () => {
+  it('does not touch the clipboard or composer on a right-click with no selection', async () => {
     const { stdin, store } = renderHomeScreen({ columns: 80, rows: 16 });
-    store.set(clipboardClientAtom, { readText: vi.fn().mockResolvedValue(null), writeText: vi.fn() });
+    const readText = vi.fn().mockResolvedValue('should not paste');
+    const writeText = vi.fn();
+    store.set(clipboardClientAtom, { readText, writeText });
+    await flushInput();
 
     stdin.write('\u001B[<2;5;13M');
     await flushInput();
 
+    // Right-click no longer pastes: nothing is read, written, or inserted.
+    expect(readText).not.toHaveBeenCalled();
+    expect(writeText).not.toHaveBeenCalled();
     expect(store.get(composerStateAtom).text).toBe('');
-    expect(store.get(transientStatusHintAtom)?.text).toBe(PASTE_FAILED_HINT);
-  });
-
-  it('silently ignores an empty clipboard on right-click paste', async () => {
-    const { stdin, store } = renderHomeScreen({ columns: 80, rows: 16 });
-    store.set(clipboardClientAtom, { readText: vi.fn().mockResolvedValue(''), writeText: vi.fn() });
-
-    stdin.write('\u001B[<2;5;13M');
-    await flushInput();
-
-    expect(store.get(composerStateAtom).text).toBe('');
-    expect(store.get(transientStatusHintAtom)).toBeUndefined();
   });
 
   it('fits over-limit validation feedback inside the 61x16 row budget', async () => {

@@ -6,6 +6,7 @@ import { App } from '@/App.tsx';
 import {
   activeSurfaceAtom,
   armedActionAtom,
+  bodyEntriesAtom,
   bodySelectionAtom,
   columnsTestOverrideAtom,
   FULLSCREEN_GUARD_ROWS,
@@ -13,6 +14,7 @@ import {
   Surface
 } from '@state/ui/index.ts';
 import { ArmedAction } from '@constants/ui.ts';
+import { BodyEntryKind } from '@constants/bodyEntry.ts';
 import { activeThemeAtom, clipboardClientAtom, productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
 import { composerStateAtom } from '@state/ui/composer/index.ts';
 import { helpVisibleAtom } from '@state/ui/help/index.ts';
@@ -180,12 +182,11 @@ describe('App', () => {
     expect(store.get(armedActionAtom)).toBeNull();
   });
 
-  it('clears an active selection and still pastes on a right-click', async () => {
+  it('copies the active selection on a right-click, then clears it', async () => {
     const { store, stdin } = renderApp({ columns: 100, rows: 20 });
-    store.set(clipboardClientAtom, {
-      readText: vi.fn().mockResolvedValue('pasted'),
-      writeText: vi.fn()
-    });
+    const writeText = vi.fn().mockResolvedValue(true);
+    store.set(clipboardClientAtom, { readText: vi.fn(), writeText });
+    store.set(bodyEntriesAtom, [{ kind: BodyEntryKind.Success, text: 'copy this line' }]);
     await flushInput();
 
     store.set(bodySelectionAtom, {
@@ -198,8 +199,11 @@ describe('App', () => {
     stdin.write('\u001B[<2;10;5M');
     await flushInput();
 
+    // Right-click copies the selection ('copy'), then dismisses the highlight;
+    // it never pastes into the composer.
+    expect(writeText).toHaveBeenCalledWith('copy');
     expect(store.get(bodySelectionAtom)).toBeNull();
-    expect(store.get(composerStateAtom).text).toBe('pasted');
+    expect(store.get(composerStateAtom).text).toBe('');
   });
 
   it('disarms a pending Ctrl+C exit on another key outside the home screen', async () => {

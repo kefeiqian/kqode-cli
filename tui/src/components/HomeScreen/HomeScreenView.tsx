@@ -19,7 +19,7 @@ import {
   parseMouseButtonEvent,
   parseMouseRightClickEvent
 } from '@libs/terminal/mouse.ts';
-import { handleRightClickPaste } from '@components/HomeScreen/rightClickPaste.ts';
+import { copySelection } from '@components/HomeScreen/copySelection.ts';
 import {
   createSelectionGestureState,
   handleSelectionGesture,
@@ -159,12 +159,13 @@ export function HomeScreenView() {
       return;
     }
 
-    // A right-click dismisses any active highlight, then pastes — the in-app
-    // selection never lingers while the paste runs. Dismissal lives here rather
+    // A right-click copies any active selection to the clipboard, then dismisses
+    // the highlight — copying is manual (a drag only highlights). Copy before the
+    // clear so the selection is still readable, and dismissal lives here rather
     // than in useGlobalKeys because the router owns all mouse input.
     if (parseMouseRightClickEvent(input) !== null) {
+      copySelection(store);
       store.set(clearBodySelectionAtom);
-      handleRightClickPaste(input, store);
       return;
     }
 

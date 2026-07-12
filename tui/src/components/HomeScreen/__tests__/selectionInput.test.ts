@@ -43,7 +43,7 @@ describe('handleSelectionGesture', () => {
     expect(dragged?.focus.column).toBe(5);
   });
 
-  it('copies the selection on release', async () => {
+  it('finalizes the selection on release without copying', async () => {
     const store = seededStore();
     const writeText = vi.fn().mockResolvedValue(true);
     store.set(clipboardClientAtom, { readText: vi.fn(), writeText });
@@ -53,7 +53,11 @@ describe('handleSelectionGesture', () => {
     handleSelectionGesture(store, { kind: 'release', row: 3, column: 40 });
     await flushPromises();
 
-    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('selectable'));
+    // Copying is a manual right-click now; a drag-release only highlights.
+    expect(writeText).not.toHaveBeenCalled();
+    const selection = store.get(bodySelectionAtom);
+    expect(selection?.anchor).toEqual({ rowIndex: 0, column: 0 });
+    expect(selection?.focus).not.toEqual(selection?.anchor);
   });
 
   it('ignores gestures when the transcript is empty', () => {
@@ -117,7 +121,7 @@ describe('handleSelectionGesture multi-click', () => {
     handleSelectionGesture(store, { kind: 'release', row: 2, column: releaseColumn }, ctx);
   }
 
-  it('selects and copies the whitespace-delimited word on a double-click (AE5)', async () => {
+  it('selects the whitespace-delimited word on a double-click (AE5)', async () => {
     const { store, writeText } = multiClickStore('error in src/main.rs line 4');
     const state = createSelectionGestureState();
     let clock = 0;
@@ -133,10 +137,11 @@ describe('handleSelectionGesture multi-click', () => {
       anchor: { rowIndex: 0, column: 9 },
       focus: { rowIndex: 0, column: 20 }
     });
-    expect(writeText).toHaveBeenCalledWith('src/main.rs');
+    // The word is highlighted, not copied — copying is a manual right-click.
+    expect(writeText).not.toHaveBeenCalled();
   });
 
-  it('selects and copies the whole rendered line on a triple-click (AE5)', async () => {
+  it('selects the whole rendered line on a triple-click (AE5)', async () => {
     const { store, writeText } = multiClickStore('error in src/main.rs line 4');
     const state = createSelectionGestureState();
     let clock = 0;
@@ -149,10 +154,14 @@ describe('handleSelectionGesture multi-click', () => {
     clickAt(store, ctx, 13);
     await flushPromises();
 
-    expect(writeText).toHaveBeenLastCalledWith('error in src/main.rs line 4');
+    expect(store.get(bodySelectionAtom)).toEqual({
+      anchor: { rowIndex: 0, column: 0 },
+      focus: { rowIndex: 0, column: 27 }
+    });
+    expect(writeText).not.toHaveBeenCalled();
   });
 
-  it('copies the full word even when the release drifts off the press cell', async () => {
+  it('keeps the locked word even when the release drifts off the press cell', async () => {
     const { store, writeText } = multiClickStore('error in src/main.rs line 4');
     const state = createSelectionGestureState();
     let clock = 0;
@@ -164,7 +173,11 @@ describe('handleSelectionGesture multi-click', () => {
     clickAt(store, ctx, 13, 14);
     await flushPromises();
 
-    expect(writeText).toHaveBeenLastCalledWith('src/main.rs');
+    expect(store.get(bodySelectionAtom)).toEqual({
+      anchor: { rowIndex: 0, column: 9 },
+      focus: { rowIndex: 0, column: 20 }
+    });
+    expect(writeText).not.toHaveBeenCalled();
   });
 
   it('selects nothing when a double-click lands on whitespace', async () => {
@@ -201,6 +214,6 @@ describe('handleSelectionGesture multi-click', () => {
       anchor: { rowIndex: 0, column: 2 },
       focus: { rowIndex: 0, column: 7 }
     });
-    expect(writeText).toHaveBeenLastCalledWith('hello');
+    expect(writeText).not.toHaveBeenCalled();
   });
 });
