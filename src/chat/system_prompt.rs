@@ -1,7 +1,12 @@
-//! The KQode base system prompt plus a bounded environment/metadata fragment.
+//! The KQode base system prompt, assembled from ordered, metadata-carrying
+//! [`fragment`]s.
 //!
-//! Kept intentionally small and chat-only for this slice; tool-use guidance is
-//! added by later milestones.
+//! [`system_message`] collects the active chat-only sections ([`sections`]),
+//! orders them most-stable-first (identity → tone → safety → memory → the
+//! volatile environment block), renders them into one system message, and emits
+//! a trace record of the fragment plan. Tool-use guidance and additional
+//! sections (tools, sandbox, MCP, subagents, output styles) are added by later
+//! milestones.
 
 use std::env;
 
@@ -9,14 +14,18 @@ use time::OffsetDateTime;
 
 use crate::provider::ChatMessage;
 
-/// Builds the system message for a turn: the base KQode prompt plus a bounded
-/// environment/metadata block (OS, working directory, current UTC time, active
-/// model, and — when supplied — the workspace git status label).
+mod fragment;
+mod sections;
+
+/// Builds the system message for a turn: the ordered active sections plus a
+/// bounded environment/metadata block (OS, working directory, current UTC time,
+/// active model, and — when supplied — the workspace git status label).
 ///
-/// `git` is injected by the caller (fetched off the coordinator loop, e.g. via
-/// [`crate::git::read_status_label`]) so this stays pure and free of
-/// blocking/async I/O. Pass `None` when the workspace is not a git repository or
-/// the label could not be read; the git line is then omitted. No session id is
+/// `git` and `memory` are injected by the caller (fetched off the coordinator
+/// loop, e.g. via [`crate::git::read_status_label`]) so this stays pure and free
+/// of blocking/async I/O. Pass `None` for `git` when the workspace is not a git
+/// repository or the label could not be read; the git line is then omitted. Pass
+/// `None` for `memory` when no safe memory context fits. No session id is
 /// included in the prompt.
 #[must_use]
 pub fn system_message(model: &str, git: Option<&str>, memory: Option<&str>) -> ChatMessage {
@@ -24,44 +33,35 @@ pub fn system_message(model: &str, git: Option<&str>, memory: Option<&str>) -> C
         .map(|path| path.display().to_string())
         .unwrap_or_else(|_| "unknown".to_owned());
 
-    ChatMessage::system(build_content(
+    let mut fragments = vec![sections::identity(), sections::tone(), sections::safety()];
+    fragments.extend(sections::memory(memory));
+    fragments.push(sections::environment(
         model,
         &cwd,
         env::consts::OS,
         &utc_now_label(),
         git,
-        memory,
-    ))
+    ));
+
+    let ordered = fragment::order_fragments(fragments);
+    trace_fragment_plan(&ordered);
+    ChatMessage::system(fragment::render(&ordered))
 }
 
-/// Pure assembly of the environment block, so metadata contents are unit-tested
-/// without touching the environment or spawning `git`.
-fn build_content(
-    model: &str,
-    cwd: &str,
-    os: &str,
-    now: &str,
-    git: Option<&str>,
-    memory: Option<&str>,
-) -> String {
-    let mut content = format!(
-        "You are KQode, a terminal coding assistant. Answer concisely and \
-         helpfully in plain text suitable for a terminal.\n\n\
-         Environment:\n\
-         - OS: {os}\n\
-         - Working directory: {cwd}\n\
-         - Current time: {now}\n\
-         - Active model: {model}"
-    );
-    if let Some(git) = git {
-        content.push_str("\n- Git: ");
-        content.push_str(git);
+/// Emits one `trace`-level record per assembled fragment (source, volatility,
+/// persistence, priority, advisory token estimate) so a prompt's composition is
+/// visible in traces without logging any fragment bodies.
+fn trace_fragment_plan(ordered: &[fragment::Fragment]) {
+    for fragment in ordered {
+        tracing::trace!(
+            source = fragment.source.as_str(),
+            volatility = ?fragment.volatility,
+            persistence = ?fragment.persistence,
+            priority = fragment.priority,
+            est_tokens = fragment.est_tokens.0,
+            "system prompt fragment"
+        );
     }
-    if let Some(memory) = memory {
-        content.push_str("\n\n");
-        content.push_str(memory);
-    }
-    content
 }
 
 /// Formats the current UTC instant as `YYYY-MM-DD HH:MM:SS UTC` from component

@@ -27,7 +27,7 @@ fn system_message_has_no_session_id() {
 }
 
 #[test]
-fn system_message_appends_memory_block_after_the_environment() {
+fn system_message_places_memory_before_the_volatile_environment() {
     let message = system_message(
         "kimi",
         None,
@@ -46,7 +46,29 @@ fn system_message_appends_memory_block_after_the_environment() {
         .content
         .find("Remembered facts")
         .expect("memory block");
-    assert!(memory > env, "memory context follows the environment block");
+    assert!(
+        memory < env,
+        "memory is a stable section and renders before the volatile environment block"
+    );
+}
+
+#[test]
+fn system_message_orders_stable_sections_before_the_environment() {
+    let message = system_message("kimi-k2", Some("⎇ main"), None);
+    let identity = message.content.find("You are KQode").expect("identity");
+    let tone = message
+        .content
+        .find("# Tone and style")
+        .expect("tone section");
+    let safety = message.content.find("# Safety").expect("safety section");
+    let env = message
+        .content
+        .find("Environment:")
+        .expect("environment block");
+    assert!(
+        identity < tone && tone < safety && safety < env,
+        "stable identity/tone/safety sections precede the volatile environment block"
+    );
 }
 
 #[test]
