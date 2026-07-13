@@ -37,14 +37,6 @@ function inkCursorRowOriginOffset(guardRows: number): number {
  */
 export const COMPOSER_MAX_HEIGHT_DIVISOR = 2;
 
-/**
- * Delay after the last scroll event before the composer re-shows its caret. The
- * caret is suppressed while the user is actively scrolling so the terminal
- * cursor's blink is not reset on every scrolled frame; it reappears (blinking
- * steadily) once scrolling has settled for this long.
- */
-export const CARET_SCROLL_SETTLE_MS = 100;
-
 // --- Selection rows ---
 
 /**

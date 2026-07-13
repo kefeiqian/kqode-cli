@@ -16,7 +16,7 @@ import {
   type GestureRegion
 } from '@components/HomeScreen/selectionInput.ts';
 import { handleWheelScroll } from '@components/HomeScreen/wheelScroll.ts';
-import { useCaretScrollSuppression } from '@components/HomeScreen/useCaretScrollSuppression.ts';
+import { useComposerCaretRefresh } from '@components/HomeScreen/useComposerCaretRefresh.ts';
 import { resolveClickResult } from '@libs/composer/composerWindow.ts';
 import { isInsideSafeChromeBounds } from '@libs/tui/safeCanvas.ts';
 import {
@@ -88,7 +88,7 @@ function positionComposerCaret(store: Store, point: { row: number; column: numbe
 export function useHomeScreenInput(): void {
   const { stdout } = useStdout();
   const scrollBodyByRows = useSetAtom(scrollBodyByRowsAtom);
-  const notifyScroll = useCaretScrollSuppression();
+  const notifyScroll = useComposerCaretRefresh();
   const store = useStore();
   // Latches the region a left press started in so drag/release events stay with
   // that gesture regardless of where the pointer wanders (see resolveGestureRegion).

@@ -33,7 +33,6 @@ import { resolveComposerWindow } from '@libs/composer/composerWindow.ts';
 import { subscribeComposerSubmitCapture } from '@libs/composer/submitCapture.ts';
 import {
   appendComposerRecallSubmitAtom,
-  caretSuppressedWhileScrollingAtom,
   composerScrollOffsetRowsAtom,
   composerStateAtom
 } from '@state/ui/composer/index.ts';
@@ -63,13 +62,6 @@ export function PromptComposer({
 }: PromptComposerProps) {
   const state = useAtomValue(composerStateAtom);
   const scrollOffsetRows = useAtomValue(composerScrollOffsetRowsAtom);
-  // Hide the caret while the user is actively scrolling (body or composer) and
-  // re-show it once scrolling settles, so the terminal cursor's blink is not
-  // reset on every scrolled frame. Subscribing here also re-renders the composer
-  // when suppression toggles, which re-asserts the caret after a scroll — Ink
-  // only draws the cursor on a frame where setCursorPosition ran (its cursorDirty
-  // flag resets each render).
-  const caretSuppressed = useAtomValue(caretSuppressedWhileScrollingAtom);
   const atomColumns = useAtomValue(safeChromeColumnsAtom);
   const atomInputColumns = useAtomValue(composerInputColumnsAtom);
   const atomInputLocked = useAtomValue(inputLockedAtom);
@@ -174,9 +166,9 @@ export function PromptComposer({
     commandActions
   });
   usePasteInput({ maxBytes });
-  // Keeps the terminal caret in sync with focus: re-asserts it on chrome
-  // repaints (so it never drops off the prompt), and hides it while input is
-  // locked during backend loading. See the hook for the full rationale.
+  // Keeps the terminal caret in sync with focus: re-asserts it on chrome and
+  // scroll repaints, and hides it while input is locked during backend loading.
+  // See the hook for the full rationale.
   useComposerCaretVisibility();
 
   const inputColumns = columns === undefined ? atomInputColumns : Math.max(1, resolvedColumns - PROMPT_PREFIX.length);
@@ -218,8 +210,7 @@ export function PromptComposer({
   if (
     resolvedIsActive &&
     composerMetrics.hasMeasured &&
-    composerWindow.cursorVisible &&
-    !caretSuppressed
+    composerWindow.cursorVisible
   ) {
     setCursorPosition(
       resolveComposerCursorPosition(

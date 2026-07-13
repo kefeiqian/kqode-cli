@@ -1,8 +1,8 @@
 import { createStore } from 'jotai';
 import { describe, expect, it } from 'vitest';
 import {
-  caretSuppressedWhileScrollingAtom,
   clearComposerAtom,
+  composerCaretRefreshTickAtom,
   composerScrollOffsetRowsAtom,
   composerStateAtom,
   deleteComposerBackwardAtom,
@@ -157,9 +157,9 @@ describe('composer click-to-position', () => {
   });
 });
 
-describe('caret scroll suppression', () => {
-  it('defaults to not suppressed', () => {
+describe('composer caret refresh tick', () => {
+  it('defaults to zero', () => {
     const store = createStore();
-    expect(store.get(caretSuppressedWhileScrollingAtom)).toBe(false);
+    expect(store.get(composerCaretRefreshTickAtom)).toBe(0);
   });
 });

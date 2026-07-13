@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PromptComposer } from '@components/PromptComposer/index.tsx';
 import { HIDE_CURSOR_SEQUENCE } from '@libs/terminal/cursorVisibility.ts';
 import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/dimensions.ts';
-import { caretSuppressedWhileScrollingAtom } from '@state/ui/composer/index.ts';
+import { composerCaretRefreshTickAtom } from '@state/ui/composer/index.ts';
 import {
   BACKEND_LOADING_HINT,
   gitStatusLabelAtom,
@@ -102,18 +102,24 @@ describe('PromptComposer caret while body scrolling is active', () => {
     stdoutWriteSpy.mockClear();
   });
 
-  it('sets no caret position and explicitly hides the terminal cursor', async () => {
+  it('keeps the caret visible and re-asserts its position on scroll repaint', async () => {
     const store = makeStore();
-    store.set(caretSuppressedWhileScrollingAtom, true);
 
     const { unmount } = renderWithJotai(<PromptComposer />, store);
     await flushInput();
-
-    expect(setCursorPositionSpy.mock.calls.length).toBeGreaterThan(0);
-    expect(everyCursorCallUndefined()).toBe(true);
     await vi.waitFor(() => {
-      expect(stdoutWriteSpy).toHaveBeenCalledWith(HIDE_CURSOR_SEQUENCE);
+      expect(setCursorPositionSpy.mock.calls.at(-1)?.[0]).toBeDefined();
     });
+    const initialPosition = setCursorPositionSpy.mock.calls.at(-1)?.[0];
+    setCursorPositionSpy.mockClear();
+    stdoutWriteSpy.mockClear();
+
+    store.set(composerCaretRefreshTickAtom, 1);
+
+    await vi.waitFor(() => {
+      expect(setCursorPositionSpy.mock.calls.at(-1)?.[0]).toEqual(initialPosition);
+    });
+    expect(stdoutWriteSpy).not.toHaveBeenCalledWith(HIDE_CURSOR_SEQUENCE);
 
     unmount();
   });
