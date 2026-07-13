@@ -26,6 +26,13 @@ type Store = ReturnType<typeof createStore>;
  * the first notch that actually scrolls — and is skipped entirely when every
  * notch routes to `'none'` (pointer outside the safe canvas), matching the
  * pre-batch behavior that only suppressed the caret when a scroll occurred.
+ *
+ * Mixed chunks: if a chunk batches a wheel notch together with a non-wheel report
+ * (a click or a selection drag), the wheel notch(es) are applied and the
+ * co-batched non-wheel report is intentionally dropped — wheel wins. Real
+ * single-pointer input never mixes a wheel with a click in one flush, so this
+ * precedence is an accepted edge case rather than one worth splitting the chunk
+ * for.
  */
 export function handleWheelScroll(
   store: Store,

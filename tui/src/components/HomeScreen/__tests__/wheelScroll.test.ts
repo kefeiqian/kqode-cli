@@ -116,4 +116,19 @@ describe('handleWheelScroll', () => {
     expect(notifyScroll).not.toHaveBeenCalled();
     expect(store.get(bodyScrollOffsetRowsAtom)).toBe(0);
   });
+
+  it('applies the wheel notch and drops a co-batched click (wheel wins)', () => {
+    const store = createStore();
+    seedScrollableBody(store);
+    const notifyScroll = vi.fn();
+
+    // A chunk mixing a left-click press with a wheel notch: the wheel path owns
+    // it and scrolls; the co-batched click is intentionally dropped.
+    const leftPress = '\u001B[<0;10;2M';
+    const chunk = leftPress + wheelUp(BODY_POINTER_ROW, 10);
+    expect(handleWheelScroll(store, chunk, notifyScroll)).toBe(true);
+
+    expect(store.get(bodyScrollOffsetRowsAtom)).toBe(MOUSE_WHEEL_SCROLL_ROWS);
+    expect(notifyScroll).toHaveBeenCalledTimes(1);
+  });
 });
