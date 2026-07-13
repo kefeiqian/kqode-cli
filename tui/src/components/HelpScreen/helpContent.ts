@@ -41,7 +41,7 @@ const KEYBINDING_SECTIONS: readonly HelpSection[] = [
       { keys: '\\ then enter', description: 'Insert a newline' },
       { keys: '← / →', description: 'Move the cursor' },
       { keys: 'backspace', description: 'Delete the previous visible character' },
-      { keys: 'ctrl+v / alt+v / right-click', description: 'Paste from the system clipboard' }
+      { keys: 'ctrl+v / alt+v', description: 'Paste from the system clipboard' }
     ]
   },
   {
@@ -51,10 +51,11 @@ const KEYBINDING_SECTIONS: readonly HelpSection[] = [
   {
     title: 'SELECTION',
     entries: [
-      { keys: 'drag', description: 'Select transcript text; copies on release' },
-      { keys: 'double-click', description: 'Select and copy the word' },
-      { keys: 'triple-click', description: 'Select and copy the line' },
-      { keys: 'any key · right-click', description: 'Dismiss the highlight' },
+      { keys: 'drag', description: 'Select transcript text' },
+      { keys: 'double-click', description: 'Select the word' },
+      { keys: 'triple-click', description: 'Select the line' },
+      { keys: 'right-click', description: 'Copy the selection, then dismiss it' },
+      { keys: 'any key', description: 'Dismiss the highlight' },
       { keys: 'shift+drag', description: 'Select with the terminal for native copy' }
     ]
   },

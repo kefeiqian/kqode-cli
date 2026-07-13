@@ -53,12 +53,13 @@ describe('helpContent', () => {
     ]);
   });
 
-  it('documents copy, paste, and drag-to-copy selection shortcuts', () => {
+  it('documents copy, paste, and selection shortcuts', () => {
     const joined = flattenHelpLines(buildHelpSections())
       .map((line) => line.text)
       .join('\n');
 
-    // Mode-less selection: drag-to-copy and multi-click, no Ctrl+R Copy Mode.
+    // Mode-less selection: drag to highlight, multi-click, right-click to copy;
+    // no Ctrl+R Copy Mode.
     expect(joined).toContain('drag');
     expect(joined).toContain('double-click');
     expect(joined).toContain('triple-click');
@@ -66,8 +67,11 @@ describe('helpContent', () => {
     expect(joined).not.toContain('Copy Mode');
     expect(joined).toContain('ctrl+o');
     expect(joined).toContain('Copy the last assistant response');
-    expect(joined).toContain('ctrl+v / alt+v / right-click');
+    expect(joined).toContain('ctrl+v / alt+v');
     expect(joined).toContain('Paste from the system clipboard');
+    // Right-click now copies the selection instead of pasting.
+    expect(joined).toContain('Copy the selection, then dismiss it');
+    expect(joined).not.toContain('ctrl+v / alt+v / right-click');
   });
 
   it('flattens sections into title, entry, and blank-separator lines', () => {
