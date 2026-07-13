@@ -4,12 +4,15 @@ import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '@/App.tsx';
 import type { BackendClient, StreamSubmitParams, TranscriptEvent, TurnResult } from '@contracts/backend/index.ts';
-import { SETTLED_KIND_COMPLETED, SETTLED_KIND_NEEDS_CONFIGURATION } from '@contracts/backend/index.ts';
+import { SETTLED_KIND_CANCELLED, SETTLED_KIND_COMPLETED, SETTLED_KIND_NEEDS_CONFIGURATION } from '@contracts/backend/index.ts';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
+import { ArmedAction } from '@constants/ui.ts';
+import { composerStateAtom } from '@state/ui/composer/index.ts';
 import { PROVIDER_NOT_CONFIGURED_MESSAGE } from '@libs/promptQueue/promptQueue.ts';
-import { activeSurfaceAtom, columnsTestOverrideAtom, rowsTestOverrideAtom, Surface } from '@state/ui/index.ts';
-import { backendClientAtom, productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
+import { activeSurfaceAtom, armedActionAtom, bodyEntriesAtom, bodySelectionAtom, columnsTestOverrideAtom, rowsTestOverrideAtom, Surface } from '@state/ui/index.ts';
+import { backendClientAtom, clipboardClientAtom, productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
 import {
+  activeTurnIdAtom,
   clientOnlyRowsAtom,
   promptQueueAtom,
   restoreComposerDraftAtom,
@@ -194,5 +197,137 @@ describe('App submit and event-fed output', () => {
       kind: BodyEntryKind.System,
       text: PROVIDER_NOT_CONFIGURED_MESSAGE
     });
+  });
+});
+
+function streamingBackend() {
+  let handler: ((event: TranscriptEvent) => void) | undefined;
+  const stopTurn = vi.fn(async () => undefined);
+  const cancelTurn = vi.fn(async () => undefined);
+  const submit = vi.fn(async ({ turnId }: StreamSubmitParams) => {
+    handler?.({ type: 'activated', turnId });
+    handler?.({ type: 'tokenDelta', turnId, delta: 'streaming…' });
+    // Intentionally no settled event: the turn stays active (streaming), so
+    // `activeTurnIdAtom` is non-null and Ctrl+C takes the busy-stop path.
+  });
+  return {
+    parts: {
+      submit,
+      stopTurn,
+      cancelTurn,
+      onTranscriptEvent: (next: (event: TranscriptEvent) => void) => {
+        handler = next;
+        return () => {
+          handler = undefined;
+        };
+      }
+    } satisfies Partial<BackendClient>,
+    stopTurn,
+    cancelTurn,
+    submit,
+    fire: (event: TranscriptEvent) => handler?.(event)
+  };
+}
+
+describe('App Ctrl+C stop while streaming', () => {
+  it('stops the running turn without arming exit and preserves the composer draft', async () => {
+    const backend = streamingBackend();
+    const { store, stdin, lastFrame } = renderApp(backend.parts);
+
+    await typePrompt(stdin, 'run something long');
+    await waitForFrame(lastFrame, (frame) => frame.includes('streaming…'));
+    expect(store.get(activeTurnIdAtom)).not.toBeNull();
+
+    stdin.write('draft while streaming');
+    await flushInput();
+    expect(store.get(composerStateAtom).text).toBe('draft while streaming');
+
+    stdin.write('\u0003');
+    await flushInput();
+
+    expect(backend.stopTurn).toHaveBeenCalledTimes(1);
+    expect(backend.cancelTurn).not.toHaveBeenCalled();
+    expect(store.get(armedActionAtom)).toBeNull();
+    expect(store.get(composerStateAtom).text).toBe('draft while streaming');
+  });
+
+  it('arms exit only after the stop settles the session idle', async () => {
+    const backend = streamingBackend();
+    const { store, stdin, lastFrame } = renderApp(backend.parts);
+
+    await typePrompt(stdin, 'go');
+    await waitForFrame(lastFrame, (frame) => frame.includes('streaming…'));
+    const activeTurnId = store.get(activeTurnIdAtom);
+    expect(activeTurnId).not.toBeNull();
+
+    stdin.write('\u0003');
+    await flushInput();
+    expect(backend.stopTurn).toHaveBeenCalledTimes(1);
+    expect(store.get(armedActionAtom)).toBeNull();
+
+    backend.fire({
+      type: 'settled',
+      turnId: activeTurnId as string,
+      result: { kind: SETTLED_KIND_CANCELLED, text: null, finishReason: null, errorKind: null, message: null }
+    });
+    await flushInput();
+    expect(store.get(activeTurnIdAtom)).toBeNull();
+
+    stdin.write('\u0003');
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBe(ArmedAction.Exit);
+  });
+
+  it('absorbs a reflexive Ctrl+C burst without arming exit', async () => {
+    const backend = streamingBackend();
+    const { store, stdin, lastFrame } = renderApp(backend.parts);
+
+    await typePrompt(stdin, 'go');
+    await waitForFrame(lastFrame, (frame) => frame.includes('streaming…'));
+
+    stdin.write('\u0003');
+    stdin.write('\u0003');
+    stdin.write('\u0003');
+    await flushInput();
+
+    expect(backend.stopTurn).toHaveBeenCalled();
+    expect(store.get(armedActionAtom)).toBeNull();
+  });
+
+  it('lets ESC cancel the running turn (not stop) while streaming', async () => {
+    const backend = streamingBackend();
+    const { stdin, lastFrame } = renderApp(backend.parts);
+
+    await typePrompt(stdin, 'go');
+    await waitForFrame(lastFrame, (frame) => frame.includes('streaming…'));
+
+    stdin.write('\u001B'); // Esc
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    expect(backend.cancelTurn).toHaveBeenCalledTimes(1);
+    expect(backend.stopTurn).not.toHaveBeenCalled();
+  });
+
+  it('copies an active transcript selection on Ctrl+C without stopping the turn', async () => {
+    const backend = streamingBackend();
+    const { store, stdin, lastFrame } = renderApp(backend.parts);
+
+    await typePrompt(stdin, 'select this prompt');
+    await waitForFrame(lastFrame, (frame) => frame.includes('streaming…'));
+
+    const writeText = vi.fn().mockResolvedValue(true);
+    store.set(clipboardClientAtom, { readText: vi.fn(), writeText });
+    store.set(bodyEntriesAtom, [{ kind: BodyEntryKind.Success, text: 'copy this line' }]);
+    store.set(bodySelectionAtom, {
+      anchor: { rowIndex: 0, column: 0 },
+      focus: { rowIndex: 0, column: 4 }
+    });
+
+    stdin.write('\u0003');
+    await flushInput();
+
+    expect(writeText).toHaveBeenCalledWith('copy');
+    expect(backend.stopTurn).not.toHaveBeenCalled();
+    expect(store.get(bodySelectionAtom)).toBeNull();
   });
 });

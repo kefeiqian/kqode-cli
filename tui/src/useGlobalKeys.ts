@@ -17,6 +17,8 @@ import {
   terminalTooSmallAtom
 } from '@state/ui/index.ts';
 import { clearComposerAtom, composerStateAtom } from '@state/ui/composer/index.ts';
+import { backendClientAtom } from '@state/global/index.ts';
+import { activeTurnIdAtom } from '@state/promptQueue/index.ts';
 
 /**
  * Global key handling that stays active in every state — the home screen, the
@@ -25,6 +27,9 @@ import { clearComposerAtom, composerStateAtom } from '@state/ui/composer/index.t
  * line first, matching the common terminal convention); otherwise it is a
  * two-step exit — the first press arms `'exit'` (the status bar shows the hint),
  * the second calls Ink's `exit`, which runs the same teardown as `/exit`.
+ * While a turn is streaming, Ctrl+C instead stops it (cancels the running turn
+ * and clears the pending queue → idle) and consumes the key, taking precedence
+ * over the exit/clear behavior; ESC keeps its own cancel-active-only path.
  * Any non-Ctrl+C key except Esc disarms a pending exit globally, so the arm
  * cannot persist across help or too-small screens where the composer is absent.
  *
@@ -85,6 +90,24 @@ export function useGlobalKeys(): void {
       // ClearInput arm are owned by the composer, so leave them untouched here
       // to avoid racing that handler when both useInputs fire on one key.
       if (key.escape !== true && armedAction === ArmedAction.Exit) {
+        store.set(armedActionAtom, null);
+      }
+      return;
+    }
+
+    // Past this point the key is Ctrl+C with no active transcript selection.
+    // While a turn is streaming, Ctrl+C stops it: cancel the running turn and
+    // clear the pending queue backend-side (both arrive as transcript events),
+    // so one press lands idle. Consume the key — no exit arm, no composer clear,
+    // and the composer draft is left intact. This keys on the active turn, not
+    // the surface, so it also fires under a docked command surface (which stays
+    // open) or the too-small notice; ESC keeps its own cancel-active-only path.
+    if (store.get(activeTurnIdAtom) !== null) {
+      void store
+        .get(backendClientAtom)
+        ?.stopTurn()
+        .catch(() => undefined);
+      if (armedAction !== null) {
         store.set(armedActionAtom, null);
       }
       return;
