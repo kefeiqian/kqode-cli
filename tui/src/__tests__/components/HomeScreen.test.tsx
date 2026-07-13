@@ -742,6 +742,30 @@ describe('HomeScreen', () => {
     expect(store.get(composerStateAtom).text).toBe('');
   });
 
+  it('suppresses terminal-native paste that follows a right-click copy', async () => {
+    const { stdin, store } = renderHomeScreen({
+      bodyEntries: [{ kind: BodyEntryKind.Success, text: 'selectable line' }],
+      columns: 80,
+      rows: 16
+    });
+    const writeText = vi.fn().mockResolvedValue(true);
+    store.set(clipboardClientAtom, { readText: vi.fn(), writeText });
+    store.set(bodySelectionAtom, {
+      anchor: { rowIndex: 0, column: 0 },
+      focus: { rowIndex: 0, column: 10 }
+    });
+    await flushInput();
+
+    stdin.write('\u001B[<2;5;3M');
+    await flushInput();
+    stdin.write('\u001B[200~terminal paste\u001B[201~');
+    await flushInput();
+
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('selectable'));
+    expect(store.get(bodySelectionAtom)).toBeNull();
+    expect(store.get(composerStateAtom).text).toBe('');
+  });
+
   it('does not touch the clipboard or composer on a right-click with no selection', async () => {
     const { stdin, store } = renderHomeScreen({ columns: 80, rows: 16 });
     const readText = vi.fn().mockResolvedValue('should not paste');

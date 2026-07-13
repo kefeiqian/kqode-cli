@@ -7,6 +7,7 @@ export * from '@state/ui/dock/atoms.ts';
 export * from '@state/ui/gitStatus.ts';
 export * from '@state/ui/inputLock.ts';
 export * from '@state/ui/keyArm.ts';
+export * from '@state/ui/pasteSuppression.ts';
 export * from '@state/ui/resume/index.ts';
 export * from '@state/ui/selection.ts';
 export * from '@state/ui/statusHint.ts';

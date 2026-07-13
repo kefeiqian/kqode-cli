@@ -2,6 +2,7 @@ import { usePaste } from 'ink';
 import { useStore } from 'jotai';
 import { sanitizePastedText } from '@libs/composer/pastedText.ts';
 import { insertComposerTextAtom } from '@state/ui/composer/index.ts';
+import { rightClickPasteSuppressionUntilAtom } from '@state/ui/index.ts';
 
 type UsePasteInputOptions = {
   maxBytes: number;
@@ -18,6 +19,14 @@ export function usePasteInput({ maxBytes }: UsePasteInputOptions): void {
   const store = useStore();
 
   usePaste((text) => {
+    const suppressionUntil = store.get(rightClickPasteSuppressionUntilAtom);
+    if (suppressionUntil > 0) {
+      store.set(rightClickPasteSuppressionUntilAtom, 0);
+      if (Date.now() <= suppressionUntil) {
+        return;
+      }
+    }
+
     store.set(insertComposerTextAtom, { maxBytes, text: sanitizePastedText(text) });
   });
 }

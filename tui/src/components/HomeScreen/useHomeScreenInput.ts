@@ -24,6 +24,7 @@ import {
   composerInputColumnsAtom,
   composerTopAtom,
   layoutAtom,
+  markRightClickPasteSuppressionAtom,
   rowsAtom,
   safeChromeColumnsAtom,
   scrollBodyByRowsAtom
@@ -148,8 +149,11 @@ export function useHomeScreenInput(): void {
     // A right-click copies any active selection to the clipboard, then dismisses
     // the highlight — copying is manual (a drag only highlights). Copy before the
     // clear so the selection is still readable, and dismissal lives here rather
-    // than in useGlobalKeys because the router owns all mouse input.
+    // than in useGlobalKeys because the router owns all mouse input. Some
+    // terminals also emit a native paste after right-click; suppress only that
+    // immediate bracketed-paste fallout so right-click never pastes into composer.
     if (parseMouseRightClickEvent(input) !== null) {
+      store.set(markRightClickPasteSuppressionAtom);
       copySelection(store);
       store.set(clearBodySelectionAtom);
       return;
