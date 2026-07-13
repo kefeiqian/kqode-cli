@@ -21,6 +21,13 @@ pub const COMPACTION_STATUS_METHOD: &str = "kqode/compactionStatus";
 /// `tui/src/contracts/backend/messages.ts`.
 pub const SESSION_SUMMARY_UPDATED_METHOD: &str = "kqode/sessionSummaryUpdated";
 
+/// Server→client notification emitted once per pending turn dropped by a
+/// `kqode.turn.stop`. The stopped active turn still settles via
+/// [`TURN_SETTLED_METHOD`] (cancelled); dropped pending turns never ran, so they
+/// are removed rather than settled. Mirrored in
+/// `tui/src/contracts/backend/messages.ts`.
+pub const TURN_REMOVED_METHOD: &str = "kqode/turnRemoved";
+
 /// Queue state for a turn that became the active head immediately on enqueue.
 pub const TURN_STATE_ACTIVE: &str = "active";
 
@@ -52,6 +59,13 @@ pub struct EnqueuedParams {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ActivatedParams {
+    pub turn_id: String,
+}
+
+/// Payload for [`TURN_REMOVED_METHOD`].
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TurnRemovedParams {
     pub turn_id: String,
 }
 
@@ -181,5 +195,21 @@ pub struct TurnCancelParams {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TurnCancelResult {
+    pub ok: bool,
+}
+
+/// Params for `kqode.turn.stop`.
+///
+/// Empty, like [`ConversationClearParams`]: stop targets the current active turn
+/// plus every pending turn, so there is no `turn_id` to pass (and none can go
+/// stale between the client's busy check and the request arriving).
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct TurnStopParams {}
+
+/// Result for `kqode.turn.stop`.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TurnStopResult {
     pub ok: bool,
 }

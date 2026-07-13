@@ -127,6 +127,7 @@ impl LoopState {
                 self.summary_requested = true;
                 let _ = respond_to.send(());
             }
+            Command::Stop => self.stop(),
             Command::Clear => self.clear(),
             Command::Shutdown => self.shutdown(),
             Command::Cancel { .. } => {}
@@ -340,6 +341,42 @@ impl LoopState {
             session_id,
             summary,
         });
+    }
+
+    /// Stops the active turn and drops every pending turn, keeping transcript
+    /// history and session/compaction state intact (unlike [`Self::clear`]).
+    ///
+    /// Pending turns never ran: each is removed, settled `cancelled` in the
+    /// durable log (so `restore_turns` does not resurrect it as an "interrupted"
+    /// turn), and announced with [`ConversationEvent::TurnRemoved`] so the TUI
+    /// drops its optimistic row. The active turn, if any, is cancelled through
+    /// the normal path and settles `cancelled`; because pending were dropped
+    /// first, no next turn activates and the session lands idle.
+    fn stop(&mut self) {
+        let pending_ids: Vec<String> = self
+            .transcript
+            .turns()
+            .iter()
+            .filter(|turn| turn.state == TurnState::Pending)
+            .map(|turn| turn.turn_id.clone())
+            .collect();
+        for turn_id in pending_ids {
+            self.transcript.remove_turn(&turn_id);
+            self.configs.remove(&turn_id);
+            if let Err(message) = self
+                .persistence
+                .on_settle(&turn_id, &TurnResult::cancelled())
+            {
+                eprintln!("KQODE_SESSION_PERSISTENCE_ERROR: {message}");
+            }
+            (self.event_sink)(ConversationEvent::TurnRemoved { turn_id });
+        }
+        if let Some(active) = self.transcript.active_id() {
+            self.cancelling = Some(active.to_owned());
+        }
+        if let Some(cancel) = &self.active_cancel {
+            cancel.cancel();
+        }
     }
 
     fn clear(&mut self) {

@@ -34,6 +34,45 @@ fn set_key_rejects_bad_custom_url_immediately_without_worker() {
 }
 
 #[test]
+fn turn_stop_dispatch_sends_stop_command() {
+    let (backend, _client) = Connection::memory();
+    let (coordinator, receiver) = std::sync::mpsc::channel();
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open_or_bootstrap_at(dir.path().join("kqode.db")).unwrap();
+
+    let response = handle_request(
+        Request {
+            id: RequestId::from(1),
+            method: RpcMethod::TurnStop.as_str().to_owned(),
+            params: serde_json::json!({}),
+        },
+        &backend,
+        &store,
+        &coordinator,
+    )
+    .expect("turn stop response");
+
+    assert_eq!(
+        response.result.expect("ok result"),
+        serde_json::json!({ "ok": true })
+    );
+    assert!(matches!(receiver.try_recv(), Ok(Command::Stop)));
+}
+
+#[test]
+fn turn_removed_event_maps_to_notification() {
+    let notifications = notifications_for_event(ConversationEvent::TurnRemoved {
+        turn_id: "turn-1".to_owned(),
+    });
+    assert_eq!(notifications.len(), 1);
+    assert_eq!(notifications[0].method, TURN_REMOVED_METHOD);
+    assert_eq!(
+        notifications[0].params,
+        serde_json::json!({ "turnId": "turn-1" })
+    );
+}
+
+#[test]
 fn theme_get_and_set_round_trip_through_dispatch() {
     let (backend, _client) = Connection::memory();
     let (coordinator, _receiver) = std::sync::mpsc::channel();

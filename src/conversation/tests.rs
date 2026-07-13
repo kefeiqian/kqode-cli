@@ -2,7 +2,8 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use super::test_support::{
-    Action, WAIT, enqueue, expect_activated, expect_enqueued, expect_settled, harness,
+    Action, WAIT, enqueue, expect_activated, expect_enqueued, expect_removed, expect_settled,
+    harness,
 };
 use super::transcript::{SettledKind, TurnResult, TurnState};
 use super::{
@@ -270,6 +271,127 @@ fn clear_empties_settled_history_and_starts_fresh() {
     b.actions.send(Action::Complete("b")).unwrap();
     expect_settled(&events, "B", SettledKind::Completed);
     handle.shutdown_and_join();
+}
+
+struct SettleRecordingPersistence {
+    settled: std::sync::Arc<std::sync::Mutex<Vec<(String, SettledKind)>>>,
+}
+
+impl ConversationPersistence for SettleRecordingPersistence {
+    fn on_enqueue(&mut self, _turn_id: &str, _seq: u64, _prompt: &str) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn on_settle(&mut self, turn_id: &str, result: &TurnResult) -> Result<(), String> {
+        self.settled
+            .lock()
+            .unwrap()
+            .push((turn_id.to_owned(), result.kind));
+        Ok(())
+    }
+
+    fn on_clear(&mut self, _turns: &[super::transcript::TranscriptTurn]) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn on_compacted(&mut self, _covered_through_seq: u64, _summary: &str) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn on_summary_generated(&mut self, _summary: &str) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn current_session_id(&self) -> Option<String> {
+        None
+    }
+
+    fn attach_session(&mut self, _session: crate::store::StoredSession) {}
+}
+
+#[test]
+fn stop_drops_pending_and_settles_active_cancelled() {
+    let (handle, events, started) = harness();
+    let sender = handle.sender();
+    enqueue(&sender, "A");
+    expect_enqueued(&events, "A", TurnState::Active);
+    let a = started.recv_timeout(WAIT).unwrap();
+    enqueue(&sender, "B");
+    expect_enqueued(&events, "B", TurnState::Pending);
+    enqueue(&sender, "C");
+    expect_enqueued(&events, "C", TurnState::Pending);
+    // A awaits cancel; stop drops pending B and C, then abandons active A.
+    a.actions.send(Action::AwaitCancel).unwrap();
+    sender.send(Command::Stop).unwrap();
+    expect_removed(&events, "B");
+    expect_removed(&events, "C");
+    expect_settled(&events, "A", SettledKind::Cancelled);
+    // Neither pending turn ever activates or starts a runner.
+    assert!(started.recv_timeout(Duration::from_millis(200)).is_err());
+    // The session lands idle: a fresh submit starts active immediately.
+    enqueue(&sender, "D");
+    expect_enqueued(&events, "D", TurnState::Active);
+    let d = started.recv_timeout(WAIT).unwrap();
+    d.actions.send(Action::Complete("d")).unwrap();
+    expect_settled(&events, "D", SettledKind::Completed);
+    handle.shutdown_and_join();
+}
+
+#[test]
+fn stop_with_no_pending_settles_active_and_lands_idle() {
+    let (handle, events, started) = harness();
+    let sender = handle.sender();
+    enqueue(&sender, "A");
+    expect_enqueued(&events, "A", TurnState::Active);
+    let a = started.recv_timeout(WAIT).unwrap();
+    a.actions.send(Action::AwaitCancel).unwrap();
+    sender.send(Command::Stop).unwrap();
+    expect_settled(&events, "A", SettledKind::Cancelled);
+    // A fresh submit starts active immediately (session is idle after stop).
+    enqueue(&sender, "B");
+    expect_enqueued(&events, "B", TurnState::Active);
+    let b = started.recv_timeout(WAIT).unwrap();
+    b.actions.send(Action::Complete("b")).unwrap();
+    expect_settled(&events, "B", SettledKind::Completed);
+    handle.shutdown_and_join();
+}
+
+#[test]
+fn stop_persists_cancelled_settles_for_dropped_pending() {
+    let settled = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let (event_tx, event_rx) = mpsc::channel();
+    let (started_tx, started_rx) = mpsc::channel();
+    let handle = Coordinator::start_with_runner(
+        move |event| event_tx.send(event).expect("event receiver alive"),
+        move |job: TurnJob| super::test_support::run_fake_turn(job, &started_tx),
+        Box::new(SettleRecordingPersistence {
+            settled: std::sync::Arc::clone(&settled),
+        }),
+    );
+    let sender = handle.sender();
+    enqueue(&sender, "A");
+    expect_enqueued(&event_rx, "A", TurnState::Active);
+    let a = started_rx.recv_timeout(WAIT).unwrap();
+    enqueue(&sender, "B");
+    expect_enqueued(&event_rx, "B", TurnState::Pending);
+    a.actions.send(Action::AwaitCancel).unwrap();
+    sender.send(Command::Stop).unwrap();
+    expect_removed(&event_rx, "B");
+    expect_settled(&event_rx, "A", SettledKind::Cancelled);
+    handle.shutdown_and_join();
+    // Dropped pending B and cancelled active A both persist as cancelled settles,
+    // so a later resume never resurrects them as "interrupted" turns.
+    let recorded = settled.lock().unwrap();
+    assert!(
+        recorded
+            .iter()
+            .any(|(id, kind)| id == "B" && *kind == SettledKind::Cancelled)
+    );
+    assert!(
+        recorded
+            .iter()
+            .any(|(id, kind)| id == "A" && *kind == SettledKind::Cancelled)
+    );
 }
 
 #[test]

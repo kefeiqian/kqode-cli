@@ -124,3 +124,42 @@ fn clear_and_cancel_contracts_use_camel_case() {
         serde_json::from_value(serde_json::to_value(cancel_result).unwrap()).unwrap();
     assert!(cancel_round_trip.ok);
 }
+
+#[test]
+fn rpc_method_maps_stop_method() {
+    assert_eq!(
+        RpcMethod::from_method("kqode.turn.stop"),
+        Some(RpcMethod::TurnStop)
+    );
+    assert_eq!(RpcMethod::TurnStop.as_str(), "kqode.turn.stop");
+}
+
+#[test]
+fn stop_and_removed_contracts_use_camel_case() {
+    let stop_params: TurnStopParams = serde_json::from_str("{}").unwrap();
+    assert_eq!(
+        serde_json::to_value(stop_params).unwrap(),
+        serde_json::json!({})
+    );
+    assert!(serde_json::from_str::<TurnStopParams>(r#"{"turnId":"x"}"#).is_err());
+
+    let stop_result = TurnStopResult { ok: true };
+    assert_eq!(
+        serde_json::to_value(&stop_result).unwrap(),
+        serde_json::json!({ "ok": true })
+    );
+    let stop_round_trip: TurnStopResult =
+        serde_json::from_value(serde_json::to_value(stop_result).unwrap()).unwrap();
+    assert!(stop_round_trip.ok);
+
+    let removed = TurnRemovedParams {
+        turn_id: "turn-1".to_string(),
+    };
+    assert_eq!(
+        serde_json::to_value(&removed).unwrap(),
+        serde_json::json!({ "turnId": "turn-1" })
+    );
+    let removed_round_trip: TurnRemovedParams =
+        serde_json::from_value(serde_json::to_value(removed).unwrap()).unwrap();
+    assert_eq!(removed_round_trip.turn_id, "turn-1");
+}

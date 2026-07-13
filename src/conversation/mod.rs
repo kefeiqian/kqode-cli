@@ -60,6 +60,10 @@ pub enum Command {
     Cancel {
         turn_id: String,
     },
+    /// Stops the active turn and drops every pending turn without clearing
+    /// transcript, session, or compaction state. Pending turns are announced via
+    /// [`ConversationEvent::TurnRemoved`]; the active turn settles `cancelled`.
+    Stop,
     QueryStatus {
         respond_to: Sender<ConversationStatus>,
     },
@@ -97,6 +101,11 @@ pub enum ConversationEvent {
     Settled {
         turn_id: String,
         result: TurnResult,
+    },
+    /// A pending turn was dropped by [`Command::Stop`] before it ran; the TUI
+    /// removes its optimistic queue row (the turn never produced output).
+    TurnRemoved {
+        turn_id: String,
     },
     /// The "Auto compacting…" status toggled for a turn.
     CompactionStatus {

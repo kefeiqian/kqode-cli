@@ -74,6 +74,12 @@ pub fn expect_settled(events: &mpsc::Receiver<ConversationEvent>, id: &str, kind
     );
 }
 
+pub fn expect_removed(events: &mpsc::Receiver<ConversationEvent>, id: &str) {
+    assert!(
+        matches!(events.recv_timeout(WAIT).unwrap(), ConversationEvent::TurnRemoved { turn_id } if turn_id == id)
+    );
+}
+
 fn config() -> KimiConfig {
     KimiConfig {
         api_key: "test-key".to_owned(),

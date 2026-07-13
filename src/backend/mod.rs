@@ -13,8 +13,9 @@ use crate::protocol::{
     ClearKeyParams, CompactionStatusParams, ConversationClearResult, EnqueuedParams,
     JSON_RPC_INVALID_PARAMS, JSON_RPC_METHOD_NOT_FOUND, RpcMethod, SESSION_SUMMARY_UPDATED_METHOD,
     SelectionSetParams, SessionSummaryUpdatedParams, SettledParams, TOKEN_DELTA_METHOD,
-    TURN_ACTIVATED_METHOD, TURN_ENQUEUED_METHOD, TURN_SETTLED_METHOD, ThemeSetParams,
-    TokenDeltaParams, TurnCancelParams, TurnCancelResult,
+    TURN_ACTIVATED_METHOD, TURN_ENQUEUED_METHOD, TURN_REMOVED_METHOD, TURN_SETTLED_METHOD,
+    ThemeSetParams, TokenDeltaParams, TurnCancelParams, TurnCancelResult, TurnRemovedParams,
+    TurnStopParams, TurnStopResult,
 };
 use crate::store::{Store, StoreError};
 
@@ -185,6 +186,7 @@ fn handle_request(
         }
         Some(RpcMethod::ConversationClear) => Some(handle_conversation_clear(request, coordinator)),
         Some(RpcMethod::TurnCancel) => Some(handle_turn_cancel(request, coordinator)),
+        Some(RpcMethod::TurnStop) => Some(handle_turn_stop(request, coordinator)),
         Some(RpcMethod::GitStatus) => {
             git_status::spawn_git_status(request, connection);
             None
@@ -254,6 +256,20 @@ fn handle_turn_cancel(request: Request, coordinator: &Sender<Command>) -> Respon
     Response::new_ok(request.id, TurnCancelResult { ok: true })
 }
 
+fn handle_turn_stop(request: Request, coordinator: &Sender<Command>) -> Response {
+    // Stop takes no params (empty like clear): validate the shape, then abandon
+    // the active turn and drop every pending turn on the single owner.
+    if let Err(error) = serde_json::from_value::<TurnStopParams>(request.params) {
+        return Response::new_err(
+            request.id,
+            JSON_RPC_INVALID_PARAMS,
+            format!("invalid turn stop params: {error}"),
+        );
+    }
+    let _ = coordinator.send(Command::Stop);
+    Response::new_ok(request.id, TurnStopResult { ok: true })
+}
+
 fn json_rpc_event_sink(
     connection: &Connection,
 ) -> impl Fn(ConversationEvent) + Send + Sync + 'static {
@@ -284,6 +300,10 @@ fn notifications_for_event(event: ConversationEvent) -> Vec<Notification> {
         ConversationEvent::Activated { turn_id } => vec![Notification::new(
             TURN_ACTIVATED_METHOD.to_owned(),
             ActivatedParams { turn_id },
+        )],
+        ConversationEvent::TurnRemoved { turn_id } => vec![Notification::new(
+            TURN_REMOVED_METHOD.to_owned(),
+            TurnRemovedParams { turn_id },
         )],
         ConversationEvent::Delta { turn_id, text } => vec![Notification::new(
             TOKEN_DELTA_METHOD.to_owned(),
