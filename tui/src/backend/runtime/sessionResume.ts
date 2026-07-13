@@ -1,6 +1,9 @@
 import type { createStore } from 'jotai';
 import type { SessionResumeResult, SessionSummary } from '@contracts/backend/index.ts';
 import type { RuntimeBackendClient } from '@backend/runtime/backendRuntime.ts';
+import { PRODUCT_NAME } from '@constants/product.ts';
+import { setSessionWindowTitle } from '@libs/terminal/windowTitle.ts';
+import { hydrateResumedTranscriptAtom } from '@state/promptQueue/atoms.ts';
 import { sessionGitBaselineAtom, sessionStartedAtAtom, workspaceCwdAtom } from '@state/global/index.ts';
 import { refreshGitStatusAtom } from '@state/ui/index.ts';
 import { resolveSessionSeed } from '@components/AppExitSummary/resolveSessionSeed.ts';
@@ -79,6 +82,10 @@ export type ResumeSessionByIdResult = {
   session: SessionSummary;
 };
 
+export type ApplyResolvedResumeSessionDeps = ResumeSessionByIdResult & {
+  store: Store;
+};
+
 /**
  * Resolves `sessionId` against the durable session list, resumes it into the
  * runtime, and returns both the restored payload and the matched summary.
@@ -105,4 +112,19 @@ export async function resumeSessionById({
     workspaceCwd: session.folder
   });
   return { resumed, session };
+}
+
+/**
+ * Applies the UI-visible effects of a resolved resume operation.
+ *
+ * Shared by the `/resume` panel and `--resume=<id>` startup path so restored
+ * transcript state and terminal title updates cannot drift between entrypoints.
+ */
+export function applyResolvedResumeSession({
+  store,
+  resumed,
+  session
+}: ApplyResolvedResumeSessionDeps): void {
+  store.set(hydrateResumedTranscriptAtom, resumed);
+  setSessionWindowTitle(PRODUCT_NAME, session.summary);
 }

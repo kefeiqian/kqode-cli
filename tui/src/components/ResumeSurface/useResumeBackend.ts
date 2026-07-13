@@ -1,7 +1,6 @@
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { useCallback } from 'react';
 import { backendClientAtom } from '@state/global/index.ts';
-import { hydrateResumedTranscriptAtom } from '@state/promptQueue/atoms.ts';
 import { turnInFlightAtom } from '@state/promptQueue/store.ts';
 import {
   closeResumePanelAtom,
@@ -11,9 +10,10 @@ import {
   setResumeRowsAtom
 } from '@state/ui/resume/index.ts';
 import { backendErrorMessage } from '@libs/promptQueue/promptQueue.ts';
-import { resumeSessionById } from '@backend/runtime/sessionResume.ts';
-import { setSessionWindowTitle } from '@libs/terminal/windowTitle.ts';
-import { PRODUCT_NAME } from '@constants/product.ts';
+import {
+  applyResolvedResumeSession,
+  resumeSessionById
+} from '@backend/runtime/sessionResume.ts';
 import type { RuntimeBackendClient } from '@backend/runtime/backendRuntime.ts';
 
 function isRuntimeBackendClient(client: unknown): client is RuntimeBackendClient {
@@ -27,7 +27,6 @@ export function useResumeBackend() {
   const setResumeRows = useSetAtom(setResumeRowsAtom);
   const setResumeFailure = useSetAtom(setResumeFailureAtom);
   const setResumeResuming = useSetAtom(setResumeResumingAtom);
-  const hydrateResumedTranscript = useSetAtom(hydrateResumedTranscriptAtom);
   const closeResumePanel = useSetAtom(closeResumePanelAtom);
 
   const refreshSessions = useCallback(async () => {
@@ -56,9 +55,8 @@ export function useResumeBackend() {
       }
       setResumeResuming();
       try {
-        const { resumed, session } = await resumeSessionById({ store, client, sessionId });
-        hydrateResumedTranscript(resumed);
-        setSessionWindowTitle(PRODUCT_NAME, session.summary);
+        const result = await resumeSessionById({ store, client, sessionId });
+        applyResolvedResumeSession({ store, ...result });
         closeResumePanel();
       } catch (error) {
         setResumeFailure(backendErrorMessage(error));
@@ -67,7 +65,6 @@ export function useResumeBackend() {
     [
       client,
       closeResumePanel,
-      hydrateResumedTranscript,
       setResumeFailure,
       setResumeResuming,
       store

@@ -46,8 +46,8 @@ export function startBackendRuntime(
       return;
     }
     if (event.type === 'sessionSummaryUpdated') {
-      // The backend only generates for its current session, so upgrade the live
-      // terminal title from the placeholder on any summary from this connection.
+      // The backend only generates for its current session, so the live terminal
+      // title changes only once the generated summary lands.
       setSessionWindowTitle(PRODUCT_NAME, event.summary);
       return;
     }

@@ -1,8 +1,19 @@
 import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
+
+const { mockSetSessionWindowTitle } = vi.hoisted(() => ({
+  mockSetSessionWindowTitle: vi.fn()
+}));
+
+vi.mock('@libs/terminal/windowTitle.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@libs/terminal/windowTitle.ts')>()),
+  setSessionWindowTitle: mockSetSessionWindowTitle
+}));
+
 import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.ts';
 import { SESSION_STATUS_CURRENT } from '@contracts/backend/index.ts';
 import type { TranscriptEvent } from '@contracts/backend/index.ts';
+import { PRODUCT_NAME } from '@constants/product.ts';
 import { backendClientAtom } from '@state/global/backend.ts';
 import { currentSessionIdAtom } from '@state/global/session.ts';
 import { BACKEND_LOADING_HINT, startupStatusHintAtom } from '@state/ui/statusHint.ts';
@@ -11,6 +22,8 @@ import { bodyScrollOffsetRowsAtom, submittedPromptEntriesAtom } from '@state/ui/
 import { gitStatusLabelAtom } from '@state/ui/gitStatus.ts';
 import { startBackendRuntime } from '@backend/runtime/backendRuntime.ts';
 import type { RuntimeBackendClient } from '@backend/runtime/backendRuntime.ts';
+
+const SESSION_ID = '019f5a2b-15e0-7ef1-9ad2-10a132448b7';
 
 function fakeClient(overrides: Partial<RuntimeBackendClient> = {}): RuntimeBackendClient {
   return {
@@ -203,7 +216,7 @@ describe('startBackendRuntime', () => {
     const listSessions = vi.fn().mockResolvedValue({
       sessions: [
         {
-          sessionId: 'conv-1',
+          sessionId: SESSION_ID,
           summary: 's',
           status: SESSION_STATUS_CURRENT,
           modifiedAt: 0,
@@ -226,7 +239,7 @@ describe('startBackendRuntime', () => {
     await flushMicrotasks();
 
     expect(listSessions).toHaveBeenCalledTimes(1);
-    expect(store.get(currentSessionIdAtom)).toBe('conv-1');
+    expect(store.get(currentSessionIdAtom)).toBe(SESSION_ID);
 
     // A second enqueued while the id is known must not re-fetch.
     transcriptHandler?.({ type: 'enqueued', turnId: 't2', seq: 1, state: 'pending' });
@@ -250,5 +263,25 @@ describe('startBackendRuntime', () => {
     await flushMicrotasks();
 
     expect(store.get(currentSessionIdAtom)).toBeUndefined();
+  });
+
+  it('updates the terminal title when the generated session summary lands', () => {
+    const store = createStore();
+    let transcriptHandler: ((event: TranscriptEvent) => void) | undefined;
+    const client = fakeClient({
+      onTranscriptEvent: vi.fn((handler: (event: TranscriptEvent) => void) => {
+        transcriptHandler = handler;
+        return () => undefined;
+      })
+    });
+
+    startBackendRuntime(store, client, fakeLogger());
+    transcriptHandler?.({
+      type: 'sessionSummaryUpdated',
+      sessionId: SESSION_ID,
+      summary: 'Hadamard 乘积'
+    });
+
+    expect(mockSetSessionWindowTitle).toHaveBeenCalledWith(PRODUCT_NAME, 'Hadamard 乘积');
   });
 });

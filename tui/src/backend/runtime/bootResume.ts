@@ -1,8 +1,11 @@
 import type { createStore } from 'jotai';
 import { CLI_NAME } from '@constants/product.ts';
-import { hydrateResumedTranscriptAtom } from '@state/promptQueue/atoms.ts';
 import type { RuntimeBackendClient } from '@backend/runtime/backendRuntime.ts';
-import { BootResumeError, resumeSessionById } from '@backend/runtime/sessionResume.ts';
+import {
+  applyResolvedResumeSession,
+  BootResumeError,
+  resumeSessionById
+} from '@backend/runtime/sessionResume.ts';
 
 type Store = ReturnType<typeof createStore>;
 
@@ -20,25 +23,28 @@ export type ApplyBootResumeDeps = {
  *
  * No-ops when `resumeSessionId` is omitted (a normal fresh-session launch). A
  * blank id (`--resume=`) is treated as an error, not a silent fresh session. On
- * any failure it runs `onFailure` (backend teardown) and rethrows so the CLI
- * entry can report the error and exit non-zero.
+ * success, applies the same hydrated transcript and terminal-title side effects
+ * as `/resume` and returns `true`. On any failure it runs `onFailure` (backend
+ * teardown) and rethrows so the CLI entry can report the error and exit
+ * non-zero.
  */
 export async function applyBootResume({
   store,
   client,
   resumeSessionId,
   onFailure
-}: ApplyBootResumeDeps): Promise<void> {
+}: ApplyBootResumeDeps): Promise<boolean> {
   if (resumeSessionId === undefined) {
-    return;
+    return false;
   }
   const sessionId = resumeSessionId.trim();
   try {
     if (sessionId === '') {
       throw new BootResumeError(resumeSessionId);
     }
-    const { resumed } = await resumeSessionById({ store, client, sessionId });
-    store.set(hydrateResumedTranscriptAtom, resumed);
+    const result = await resumeSessionById({ store, client, sessionId });
+    applyResolvedResumeSession({ store, ...result });
+    return true;
   } catch (error) {
     onFailure();
     throw error;

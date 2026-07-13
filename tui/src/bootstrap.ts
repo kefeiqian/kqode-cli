@@ -143,14 +143,23 @@ export async function createAppRuntime({
   // Reopen a requested session before the first frame renders and before the
   // alternate screen is entered, so an unknown id fails cleanly to the normal
   // buffer (backend torn down, error rethrown) with no screen flash.
-  await applyBootResume({ store, client, resumeSessionId, onFailure: disposeBackend });
+  const didBootResume = await applyBootResume({
+    store,
+    client,
+    resumeSessionId,
+    onFailure: disposeBackend
+  });
 
-  // Enter the alternate screen buffer before any visual setup so the session
-  // renders in a scrollback-less buffer: while the TUI owns the screen the
-  // terminal's native scrollbar has no pre-launch history to scroll into, and
-  // the original buffer (with its scrollback) is restored on exit.
+  // Enter the alternate screen buffer before frame-oriented visual setup so the
+  // session renders in a scrollback-less buffer: while the TUI owns the screen
+  // the terminal's native scrollbar has no pre-launch history to scroll into,
+  // and the original buffer (with its scrollback) is restored on exit. Boot
+  // resume has already applied the session title through the shared resume path,
+  // so only fresh launches write the generic product title here.
   enterAlternateScreen();
-  setTerminalWindowTitle(PRODUCT_NAME, productVersion);
+  if (!didBootResume) {
+    setTerminalWindowTitle(PRODUCT_NAME, productVersion);
+  }
   // Seed the active theme and terminal background together through the same
   // centralized apply-theme seam the /theme picker uses.
   store.set(applyThemeAtom, initialTheme);

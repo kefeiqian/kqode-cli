@@ -7,6 +7,8 @@ import type { RuntimeBackendClient } from '@backend/runtime/backendRuntime.ts';
 import { BootResumeError } from '@backend/runtime/sessionResume.ts';
 import { applyBootResume, bootResumeErrorMessage } from '@backend/runtime/bootResume.ts';
 
+const SESSION_ID = '019f5a2b-15e0-7ef1-9ad2-10a132448b7';
+
 function fakeClient(overrides: Partial<RuntimeBackendClient> = {}): RuntimeBackendClient {
   return {
     listSessions: vi.fn(),
@@ -53,7 +55,7 @@ describe('applyBootResume', () => {
     const store = createStore();
     store.set(workspaceCwdAtom, 'C:\\old');
     const session: SessionSummary = {
-      sessionId: 'conv-1',
+      sessionId: SESSION_ID,
       summary: 's',
       status: SESSION_STATUS_IDLE,
       modifiedAt: 0,
@@ -63,7 +65,7 @@ describe('applyBootResume', () => {
     const client = fakeClient({
       listSessions: vi.fn(async () => ({ sessions: [session] })),
       resumeSession: vi.fn(async () => ({
-        sessionId: 'conv-1',
+        sessionId: SESSION_ID,
         workspaceCwd: 'C:\\new',
         canonicalWorkspaceCwd: 'C:\\new',
         turns: []
@@ -71,17 +73,22 @@ describe('applyBootResume', () => {
     });
     const onFailure = vi.fn();
 
-    await applyBootResume({ store, client, resumeSessionId: 'conv-1', onFailure });
+    await applyBootResume({
+      store,
+      client,
+      resumeSessionId: SESSION_ID,
+      onFailure
+    });
 
-    expect(store.get(currentSessionIdAtom)).toBe('conv-1');
+    expect(store.get(currentSessionIdAtom)).toBe(SESSION_ID);
     expect(onFailure).not.toHaveBeenCalled();
   });
 });
 
 describe('bootResumeErrorMessage', () => {
   it('names the offending id and points at the /resume recovery path', () => {
-    const message = bootResumeErrorMessage(new BootResumeError('conv-x'));
-    expect(message).toContain('conv-x');
+    const message = bootResumeErrorMessage(new BootResumeError(SESSION_ID));
+    expect(message).toContain(SESSION_ID);
     expect(message).toContain('/resume');
   });
 });

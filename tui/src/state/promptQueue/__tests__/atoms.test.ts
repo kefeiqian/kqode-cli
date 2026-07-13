@@ -1,12 +1,14 @@
 import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 
-const { mockSetTerminalWindowTitle } = vi.hoisted(() => ({
+const { mockSetSessionWindowTitle, mockSetTerminalWindowTitle } = vi.hoisted(() => ({
+  mockSetSessionWindowTitle: vi.fn(),
   mockSetTerminalWindowTitle: vi.fn()
 }));
 
 vi.mock('@libs/terminal/windowTitle.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@libs/terminal/windowTitle.ts')>()),
+  setSessionWindowTitle: mockSetSessionWindowTitle,
   setTerminalWindowTitle: mockSetTerminalWindowTitle
 }));
 
@@ -37,6 +39,8 @@ import {
 import { memoryBackendStub } from '@test/backendMemoryStub.ts';
 import { themeBackendStub } from '@test/backendThemeStub.ts';
 import { PRODUCT_NAME } from '@constants/product.ts';
+
+const SESSION_ID = '019f5a2b-15e0-7ef1-9ad2-10a132448b7';
 
 function clientWithSubmit(submit: BackendClient['submit']): BackendClient {
   return {
@@ -97,6 +101,16 @@ describe('enqueuePromptAtom', () => {
 
     expect(submit).toHaveBeenCalledWith({ turnId: 'turn-1', text: 'hello' });
     expect(store.get(submittedPromptEntriesAtom)[0]).toMatchObject({ kind: 'user', text: 'hello' });
+  });
+
+  it('does not update the terminal title from the first prompt', async () => {
+    const store = createStore();
+    store.set(newTurnIdAtom, { newTurnId: () => 'turn-1' });
+    store.set(backendClientAtom, clientWithSubmit(async () => undefined));
+
+    await store.set(enqueuePromptAtom, 'Hadamard 乘积是什么');
+
+    expect(mockSetSessionWindowTitle).not.toHaveBeenCalled();
   });
 
   it('keeps unconfigured turns on the home screen without opening a surface', async () => {
@@ -247,24 +261,24 @@ describe('currentSessionIdAtom lifecycle', () => {
   it('hydrateResumedTranscriptAtom sets the current session id from the resumed payload', () => {
     const store = createStore();
     store.set(hydrateResumedTranscriptAtom, {
-      sessionId: 'conv-7',
+      sessionId: SESSION_ID,
       workspaceCwd: 'w',
       canonicalWorkspaceCwd: 'w',
       turns: []
     });
-    expect(store.get(currentSessionIdAtom)).toBe('conv-7');
+    expect(store.get(currentSessionIdAtom)).toBe(SESSION_ID);
   });
 
   it('clearTranscriptAtom clears the current session id', () => {
     const store = createStore();
-    store.set(currentSessionIdAtom, 'conv-1');
+    store.set(currentSessionIdAtom, SESSION_ID);
     store.set(clearTranscriptAtom);
     expect(store.get(currentSessionIdAtom)).toBeUndefined();
   });
 
   it('resetTranscriptMirrorAtom clears the current session id', () => {
     const store = createStore();
-    store.set(currentSessionIdAtom, 'conv-1');
+    store.set(currentSessionIdAtom, SESSION_ID);
     store.set(resetTranscriptMirrorAtom);
     expect(store.get(currentSessionIdAtom)).toBeUndefined();
   });
