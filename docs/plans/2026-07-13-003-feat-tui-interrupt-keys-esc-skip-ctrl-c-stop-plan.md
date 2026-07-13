@@ -1,7 +1,7 @@
 ---
 title: "feat: TUI interrupt keys — ESC skips, Ctrl+C stops"
 type: feat
-status: active
+status: completed
 date: 2026-07-13
 origin: docs/brainstorms/2026-07-13-tui-interrupt-keys-esc-skip-ctrl-c-stop-requirements.md
 ---
