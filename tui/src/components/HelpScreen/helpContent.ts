@@ -55,7 +55,7 @@ const KEYBINDING_SECTIONS: readonly HelpSection[] = [
       { keys: 'double-click', description: 'Select the word' },
       { keys: 'triple-click', description: 'Select the line' },
       { keys: 'ctrl+c / cmd+c', description: 'Copy the selection, then dismiss it' },
-      { keys: 'right-click', description: 'Copy the selection, then dismiss it' },
+      { keys: 'right-click', description: 'Copy selection, or paste when none is active' },
       { keys: 'other keys', description: 'Dismiss the highlight; scroll keys keep it' },
       { keys: 'shift+drag', description: 'Select with the terminal for native copy' }
     ]

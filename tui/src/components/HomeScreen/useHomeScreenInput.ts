@@ -9,6 +9,7 @@ import {
   parseMouseRightClickEvent
 } from '@libs/terminal/mouse.ts';
 import { copySelection } from '@components/HomeScreen/copySelection.ts';
+import { pasteFromClipboard } from '@components/PromptComposer/input/handlePaste.ts';
 import {
   createSelectionGestureState,
   handleSelectionGesture,
@@ -18,6 +19,7 @@ import {
 import { handleWheelScroll } from '@components/HomeScreen/wheelScroll.ts';
 import { useComposerCaretRefresh } from '@components/HomeScreen/useComposerCaretRefresh.ts';
 import { resolveClickResult } from '@libs/composer/composerWindow.ts';
+import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import { isInsideSafeChromeBounds } from '@libs/tui/safeCanvas.ts';
 import {
   clearBodySelectionAtom,
@@ -146,15 +148,15 @@ export function useHomeScreenInput(): void {
       return;
     }
 
-    // A right-click copies any active selection to the clipboard, then dismisses
-    // the highlight — copying is manual (a drag only highlights). Copy before the
-    // clear so the selection is still readable, and dismissal lives here rather
-    // than in useGlobalKeys because the router owns all mouse input. Some
-    // terminals also emit a native paste after right-click; suppress only that
-    // immediate bracketed-paste fallout so right-click never pastes into composer.
+    // A right-click copies any active selection, otherwise it pastes into the
+    // composer. Some terminals also emit a native paste after right-click;
+    // suppress only that immediate bracketed-paste fallout so this app-owned
+    // branch is the single source of truth.
     if (parseMouseRightClickEvent(input) !== null) {
       store.set(markRightClickPasteSuppressionAtom);
-      copySelection(store);
+      if (!copySelection(store)) {
+        pasteFromClipboard(store, PROMPT_MAX_BYTES);
+      }
       store.set(clearBodySelectionAtom);
       return;
     }

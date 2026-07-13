@@ -69,6 +69,7 @@ describe('helpContent', () => {
       'Paste from the system clipboard',
       'ctrl+c / cmd+c',
       'Copy the selection, then dismiss it',
+      'Copy selection, or paste when none is active',
       'other keys',
       'Dismiss the highlight; scroll keys keep it'
     ];
@@ -88,7 +89,7 @@ describe('helpContent', () => {
     for (const text of forbidden) {
       expect(joined).not.toContain(text);
     }
-    // Right-click and keyboard shortcuts copy the selection instead of pasting.
+    // Right-click copies selection or pastes when no selection is active.
     expect(joined).toContain('right-click');
   });
 

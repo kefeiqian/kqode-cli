@@ -766,9 +766,9 @@ describe('HomeScreen', () => {
     expect(store.get(composerStateAtom).text).toBe('');
   });
 
-  it('does not touch the clipboard or composer on a right-click with no selection', async () => {
+  it('pastes the clipboard on a right-click with no selection', async () => {
     const { stdin, store } = renderHomeScreen({ columns: 80, rows: 16 });
-    const readText = vi.fn().mockResolvedValue('should not paste');
+    const readText = vi.fn().mockResolvedValue('pasted text');
     const writeText = vi.fn();
     store.set(clipboardClientAtom, { readText, writeText });
     await flushInput();
@@ -776,10 +776,24 @@ describe('HomeScreen', () => {
     stdin.write('\u001B[<2;5;13M');
     await flushInput();
 
-    // Right-click no longer pastes: nothing is read, written, or inserted.
-    expect(readText).not.toHaveBeenCalled();
+    expect(readText).toHaveBeenCalledTimes(1);
     expect(writeText).not.toHaveBeenCalled();
-    expect(store.get(composerStateAtom).text).toBe('');
+    expect(store.get(composerStateAtom).text).toBe('pasted text');
+  });
+
+  it('suppresses duplicate terminal-native paste after right-click paste', async () => {
+    const { stdin, store } = renderHomeScreen({ columns: 80, rows: 16 });
+    const readText = vi.fn().mockResolvedValue('pasted text');
+    store.set(clipboardClientAtom, { readText, writeText: vi.fn() });
+    await flushInput();
+
+    stdin.write('\u001B[<2;5;13M');
+    await flushInput();
+    stdin.write('\u001B[200~terminal paste\u001B[201~');
+    await flushInput();
+
+    expect(readText).toHaveBeenCalledTimes(1);
+    expect(store.get(composerStateAtom).text).toBe('pasted text');
   });
 
   it('fits over-limit validation feedback inside the 61x16 row budget', async () => {
