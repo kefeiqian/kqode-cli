@@ -1024,7 +1024,7 @@ fn sample_memory_item(id: &str, scope: MemoryScope, active: bool) -> MemoryItem 
         active,
         provenance: MemoryProvenance {
             source: MemorySource::Manual,
-            source_session_id: Some("conv-1".to_owned()),
+            source_session_id: Some("019f5a2b-0000-7000-8000-000000000001".to_owned()),
             source_turn_start: Some(0),
             source_turn_end: Some(0),
             created_at_ms: 100,
@@ -1060,7 +1060,7 @@ fn reindex_rebuilds_items_inbox_cursor_and_corrections_from_files_and_events() {
                 memory_type: Some(MemoryType::User),
                 title: Some("candidate pref".to_owned()),
                 confidence: Some(0.3),
-                source_session_id: Some("conv-1".to_owned()),
+                source_session_id: Some("019f5a2b-0000-7000-8000-000000000001".to_owned()),
                 source_turn_start: Some(0),
                 source_turn_end: Some(1),
                 operation_id: None,
@@ -1093,7 +1093,7 @@ fn reindex_rebuilds_items_inbox_cursor_and_corrections_from_files_and_events() {
     append_memory_event(
         &store,
         &MemoryEvent::CursorAdvanced {
-            session_id: "conv-1".to_owned(),
+            session_id: "019f5a2b-0000-7000-8000-000000000001".to_owned(),
             last_extracted_seq: 4,
             at_ms: 8,
         },
@@ -1113,7 +1113,12 @@ fn reindex_rebuilds_items_inbox_cursor_and_corrections_from_files_and_events() {
         "the later review status wins over the initial proposal"
     );
     assert!(store.has_memory_correction("k1").unwrap());
-    assert_eq!(store.memory_cursor("conv-1").unwrap(), Some(4));
+    assert_eq!(
+        store
+            .memory_cursor("019f5a2b-0000-7000-8000-000000000001")
+            .unwrap(),
+        Some(4)
+    );
 }
 
 #[test]

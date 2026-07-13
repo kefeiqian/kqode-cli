@@ -16,6 +16,8 @@ type StoreSeed = {
   sessionId?: string;
 };
 
+const SESSION_ID = '019f5a2b-15e0-7ef1-9ad2-10a132448b7';
+
 function seededStore({ startedAt = 0, baseline, cwd = '/repo', sessionId }: StoreSeed) {
   const store = createStore();
   store.set(sessionStartedAtAtom, startedAt);
@@ -87,11 +89,11 @@ describe('computeExitSummary', () => {
   });
 
   it('builds the resume command when the session is resumable', () => {
-    const store = seededStore({ startedAt: 1_000, sessionId: 'conv-42' });
+    const store = seededStore({ startedAt: 1_000, sessionId: SESSION_ID });
 
     const data = computeExitSummary({ store, now: () => 2_000, readLineDelta: () => undefined });
 
-    expect(data.resumeCommand).toBe('kqode --resume=conv-42');
+    expect(data.resumeCommand).toBe(`kqode --resume=${SESSION_ID}`);
   });
 
   it('leaves the resume command undefined when there is no resumable session', () => {

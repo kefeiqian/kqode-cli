@@ -276,11 +276,10 @@ impl ConversationPersistence for SessionPersistence {
 
 /// Mints the durable conversation/resume id, lazily at first enqueue.
 ///
-/// The `conv-` prefix marks it as a resumable-conversation id — distinct from
-/// the backend debug-log session id in the `ready` notification. The UUIDv7 body
-/// is time-sortable and unique, so no separate counter is needed.
+/// UUIDv7 keeps the id time-sortable and unique without adding a product-specific
+/// prefix or a separate counter.
 fn new_conversation_session_id() -> String {
-    format!("conv-{}", Uuid::now_v7())
+    Uuid::now_v7().to_string()
 }
 
 fn now_ms() -> i64 {
@@ -334,6 +333,15 @@ mod tests {
             .lines()
             .map(|line| serde_json::from_str::<SessionLogEvent>(line).expect("valid log line"))
             .collect()
+    }
+
+    #[test]
+    fn new_conversation_session_id_is_plain_uuid() {
+        let id = new_conversation_session_id();
+
+        Uuid::parse_str(&id).expect("plain uuid session id");
+        assert_eq!(id.len(), 36);
+        assert_eq!(id.chars().filter(|char| *char == '-').count(), 4);
     }
 
     #[test]

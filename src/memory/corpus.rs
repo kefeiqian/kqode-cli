@@ -338,7 +338,7 @@ mod tests {
             active: true,
             provenance: MemoryProvenance {
                 source: super::super::MemorySource::Manual,
-                source_session_id: Some("conv-1".to_owned()),
+                source_session_id: Some("019f5a2b-0000-7000-8000-000000000001".to_owned()),
                 source_turn_start: Some(0),
                 source_turn_end: Some(0),
                 created_at_ms: 1_000,

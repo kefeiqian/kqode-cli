@@ -4,6 +4,8 @@ import type { Colorize } from '@components/AppExitSummary/types.ts';
 import { DEFAULT_THEME } from '@theme/themeConfig.ts';
 
 const identity: Colorize = (text) => text;
+const SESSION_ID = '019f5a2b-15e0-7ef1-9ad2-10a132448b7';
+const RESUME_COMMAND = `kqode --resume=${SESSION_ID}`;
 
 describe('formatExitSummaryCard', () => {
   it('renders a bordered banner card with only the rows that carry data (covers R2, R3, R10)', () => {
@@ -96,46 +98,56 @@ describe('formatExitSummaryCard', () => {
 
   it('renders the Resume row with the command when the session is resumable (covers R1, R2)', () => {
     const card = formatExitSummaryCard(
-      { changes: { insertions: 3, deletions: 1 }, durationMs: 5_000, resumeCommand: 'kqode --resume=conv-9' },
+      {
+        changes: { insertions: 3, deletions: 1 },
+        durationMs: 5_000,
+        resumeCommand: RESUME_COMMAND
+      },
       { colorize: identity, theme: DEFAULT_THEME, columns: 80 }
     );
 
     expect(card).toContain('Resume');
-    expect(card).toContain('kqode --resume=conv-9');
+    expect(card).toContain(RESUME_COMMAND);
     // Resume follows the other stat rows.
     expect(card.indexOf('Duration')).toBeLessThan(card.indexOf('Resume'));
   });
 
   it('shows the Resume row for a resumable no-provider session (covers corrected AE2)', () => {
     const card = formatExitSummaryCard(
-      { changes: undefined, durationMs: 2_000, resumeCommand: 'kqode --resume=conv-np' },
+      {
+        changes: undefined,
+        durationMs: 2_000,
+        resumeCommand: RESUME_COMMAND
+      },
       { colorize: identity, theme: DEFAULT_THEME, columns: 80 }
     );
-
     expect(card).toContain('Resume');
-    expect(card).toContain('kqode --resume=conv-np');
+    expect(card).toContain(RESUME_COMMAND);
   });
 
   it('preserves the full session id when the card degrades on a narrow terminal (covers R4)', () => {
-    const longId = 'conv-1783754959900-1a2b3c-42';
     const card = formatExitSummaryCard(
-      { changes: undefined, durationMs: undefined, resumeCommand: `kqode --resume=${longId}` },
+      { changes: undefined, durationMs: undefined, resumeCommand: RESUME_COMMAND },
       { colorize: identity, theme: DEFAULT_THEME, columns: 20 }
     );
 
-    expect(card).toContain(longId);
+    expect(card).toContain(SESSION_ID);
   });
 
   it('does not colorize the resume command (only Changes uses the color seam)', () => {
     const mark: Colorize = (text) => `<C>${text}</C>`;
     const card = formatExitSummaryCard(
-      { changes: { insertions: 2, deletions: 1 }, durationMs: 1_000, resumeCommand: 'kqode --resume=conv-1' },
+      {
+        changes: { insertions: 2, deletions: 1 },
+        durationMs: 1_000,
+        resumeCommand: RESUME_COMMAND
+      },
       { colorize: mark, theme: DEFAULT_THEME, columns: 80 }
     );
 
     expect(card).toContain('<C>'); // Changes is colorized...
-    expect(card).toContain('kqode --resume=conv-1'); // ...but the resume command is plain.
+    expect(card).toContain(RESUME_COMMAND); // ...but the resume command is plain.
     expect(card).not.toContain('<C>kqode');
-    expect(card).not.toContain('conv-1</C>');
+    expect(card).not.toContain(`${SESSION_ID}</C>`);
   });
 });

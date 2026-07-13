@@ -283,7 +283,7 @@ mod tests {
         let path = dir.path().join("memory_events.jsonl");
         let events = [
             MemoryEvent::CursorAdvanced {
-                session_id: "conv-1".to_owned(),
+                session_id: "019f5a2b-0000-7000-8000-000000000001".to_owned(),
                 last_extracted_seq: 3,
                 at_ms: 10,
             },
@@ -336,7 +336,7 @@ mod tests {
                 memory_type: Some(MemoryType::User),
                 title: Some("prefers tabs".to_owned()),
                 confidence: Some(0.4),
-                source_session_id: Some("conv-1".to_owned()),
+                source_session_id: Some("019f5a2b-0000-7000-8000-000000000001".to_owned()),
                 source_turn_start: Some(0),
                 source_turn_end: Some(1),
                 operation_id: None,
