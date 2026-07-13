@@ -8,6 +8,7 @@ import {
   bodyScrollOffsetRowsAtom,
   columnsTestOverrideAtom,
   composerTopAtom,
+  maxBodyScrollOffsetRowsAtom,
   rowsTestOverrideAtom
 } from '@state/ui/index.ts';
 import { composerScrollOffsetRowsAtom, composerStateAtom } from '@state/ui/composer/index.ts';
@@ -102,6 +103,20 @@ describe('handleWheelScroll', () => {
     expect(handleWheelScroll(store, chunk, notifyScroll)).toBe(true);
 
     expect(store.get(bodyScrollOffsetRowsAtom)).toBe(0);
+    expect(notifyScroll).not.toHaveBeenCalled();
+  });
+
+  it('consumes the chunk but does not notify when body wheel input is clamped at the top', () => {
+    const store = createStore();
+    seedScrollableBody(store);
+    const maxScrollOffset = store.get(maxBodyScrollOffsetRowsAtom);
+    store.set(bodyScrollOffsetRowsAtom, maxScrollOffset);
+    const notifyScroll = vi.fn();
+
+    const chunk = wheelUp(BODY_POINTER_ROW, 10).repeat(2);
+    expect(handleWheelScroll(store, chunk, notifyScroll)).toBe(true);
+
+    expect(store.get(bodyScrollOffsetRowsAtom)).toBe(maxScrollOffset);
     expect(notifyScroll).not.toHaveBeenCalled();
   });
 

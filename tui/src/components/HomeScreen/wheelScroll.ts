@@ -3,7 +3,9 @@ import { MOUSE_WHEEL_SCROLL_ROWS } from '@constants/ui.ts';
 import { parseMouseWheelEvents } from '@libs/terminal/mouse.ts';
 import { resolveWheelTarget } from '@components/HomeScreen/wheelRouting.ts';
 import { activeDockedPanelAtom } from '@state/ui/dock/atoms.ts';
+import { composerScrollOffsetRowsAtom } from '@state/ui/composer/index.ts';
 import {
+  bodyScrollOffsetRowsAtom,
   composerCanScrollAtom,
   composerTopAtom,
   layoutAtom,
@@ -59,8 +61,9 @@ export function handleWheelScroll(
 
     // While a docked panel is open the transcript body owns the wheel.
     if (dockedActive) {
-      notifyOnce();
-      store.set(scrollBodyByRowsAtom, bodyDelta);
+      if (applyBodyScroll(store, bodyDelta)) {
+        notifyOnce();
+      }
       continue;
     }
 
@@ -77,18 +80,34 @@ export function handleWheelScroll(
       continue;
     }
 
-    notifyOnce();
     if (target === 'composer') {
       // A body-sized notch is near-full-page in a small composer; clamp it.
       const step = Math.max(
         1,
         Math.min(MOUSE_WHEEL_SCROLL_ROWS, store.get(layoutAtom).composerVisibleRows - 1)
       );
-      store.set(scrollComposerByRowsAtom, wheel.direction === 'up' ? step : -step);
-    } else {
-      store.set(scrollBodyByRowsAtom, bodyDelta);
+      if (applyComposerScroll(store, wheel.direction === 'up' ? step : -step)) {
+        notifyOnce();
+      }
+      continue;
+    }
+
+    if (applyBodyScroll(store, bodyDelta)) {
+      notifyOnce();
     }
   }
 
   return true;
+}
+
+function applyBodyScroll(store: Store, deltaRows: number): boolean {
+  const before = store.get(bodyScrollOffsetRowsAtom);
+  store.set(scrollBodyByRowsAtom, deltaRows);
+  return store.get(bodyScrollOffsetRowsAtom) !== before;
+}
+
+function applyComposerScroll(store: Store, deltaRows: number): boolean {
+  const before = store.get(composerScrollOffsetRowsAtom);
+  store.set(scrollComposerByRowsAtom, deltaRows);
+  return store.get(composerScrollOffsetRowsAtom) !== before;
 }

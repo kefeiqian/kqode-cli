@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PromptComposer } from '@components/PromptComposer/index.tsx';
 import { HIDE_CURSOR_SEQUENCE } from '@libs/terminal/cursorVisibility.ts';
 import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/dimensions.ts';
+import { caretSuppressedWhileScrollingAtom } from '@state/ui/composer/index.ts';
 import {
   BACKEND_LOADING_HINT,
   gitStatusLabelAtom,
@@ -90,6 +91,29 @@ describe('PromptComposer caret while input is locked (backend loading)', () => {
       expect(stdoutWriteSpy).toHaveBeenCalledWith(HIDE_CURSOR_SEQUENCE);
     });
     expect(everyCursorCallUndefined()).toBe(true);
+
+    unmount();
+  });
+});
+
+describe('PromptComposer caret while body scrolling is active', () => {
+  beforeEach(() => {
+    setCursorPositionSpy.mockClear();
+    stdoutWriteSpy.mockClear();
+  });
+
+  it('sets no caret position and explicitly hides the terminal cursor', async () => {
+    const store = makeStore();
+    store.set(caretSuppressedWhileScrollingAtom, true);
+
+    const { unmount } = renderWithJotai(<PromptComposer />, store);
+    await flushInput();
+
+    expect(setCursorPositionSpy.mock.calls.length).toBeGreaterThan(0);
+    expect(everyCursorCallUndefined()).toBe(true);
+    await vi.waitFor(() => {
+      expect(stdoutWriteSpy).toHaveBeenCalledWith(HIDE_CURSOR_SEQUENCE);
+    });
 
     unmount();
   });
