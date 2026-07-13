@@ -3,7 +3,7 @@ import { useAtomValue } from 'jotai';
 import { LOWER_HALF_BLOCK, UPPER_HALF_BLOCK } from '@libs/tui/backgroundBlock.ts';
 import { PROMPT_PREFIX } from '@constants/ui.ts';
 import { formatValidationError } from '@components/PromptComposer/promptTextView.ts';
-import { padEndToWidth } from '@libs/text/displayWidth.ts';
+import { displayWidth } from '@libs/text/displayWidth.ts';
 import { activeThemeAtom } from '@state/global/index.ts';
 import type { ThemeDefinition } from '@theme/themeConfig.ts';
 
@@ -60,7 +60,11 @@ function ComposerTextRow({
 }) {
   const prefix = promptPrefixForRow(rowIndex);
   const rowColumns = Math.max(0, columns - prefix.length);
+  const rowSegments = shouldRenderBackground
+    ? resolveComposerTextSegments(row, rowColumns)
+    : { text: row, padding: '' };
   const theme = useAtomValue(activeThemeAtom);
+  const rowBackgroundColor = backgroundColor(shouldRenderBackground, theme);
 
   return (
     // Pin the row to the safe content width. Without an explicit width Ink's
@@ -70,21 +74,34 @@ function ComposerTextRow({
     // composer's right edge on the initial paint until the first keystroke's
     // incremental `ESC[K` erases it. Pinning the width keeps every composer row
     // at the safe width so the reserved column stays a background gutter.
-    <Box backgroundColor={backgroundColor(shouldRenderBackground, theme)} width={columns}>
+    <Box backgroundColor={rowBackgroundColor} width={columns}>
       <Text
-        backgroundColor={backgroundColor(shouldRenderBackground, theme)}
+        backgroundColor={rowBackgroundColor}
         color={rowIndex === 0 ? theme.colors.accentBlue : theme.colors.foreground}
       >
         {prefix}
       </Text>
       <Text
-        backgroundColor={backgroundColor(shouldRenderBackground, theme)}
+        backgroundColor={rowBackgroundColor}
         color={theme.colors.foreground}
       >
-        {shouldRenderBackground ? padEndToWidth(row, rowColumns) : row}
+        {rowSegments.text}
       </Text>
+      {rowSegments.padding.length === 0 ? null : (
+        <Text backgroundColor={rowBackgroundColor}>{rowSegments.padding}</Text>
+      )}
     </Box>
   );
+}
+
+export function resolveComposerTextSegments(
+  row: string,
+  rowColumns: number
+): { text: string; padding: string } {
+  // Keep authored trailing spaces in their own styled segment so typing a space
+  // changes the Ink frame instead of falling into the cursor-only update path.
+  const paddingColumns = Math.max(0, rowColumns - displayWidth(row));
+  return { text: row, padding: ' '.repeat(paddingColumns) };
 }
 
 function ComposerHalfLine({ glyph, columns }: { glyph: string; columns: number }) {
