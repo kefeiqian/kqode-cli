@@ -1,6 +1,7 @@
 use crate::commands::CommandSpec;
 
 pub mod dev;
+pub mod dev_here;
 pub mod install;
 pub mod prod;
 pub mod test;
@@ -10,6 +11,12 @@ pub const DEV: CommandSpec = CommandSpec {
     name: "tui-dev",
     description: "Run the TUI from the workspace, choosing a fixture if missing",
     run: dev::run,
+};
+
+pub const DEV_HERE: CommandSpec = CommandSpec {
+    name: "tui-dev-here",
+    description: "Run the TUI from source against the current terminal directory",
+    run: dev_here::run,
 };
 
 pub const PROD: CommandSpec = CommandSpec {
@@ -36,4 +43,4 @@ pub const TEST: CommandSpec = CommandSpec {
     run: test::run,
 };
 
-pub const COMMANDS: &[CommandSpec] = &[DEV, PROD, INSTALL, TYPECHECK, TEST];
+pub const COMMANDS: &[CommandSpec] = &[DEV, DEV_HERE, PROD, INSTALL, TYPECHECK, TEST];

@@ -22,6 +22,7 @@
 .EXAMPLE
     ./scripts/xtask.ps1 blog-serve
     ./scripts/xtask.ps1 tui-dev
+    C:\path\to\KQode\scripts\xtask.ps1 tui-dev-here  # from another project cwd
 #>
 $ErrorActionPreference = 'Stop'
 

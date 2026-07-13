@@ -70,6 +70,7 @@ cargo xtask tui-install    # install nested TUI dependencies
 cargo xtask tui-typecheck  # type-check the TUI (tsc --noEmit)
 cargo xtask tui-test       # run TUI tests (vitest)
 cargo xtask tui-dev        # run the TUI from a throwaway fixture workspace
+cargo xtask tui-dev-here   # run the TUI from source against the current cwd
 ```
 
 ### Documentation site
@@ -89,9 +90,10 @@ cargo xtask blog-preview
 private `target\xtask` directory, separate from the workspace `target\`, so a
 fast command never relinks a binary another process is holding. Run fast
 commands normally, including in parallel. The long-running servers
-(`blog-serve`, `blog-serve-en`, `blog-preview`, `tui-dev`, `tui-prod`) hold the
-binary for their whole session, so run those through the launcher, which builds
-once and then runs a per-invocation copy that leaves the canonical binary free:
+(`blog-serve`, `blog-serve-en`, `blog-preview`, `tui-dev`, `tui-dev-here`,
+`tui-prod`) hold the binary for their whole session, so run those through the
+launcher, which builds once and then runs a per-invocation copy that leaves the
+canonical binary free:
 
 ```powershell
 ./scripts/xtask.ps1 blog-serve   # Windows (PowerShell)

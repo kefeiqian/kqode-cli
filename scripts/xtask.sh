@@ -17,6 +17,7 @@
 # Usage:
 #   ./scripts/xtask.sh blog-serve
 #   ./scripts/xtask.sh tui-dev
+#   /path/to/KQode/scripts/xtask.sh tui-dev-here  # from another project cwd
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

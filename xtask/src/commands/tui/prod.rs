@@ -19,7 +19,7 @@ use crate::{
 /// Returns an error when the workspace cannot be prepared, packaging fails, the
 /// built executable is missing, or it exits non-zero.
 pub fn run(repo_root: &Path) -> Result<(), String> {
-    dev::ensure_workspace(repo_root)?;
+    let workspace = dev::ensure_workspace(repo_root)?;
     package::run(repo_root)?;
 
     let exe = paths::tui_packaged_exe(repo_root);
@@ -30,7 +30,6 @@ pub fn run(repo_root: &Path) -> Result<(), String> {
         ));
     }
 
-    let workspace = paths::workspace(repo_root);
     let status = Command::new(&exe)
         .current_dir(&workspace)
         .status()

@@ -105,10 +105,14 @@ cargo xtask tui-install    # install nested TUI dependencies
 cargo xtask tui-typecheck  # type-check the TUI (tsc --noEmit)
 cargo xtask tui-test       # run TUI tests (vitest)
 cargo xtask tui-dev        # run the TUI from a throwaway fixture workspace
+cargo xtask tui-dev-here   # run the TUI from source against the current cwd
 ```
 
 `cargo xtask tui-dev` runs the Ink TUI against a copied fixture workspace, so the
 displayed working directory is a realistic project rather than the KQode repo.
+When dogfooding against an existing checkout, run
+`/path/to/KQode/scripts/xtask.sh tui-dev-here` from that checkout so source mode
+uses the terminal's current directory, matching the packaged `kqode` executable.
 Today the TUI talks to a local Rust JSON-RPC backend that acknowledges each
 submitted prompt and now persists local resumable session history and durable
 local memory under `~/.kqode/`; `/help`, `/clear`, `/login`, `/model`,
