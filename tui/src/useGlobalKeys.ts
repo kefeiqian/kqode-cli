@@ -8,12 +8,22 @@ import {
   isSelectionCopyShortcut
 } from '@libs/keyboard/clipboardShortcuts.ts';
 import { isMouseInput } from '@libs/terminal/mouse.ts';
-import { armedActionAtom, bodySelectionAtom, clearBodySelectionAtom } from '@state/ui/index.ts';
+import {
+  activeSurfaceAtom,
+  armedActionAtom,
+  bodySelectionAtom,
+  clearBodySelectionAtom,
+  Surface,
+  terminalTooSmallAtom
+} from '@state/ui/index.ts';
+import { clearComposerAtom, composerStateAtom } from '@state/ui/composer/index.ts';
 
 /**
  * Global key handling that stays active in every state — the home screen, the
- * too-small notice, and while composer input is locked. Owns Ctrl+C as a
- * two-step exit: the first press arms `'exit'` (the status bar shows the hint),
+ * too-small notice, and while composer input is locked. Owns Ctrl+C: on the home
+ * screen a first press with composer text clears the composer (empty the input
+ * line first, matching the common terminal convention); otherwise it is a
+ * two-step exit — the first press arms `'exit'` (the status bar shows the hint),
  * the second calls Ink's `exit`, which runs the same teardown as `/exit`.
  * Any non-Ctrl+C key except Esc disarms a pending exit globally, so the arm
  * cannot persist across help or too-small screens where the composer is absent.
@@ -83,8 +93,25 @@ export function useGlobalKeys(): void {
     if (armedAction === ArmedAction.Exit) {
       store.set(armedActionAtom, null);
       exit();
-    } else {
-      store.set(armedActionAtom, ArmedAction.Exit);
+      return;
     }
+
+    // First Ctrl+C clears a non-empty composer instead of arming exit, matching
+    // the common terminal convention (empty the input line first, then two-step
+    // exit). Scoped to the home screen composer being the active editable
+    // surface: a docked command surface leaves the composer empty and the
+    // too-small notice unmounts it, so those states keep pure exit arming. Any
+    // pending Esc clear-input arm is dropped so its status hint clears too.
+    const composerIsActiveInputSurface =
+      store.get(activeSurfaceAtom) === Surface.Home && !store.get(terminalTooSmallAtom);
+    if (composerIsActiveInputSurface && store.get(composerStateAtom).text.length > 0) {
+      store.set(clearComposerAtom);
+      if (armedAction !== null) {
+        store.set(armedActionAtom, null);
+      }
+      return;
+    }
+
+    store.set(armedActionAtom, ArmedAction.Exit);
   });
 }

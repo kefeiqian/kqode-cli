@@ -156,6 +156,58 @@ describe('App', () => {
     expect(store.get(armedActionAtom)).toBeNull();
   });
 
+  it('clears the composer on the first Ctrl+C when it has content instead of arming exit', async () => {
+    const { store, lastFrame, stdin } = renderApp({ columns: 100, rows: 20 });
+    await flushInput();
+
+    stdin.write('draft prompt');
+    await flushInput();
+    expect(store.get(composerStateAtom).text).toBe('draft prompt');
+
+    stdin.write('\u0003');
+    await flushInput();
+
+    expect(store.get(composerStateAtom).text).toBe('');
+    expect(store.get(armedActionAtom)).toBeNull();
+    expect(lastFrame() ?? '').not.toContain('ctrl+c again to exit');
+  });
+
+  it('arms exit on the next Ctrl+C once the composer has been cleared', async () => {
+    const { store, stdin } = renderApp({ columns: 100, rows: 20 });
+    await flushInput();
+
+    stdin.write('draft prompt');
+    await flushInput();
+
+    stdin.write('\u0003');
+    await flushInput();
+    expect(store.get(composerStateAtom).text).toBe('');
+    expect(store.get(armedActionAtom)).toBeNull();
+
+    stdin.write('\u0003');
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBe(ArmedAction.Exit);
+  });
+
+  it('clears a pending Esc input-clear arm when Ctrl+C clears the composer', async () => {
+    const { store, stdin } = renderApp({ columns: 100, rows: 20 });
+    await flushInput();
+
+    stdin.write('draft prompt');
+    await flushInput();
+
+    stdin.write('\u001B'); // Esc arms clear-input while the composer has text
+    // Ink debounces a lone ESC to disambiguate escape sequences, so wait past
+    // that window (flushInput alone is too short) before asserting the arm.
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(store.get(armedActionAtom)).toBe(ArmedAction.ClearInput);
+
+    stdin.write('\u0003'); // Ctrl+C clears the composer and disarms
+    await flushInput();
+    expect(store.get(composerStateAtom).text).toBe('');
+    expect(store.get(armedActionAtom)).toBeNull();
+  });
+
   it('keeps a pending Ctrl+C exit armed when only Ctrl is pressed', async () => {
     const { store, stdin } = renderApp({ columns: 100, rows: 20 });
     await flushInput();
@@ -256,7 +308,11 @@ describe('App', () => {
   });
 
   it('disarms a pending Ctrl+C exit on another key outside the home screen', async () => {
-    const { store, stdin, stdout } = renderApp({ columns: 100, rows: 20 });
+    // No rows override, so the resize below genuinely drops the app into the
+    // too-small notice (the composer unmounts). With a rows override,
+    // terminalTooSmallAtom reads it first and the app would stay on the home
+    // screen, where a first Ctrl+C now clears the composer instead of arming.
+    const { store, stdin, stdout } = renderApp({ columns: 100 });
     await flushInput();
 
     stdin.write('\u0003');
