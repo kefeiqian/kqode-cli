@@ -35,6 +35,7 @@ function renderApp(backendClient: Partial<BackendClient>, columns = 80, rows = 4
     onTranscriptEvent: () => () => {},
     clearConversation: async () => undefined,
     cancelTurn: async () => undefined,
+    stopTurn: async () => undefined,
     gitStatus: async () => null,
     listProviders: async () => ({ providers: [] }),
     getActiveSelection: async () => ({ providerId: null, modelId: null }),

@@ -28,7 +28,9 @@ import {
   backendReadyNotification,
   tokenDeltaNotification,
   turnCancelRequest,
-  turnSettledNotification
+  turnRemovedNotification,
+  turnSettledNotification,
+  turnStopRequest
 } from '@backend/protocol/messageProtocol.ts';
 import {
   sessionListRequest,
@@ -318,6 +320,30 @@ describe('createBackendClient (fake backend)', () => {
       turnId: 'turn-1',
       result: { kind: SETTLED_KIND_CANCELLED }
     });
+    client.dispose();
+  });
+
+  it('sends stopTurn and delivers a removed event for a dropped pending prompt', async () => {
+    const fake = makeFakeBackend((server) => {
+      server.onRequest(turnStopRequest, () => {
+        queueMicrotask(
+          () => void server.sendNotification(turnRemovedNotification, { turnId: 'queued-1' })
+        );
+        return { ok: true };
+      });
+    });
+    const client = createBackendClient({ launch: async () => fake.launched });
+    const removed = new Promise((resolve) =>
+      client.onTranscriptEvent((event) => {
+        if (event.type === 'removed') {
+          resolve(event);
+        }
+      })
+    );
+
+    await client.stopTurn();
+
+    await expect(removed).resolves.toMatchObject({ type: 'removed', turnId: 'queued-1' });
     client.dispose();
   });
 

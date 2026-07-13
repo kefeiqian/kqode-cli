@@ -32,6 +32,7 @@ export function baseClient(): BackendClient {
     onTranscriptEvent: () => () => undefined,
     clearConversation: vi.fn(async () => undefined),
     cancelTurn: vi.fn(async () => undefined),
+    stopTurn: vi.fn(async () => undefined),
     gitStatus: vi.fn(async () => null),
     listProviders: vi.fn(async () => ({ providers: [] })),
     getActiveSelection: vi.fn(async () => ({ providerId: null, modelId: null })),

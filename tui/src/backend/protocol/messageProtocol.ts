@@ -10,7 +10,9 @@ import {
   TURN_ACTIVATED_METHOD,
   TURN_CANCEL_METHOD,
   TURN_ENQUEUED_METHOD,
-  TURN_SETTLED_METHOD
+  TURN_REMOVED_METHOD,
+  TURN_SETTLED_METHOD,
+  TURN_STOP_METHOD
 } from '@contracts/backend/index.ts';
 import type {
   ActivatedParams,
@@ -25,7 +27,10 @@ import type {
   SettledParams,
   TokenDeltaParams,
   TurnCancelParams,
-  TurnCancelResult
+  TurnCancelResult,
+  TurnRemovedParams,
+  TurnStopParams,
+  TurnStopResult
 } from '@contracts/backend/index.ts';
 
 /**
@@ -47,6 +52,17 @@ export const conversationClearRequest = new RequestType0<ConversationClearResult
 /** Typed request descriptor for `kqode.turn.cancel`. */
 export const turnCancelRequest = new RequestType<TurnCancelParams, TurnCancelResult, void>(
   TURN_CANCEL_METHOD
+);
+
+/**
+ * Typed request descriptor for `kqode.turn.stop`.
+ *
+ * Carries an empty params object (not parameterless) so the Rust handler's
+ * `deny_unknown_fields` validation of `TurnStopParams` receives `{}` rather than
+ * a null params value.
+ */
+export const turnStopRequest = new RequestType<TurnStopParams, TurnStopResult, void>(
+  TURN_STOP_METHOD
 );
 
 /**
@@ -84,6 +100,9 @@ export const turnActivatedNotification = new NotificationType<ActivatedParams>(
 
 /** Unified terminal result notification for a turn. */
 export const turnSettledNotification = new NotificationType<SettledParams>(TURN_SETTLED_METHOD);
+
+/** Notification emitted once per pending turn dropped by a stop. */
+export const turnRemovedNotification = new NotificationType<TurnRemovedParams>(TURN_REMOVED_METHOD);
 
 /** Toggles the "Auto compacting…" status while a turn's hidden compaction runs. */
 export const compactionStatusNotification = new NotificationType<CompactionStatusParams>(

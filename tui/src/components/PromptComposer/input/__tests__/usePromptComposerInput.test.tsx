@@ -44,6 +44,7 @@ function clientWithCancel(cancelTurn: BackendClient['cancelTurn']): BackendClien
     onTranscriptEvent: () => () => undefined,
     clearConversation: async () => undefined,
     cancelTurn,
+    stopTurn: async () => undefined,
     gitStatus: async () => null,
     listProviders: async () => ({ providers: [] }),
     getActiveSelection: async () => ({ providerId: null, modelId: null }),

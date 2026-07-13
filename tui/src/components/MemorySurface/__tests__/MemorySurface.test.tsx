@@ -61,6 +61,7 @@ function fakeClient(memory: { items?: MemoryItem[]; inbox?: MemoryInboxEntry[]; 
     onTranscriptEvent: () => () => undefined,
     clearConversation: async () => undefined,
     cancelTurn: async () => undefined,
+    stopTurn: async () => undefined,
     gitStatus: async () => null,
     listProviders: async () => ({ providers: [] }),
     getActiveSelection: async () => ({ providerId: null, modelId: null }),

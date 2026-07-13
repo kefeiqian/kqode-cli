@@ -75,6 +75,7 @@ export type TranscriptEvent =
   | { type: 'activated'; turnId: string }
   | { type: 'tokenDelta'; turnId: string; delta: string }
   | { type: 'settled'; turnId: string; result: TurnResult }
+  | { type: 'removed'; turnId: string }
   | { type: 'compactionStatus'; turnId: string; active: boolean }
   | { type: 'sessionSummaryUpdated'; sessionId: string; summary: string };
 
@@ -89,6 +90,12 @@ export type BackendClient = {
   onTranscriptEvent(handler: (event: TranscriptEvent) => void): () => void;
   clearConversation(): Promise<void>;
   cancelTurn(turnId: string): Promise<void>;
+  /**
+   * Stops the running turn and clears every pending queued prompt, landing the
+   * session idle. Takes no turn id: it targets whatever is active plus the whole
+   * pending queue. Dropped pending prompts arrive as `removed` transcript events.
+   */
+  stopTurn(): Promise<void>;
   /**
    * Fetches the workspace git status label (e.g. `⎇ main*`), or `null` when the
    * workspace is not a git repository or `git` could not be queried. Rejects

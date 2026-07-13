@@ -225,6 +225,8 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
       void (await withClient((client) => client.clearConversation())),
     cancelTurn: async (turnId: string): Promise<void> =>
       void (await withClient((client) => client.cancelTurn(turnId))),
+    stopTurn: async (): Promise<void> =>
+      void (await withClient((client) => client.stopTurn())),
     gitStatus: (): Promise<string | null> => withClient((client) => client.gitStatus()),
     listProviders: (): Promise<ProviderListResult> => withClient((client) => client.listProviders()),
     getActiveSelection: (): Promise<ActiveSelectionResult> =>

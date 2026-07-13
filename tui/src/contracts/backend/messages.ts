@@ -20,6 +20,9 @@ export const CONVERSATION_CLEAR_METHOD = 'kqode.conversation.clear';
 /** Must match `RpcMethod::TurnCancel` (via `RpcMethod::as_str`) in `src/protocol.rs`. */
 export const TURN_CANCEL_METHOD = 'kqode.turn.cancel';
 
+/** Must match `RpcMethod::TurnStop` (via `RpcMethod::as_str`) in `src/protocol.rs`. */
+export const TURN_STOP_METHOD = 'kqode.turn.stop';
+
 /**
  * KQode-owned JSON-RPC method returning the workspace git status label.
  *
@@ -62,6 +65,9 @@ export const TURN_ACTIVATED_METHOD = 'kqode/turnActivated';
 
 /** Must match `TURN_SETTLED_METHOD` in `src/protocol.rs`. */
 export const TURN_SETTLED_METHOD = 'kqode/turnSettled';
+
+/** Must match `TURN_REMOVED_METHOD` in `src/protocol.rs`. */
+export const TURN_REMOVED_METHOD = 'kqode/turnRemoved';
 
 /** Must match `COMPACTION_STATUS_METHOD` in `src/protocol.rs`. */
 export const COMPACTION_STATUS_METHOD = 'kqode/compactionStatus';
@@ -138,6 +144,14 @@ export type TurnCancelResult = {
   ok: boolean;
 };
 
+/** Must match `TurnStopParams` in `src/protocol.rs` (empty, like clear). */
+export type TurnStopParams = Record<string, never>;
+
+/** Must match `TurnStopResult` in `src/protocol.rs`. */
+export type TurnStopResult = {
+  ok: boolean;
+};
+
 /** Payload for {@link TOKEN_DELTA_METHOD}. */
 export type TokenDeltaParams = {
   turnId: string;
@@ -153,6 +167,11 @@ export type EnqueuedParams = {
 
 /** Payload for {@link TURN_ACTIVATED_METHOD}. Must match `ActivatedParams` in `src/protocol.rs`. */
 export type ActivatedParams = {
+  turnId: string;
+};
+
+/** Payload for {@link TURN_REMOVED_METHOD}. Must match `TurnRemovedParams` in `src/protocol.rs`. */
+export type TurnRemovedParams = {
   turnId: string;
 };
 

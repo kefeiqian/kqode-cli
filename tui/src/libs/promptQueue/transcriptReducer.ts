@@ -31,6 +31,11 @@ export function reduceTranscriptEvent(
   if (state.settledTurnIds.has(event.turnId)) {
     return { state };
   }
+  if (event.type === 'removed') {
+    // Handled before `ensureTurn` so an unknown turnId is a clean no-op rather
+    // than creating then immediately dropping a phantom queue item.
+    return { state: removeTurn(state, event.turnId) };
+  }
   const stamped = stampTurnGeneration(state, event.turnId, currentGeneration);
   if (stamped === undefined) {
     return { state };
@@ -147,6 +152,23 @@ function settleTurn(
   // message; it must not hijack the screen by opening /model. The user decides
   // whether to run /connect or /model.
   return { state: nextState };
+}
+
+function removeTurn(state: TranscriptReducerState, turnId: string): TranscriptReducerState {
+  const item = state.queue.find((candidate) => candidate.turnId === turnId);
+  if (item === undefined) {
+    return state;
+  }
+  const settledTurnIds = new Set(state.settledTurnIds);
+  settledTurnIds.add(turnId);
+  const streamingTextById = new Map(state.streamingTextById);
+  streamingTextById.delete(item.id);
+  return {
+    ...state,
+    settledTurnIds,
+    streamingTextById,
+    queue: state.queue.filter((candidate) => candidate.turnId !== turnId)
+  };
 }
 
 function updateTurn(

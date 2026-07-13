@@ -54,6 +54,7 @@ export function fakeClient(options: {
     onTranscriptEvent: () => () => undefined,
     clearConversation: async () => undefined,
     cancelTurn: async () => undefined,
+    stopTurn: async () => undefined,
     gitStatus: vi.fn(async () => null),
     listProviders: vi.fn(async () => ({
       providers: providerBatches[Math.min(listIndex++, providerBatches.length - 1)] ?? []

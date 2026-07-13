@@ -131,4 +131,44 @@ describe('reduceTranscriptEvent', () => {
     });
     expect(result.effect).toBeUndefined();
   });
+
+  it('removes a queued item on a removed event and keeps the active turn', () => {
+    const withQueued: TranscriptReducerState = {
+      ...base(),
+      queue: [
+        { id: 0, turnId: 'turn-1', text: 'hello', state: 'active' },
+        { id: 1, turnId: 'turn-2', text: 'queued', state: 'queued' }
+      ],
+      nextQueueItemId: 2
+    };
+    const state = reduceTranscriptEvent(withQueued, { type: 'removed', turnId: 'turn-2' }, 0).state;
+
+    expect(state.queue).toHaveLength(1);
+    expect(state.queue[0]).toMatchObject({ turnId: 'turn-1', state: 'active' });
+    expect(state.settledTurnIds.has('turn-2')).toBe(true);
+  });
+
+  it('ignores a late event for a removed turn (no resurrection)', () => {
+    const withQueued: TranscriptReducerState = {
+      ...base(),
+      queue: [
+        { id: 0, turnId: 'turn-1', text: 'hello', state: 'active' },
+        { id: 1, turnId: 'turn-2', text: 'queued', state: 'queued' }
+      ],
+      nextQueueItemId: 2
+    };
+    let state = reduceTranscriptEvent(withQueued, { type: 'removed', turnId: 'turn-2' }, 0).state;
+    state = reduceTranscriptEvent(state, { type: 'activated', turnId: 'turn-2' }, 0).state;
+
+    expect(state.queue.some((item) => item.turnId === 'turn-2')).toBe(false);
+  });
+
+  it('is a no-op for an unknown removed turnId (no phantom item)', () => {
+    const state = reduceTranscriptEvent(base(), { type: 'removed', turnId: 'ghost' }, 0).state;
+
+    expect(state.queue).toHaveLength(1);
+    expect(state.queue[0]?.turnId).toBe('turn-1');
+    expect(state.nextQueueItemId).toBe(1);
+    expect(state.settledTurnIds.has('ghost')).toBe(false);
+  });
 });

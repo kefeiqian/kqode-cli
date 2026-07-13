@@ -14,6 +14,7 @@ function clientWithGitStatus(gitStatus: BackendClient['gitStatus']): BackendClie
     onTranscriptEvent: () => () => undefined,
     clearConversation: async () => undefined,
     cancelTurn: async () => undefined,
+    stopTurn: async () => undefined,
     gitStatus,
     listProviders: async () => ({ providers: [] }),
     getActiveSelection: async () => ({ providerId: null, modelId: null }),

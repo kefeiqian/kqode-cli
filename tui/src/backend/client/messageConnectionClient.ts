@@ -15,7 +15,9 @@ import {
   turnActivatedNotification,
   turnCancelRequest,
   turnEnqueuedNotification,
-  turnSettledNotification
+  turnRemovedNotification,
+  turnSettledNotification,
+  turnStopRequest
 } from '@backend/protocol/messageProtocol.ts';
 import {
   providerClearKeyRequest,
@@ -66,7 +68,7 @@ export function createMessageConnectionClient(
   const handlers = new Set<(event: TranscriptEvent) => void>();
   const inFlightTurnIds = new Set<string>();
   const emit = (event: TranscriptEvent): void => {
-    if (event.type === 'settled') {
+    if (event.type === 'settled' || event.type === 'removed') {
       inFlightTurnIds.delete(event.turnId);
     }
     for (const handler of handlers) {
@@ -84,6 +86,9 @@ export function createMessageConnectionClient(
   );
   connection.onNotification(turnSettledNotification, (event) =>
     emit({ type: 'settled', ...event })
+  );
+  connection.onNotification(turnRemovedNotification, (event) =>
+    emit({ type: 'removed', ...event })
   );
   connection.onNotification(compactionStatusNotification, (event) =>
     emit({ type: 'compactionStatus', ...event })
@@ -127,6 +132,9 @@ export function createMessageConnectionClient(
     },
     async cancelTurn(turnId: string): Promise<void> {
       await okRequest(connection.sendRequest(turnCancelRequest, { turnId }), requestTimeoutMs);
+    },
+    async stopTurn(): Promise<void> {
+      await okRequest(connection.sendRequest(turnStopRequest, {}), requestTimeoutMs);
     },
     async gitStatus(): Promise<string | null> {
       const result = await request(connection.sendRequest(gitStatusRequest), requestTimeoutMs);

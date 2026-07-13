@@ -42,6 +42,7 @@ export function fakeClient(options: {
     onTranscriptEvent: () => () => undefined,
     clearConversation: async () => undefined,
     cancelTurn: async () => undefined,
+    stopTurn: async () => undefined,
     gitStatus: vi.fn(async () => null),
     listProviders: vi.fn(async () => ({ providers: options.providers })),
     getActiveSelection: vi.fn(async () => options.active ?? { providerId: null, modelId: null }),
