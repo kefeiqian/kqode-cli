@@ -1,5 +1,6 @@
 use crate::commands::CommandSpec;
 
+mod args;
 pub mod dev;
 pub mod dev_here;
 pub mod install;
@@ -9,19 +10,19 @@ pub mod typecheck;
 
 pub const DEV: CommandSpec = CommandSpec {
     name: "tui-dev",
-    description: "Run the TUI from the workspace, choosing a fixture if missing",
+    description: "Run the TUI from the workspace, forwarding TUI args",
     run: dev::run,
 };
 
 pub const DEV_HERE: CommandSpec = CommandSpec {
     name: "tui-dev-here",
-    description: "Run the TUI from source against the current terminal directory",
+    description: "Run the TUI from source against the current directory, forwarding TUI args",
     run: dev_here::run,
 };
 
 pub const PROD: CommandSpec = CommandSpec {
     name: "tui-prod",
-    description: "Package the standalone kqode executable and run it from the workspace",
+    description: "Package the standalone kqode executable, then run it with TUI args",
     run: prod::run,
 };
 

@@ -5,13 +5,16 @@ use std::{
 };
 
 use crate::{
-    commands::{CommandSpec, fixture},
+    commands::{
+        CommandSpec, fixture,
+        tui::args::{forwarded_tui_args, source_tui_args},
+    },
     support::{bun, paths},
 };
 
 pub fn run(repo_root: &Path) -> Result<(), String> {
     let workspace = ensure_workspace(repo_root)?;
-    run_with_workspace(repo_root, &workspace)
+    run_with_workspace(repo_root, &workspace, forwarded_tui_args())
 }
 
 /// Runs the source TUI with `workspace` as the application working directory.
@@ -25,13 +28,15 @@ pub fn run(repo_root: &Path) -> Result<(), String> {
 ///
 /// Returns an error when dependencies cannot be installed, `tsx` cannot be
 /// started, or the TUI exits unsuccessfully.
-pub(crate) fn run_with_workspace(repo_root: &Path, workspace: &Path) -> Result<(), String> {
+pub(crate) fn run_with_workspace(
+    repo_root: &Path,
+    workspace: &Path,
+    forwarded_args: impl IntoIterator<Item = std::ffi::OsString>,
+) -> Result<(), String> {
     bun::ensure_tui_dependencies(repo_root)?;
 
     let status = Command::new(paths::tui_bin(repo_root, "tsx"))
-        .arg("--tsconfig")
-        .arg(paths::tui_tsconfig(repo_root))
-        .arg(paths::tui_entrypoint(repo_root))
+        .args(source_tui_args(repo_root, forwarded_args))
         .current_dir(workspace)
         .status()
         .map_err(|error| format!("run TUI dev command: {error}"))?;

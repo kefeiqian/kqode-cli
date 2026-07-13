@@ -1,6 +1,6 @@
 use std::{env, path::Path};
 
-use crate::commands::tui::dev;
+use crate::commands::tui::{args::forwarded_tui_args, dev};
 
 /// Runs the source TUI against the terminal's current working directory.
 ///
@@ -20,5 +20,5 @@ pub fn run(repo_root: &Path) -> Result<(), String> {
         "using current directory as TUI workspace: {}",
         workspace.display()
     );
-    dev::run_with_workspace(repo_root, &workspace)
+    dev::run_with_workspace(repo_root, &workspace, forwarded_tui_args())
 }

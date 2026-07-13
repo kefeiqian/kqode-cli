@@ -1,7 +1,10 @@
 use std::{path::Path, process::Command};
 
 use crate::{
-    commands::{package, tui::dev},
+    commands::{
+        package,
+        tui::{args::forwarded_tui_args, dev},
+    },
     support::paths,
 };
 
@@ -31,6 +34,7 @@ pub fn run(repo_root: &Path) -> Result<(), String> {
     }
 
     let status = Command::new(&exe)
+        .args(forwarded_tui_args())
         .current_dir(&workspace)
         .status()
         .map_err(|error| format!("run packaged executable {}: {error}", exe.display()))?;
