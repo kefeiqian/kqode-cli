@@ -22,6 +22,24 @@ Two tiers:
 
 Baseline runs are written under a stable `~/.kqode/eval/baseline/` directory.
 
+## Benchmarks
+
+KQode currently records two EvalPlus Python code-generation benchmarks:
+
+- **HumanEval+** — the EvalPlus-augmented version of OpenAI HumanEval. It grades
+  164 function-completion problems where the model must write a Python function
+  from a signature, docstring, and examples. It is a compact signal for
+  algorithmic correctness and edge-case handling.
+- **MBPP+** — the EvalPlus-augmented version of Mostly Basic Python Problems.
+  It grades 378 short Python programming tasks in this harness, covering a
+  broader spread of everyday list, string, math, and data-structure exercises.
+  It complements HumanEval+ with more varied, beginner-to-intermediate tasks.
+
+For both benchmarks, EvalPlus reports the original test-suite score as `base`
+and the stricter augmented-test score as `plus`. KQode treats `pass@1 (plus)` as
+the primary baseline signal because it catches solutions that only satisfy the
+original examples or under-specified edge cases.
+
 ## How to reproduce
 
 ```bash
