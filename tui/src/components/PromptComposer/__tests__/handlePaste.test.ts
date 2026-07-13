@@ -74,6 +74,16 @@ describe('handlePaste', () => {
     expect(store.get(composerStateAtom).text).toBe('alt');
   });
 
+  it('reads and inserts clipboard text for forwarded Command+V', async () => {
+    const store = createStore();
+    store.set(clipboardClientAtom, { readText: vi.fn().mockResolvedValue('cmd'), writeText: vi.fn() });
+
+    expect(handlePaste(context(store, 'v', { super: true }))).toBe(process.platform === 'darwin');
+    await flushPromises();
+
+    expect(store.get(composerStateAtom).text).toBe(process.platform === 'darwin' ? 'cmd' : '');
+  });
+
   it('ignores repeat paste shortcuts while a read is in flight', async () => {
     const store = createStore();
     let resolveRead: (text: string) => void = () => undefined;
@@ -104,11 +114,12 @@ describe('handlePaste', () => {
     expect(store.get(transientStatusHintAtom)?.text).toBe(PASTE_FAILED_HINT);
   });
 
-  it('keeps Ctrl+V, Alt+V, and Ctrl+R out of text editing', () => {
+  it('keeps modified clipboard shortcuts out of text editing', () => {
     const store = createStore();
 
     expect(handleTextEdit(context(store, 'v', { ctrl: true }))).toBe(false);
     expect(handleTextEdit(context(store, 'v', { meta: true }))).toBe(false);
+    expect(handleTextEdit(context(store, 'c', { super: true }))).toBe(false);
     expect(handleTextEdit(context(store, 'r', { ctrl: true }))).toBe(false);
 
     expect(store.get(composerStateAtom).text).toBe('');

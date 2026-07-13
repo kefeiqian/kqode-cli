@@ -27,7 +27,7 @@ export const handleTextEdit: ComposerKeyHandler = (context) => {
     return true;
   }
 
-  if (key.ctrl === true || key.meta === true) {
+  if (key.ctrl === true || key.meta === true || key.super === true) {
     return false;
   }
 

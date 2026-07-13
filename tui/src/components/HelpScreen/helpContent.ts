@@ -29,7 +29,7 @@ const KEYBINDING_SECTIONS: readonly HelpSection[] = [
     title: 'GLOBAL',
     entries: [
       { keys: '/', description: 'Open the command menu' },
-      { keys: 'ctrl+c ×2', description: 'Exit KQode' },
+      { keys: 'ctrl+c ×2', description: 'Exit KQode when no selection is active' },
       { keys: 'esc', description: 'Clear the prompt · close the command menu' }
     ]
   },
@@ -41,7 +41,7 @@ const KEYBINDING_SECTIONS: readonly HelpSection[] = [
       { keys: '\\ then enter', description: 'Insert a newline' },
       { keys: '← / →', description: 'Move the cursor' },
       { keys: 'backspace', description: 'Delete the previous visible character' },
-      { keys: 'ctrl+v / alt+v', description: 'Paste from the system clipboard' }
+      { keys: 'ctrl+v / alt+v / cmd+v', description: 'Paste from the system clipboard' }
     ]
   },
   {
@@ -54,8 +54,9 @@ const KEYBINDING_SECTIONS: readonly HelpSection[] = [
       { keys: 'drag', description: 'Select transcript text' },
       { keys: 'double-click', description: 'Select the word' },
       { keys: 'triple-click', description: 'Select the line' },
+      { keys: 'ctrl+c / cmd+c', description: 'Copy the selection, then dismiss it' },
       { keys: 'right-click', description: 'Copy the selection, then dismiss it' },
-      { keys: 'any key', description: 'Dismiss the highlight' },
+      { keys: 'other keys', description: 'Dismiss the highlight; scroll keys keep it' },
       { keys: 'shift+drag', description: 'Select with the terminal for native copy' }
     ]
   },

@@ -37,26 +37,23 @@ function renderApp({ columns, rows }: { columns?: number; rows?: number } = {}) 
   return { store, ...renderWithJotai(<App />, store) };
 }
 
-function deferredPromise<T>() {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  const promise = new Promise<T>((innerResolve) => {
-    resolve = innerResolve;
-  });
-  return { promise, resolve };
-}
+type AppStore = ReturnType<typeof createStore>;
 
-async function waitForFrame(
-  getFrame: () => string | undefined,
-  predicate: (frame: string) => boolean
-): Promise<string> {
-  for (let attempt = 0; attempt < 200; attempt += 1) {
-    const frame = getFrame() ?? '';
-    if (predicate(frame)) {
-      return frame;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 5));
+function seedSelectionClipboard(
+  store: AppStore,
+  selection: { anchorColumn: number; focusColumn: number } = {
+    anchorColumn: 0,
+    focusColumn: 4
   }
-  throw new Error(`timed out waiting for frame. Last frame:\n${getFrame() ?? ''}`);
+) {
+  const writeText = vi.fn().mockResolvedValue(true);
+  store.set(clipboardClientAtom, { readText: vi.fn(), writeText });
+  store.set(bodyEntriesAtom, [{ kind: BodyEntryKind.Success, text: 'copy this line' }]);
+  store.set(bodySelectionAtom, {
+    anchor: { rowIndex: 0, column: selection.anchorColumn },
+    focus: { rowIndex: 0, column: selection.focusColumn }
+  });
+  return writeText;
 }
 
 describe('App', () => {
@@ -159,26 +156,47 @@ describe('App', () => {
     expect(store.get(armedActionAtom)).toBeNull();
   });
 
-  it('clears an active selection and arms exit on the first Ctrl+C, exiting on the second', async () => {
+  it('copies an active selection on Ctrl+C without arming exit', async () => {
     const { store, stdin } = renderApp({ columns: 100, rows: 20 });
-    await flushInput();
-
-    store.set(bodySelectionAtom, {
-      anchor: { rowIndex: 0, column: 0 },
-      focus: { rowIndex: 0, column: 4 }
-    });
+    const writeText = seedSelectionClipboard(store);
     await flushInput();
 
     stdin.write('\u0003');
     await flushInput();
 
-    // One Ctrl+C both dismisses the highlight and arms the exit — dismissal is
-    // non-consuming, so the armed-exit logic still runs on the same press.
+    expect(writeText).toHaveBeenCalledWith('copy');
+    expect(store.get(bodySelectionAtom)).toBeNull();
+    expect(store.get(armedActionAtom)).toBeNull();
+  });
+
+  it('falls back to Ctrl+C exit when the active selection is collapsed', async () => {
+    const { store, stdin } = renderApp({ columns: 100, rows: 20 });
+    const writeText = seedSelectionClipboard(store, { anchorColumn: 2, focusColumn: 2 });
+    await flushInput();
+
+    stdin.write('\u0003');
+    await flushInput();
+
+    expect(writeText).not.toHaveBeenCalled();
     expect(store.get(bodySelectionAtom)).toBeNull();
     expect(store.get(armedActionAtom)).toBe(ArmedAction.Exit);
 
     stdin.write('\u0003');
     await flushInput();
+    expect(store.get(armedActionAtom)).toBeNull();
+  });
+
+  it('clears a pending input-clear arm when Ctrl+C copies a selection', async () => {
+    const { store, stdin } = renderApp({ columns: 100, rows: 20 });
+    const writeText = seedSelectionClipboard(store);
+    store.set(armedActionAtom, ArmedAction.ClearInput);
+    await flushInput();
+
+    stdin.write('\u0003');
+    await flushInput();
+
+    expect(writeText).toHaveBeenCalledWith('copy');
+    expect(store.get(bodySelectionAtom)).toBeNull();
     expect(store.get(armedActionAtom)).toBeNull();
   });
 

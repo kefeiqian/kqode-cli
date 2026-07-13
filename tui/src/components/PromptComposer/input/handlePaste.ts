@@ -1,15 +1,16 @@
 import type { ComposerKeyHandler } from '@components/PromptComposer/input/types.ts';
-import { PASTE_FAILED_HINT, PASTE_INPUT_KEY } from '@constants/ui.ts';
+import { PASTE_FAILED_HINT } from '@constants/ui.ts';
 import { clipboardClientAtom } from '@state/global/index.ts';
 import { setTransientStatusHintAtom } from '@state/ui/index.ts';
 import { insertComposerTextAtom } from '@state/ui/composer/index.ts';
 import { sanitizePastedText } from '@libs/composer/pastedText.ts';
+import { isClipboardPasteShortcut } from '@libs/keyboard/clipboardShortcuts.ts';
 
 let readInFlight = false;
 
 /** Handles raw terminal paste shortcuts by reading the injected clipboard seam. */
 export const handlePaste: ComposerKeyHandler = ({ input, key, maxBytes, store }) => {
-  if (!isPasteKey(input, key)) {
+  if (!isClipboardPasteShortcut(input, key)) {
     return false;
   }
 
@@ -41,7 +42,3 @@ export const handlePaste: ComposerKeyHandler = ({ input, key, maxBytes, store })
 
   return true;
 };
-
-function isPasteKey(input: string, key: { ctrl?: boolean; meta?: boolean }): boolean {
-  return input === PASTE_INPUT_KEY && (key.ctrl === true || key.meta === true);
-}
