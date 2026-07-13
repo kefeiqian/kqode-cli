@@ -24,7 +24,9 @@ KQode 是一个基于 Rust 的 Coding Agent，作为学习及研究 Agent Runtim
 | 名称 | 主页 | GitHub |
 |---|---|---|
 | GitHub Copilot CLI | [GitHub Copilot CLI](https://github.com/features/copilot/cli/) | [github/copilot-cli](https://github.com/github/copilot-cli) |
+| GitHub Copilot SDK | [GitHub Copilot SDK](https://docs.github.com/en/copilot/how-tos/copilot-sdk) | [github/copilot-sdk](https://github.com/github/copilot-sdk) |
 | Claude Code | [Claude Code](https://claude.com/product/claude-code) | - |
+| Claude Agent SDK | [Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview) | [anthropics/claude-agent-sdk-typescript](https://github.com/anthropics/claude-agent-sdk-typescript) · [anthropics/claude-agent-sdk-python](https://github.com/anthropics/claude-agent-sdk-python) |
 | OpenAI Codex CLI | [Codex](https://openai.com/codex/) | [openai/codex](https://github.com/openai/codex) |
 | Gemini CLI | [Gemini CLI](https://geminicli.com) | [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli) |
 | OpenCode | [OpenCode](https://opencode.ai) | [anomalyco/opencode](https://github.com/anomalyco/opencode) |
