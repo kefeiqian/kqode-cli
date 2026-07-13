@@ -2,6 +2,7 @@ import { createStore } from 'jotai';
 import { describe, expect, it } from 'vitest';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
 import { BodyPane } from '@components/BodyPane.tsx';
+import { UPPER_HALF_BLOCK } from '@libs/tui/backgroundBlock.ts';
 import { bodySelectionAtom } from '@state/ui/index.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
@@ -60,5 +61,23 @@ describe('BodyPane', () => {
     );
 
     expect(lastFrame()).toContain('highlighted line');
+  });
+
+  it('pads full-width user prompt rows by display width so CJK text does not wrap padding', () => {
+    const { lastFrame } = renderWithJotai(
+      <BodyPane
+        columns={60}
+        entries={[
+          { kind: BodyEntryKind.User, text: 'Hadamard 乘积什么时候用到?' },
+          { kind: BodyEntryKind.Assistant, text: 'answer' }
+        ]}
+        rows={6}
+      />
+    );
+
+    const rows = (lastFrame() ?? '').split('\n');
+    expect(rows[1]).toContain('  ❯ Hadamard 乘积什么时候用到?');
+    expect(rows[2]).toBe(UPPER_HALF_BLOCK.repeat(60));
+    expect(rows[3]).toBe('• answer');
   });
 });

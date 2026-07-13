@@ -169,7 +169,7 @@ function renderScrollbar({
 }
 
 function padBodyText(text: string, contentColumns: number): string {
-  return text.padEnd(contentColumns, ' ');
+  return padEndToWidth(text, contentColumns);
 }
 
 function renderHighlightedContent(
