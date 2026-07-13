@@ -64,24 +64,33 @@ describe('handlePaste', () => {
     expect(readText).not.toHaveBeenCalled();
   });
 
-  it('reads and inserts clipboard text for Alt+V', async () => {
+  it('ignores Alt+V instead of reading from the clipboard', async () => {
     const store = createStore();
-    store.set(clipboardClientAtom, { readText: vi.fn().mockResolvedValue('alt'), writeText: vi.fn() });
+    const readText = vi.fn().mockResolvedValue('alt');
+    store.set(clipboardClientAtom, { readText, writeText: vi.fn() });
 
-    expect(handlePaste(context(store, 'v', { meta: true }))).toBe(true);
+    expect(handlePaste(context(store, 'v', { meta: true }))).toBe(false);
     await flushPromises();
 
-    expect(store.get(composerStateAtom).text).toBe('alt');
+    expect(readText).not.toHaveBeenCalled();
+    expect(store.get(composerStateAtom).text).toBe('');
   });
 
-  it('reads and inserts clipboard text for forwarded Command+V', async () => {
+  it('reads and inserts clipboard text for forwarded Command+V on macOS only', async () => {
     const store = createStore();
-    store.set(clipboardClientAtom, { readText: vi.fn().mockResolvedValue('cmd'), writeText: vi.fn() });
+    const readText = vi.fn().mockResolvedValue('cmd');
+    store.set(clipboardClientAtom, { readText, writeText: vi.fn() });
 
     expect(handlePaste(context(store, 'v', { super: true }))).toBe(process.platform === 'darwin');
     await flushPromises();
 
-    expect(store.get(composerStateAtom).text).toBe(process.platform === 'darwin' ? 'cmd' : '');
+    if (process.platform === 'darwin') {
+      expect(readText).toHaveBeenCalledTimes(1);
+      expect(store.get(composerStateAtom).text).toBe('cmd');
+    } else {
+      expect(readText).not.toHaveBeenCalled();
+      expect(store.get(composerStateAtom).text).toBe('');
+    }
   });
 
   it('ignores repeat paste shortcuts while a read is in flight', async () => {

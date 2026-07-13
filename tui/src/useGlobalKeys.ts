@@ -4,6 +4,7 @@ import { ArmedAction } from '@constants/ui.ts';
 import { copySelection } from '@components/HomeScreen/copySelection.ts';
 import {
   isCtrlCShortcut,
+  isModifierOnlyKeyEvent,
   isSelectionCopyShortcut
 } from '@libs/keyboard/clipboardShortcuts.ts';
 import { isMouseInput } from '@libs/terminal/mouse.ts';
@@ -36,6 +37,10 @@ export function useGlobalKeys(): void {
     const bodySelection = store.get(bodySelectionAtom);
     const armedAction = store.get(armedActionAtom);
     const isCtrlC = isCtrlCShortcut(input, key);
+
+    if (isModifierOnlyKeyEvent(input, key)) {
+      return;
+    }
 
     if (
       bodySelection !== null &&

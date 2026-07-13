@@ -15,6 +15,7 @@ import type {
   ComposerKeyHandler
 } from '@components/PromptComposer/input/types.ts';
 import { handleMenuKey } from '@components/SlashCommandMenu/handleMenuKey.ts';
+import { isModifierOnlyKeyEvent } from '@libs/keyboard/clipboardShortcuts.ts';
 import { isMouseInput } from '@libs/terminal/mouse.ts';
 import type { CommandActions } from '@libs/commands/executeCommand.ts';
 import { armedActionAtom } from '@state/ui/index.ts';
@@ -67,6 +68,10 @@ export function usePromptComposerInput({
   useInput(
     (input, key) => {
       if (isMouseInput(input)) {
+        return;
+      }
+
+      if (isModifierOnlyKeyEvent(input, key)) {
         return;
       }
 

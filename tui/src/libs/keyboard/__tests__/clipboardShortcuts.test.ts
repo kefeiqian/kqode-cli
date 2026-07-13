@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isClipboardPasteShortcut,
   isCtrlCShortcut,
+  isModifierOnlyKeyEvent,
   isSelectionCopyShortcut
 } from '@libs/keyboard/clipboardShortcuts.ts';
 
@@ -20,12 +21,12 @@ describe('isSelectionCopyShortcut', () => {
     expect(isSelectionCopyShortcut('c', { ctrl: true }, 'linux')).toBe(true);
   });
 
-  it('accepts forwarded Command+C shapes on macOS', () => {
+  it('accepts forwarded Command+C super shape on macOS', () => {
     expect(isSelectionCopyShortcut('c', { super: true }, 'darwin')).toBe(true);
-    expect(isSelectionCopyShortcut('c', { meta: true }, 'darwin')).toBe(true);
   });
 
   it('rejects meta and super C on non-macOS platforms', () => {
+    expect(isSelectionCopyShortcut('c', { meta: true }, 'darwin')).toBe(false);
     expect(isSelectionCopyShortcut('c', { meta: true }, 'linux')).toBe(false);
     expect(isSelectionCopyShortcut('c', { super: true }, 'win32')).toBe(false);
   });
@@ -38,11 +39,27 @@ describe('isSelectionCopyShortcut', () => {
   });
 });
 
+describe('isModifierOnlyKeyEvent', () => {
+  it('accepts enhanced modifier-only press and release events', () => {
+    expect(isModifierOnlyKeyEvent('', { eventType: 'press', super: true })).toBe(true);
+    expect(isModifierOnlyKeyEvent('', { eventType: 'press', ctrl: true })).toBe(true);
+    expect(isModifierOnlyKeyEvent('', { eventType: 'press', meta: true })).toBe(true);
+    expect(isModifierOnlyKeyEvent('', { eventType: 'release' })).toBe(true);
+  });
+
+  it('rejects actionable keys and printable modified shortcuts', () => {
+    expect(isModifierOnlyKeyEvent('c', { eventType: 'press', super: true })).toBe(false);
+    expect(isModifierOnlyKeyEvent('', { eventType: 'press', leftArrow: true, ctrl: true })).toBe(false);
+    expect(isModifierOnlyKeyEvent('', { eventType: 'press', escape: true })).toBe(false);
+    expect(isModifierOnlyKeyEvent('', {})).toBe(false);
+  });
+});
+
 describe('isClipboardPasteShortcut', () => {
-  it('accepts Ctrl+V and forwarded Alt+V on every platform', () => {
+  it('accepts Ctrl+V on every platform', () => {
     expect(isClipboardPasteShortcut('v', { ctrl: true }, 'darwin')).toBe(true);
     expect(isClipboardPasteShortcut('v', { ctrl: true }, 'win32')).toBe(true);
-    expect(isClipboardPasteShortcut('v', { meta: true }, 'linux')).toBe(true);
+    expect(isClipboardPasteShortcut('v', { ctrl: true }, 'linux')).toBe(true);
   });
 
   it('accepts forwarded Command+V super shape only on macOS', () => {
@@ -54,6 +71,8 @@ describe('isClipboardPasteShortcut', () => {
   it('rejects unrelated paste shortcuts', () => {
     expect(isClipboardPasteShortcut('c', { super: true }, 'darwin')).toBe(false);
     expect(isClipboardPasteShortcut('o', { ctrl: true }, 'darwin')).toBe(false);
+    expect(isClipboardPasteShortcut('v', { meta: true }, 'darwin')).toBe(false);
+    expect(isClipboardPasteShortcut('v', { meta: true }, 'linux')).toBe(false);
     expect(isClipboardPasteShortcut('v', {}, 'darwin')).toBe(false);
   });
 });

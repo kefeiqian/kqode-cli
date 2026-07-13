@@ -156,6 +156,23 @@ describe('App', () => {
     expect(store.get(armedActionAtom)).toBeNull();
   });
 
+  it('keeps a pending Ctrl+C exit armed when only Ctrl is pressed', async () => {
+    const { store, stdin } = renderApp({ columns: 100, rows: 20 });
+    await flushInput();
+
+    stdin.write('\u0003');
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBe(ArmedAction.Exit);
+
+    stdin.write('\u001B[57442;5u'); // kitty left-control press
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBe(ArmedAction.Exit);
+
+    stdin.write('\u0003');
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBeNull();
+  });
+
   it('copies an active selection on Ctrl+C without arming exit', async () => {
     const { store, stdin } = renderApp({ columns: 100, rows: 20 });
     const writeText = seedSelectionClipboard(store);
@@ -167,6 +184,20 @@ describe('App', () => {
     expect(writeText).toHaveBeenCalledWith('copy');
     expect(store.get(bodySelectionAtom)).toBeNull();
     expect(store.get(armedActionAtom)).toBeNull();
+  });
+
+  it('keeps an active selection when only a modifier key is pressed', async () => {
+    const { store, stdin } = renderApp({ columns: 100, rows: 20 });
+    seedSelectionClipboard(store);
+    await flushInput();
+
+    stdin.write('\u001B[57444;9u'); // kitty left-super press
+    await flushInput();
+    expect(store.get(bodySelectionAtom)).not.toBeNull();
+
+    stdin.write('\u001B[57442;5u'); // kitty left-control press
+    await flushInput();
+    expect(store.get(bodySelectionAtom)).not.toBeNull();
   });
 
   it('falls back to Ctrl+C exit when the active selection is collapsed', async () => {

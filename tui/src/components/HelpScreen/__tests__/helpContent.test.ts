@@ -65,7 +65,7 @@ describe('helpContent', () => {
       'Copy the last assistant response',
       'ctrl+c ×2',
       'Exit KQode when no selection is active',
-      'ctrl+v / alt+v / cmd+v',
+      'ctrl+v / cmd+v',
       'Paste from the system clipboard',
       'ctrl+c / cmd+c',
       'Copy the selection, then dismiss it',
@@ -76,6 +76,7 @@ describe('helpContent', () => {
       'ctrl+r',
       'Copy Mode',
       'cmd+o',
+      'ctrl+v / alt+v / cmd+v',
       'ctrl+v / alt+v / right-click'
     ];
 
