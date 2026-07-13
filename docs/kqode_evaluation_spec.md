@@ -8,7 +8,7 @@ KQode evaluation must prove more than "the model answered." It must show that th
 
 - Evaluate the harness, not only the LLM.
 - Start with local deterministic tests before public benchmarks.
-- Establish a provider/model capability baseline from no-tool public benchmarks early; measure harness gains as lift above that baseline.
+- Establish a provider/model capability baseline from no-tool public benchmarks early; measure harness gains primarily on tasks that require tools, sandboxing, repository edits, and recovery.
 - Record every run as a replayable trajectory.
 - Report pass rate, cost, runtime, and failure categories together.
 - Keep test tasks small enough to debug manually.
@@ -65,7 +65,7 @@ kqode eval provider --provider <name>
 
 ### Layer 1b. Provider/model capability baseline (no-tool public benchmarks)
 
-These runs measure raw provider/model coding capability with no KQode tools, sandbox, or plugins in the loop. They are the comparability floor against frontier-lab reports (which report saturated general benchmarks alongside agentic ones) and the growth carrier for harness work: as tools, sandbox, and plugins land, the same benchmarks should rise, and the delta is the harness's contribution.
+These runs measure raw provider/model coding capability with no KQode tools, sandbox, or plugins in the loop. They are the comparability floor against frontier-lab reports (which report saturated general benchmarks alongside agentic ones), not the primary harness-quality score. Tool-enabled runs of the same benchmarks may show a small self-check/repair lift, but these tasks are compact and saturated; the main harness contribution should be measured on task suites that require tools, sandboxed command execution, repository edits, recovery, and policy handling.
 
 Run these early — they depend only on a connected provider (Layer 1), not on the harness maturity that later layers assume. They do not prove harness quality; keep them separate from the harness signal (see the non-goals).
 
@@ -74,7 +74,9 @@ Run these early — they depend only on a connected provider (Layer 1), not on t
 - EvalPlus **MBPP+** — basic-programming correctness under augmented tests.
 
 **Deferred (DEFER — blocked on systems KQode does not have yet):**
-- Tool-use / agentic repair benchmarks — need the tool registry + sandbox.
+- Tool-use / agentic repair benchmarks — need the tool registry + sandbox. Start
+  with the Layer 2 local golden suite, then graduate to Layer 7 public agentic
+  benchmarks such as SWE-bench Lite and SWE-bench Verified.
 - Vision / multimodal benchmarks — need image input.
 - Long-context retrieval benchmarks — need the context builder at scale.
 
@@ -232,8 +234,11 @@ These are the **tool-requiring / repository-scale** public benchmarks, distinct 
 **Graduation target:** **SWE-bench Verified** is the headline agentic metric KQode graduates toward. The Layer 1b no-tool baseline is what rises first as tools land; SWE-bench Verified is what becomes runnable — and then the primary external scorecard — once the agentic loop is complete.
 
 **Targets:**
+- Terminal-Bench smoke subset (first external tool/sandbox baseline).
+- SWE-bench Lite development subset (first external repository-editing baseline).
 - SWE-bench Verified (headline graduation target).
 - SWE-bench Lite subset (cheaper iteration).
+- SWE-bench Multilingual (later polyglot/repo-editing coverage).
 - Aider-style polyglot editing tasks.
 - AutoCodeRover-style GitHub issue tasks.
 
@@ -357,14 +362,16 @@ Start with 10 tasks:
 1. Build Layer 0 with fake providers.
 2. Add Layer 1 provider smoke tests.
 3. Add the Layer 1b no-tool public-benchmark baseline (EvalPlus HumanEval+/MBPP+) as the provider/model floor.
-4. Add first 3 local golden tasks.
-5. Add trace assertions.
-6. Add badcase capture.
-7. Add safety tests.
-8. Add replay tests.
-9. Add multi-agent tests.
-10. Publish local benchmark report.
-11. Add the SWE-bench (Verified) agentic adapter only after local reports are stable and the tool/sandbox loop exists.
+4. Record the pre-tool external benchmark readiness baseline (Terminal-Bench and SWE-bench Lite not runnable yet).
+5. Implement the first headless tool-loop slice with fake-provider tests (`read_file` -> `complete_task`) before file writes or shell execution.
+6. Add first 3 local golden tasks.
+7. Add trace assertions.
+8. Add badcase capture.
+9. Add safety tests.
+10. Add replay tests.
+11. Add multi-agent tests.
+12. Publish local benchmark report.
+13. Add the SWE-bench (Verified) agentic adapter only after local reports are stable and the tool/sandbox loop exists.
 
 ## Portfolio report
 
@@ -391,4 +398,3 @@ The public report should include:
 - Do not hide failures behind aggregate pass rate.
 - Do not run evals without preserving traces.
 - Do not treat model quality as harness quality.
-
