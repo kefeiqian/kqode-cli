@@ -7,10 +7,11 @@ import { SETTLED_KIND_COMPLETED } from '@contracts/backend/index.ts';
 import type { TranscriptEvent } from '@contracts/backend/index.ts';
 import type { SessionResumeResult } from '@contracts/backend/index.ts';
 import { backendClientAtom, currentSessionIdAtom, productVersionAtom } from '@state/global/index.ts';
-import { bodyScrollOffsetRowsAtom } from '@state/ui/index.ts';
+import { bodyScrollOffsetRowsAtom, maxBodyScrollOffsetRowsAtom } from '@state/ui/index.ts';
 import { openConnectSurfaceAtom } from '@state/ui/surface/index.ts';
 import { refreshGitStatusAtom } from '@state/ui/index.ts';
 import { createDeltaCoalescer } from '@libs/promptQueue/streamCoalescer.ts';
+import { resolveFollowScrollOffset } from '@libs/tui/followScroll.ts';
 import { BACKEND_UNAVAILABLE_MESSAGE, backendErrorMessage } from '@libs/promptQueue/promptQueue.ts';
 import type { QueueItem } from '@libs/promptQueue/promptQueue.ts';
 import { hydrateResumeTranscript } from '@state/promptQueue/hydrateResumeTranscript.ts';
@@ -151,6 +152,8 @@ export const hydrateResumedTranscriptAtom = atom(
   }
 );
 function applyTranscriptEvent(get: Getter, set: Setter, event: TranscriptEvent): void {
+  const previousOffset = get(bodyScrollOffsetRowsAtom);
+  const previousMaxOffset = get(maxBodyScrollOffsetRowsAtom);
   const result = reduceTranscriptEvent(
     get(transcriptReducerStateAtom),
     event,
@@ -161,7 +164,17 @@ function applyTranscriptEvent(get: Getter, set: Setter, event: TranscriptEvent):
   set(turnGenerationByIdAtom, result.state.generationByTurnId);
   set(settledTurnIdsAtom, result.state.settledTurnIds);
   set(nextQueueItemIdAtom, result.state.nextQueueItemId);
-  set(bodyScrollOffsetRowsAtom, 0);
+  // Follow the newest output only while pinned to the bottom. Once the reader
+  // has scrolled up, keep their place as the transcript grows instead of
+  // snapping back to the end on every streaming flush.
+  set(
+    bodyScrollOffsetRowsAtom,
+    resolveFollowScrollOffset({
+      previousOffset,
+      previousMaxOffset,
+      nextMaxOffset: get(maxBodyScrollOffsetRowsAtom)
+    })
+  );
   if (event.type === 'settled' && event.result.kind === SETTLED_KIND_COMPLETED) {
     void set(refreshGitStatusAtom);
   }

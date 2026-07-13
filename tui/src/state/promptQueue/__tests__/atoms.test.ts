@@ -30,7 +30,17 @@ import {
 } from '@libs/promptQueue/promptQueue.ts';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
 import { backendClientAtom, currentSessionIdAtom, productVersionAtom } from '@state/global/index.ts';
-import { activeSurfaceAtom, bodyScrollOffsetRowsAtom, submittedPromptEntriesAtom, Surface } from '@state/ui/index.ts';
+import {
+  activeSurfaceAtom,
+  bodyEntriesAtom,
+  bodyScrollOffsetRowsAtom,
+  columnsTestOverrideAtom,
+  maxBodyScrollOffsetRowsAtom,
+  rowsTestOverrideAtom,
+  submittedPromptEntriesAtom,
+  Surface,
+  visibleBodyRowsAtom
+} from '@state/ui/index.ts';
 import {
   SETTLED_KIND_NEEDS_CONFIGURATION,
   type BackendClient,
@@ -254,6 +264,75 @@ describe('settled git status refresh', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(gitStatus).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('transcript scroll follow', () => {
+  /** Seeds a transcript taller than the viewport so the body can scroll. */
+  function seedScrollableTranscript(store: ReturnType<typeof createStore>): void {
+    store.set(columnsTestOverrideAtom, 80);
+    store.set(rowsTestOverrideAtom, 24);
+    store.set(
+      bodyEntriesAtom,
+      Array.from({ length: 80 }, (_, index) => ({
+        kind: BodyEntryKind.Success,
+        text: `line ${index}`
+      }))
+    );
+  }
+
+  it('anchors a scrolled-up reader as a turn settles instead of snapping to the bottom', async () => {
+    const store = createStore();
+    seedScrollableTranscript(store);
+    store.set(newTurnIdAtom, { newTurnId: () => 'turn-1' });
+    store.set(backendClientAtom, clientWithSubmit(async () => undefined));
+    await store.set(enqueuePromptAtom, 'hello');
+
+    // The reader scrolls up mid-turn (offset > 0 means "not pinned to bottom").
+    store.set(bodyScrollOffsetRowsAtom, 10);
+    const maxBefore = store.get(maxBodyScrollOffsetRowsAtom);
+    const topRowBefore = store.get(visibleBodyRowsAtom).visibleRows[0]?.text;
+
+    store.set(transcriptEventAtom, {
+      type: 'settled',
+      turnId: 'turn-1',
+      result: {
+        kind: 'completed',
+        text: Array.from({ length: 20 }, (_, index) => `reply line ${index}`).join('\n'),
+        finishReason: 'stop',
+        errorKind: null,
+        message: null
+      }
+    });
+
+    const maxAfter = store.get(maxBodyScrollOffsetRowsAtom);
+    // The reply appended rows below the viewport, so the transcript grew.
+    expect(maxAfter).toBeGreaterThan(maxBefore);
+    // Anchored: the offset absorbs that growth so the same rows stay on screen,
+    // rather than being force-reset to 0 (pinned to the newest output).
+    expect(store.get(bodyScrollOffsetRowsAtom)).toBe(10 + (maxAfter - maxBefore));
+    // Independent of the offset arithmetic: the same transcript row that was at
+    // the top of the viewport before the reply is still there afterward.
+    expect(store.get(visibleBodyRowsAtom).visibleRows[0]?.text).toBe(topRowBefore);
+  });
+
+  it('keeps following the newest output while pinned to the bottom', async () => {
+    const store = createStore();
+    seedScrollableTranscript(store);
+    store.set(newTurnIdAtom, { newTurnId: () => 'turn-1' });
+    store.set(backendClientAtom, clientWithSubmit(async () => undefined));
+    await store.set(enqueuePromptAtom, 'hello');
+
+    // Pinned to the bottom (offset 0) must keep following as the turn settles.
+    expect(store.get(bodyScrollOffsetRowsAtom)).toBe(0);
+
+    store.set(transcriptEventAtom, {
+      type: 'settled',
+      turnId: 'turn-1',
+      result: { kind: 'completed', text: 'reply', finishReason: 'stop', errorKind: null, message: null }
+    });
+
+    expect(store.get(bodyScrollOffsetRowsAtom)).toBe(0);
   });
 });
 
