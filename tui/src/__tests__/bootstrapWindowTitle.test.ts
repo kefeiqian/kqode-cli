@@ -11,6 +11,8 @@ const {
   mockClient,
   mockCreateSessionLogger,
   mockCreateSourceBackendClient,
+  mockDisableTerminalKeyboardProtocol,
+  mockEnableTerminalKeyboardProtocol,
   mockEnterAlternateScreen,
   mockLeaveAlternateScreen,
   mockResetTerminalBackground,
@@ -59,6 +61,8 @@ const {
     mockClient,
     mockCreateSessionLogger: vi.fn(() => mockLogger),
     mockCreateSourceBackendClient: vi.fn(() => mockClient),
+    mockDisableTerminalKeyboardProtocol: vi.fn(),
+    mockEnableTerminalKeyboardProtocol: vi.fn(),
     mockEnterAlternateScreen: vi.fn(),
     mockLeaveAlternateScreen: vi.fn(),
     mockResetTerminalBackground: vi.fn(),
@@ -94,6 +98,10 @@ vi.mock('@libs/product/productMetadata.ts', () => ({
 vi.mock('@libs/terminal/alternateScreen.ts', () => ({
   enterAlternateScreen: mockEnterAlternateScreen,
   leaveAlternateScreen: mockLeaveAlternateScreen
+}));
+vi.mock('@libs/terminal/keyboardProtocol.ts', () => ({
+  disableTerminalKeyboardProtocol: mockDisableTerminalKeyboardProtocol,
+  enableTerminalKeyboardProtocol: mockEnableTerminalKeyboardProtocol
 }));
 vi.mock('@libs/terminal/terminalBackground.ts', () => ({
   resetTerminalBackground: mockResetTerminalBackground,
@@ -139,8 +147,23 @@ describe('createAppRuntime window title', () => {
   it('writes the product title on a fresh launch', async () => {
     runtime = await createAppRuntime({ entryUrl: import.meta.url });
 
+    expect(mockEnterAlternateScreen).toHaveBeenCalledOnce();
+    expect(mockEnableTerminalKeyboardProtocol).toHaveBeenCalledOnce();
     expect(mockSetTerminalWindowTitle).toHaveBeenCalledWith(PRODUCT_NAME, PRODUCT_VERSION);
     expect(mockSetSessionWindowTitle).not.toHaveBeenCalled();
+  });
+
+  it('restores keyboard mode before leaving the alternate screen on dispose', async () => {
+    runtime = await createAppRuntime({ entryUrl: import.meta.url });
+
+    runtime.dispose();
+    runtime = undefined;
+
+    expect(mockDisableTerminalKeyboardProtocol).toHaveBeenCalledOnce();
+    expect(mockLeaveAlternateScreen).toHaveBeenCalledOnce();
+    expect(mockDisableTerminalKeyboardProtocol.mock.invocationCallOrder[0]).toBeLessThan(
+      mockLeaveAlternateScreen.mock.invocationCallOrder[0] ?? 0
+    );
   });
 
   it('keeps a boot-resumed session title instead of overwriting it with the product title', async () => {

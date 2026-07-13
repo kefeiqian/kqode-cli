@@ -17,6 +17,10 @@ import {
   enterAlternateScreen,
   leaveAlternateScreen
 } from '@libs/terminal/alternateScreen.ts';
+import {
+  disableTerminalKeyboardProtocol,
+  enableTerminalKeyboardProtocol
+} from '@libs/terminal/keyboardProtocol.ts';
 import { resolveSessionSeed } from '@components/AppExitSummary/resolveSessionSeed.ts';
 import { windowColumnsAtom, windowRowsAtom } from '@state/ui/index.ts';
 import {
@@ -157,6 +161,7 @@ export async function createAppRuntime({
   // resume has already applied the session title through the shared resume path,
   // so only fresh launches write the generic product title here.
   enterAlternateScreen();
+  enableTerminalKeyboardProtocol();
   if (!didBootResume) {
     setTerminalWindowTitle(PRODUCT_NAME, productVersion);
   }
@@ -166,13 +171,15 @@ export async function createAppRuntime({
 
   // Restore the user's terminal on clean shutdown and on hard exit (Ctrl+C /
   // crash) so neither the OSC 2 window title, the OSC 11 background override,
-  // nor the alternate screen buffer outlives the session. The `exit` listener
-  // is the safety net; `dispose` removes it on the clean path to avoid a
-  // redundant restore. Mirror the enter order on teardown: reset the background
-  // and window title, then leave the alt buffer.
+  // keyboard enhancement mode, nor the alternate screen buffer outlives the
+  // session. The `exit` listener is the safety net; `dispose` removes it on the
+  // clean path to avoid a redundant restore. Mirror the enter order on teardown:
+  // reset the background and window title, restore keyboard mode, then leave the
+  // alt buffer.
   const restoreTerminal = () => {
     resetTerminalBackground();
     resetTerminalWindowTitle();
+    disableTerminalKeyboardProtocol();
     leaveAlternateScreen();
   };
   process.once('exit', restoreTerminal);
