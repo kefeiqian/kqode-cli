@@ -13,7 +13,7 @@ import { SlashCommandMenu } from '@components/SlashCommandMenu/index.tsx';
 import { StatusBar } from '@components/StatusBar.tsx';
 import { useHomeScreenInput } from '@components/HomeScreen/useHomeScreenInput.ts';
 import { BODY_CWD_GAP_ROWS } from '@libs/tui/layout.ts';
-import { bottomSpacerRowsAtom, layoutAtom } from '@state/ui/index.ts';
+import { bottomSpacerRowsAtom, homeHeaderRowsAtom, layoutAtom } from '@state/ui/index.ts';
 import { columnsAtom, rowsAtom } from '@state/ui/index.ts';
 import { commandMenuOpenAtom } from '@state/ui/commands/index.ts';
 import { activeDockedPanelAtom, DockedPanel } from '@state/ui/dock/atoms.ts';
@@ -42,6 +42,11 @@ export function HomeScreenView() {
 }
 
 function HomeHeader() {
+  const headerRows = useAtomValue(homeHeaderRowsAtom);
+  if (headerRows === 0) {
+    return null;
+  }
+
   return <Header />;
 }
 

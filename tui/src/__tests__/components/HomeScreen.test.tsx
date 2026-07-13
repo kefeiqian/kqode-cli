@@ -108,6 +108,21 @@ describe('HomeScreen', () => {
     expect(output).not.toContain(NOT_CONFIGURED_MODEL_LABEL);
   });
 
+  it('hides the home header and starts body content on the first row once content exists', () => {
+    const { lastFrame } = renderHomeScreen({
+      columns: 100,
+      rows: 20,
+      bodyEntries: [{ kind: BodyEntryKind.Success, text: 'conversation starts at top' }]
+    });
+
+    const output = lastFrame() ?? '';
+    const outputRows = output.split('\n');
+
+    expect(outputRows[0]).not.toContain('KQode');
+    expect(outputRows[0]).not.toContain('v0.1.0');
+    expect(outputRows[0]).toContain('conversation starts at top');
+  });
+
   it('displays the copied dummy React workspace cwd rather than the TUI package path', () => {
     const copiedWorkspace = path.join(workspaceCwd, 'target', 'kqode-test-workspaces', 'workspace');
     const { lastFrame } = renderHomeScreen({ workspaceCwd: copiedWorkspace, columns: 120, rows: 20 });

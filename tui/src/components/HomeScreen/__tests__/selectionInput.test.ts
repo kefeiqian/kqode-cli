@@ -85,8 +85,11 @@ describe('resolveGestureRegion', () => {
   });
 
   it('returns null for a press on inert chrome above the body', () => {
-    const store = seededStore();
-    // SGR row 1 → zero-based row 0, the header row above the transcript.
+    const store = createStore();
+    store.set(columnsTestOverrideAtom, 80);
+    store.set(rowsTestOverrideAtom, 24);
+
+    // SGR row 1 → zero-based row 0, the visible header row above the transcript.
     expect(resolveGestureRegion(store, 1)).toBeNull();
   });
 

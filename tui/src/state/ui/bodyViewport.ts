@@ -1,9 +1,13 @@
 import { atom } from 'jotai';
 import { DEFAULT_BODY_ENTRIES } from '@libs/tui/bodyRows.ts';
 import { resolveBodyRowWindow } from '@libs/tui/bodyWindow.ts';
-import { HEADER_ROWS } from '@libs/tui/layout.ts';
 import { activeThemeAtom } from '@state/global/theme.ts';
-import { bodyScrollOffsetRowsAtom, displayedBodyEntriesAtom, layoutAtom } from '@state/ui/atoms.ts';
+import {
+  bodyScrollOffsetRowsAtom,
+  displayedBodyEntriesAtom,
+  homeHeaderRowsAtom,
+  layoutAtom
+} from '@state/ui/atoms.ts';
 import { safeChromeColumnsAtom } from '@state/ui/dimensions.ts';
 
 /**
@@ -22,8 +26,8 @@ export const visibleBodyRowsAtom = atom((get) =>
 );
 
 /**
- * Zero-based screen row where the transcript body begins — directly below the
- * one-row header. Mirrors `composerTopAtom`'s reconciliation of 1-based SGR mouse
- * rows with Ink's zero-based rows: `bodyRowIndex = sgrRow - 1 - bodyTop`.
+ * Zero-based screen row where the transcript body begins. Mirrors
+ * `composerTopAtom`'s reconciliation of 1-based SGR mouse rows with Ink's
+ * zero-based rows: `bodyRowIndex = sgrRow - 1 - bodyTop`.
  */
-export const bodyTopAtom = atom(() => HEADER_ROWS);
+export const bodyTopAtom = atom((get) => get(homeHeaderRowsAtom));

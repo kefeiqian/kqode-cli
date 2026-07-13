@@ -6,6 +6,7 @@ import { countCwdRows } from '@libs/tui/cwdLine.ts';
 import {
   BODY_CWD_GAP_ROWS,
   DEFAULT_COMPOSER_ROWS,
+  HIDDEN_HEADER_ROWS,
   HEADER_ROWS,
   resolveHomeScreenLayout
 } from '@libs/tui/layout.ts';
@@ -60,6 +61,10 @@ export const displayedBodyEntriesAtom = atom((get) => {
     : [...baseBodyEntries, ...submittedPromptEntries];
 });
 
+export const homeHeaderRowsAtom = atom((get) =>
+  get(displayedBodyEntriesAtom).length === 0 ? HEADER_ROWS : HIDDEN_HEADER_ROWS
+);
+
 /**
  * Rows the open command menu actually occupies: the desired height (U2) clamped
  * to the rows free above a one-row-minimum body, so the menu is truncated or
@@ -78,9 +83,10 @@ export const commandMenuRowsAtom = atom((get) => {
   const rows = get(rowsAtom);
   const composerRows = get(composerRowsAtom);
   const cwdRows = get(cwdRowsAtom);
+  const homeHeaderRows = get(homeHeaderRowsAtom);
   const freeMenuRows = Math.max(
     0,
-    rows - HEADER_ROWS - BODY_CWD_GAP_ROWS - cwdRows - 1 - composerRows - 1
+    rows - homeHeaderRows - BODY_CWD_GAP_ROWS - cwdRows - 1 - composerRows - 1
   );
   return Math.min(desired, freeMenuRows);
 });
@@ -93,18 +99,20 @@ export const layoutAtom = atom((get) => {
   const rows = get(rowsAtom);
   const composerRows = get(composerRowsAtom);
   const displayedBodyEntries = get(displayedBodyEntriesAtom);
+  const homeHeaderRows = get(homeHeaderRowsAtom);
   // Body wraps within the shared safe content width (the physical final column
   // is a reserved gutter), so count rows at that width to match the render.
   const bodyEntryRows = countBodyRows(displayedBodyEntries, safeColumns, rows);
 
-  return resolveHomeScreenLayout(
+  return resolveHomeScreenLayout({
     rows,
-    bodyEntryRows,
+    bodyEntryCount: bodyEntryRows,
     composerRows,
-    get(cwdRowsAtom),
-    get(commandMenuRowsAtom),
-    get(dockedPanelRowsAtom)
-  );
+    cwdRows: get(cwdRowsAtom),
+    commandMenuRows: get(commandMenuRowsAtom),
+    resumePanelRows: get(dockedPanelRowsAtom),
+    headerRows: homeHeaderRows
+  });
 });
 
 export const maxBodyScrollOffsetRowsAtom = atom((get) => {
@@ -123,8 +131,9 @@ export const bottomSpacerRowsAtom = atom((get) => {
   const rows = get(rowsAtom);
   const layout = get(layoutAtom);
   const dockedPanelRows = get(dockedPanelRowsAtom);
+  const homeHeaderRows = get(homeHeaderRowsAtom);
   if (dockedPanelRows > 0) {
-    return Math.max(0, rows - HEADER_ROWS - layout.bodyRows - dockedPanelRows);
+    return Math.max(0, rows - homeHeaderRows - layout.bodyRows - dockedPanelRows);
   }
 
   const composerRows = get(composerRowsAtom);
@@ -133,7 +142,7 @@ export const bottomSpacerRowsAtom = atom((get) => {
   return Math.max(
     0,
     rows -
-      HEADER_ROWS -
+      homeHeaderRows -
       layout.bodyRows -
       BODY_CWD_GAP_ROWS -
       layout.cwdRows -

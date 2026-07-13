@@ -5,17 +5,16 @@ import {
 } from '@constants/ui.ts';
 import { clamp } from '@libs/math/clamp.ts';
 
-/**
- * Rows occupied by the always-visible home-screen header (product name +
- * version). The app only renders at or above `MIN_COLUMNS`, so the header no
- * longer degrades to a compact or hidden variant and always takes one row.
- */
+/** Rows occupied by the home-screen header when it is rendered. */
 export const HEADER_ROWS = 1;
+/** Rows occupied by the home-screen header when transcript content hides it. */
+export const HIDDEN_HEADER_ROWS = 0;
 
 /**
- * Alias for the home-screen header height, used by the docked-popup cap formula
- * and named to disambiguate it from the per-surface header rows (theme/model = 3,
- * memory = 4) that live as module-local constants inside each surface component.
+ * Alias for the visible home-screen header height, used by the docked-popup cap
+ * formula and named to disambiguate it from the per-surface header rows
+ * (theme/model = 3, memory = 4) that live as module-local constants inside each
+ * surface component.
  */
 export const HOME_HEADER_ROWS = HEADER_ROWS;
 
@@ -25,28 +24,39 @@ export const BODY_CWD_GAP_ROWS = 2;
 
 const COMPOSER_ERROR_RESERVE_ROWS = 1;
 
+type HomeScreenLayoutOptions = {
+  bodyEntryCount?: number;
+  commandMenuRows?: number;
+  composerRows?: number;
+  cwdRows?: number;
+  headerRows?: number;
+  resumePanelRows?: number;
+  rows: number;
+};
+
 /**
  * Resolves the home screen's vertical budget from the terminal `rows`, returning
  * the rows granted to the body, the composer's visible height, and the cwd line.
  *
  * `bodyEntryCount` caps the body at its content height (plus one) so short
- * transcripts do not reserve the whole pane. `composerRows`, `cwdRows`, and
- * `commandMenuRows`/`resumePanelRows` are the current heights of the pinned bottom stack, whose
- * rows come out of the body budget so the composer and status row stay pinned to
- * the bottom and the total never exceeds the canvas.
+ * transcripts do not reserve the whole pane. `headerRows`, `composerRows`,
+ * `cwdRows`, and `commandMenuRows`/`resumePanelRows` are the current heights of
+ * the pinned stack, whose rows come out of the body budget so the composer and
+ * status row stay pinned to the bottom and the total never exceeds the canvas.
  */
-export function resolveHomeScreenLayout(
-  rows: number,
+export function resolveHomeScreenLayout({
+  rows,
   bodyEntryCount = Number.POSITIVE_INFINITY,
   composerRows = DEFAULT_COMPOSER_ROWS,
   cwdRows = 1,
   commandMenuRows = 0,
-  resumePanelRows = 0
-): { bodyRows: number; composerVisibleRows: number; cwdRows: number } {
-  const headerRows = HEADER_ROWS;
+  resumePanelRows = 0,
+  headerRows = HEADER_ROWS
+}: HomeScreenLayoutOptions): { bodyRows: number; composerVisibleRows: number; cwdRows: number } {
+  const resolvedHeaderRows = Math.max(0, headerRows);
   const resolvedResumePanelRows = Math.max(0, resumePanelRows);
   if (resolvedResumePanelRows > 0) {
-    const maxBodyRows = rows - headerRows - resolvedResumePanelRows;
+    const maxBodyRows = rows - resolvedHeaderRows - resolvedResumePanelRows;
     return {
       bodyRows: Math.max(1, Math.min(maxBodyRows, bodyEntryCount + 1)),
       composerVisibleRows: 1,
@@ -60,7 +70,7 @@ export function resolveHomeScreenLayout(
   const minBodyRows = 1;
   // Fixed rows exclude the composer because it grows with wrapping/validation;
   // reserving one possible error row keeps the body from collapsing below 1 row.
-  const fixedRows = headerRows + BODY_CWD_GAP_ROWS + resolvedCwdRows + statusRows;
+  const fixedRows = resolvedHeaderRows + BODY_CWD_GAP_ROWS + resolvedCwdRows + statusRows;
   // Cap the composer's visible text rows so the whole box (text + background
   // padding + reserved error row) never exceeds `rows / COMPOSER_MAX_HEIGHT_DIVISOR`
   // (half the terminal), keeping the transcript visible. The `min` with the
