@@ -1,8 +1,10 @@
 import { isSelectionEmpty, type SelectionBounds } from '@libs/selection/bounds.ts';
-import { indexAtDisplayColumn } from '@libs/text/displayWidth.ts';
+import type { RenderedStyledSegment } from '@libs/markdown/types.ts';
+import { displayWidth, indexAtDisplayColumn } from '@libs/text/displayWidth.ts';
 
 /** A row's content split around the selected span, for rendering the highlight. */
 export type RowHighlight = { pre: string; selected: string; post: string };
+export type RowHighlightedSegment = RenderedStyledSegment & { selected: boolean };
 
 /**
  * Splits a row's content `text` into the unselected prefix/suffix and the
@@ -41,4 +43,73 @@ export function rowHighlight(
     selected: text.slice(startChar, endChar),
     post: text.slice(endChar)
   };
+}
+
+/**
+ * Splits styled row segments into selected and unselected pieces while keeping
+ * each segment's visual style. Selection columns use the same marker offset and
+ * grapheme boundary rules as `rowHighlight`.
+ */
+export function rowSegmentHighlights(
+  segments: readonly RenderedStyledSegment[],
+  rowIndex: number,
+  bounds: SelectionBounds,
+  markerWidth: number
+): RowHighlightedSegment[] | null {
+  if (
+    isSelectionEmpty(bounds) ||
+    rowIndex < bounds.start.rowIndex ||
+    rowIndex > bounds.end.rowIndex
+  ) {
+    return null;
+  }
+
+  const selectedStart =
+    rowIndex === bounds.start.rowIndex ? Math.max(0, bounds.start.column - markerWidth) : 0;
+  const selectedEnd =
+    rowIndex === bounds.end.rowIndex
+      ? Math.max(0, bounds.end.column - markerWidth)
+      : Number.POSITIVE_INFINITY;
+  const highlighted: RowHighlightedSegment[] = [];
+  let segmentStartColumn = 0;
+  let hasSelectedSegment = false;
+
+  for (const segment of segments) {
+    const segmentWidth = displayWidth(segment.text);
+    const segmentEndColumn = segmentStartColumn + segmentWidth;
+    const overlapStart = Math.max(selectedStart, segmentStartColumn);
+    const overlapEnd = Math.min(selectedEnd, segmentEndColumn);
+
+    if (overlapEnd <= overlapStart) {
+      pushHighlightedSegment(highlighted, segment, segment.text, false);
+      segmentStartColumn = segmentEndColumn;
+      continue;
+    }
+
+    const startChar = indexAtDisplayColumn(segment.text, overlapStart - segmentStartColumn);
+    const endChar = indexAtDisplayColumn(segment.text, overlapEnd - segmentStartColumn);
+
+    pushHighlightedSegment(highlighted, segment, segment.text.slice(0, startChar), false);
+    if (endChar > startChar) {
+      pushHighlightedSegment(highlighted, segment, segment.text.slice(startChar, endChar), true);
+      hasSelectedSegment = true;
+    }
+    pushHighlightedSegment(highlighted, segment, segment.text.slice(endChar), false);
+    segmentStartColumn = segmentEndColumn;
+  }
+
+  return hasSelectedSegment ? highlighted : null;
+}
+
+function pushHighlightedSegment(
+  target: RowHighlightedSegment[],
+  segment: RenderedStyledSegment,
+  text: string,
+  selected: boolean
+): void {
+  if (text.length === 0) {
+    return;
+  }
+
+  target.push({ ...segment, selected, text });
 }

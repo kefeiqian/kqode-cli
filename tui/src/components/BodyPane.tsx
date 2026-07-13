@@ -2,7 +2,12 @@ import { Box, Text } from 'ink';
 import { useAtomValue } from 'jotai';
 import type { ReactNode } from 'react';
 import { selectionBounds } from '@libs/selection/bounds.ts';
-import { rowHighlight, type RowHighlight } from '@libs/selection/highlightRow.ts';
+import {
+  rowHighlight,
+  rowSegmentHighlights,
+  type RowHighlight,
+  type RowHighlightedSegment
+} from '@libs/selection/highlightRow.ts';
 import { DEFAULT_BODY_ENTRIES } from '@libs/tui/bodyRows.ts';
 import type { BodyEntry, BodyRow } from '@libs/tui/bodyRows.ts';
 import { resolveBodyRowWindow } from '@libs/tui/bodyWindow.ts';
@@ -94,12 +99,20 @@ export function BodyPane({
         const marker = row.marker ?? '';
         const paddedTextColumns = Math.max(1, contentColumns - marker.length);
         const shouldPadText = isScrollable || row.fillColumns === true;
-        const highlight =
-          selectionBoundsValue === null
+        const markerWidth = displayWidth(marker);
+        const rowIndex = start + index;
+        const highlightedSegments =
+          selectionBoundsValue === null || row.segments === undefined
             ? null
-            : rowHighlight(row.text, start + index, selectionBoundsValue, displayWidth(marker));
+            : rowSegmentHighlights(row.segments, rowIndex, selectionBoundsValue, markerWidth);
+        const highlight =
+          selectionBoundsValue === null || highlightedSegments !== null
+            ? null
+            : rowHighlight(row.text, rowIndex, selectionBoundsValue, markerWidth);
         const segmentDisplay =
-          highlight === null ? renderSegments(row, paddedTextColumns, shouldPadText) : undefined;
+          highlight === null && highlightedSegments === null
+            ? renderSegments(row, paddedTextColumns, shouldPadText)
+            : undefined;
         const displayText =
           highlight === null && segmentDisplay === undefined
             ? shouldPadText
@@ -114,15 +127,23 @@ export function BodyPane({
                 {marker}
               </Text>
             ) : null}
-            {highlight !== null
-              ? renderHighlightedContent(
+            {highlightedSegments !== null
+              ? renderHighlightedSegments(
+                  highlightedSegments,
+                  row,
+                  paddedTextColumns,
+                  shouldPadText,
+                  theme.colors.selectionBackground
+                )
+              : highlight !== null
+                ? renderHighlightedContent(
                   highlight,
                   row,
                   paddedTextColumns,
                   shouldPadText,
                   theme.colors.selectionBackground
                 )
-              : segmentDisplay ?? (
+                : segmentDisplay ?? (
                   <Text backgroundColor={row.backgroundColor} color={row.color}>
                     {displayText}
                   </Text>
@@ -198,6 +219,48 @@ function renderHighlightedContent(
           {sanitizeRenderedText(highlight.post)}
         </Text>
       ) : null}
+      {padding.length > 0 ? (
+        <Text backgroundColor={row.backgroundColor} color={row.color}>
+          {padding}
+        </Text>
+      ) : null}
+    </>
+  );
+}
+
+function renderHighlightedSegments(
+  segments: readonly RowHighlightedSegment[],
+  row: BodyRow,
+  contentColumns: number,
+  shouldPadText: boolean,
+  selectionColor: string
+): ReactNode {
+  const sanitizedSegments = segments.map((segment) => ({
+    ...segment,
+    href: segment.href === undefined ? undefined : sanitizeLinkHref(segment.href),
+    text: sanitizeRenderedText(segment.text)
+  }));
+  const text = sanitizedSegments.map((segment) => segment.text).join('');
+  const padding =
+    shouldPadText || text.length === 0 ? padEndToWidth('', contentColumns - displayWidth(text)) : '';
+
+  return (
+    <>
+      {sanitizedSegments.map((segment, index) => (
+        <Text
+          key={`${index}-${segment.text}`}
+          backgroundColor={
+            segment.selected ? selectionColor : segment.backgroundColor ?? row.backgroundColor
+          }
+          bold={segment.bold}
+          color={segment.color ?? row.color}
+          dimColor={segment.dimColor}
+          italic={segment.italic}
+          underline={segment.underline}
+        >
+          {renderSegmentText(segment)}
+        </Text>
+      ))}
       {padding.length > 0 ? (
         <Text backgroundColor={row.backgroundColor} color={row.color}>
           {padding}

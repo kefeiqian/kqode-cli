@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { selectionBounds } from '@libs/selection/bounds.ts';
-import { rowHighlight } from '@libs/selection/highlightRow.ts';
+import { rowHighlight, rowSegmentHighlights } from '@libs/selection/highlightRow.ts';
 
 function bounds(anchorRow: number, anchorCol: number, focusRow: number, focusCol: number) {
   return selectionBounds(
@@ -48,5 +48,26 @@ describe('rowHighlight', () => {
       selected: '好wo',
       post: 'rld'
     });
+  });
+
+  it('preserves styled segment colors around the selected span', () => {
+    const segments = [
+      { color: '#ffffff', text: 'before ' },
+      { color: '#9ECE6A', text: 'transpose' },
+      { color: '#ffffff', text: ' after' }
+    ];
+
+    expect(
+      rowSegmentHighlights(segments, 0, bounds(0, 0, 0, 7), 0)
+    ).toEqual([
+      { color: '#ffffff', selected: true, text: 'before ' },
+      { color: '#9ECE6A', selected: false, text: 'transpose' },
+      { color: '#ffffff', selected: false, text: ' after' }
+    ]);
+    expect(
+      rowSegmentHighlights(segments, 0, bounds(0, 7, 0, 16), 0)?.find(
+        (segment) => segment.text === 'transpose'
+      )
+    ).toEqual({ color: '#9ECE6A', selected: true, text: 'transpose' });
   });
 });
