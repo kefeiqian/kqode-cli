@@ -3,85 +3,91 @@ date: 2026-07-12
 topic: tui-modeless-selection
 ---
 
-# TUI Mode-less Selection: Copy by Default
+# TUI Modeless Selection: Keyboard Copy
 
 ## Summary
 
-Remove the `Ctrl+R` copy mode so in-app text selection is always available: a plain left-drag over the transcript selects and auto-copies on mouse release (copy-on-select), click-without-drag keeps its current meaning, and double-/triple-click select a word/line. This matches Claude Code's fullscreen-renderer selection model on KQode's existing alt-screen architecture — no rendering rearchitecture.
+Keep transcript selection modeless and add keyboard copy for the active selection. A highlighted transcript selection can be copied with `Ctrl+C` on Windows, macOS, and Linux, and with `Command+C` on macOS when the terminal forwards it; when no selection is active, `Ctrl+C` keeps its existing two-step exit behavior.
 
 ---
 
 ## Problem Frame
 
-Copying transcript text today requires pressing `Ctrl+R` first to enter copy mode; only then do mouse press/drag/release build the in-app selection that copies on release (`tui/src/state/ui/copyMode.ts`, `tui/src/useGlobalKeys.ts`). The user compares this unfavorably to Claude Code and Copilot CLI, where drag-to-copy just works with no mode.
+KQode now owns transcript selection in-app: drag, double-click, and triple-click create a highlighted body selection while release only finalizes the highlight. Copying that selection is currently manual through right-click, which writes the reconstructed transcript text to the system clipboard and clears the highlight.
 
-Investigation showed the mode gate is not architecturally necessary. Claude Code's current fullscreen renderer (verified against its public docs) uses the same architecture KQode already has — alternate screen buffer, captured mouse, in-app viewport scrolling, pinned composer — and still delivers copy-by-default: drag always selects in-app and the selection auto-copies on release. The selection machinery KQode needs already exists on this branch; it is merely gated behind a mode toggle that Claude Code proves is unnecessary. An earlier direction explored in this brainstorm — rearchitecting to normal-buffer scrollback rendering — was dropped once verification showed that model corresponds to Claude Code's *legacy* renderer, not the behavior the user observed and wants.
+Right-click-only copy leaves a keyboard ergonomics gap. Users expect `Ctrl+C` to copy selected text, and macOS users also expect `Command+C`. The TUI already uses `Ctrl+C` for two-step exit, so the selected-text case needs an explicit precedence rule: selection copy wins only while a non-empty transcript selection is active; otherwise exit is unchanged.
+
+The same clipboard-parity lens applies to help text. Paste already accepts a meta/Command-style `V` when the terminal forwards it, but the help surface only documents `Ctrl+V / Alt+V`, so macOS clipboard behavior is under-documented.
 
 ---
 
 ## Requirements
 
-**Mode-less selection**
-- R1. A plain left-drag over the transcript body builds the in-app selection with no prior mode toggle; the `Ctrl+R` copy mode (atom, key binding, status hints, help entries) is removed.
-- R2. When the left button is released after a drag, the selected text is copied to the system clipboard automatically (copy-on-select), preserving the current copy-mode release behavior as the default.
-- R3. When a left-click is released without dragging, no selection is made and no copy occurs; click keeps its current meanings (composer caret positioning; other click targets unchanged).
-- R4. While a selection is being dragged or is highlighted, wheel scrolling and body scroll keys continue to scroll the transcript, as they do in today's copy mode.
-- R5. The selection highlight is dismissed without side effects by the existing gestures (any key press, or right-click — which also still pastes); dismissal never re-introduces a mode.
+**Selection model**
+- R1. Transcript selection stays modeless: drag, double-click, and triple-click create or update a highlighted transcript selection without entering a copy mode.
+- R2. Mouse release finalizes the highlight and does not copy automatically.
+- R3. Right-click keeps copying the active transcript selection through the existing clipboard path, then dismissing the highlight.
 
-**Multi-click gestures**
-- R6. Double-click selects the word under the pointer and copies it (same copy-on-select path as drag).
-- R7. Triple-click selects the whole rendered line under the pointer and copies it.
+**Keyboard copy**
+- R4. When a non-empty transcript selection is active, `Ctrl+C` copies that selected text on Windows, macOS, and Linux instead of arming exit.
+- R5. On macOS, `Command+C` also copies the active transcript selection when the terminal/runtime forwards that key event to the TUI.
+- R6. Keyboard selection copy uses the same selected-text reconstruction and clipboard seam as right-click copy, so copied text excludes KQode chrome and preserves wrapped-text fidelity.
+- R7. After a handled keyboard selection-copy action, the highlight is dismissed and the user sees the same success or failure feedback used for selection copy today.
 
-**Key ownership**
-- R8. `Ctrl+O` copy-last-response and the `Ctrl+C` two-step armed exit are unchanged; `Ctrl+R` becomes unbound (free for future use).
-- R9. Status-bar and help text no longer reference copy mode; if a hint is shown, it describes drag-to-copy directly.
+**Key ownership and help**
+- R8. When there is no non-empty transcript selection, `Ctrl+C` keeps the existing two-step armed-exit behavior.
+- R9. `Ctrl+O` copy-last-response remains unchanged and does not gain a `Command+O` alias in this scope.
+- R10. Help text documents selected-text keyboard copy with `Ctrl+C`, macOS `Command+C` where supported, and the existing `Command+V` paste path where supported.
 
 ---
 
 ## Acceptance Examples
 
-- AE1. **Covers R1, R2.** Given normal interaction (no mode toggled), when the user drags across two rows of transcript text and releases, the dragged text is highlighted during the drag and lands on the system clipboard on release.
-- AE2. **Covers R3.** Given normal interaction, when the user clicks inside the composer without dragging, the caret moves to the click position, nothing is highlighted, and the clipboard is untouched.
-- AE3. **Covers R4.** Given a drag in progress, when the user scrolls the wheel, the transcript scrolls and the selection anchor remains correct.
-- AE4. **Covers R5.** Given a highlighted selection, when the user presses any key, the highlight clears and the key otherwise behaves normally.
-- AE5. **Covers R6, R7.** Given transcript text `error in src/main.rs line 4`, double-clicking a word selects and copies that word; triple-clicking selects and copies the whole line.
-- AE6. **Covers R8.** Given the change, `Ctrl+R` does nothing, `Ctrl+O` still copies the last response, and `Ctrl+C` twice still exits.
+- AE1. **Covers R1, R2, R4, R7.** Given transcript text is highlighted, when the user presses `Ctrl+C`, the selected transcript text is written to the clipboard, the highlight clears, and exit is not armed.
+- AE2. **Covers R5, R7.** Given transcript text is highlighted on macOS and the terminal forwards `Command+C`, when the user presses `Command+C`, the selected transcript text is written to the clipboard and the highlight clears.
+- AE3. **Covers R8.** Given no transcript selection is active, when the user presses `Ctrl+C` once, the status bar shows the existing press-again-to-exit hint; pressing `Ctrl+C` again exits as before.
+- AE4. **Covers R3, R6.** Given transcript text is highlighted, when the user right-clicks or uses a keyboard copy shortcut, both paths copy the same reconstructed text.
+- AE5. **Covers R7.** Given the clipboard write fails, when the user triggers keyboard selection copy, KQode shows the selection-copy failure hint and keeps running.
+- AE6. **Covers R9, R10.** Given the help screen is opened after the change, it still lists `Ctrl+O` for copy-last-response and documents macOS clipboard shortcuts without implying broad macOS aliases for every shortcut.
 
 ---
 
 ## Success Criteria
 
-- The user can copy any visible transcript text with a single drag gesture, with no mode key, matching the muscle memory they have from Claude Code.
-- Click-to-caret, wheel scrolling (including the smoothness work), right-click paste, pinned chrome, and live theme restyle all behave exactly as before — this change removes a gate, it does not alter the architecture.
-- A downstream planner can implement this without re-deciding the selection model (in-app, copy-on-select) or the gesture disambiguation (click vs drag vs multi-click).
+- Users can select transcript text once and copy it with the expected keyboard shortcut on their platform.
+- `Ctrl+C` remains a reliable exit path when there is no active selection.
+- Right-click copy, `Ctrl+O` copy-last-response, paste, scroll, and composer caret behavior remain unchanged.
+- The help screen accurately reflects clipboard shortcuts for Windows, macOS, and Linux without over-promising terminal behavior KQode cannot observe.
 
 ---
 
 ## Scope Boundaries
 
-- No rendering rearchitecture — the alternate-screen, app-owned-viewport model stays (decided after verifying Claude Code's fullscreen renderer uses the same model).
-- No terminal-native selection path; Shift+drag native selection is a terminal-provided bypass that needs no code (optionally mentioned in help).
-- No copy-on-select toggle or config setting this round — copy-on-select is always on (Claude Code offers a toggle; deferred until someone wants it).
-- No transcript/search mode or dump-to-native-scrollback (Claude Code's `Ctrl+O` transcript mode) — candidate for its own brainstorm.
-- No `Ctrl+Shift+C` manual copy binding (terminals swallow it; unchanged from the 2026-07-05 brainstorm).
-- No selection support inside the composer beyond what exists today; selection covers the transcript body.
+- No copy mode is reintroduced.
+- No terminal-native selection rework; in-app transcript selection remains the model.
+- No composer text selection support in this scope.
+- No copy-on-release behavior; release highlights only.
+- No broad macOS keymap parity such as `Command+O` for copy-last-response.
+- No enhanced keyboard-protocol negotiation to force terminals to send `Command+C`; support is best effort when the event reaches the app.
 
 ---
 
 ## Key Decisions
 
-- **Remove the mode, keep the mechanism:** the in-app selection built for copy mode already does press/drag/release selection with copy-on-release; this change makes it the default gesture instead of a moded one. Verified as exactly Claude Code's fullscreen-mode design ("selected text copies to your clipboard automatically on mouse release").
-- **Full rearchitecture rejected:** the normal-buffer scrollback model matches Claude Code's legacy renderer; its fullscreen replacement — the behavior the user actually observed (pinned composer, click-to-caret, default copy) — shares KQode's current architecture, so the rearchitecture would have moved away from the target, not toward it.
-- **Click vs drag disambiguation over a modifier key:** press-without-movement keeps click semantics (caret), movement while held means selection — standard GUI text-box behavior, no new key to learn.
-- **Copy-on-select always on, no setting:** smallest version that delivers the value; a toggle is cheap to add later if auto-copy ever annoys.
+- **Selection-first `Ctrl+C`:** an active selection is a stronger copy intent than exit intent, so selection copy wins only while non-empty transcript text is highlighted.
+- **Clipboard shortcuts only for macOS parity:** this scope adds `Command+C` for selected text and documents `Command+V` paste where supported, without converting every shortcut to a macOS alias.
+- **Reuse the existing selection-copy path:** keyboard copy should share right-click copy's selected-text reconstruction, clipboard seam, and feedback behavior rather than create a parallel clipboard path.
+- **Exit fallback stays unchanged:** preserving `Ctrl+C` two-step exit with no selection keeps the global escape hatch predictable.
 
 ---
 
 ## Dependencies / Assumptions
 
-- Builds on the in-app selection subsystem on branch `feat/tui-composer-scroll` (selection state, `BodyPane` highlight overlay, SGR drag parsing in `tui/src/libs/terminal/mouse.ts`), **including currently uncommitted working-tree changes** to `copyMode.ts`, `useGlobalKeys.ts`, and related files — these must be committed before implementation starts in a fresh worktree.
-- Assumes the existing clipboard-write path used by copy mode's release-copy works unchanged when invoked outside the mode — verified plausible (same code path), to confirm in planning.
-- Multi-click detection (double/triple) requires timing/position tracking over SGR press events; SGR reports carry no click count — new logic, feasibility assumed based on standard terminal-app practice (Claude Code implements it on the same protocol).
+- In-app selection is already modeless and release does not copy automatically (`tui/src/components/HomeScreen/selectionInput.ts:77-84`, `tui/src/components/HomeScreen/selectionInput.ts:113-124`, `tui/src/__tests__/components/HomeScreen.test.tsx:547-575`).
+- Right-click copy already routes through `copySelection`, then clears the highlight (`tui/src/components/HomeScreen/useHomeScreenInput.ts:148-155`, `tui/src/__tests__/App.test.tsx:185-206`).
+- `copySelection` already reconstructs text from body rows and writes through the injected clipboard seam with success/failure hints (`tui/src/components/HomeScreen/copySelection.ts:13-51`, `tui/src/components/HomeScreen/__tests__/copySelection.test.ts:24-80`).
+- `Ctrl+C` is currently owned by `useGlobalKeys` as two-step exit, and selection dismissal is non-consuming before normal key handling continues (`tui/src/useGlobalKeys.ts:8-25`, `tui/src/useGlobalKeys.ts:34-68`).
+- Paste already recognizes meta/Command-style `V` when delivered (`tui/src/components/PromptComposer/input/handlePaste.ts:44-47`), while help currently documents only `Ctrl+V / Alt+V` (`tui/src/components/HelpScreen/helpContent.ts:41-45`).
 
 ---
 
@@ -89,7 +95,5 @@ Investigation showed the mode gate is not architecturally necessary. Claude Code
 
 ### Deferred to Planning
 
-- [Affects R3][Technical] The exact drag threshold: any motion report between press and release, or a minimum cell distance, to avoid twitchy clicks becoming one-cell selections.
-- [Affects R6][Technical] Word-boundary rules for double-click (whitespace-delimited runs vs punctuation-aware; Claude Code treats a file path as one word — pick one and document it).
-- [Affects R5][Technical] Whether Esc should clear the selection without its usual surface-dismissal side effect when a selection is active, or behave normally.
-- [Affects R6, R7][Technical] Double/triple-click timing window and whether the position must be identical between clicks.
+- [Affects R5][Technical] Confirm the exact Ink key shape for `Command+C` across target macOS terminals and add tests for the event form KQode can observe.
+- [Affects R7][Technical] Decide whether a failed clipboard write should clear the highlight exactly like right-click does today, or preserve the highlight so the user can retry.
