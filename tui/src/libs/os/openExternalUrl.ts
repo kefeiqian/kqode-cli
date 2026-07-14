@@ -20,10 +20,11 @@ export type OpenCommand = { command: string; args: string[] };
  * The platform command + argv that opens `url` in the default browser, or `null`
  * when `url` is not an openable http(s) URL.
  *
- * Pure and separated from the spawn so the mapping is unit-testable. The argv
- * form (never a shell string) keeps the URL from being reinterpreted as extra
- * arguments; combined with the http(s) check it blocks command injection from a
- * hostile URL.
+ * Every platform uses a non-shell opener (`explorer.exe` / `open` / `xdg-open`)
+ * invoked directly — never `cmd` or a shell string — so URL metacharacters such
+ * as the `&` between query parameters are handed to the opener literally and
+ * cannot be reinterpreted as extra commands. Combined with the http(s) allowlist
+ * in {@link isOpenableUrl}, this blocks command injection from a hostile URL.
  */
 export function resolveOpenCommand(
   url: string,
@@ -33,9 +34,7 @@ export function resolveOpenCommand(
     return null;
   }
   if (platform === 'win32') {
-    // `start` treats its first quoted argument as the window title, so pass an
-    // empty title before the url.
-    return { command: 'cmd', args: ['/c', 'start', '', url] };
+    return { command: 'explorer.exe', args: [url] };
   }
   if (platform === 'darwin') {
     return { command: 'open', args: [url] };
@@ -48,14 +47,20 @@ export type ProcessSpawner = (
   command: string,
   args: string[],
   options: { stdio: 'ignore'; detached: true }
-) => { unref: () => void };
+) => {
+  on: (event: 'error', listener: (error: Error) => void) => void;
+  unref: () => void;
+};
 
 /**
  * Opens `url` in the user's default browser as a detached, unref'd process.
  *
  * Returns whether a launch was attempted: `false` for a non-openable URL or a
- * spawn failure. Best-effort by design — KQode owns the terminal input loop, so
- * a failed open must never throw into it.
+ * synchronous spawn failure. Best-effort by design — KQode owns the terminal
+ * input loop, so a failure must never throw into it. A missing opener binary is
+ * reported asynchronously via the child's `error` event (e.g. Linux without
+ * `xdg-open`), so an `error` listener is attached to swallow it rather than let
+ * it surface as an uncaught exception.
  */
 export function openExternalUrl(
   url: string,
@@ -67,7 +72,12 @@ export function openExternalUrl(
     return false;
   }
   try {
-    spawnProcess(resolved.command, resolved.args, { stdio: 'ignore', detached: true }).unref();
+    const child = spawnProcess(resolved.command, resolved.args, {
+      stdio: 'ignore',
+      detached: true
+    });
+    child.on('error', () => {});
+    child.unref();
     return true;
   } catch {
     return false;

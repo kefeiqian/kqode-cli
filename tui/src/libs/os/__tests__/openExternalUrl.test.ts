@@ -22,11 +22,13 @@ describe('isOpenableUrl', () => {
 });
 
 describe('resolveOpenCommand', () => {
-  it('uses cmd start with an empty title on Windows, url as its own arg', () => {
-    expect(resolveOpenCommand(url, 'win32')).toEqual({
-      command: 'cmd',
-      args: ['/c', 'start', '', url]
-    });
+  it('uses a non-shell opener (explorer.exe) on Windows so the url cannot inject', () => {
+    expect(resolveOpenCommand(url, 'win32')).toEqual({ command: 'explorer.exe', args: [url] });
+  });
+
+  it('passes query-string metacharacters through literally (no shell to reparse them)', () => {
+    const query = 'https://example.com/?a=1&b=2';
+    expect(resolveOpenCommand(query, 'win32')).toEqual({ command: 'explorer.exe', args: [query] });
   });
 
   it('uses open on macOS', () => {
@@ -43,13 +45,20 @@ describe('resolveOpenCommand', () => {
 });
 
 describe('openExternalUrl', () => {
-  it('spawns the resolved opener detached and unref’d, reporting success', () => {
+  function fakeSpawner() {
+    const on = vi.fn();
     const unref = vi.fn();
     const spawnProcess = vi.fn(
       (_command: string, _args: string[], _options: { stdio: 'ignore'; detached: true }) => ({
+        on,
         unref
       })
     );
+    return { on, unref, spawnProcess };
+  }
+
+  it('spawns the resolved opener detached and unref’d, reporting success', () => {
+    const { unref, spawnProcess } = fakeSpawner();
 
     expect(openExternalUrl(url, 'linux', spawnProcess)).toBe(true);
     expect(spawnProcess).toHaveBeenCalledWith('xdg-open', [url], {
@@ -59,18 +68,26 @@ describe('openExternalUrl', () => {
     expect(unref).toHaveBeenCalledOnce();
   });
 
+  it('attaches an error listener that swallows an async spawn failure', () => {
+    const { on, spawnProcess } = fakeSpawner();
+
+    openExternalUrl(url, 'linux', spawnProcess);
+
+    const [event, listener] = on.mock.calls[0] ?? [];
+    expect(event).toBe('error');
+    // A missing opener (e.g. no xdg-open) emits 'error' asynchronously; the
+    // listener must not rethrow, or it would crash the input loop.
+    expect(() => (listener as (error: Error) => void)(new Error('ENOENT'))).not.toThrow();
+  });
+
   it('does not spawn for a non-openable url', () => {
-    const spawnProcess = vi.fn(
-      (_command: string, _args: string[], _options: { stdio: 'ignore'; detached: true }) => ({
-        unref: vi.fn()
-      })
-    );
+    const { spawnProcess } = fakeSpawner();
 
     expect(openExternalUrl('file:///x', 'linux', spawnProcess)).toBe(false);
     expect(spawnProcess).not.toHaveBeenCalled();
   });
 
-  it('returns false instead of throwing when the spawn fails', () => {
+  it('returns false instead of throwing when the spawn fails synchronously', () => {
     const spawnProcess = vi.fn(
       (_command: string, _args: string[], _options: { stdio: 'ignore'; detached: true }) => {
         throw new Error('spawn failed');
