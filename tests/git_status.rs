@@ -40,4 +40,9 @@ fn git_status_returns_a_formatted_label_for_the_workspace() {
             || frames[0]["result"]["pullRequestLabel"].is_string(),
         "pull request label should be null or a string"
     );
+    assert!(
+        frames[0]["result"]["pullRequestUrl"].is_null()
+            || frames[0]["result"]["pullRequestUrl"].is_string(),
+        "pull request url should be null or a string"
+    );
 }

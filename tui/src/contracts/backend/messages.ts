@@ -104,10 +104,13 @@ export type TurnErrorParams = {
  * Result for `kqode.git.status`: the formatted working-tree label (e.g.
  * `⎇ main*`), or `null` when the workspace is not a git repository or `git`
  * could not be queried. `pullRequestLabel` is an optional GitHub PR segment
- * such as `#3`. The Rust backend owns parsing and formatting (`GitStatusResult`
- * in `src/protocol.rs`); keep the two shapes in lockstep.
+ * such as `#3`, and `pullRequestUrl` is that PR's web URL when available (so the
+ * TUI can render the label as a hyperlink). The Rust backend owns parsing and
+ * formatting (`GitStatusResult` in `src/protocol.rs`); keep the two shapes in
+ * lockstep.
  */
 export type GitStatusResult = {
   label: string | null;
   pullRequestLabel: string | null;
+  pullRequestUrl: string | null;
 };

@@ -167,7 +167,10 @@ fn spawn_git_status(request: Request, connection: &Connection) {
             id,
             GitStatusResult {
                 label: status.as_ref().map(|status| status.label.clone()),
-                pull_request_label: status.and_then(|status| status.pull_request_label),
+                pull_request_label: status
+                    .as_ref()
+                    .and_then(|status| status.pull_request_label.clone()),
+                pull_request_url: status.and_then(|status| status.pull_request_url),
             },
         );
         let _ = sender.send(Message::Response(response));

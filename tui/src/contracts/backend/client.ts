@@ -52,6 +52,7 @@ export type StreamOutcome =
 export type GitStatus = {
   label: string;
   pullRequestLabel?: string;
+  pullRequestUrl?: string;
 };
 
 /**

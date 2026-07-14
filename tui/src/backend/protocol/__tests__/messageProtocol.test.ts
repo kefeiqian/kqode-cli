@@ -198,16 +198,28 @@ describe('message protocol client', () => {
 describe('git status request', () => {
   it('resolves the formatted label the backend returns', async () => {
     const { client, server } = pairedConnections();
-    server.onRequest(gitStatusRequest, () => ({ label: '⎇ main*', pullRequestLabel: '#3' }));
+    server.onRequest(gitStatusRequest, () => ({
+      label: '⎇ main*',
+      pullRequestLabel: '#3',
+      pullRequestUrl: 'https://github.com/o/r/pull/3'
+    }));
 
     const status = await createMessageConnectionClient(client).gitStatus();
 
-    expect(status).toEqual({ label: '⎇ main*', pullRequestLabel: '#3' });
+    expect(status).toEqual({
+      label: '⎇ main*',
+      pullRequestLabel: '#3',
+      pullRequestUrl: 'https://github.com/o/r/pull/3'
+    });
   });
 
   it('resolves null when the workspace is not a git repository', async () => {
     const { client, server } = pairedConnections();
-    server.onRequest(gitStatusRequest, () => ({ label: null, pullRequestLabel: null }));
+    server.onRequest(gitStatusRequest, () => ({
+      label: null,
+      pullRequestLabel: null,
+      pullRequestUrl: null
+    }));
 
     const status = await createMessageConnectionClient(client).gitStatus();
 

@@ -1,4 +1,4 @@
-use super::{format_label, format_pull_request_label, parse_pull_request_number, parse_status};
+use super::{format_label, format_pull_request_label, parse_pull_request, parse_status};
 
 fn parse_status_label(porcelain: &str) -> Option<String> {
     parse_status(porcelain).map(|status| format_label(&status))
@@ -76,9 +76,18 @@ fn treats_untracked_entries_as_untracked_only() {
 }
 
 #[test]
-fn formats_pull_request_label_from_number() {
-    assert_eq!(parse_pull_request_number("3\n"), Some(3));
-    assert_eq!(format_pull_request_label(3), "#3");
+fn parses_pull_request_number_and_url_and_formats_the_label() {
+    let pull_request =
+        parse_pull_request("{\"number\":3,\"url\":\"https://github.com/o/r/pull/3\"}\n").unwrap();
+    assert_eq!(pull_request.number, 3);
+    assert_eq!(pull_request.url, "https://github.com/o/r/pull/3");
+    assert_eq!(format_pull_request_label(pull_request.number), "#3");
+}
+
+#[test]
+fn ignores_unparseable_pull_request_output() {
+    assert!(parse_pull_request("").is_none());
+    assert!(parse_pull_request("not json").is_none());
 }
 
 #[test]

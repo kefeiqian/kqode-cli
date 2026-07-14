@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use serde::Deserialize;
+
 use super::command::run_stdout;
 
 /// Command used for local repository status.
@@ -8,8 +10,9 @@ const GIT_COMMAND: &str = "git";
 const GITHUB_COMMAND: &str = "gh";
 /// Arguments that ask git for stable branch/status porcelain.
 const GIT_STATUS_ARGS: &[&str] = &["status", "--porcelain=v1", "--branch"];
-/// Arguments that ask GitHub CLI for the current branch's pull-request number.
-const PULL_REQUEST_NUMBER_ARGS: &[&str] = &["pr", "view", "--json", "number", "--jq", ".number"];
+/// Arguments that ask GitHub CLI for the current branch's pull-request number
+/// and URL as a JSON object (e.g. `{"number":3,"url":"https://…/pull/3"}`).
+const PULL_REQUEST_ARGS: &[&str] = &["pr", "view", "--json", "number,url"];
 /// Branch glyph prefixing every status label.
 const GIT_BRANCH_ICON: &str = "⎇";
 /// Flag appended when the worktree has unstaged changes.
@@ -35,6 +38,14 @@ const COMMAND_TIMEOUT: Duration = Duration::from_secs(2);
 pub struct WorkspaceGitStatus {
     pub label: String,
     pub pull_request_label: Option<String>,
+    pub pull_request_url: Option<String>,
+}
+
+/// The current branch's GitHub pull request, as reported by `gh pr view`.
+#[derive(Debug, Deserialize)]
+struct PullRequest {
+    number: u32,
+    url: String,
 }
 
 /// Parsed porcelain status of the workspace worktree.
@@ -52,18 +63,15 @@ struct GitStatus {
 #[must_use]
 pub fn status() -> Option<WorkspaceGitStatus> {
     let parsed_status = read_status()?;
+    let pull_request = pull_request();
 
     Some(WorkspaceGitStatus {
         label: format_label(&parsed_status),
-        pull_request_label: pull_request_number().map(format_pull_request_label),
+        pull_request_label: pull_request
+            .as_ref()
+            .map(|pull_request| format_pull_request_label(pull_request.number)),
+        pull_request_url: pull_request.map(|pull_request| pull_request.url),
     })
-}
-
-/// Returns only the formatted git status label for callers that do not need the
-/// optional pull-request label.
-#[must_use]
-pub fn status_label() -> Option<String> {
-    read_status().map(|parsed_status| format_label(&parsed_status))
 }
 
 fn read_status() -> Option<GitStatus> {
@@ -71,9 +79,9 @@ fn read_status() -> Option<GitStatus> {
     parse_status(&porcelain)
 }
 
-fn pull_request_number() -> Option<u32> {
-    let stdout = run_stdout(GITHUB_COMMAND, PULL_REQUEST_NUMBER_ARGS, COMMAND_TIMEOUT)?;
-    parse_pull_request_number(&stdout)
+fn pull_request() -> Option<PullRequest> {
+    let stdout = run_stdout(GITHUB_COMMAND, PULL_REQUEST_ARGS, COMMAND_TIMEOUT)?;
+    parse_pull_request(&stdout)
 }
 
 fn parse_status(porcelain: &str) -> Option<GitStatus> {
@@ -143,8 +151,8 @@ fn parse_branch_name(branch_line: &str) -> String {
         .to_owned()
 }
 
-fn parse_pull_request_number(stdout: &str) -> Option<u32> {
-    stdout.trim().parse().ok()
+fn parse_pull_request(stdout: &str) -> Option<PullRequest> {
+    serde_json::from_str(stdout.trim()).ok()
 }
 
 fn format_label(status: &GitStatus) -> String {

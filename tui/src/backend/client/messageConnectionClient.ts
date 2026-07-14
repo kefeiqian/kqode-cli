@@ -145,7 +145,8 @@ export function createMessageConnectionClient(
           ? null
           : {
               label: result.label,
-              pullRequestLabel: result.pullRequestLabel ?? undefined
+              pullRequestLabel: result.pullRequestLabel ?? undefined,
+              pullRequestUrl: result.pullRequestUrl ?? undefined
             };
       } catch (error) {
         throw toBackendClientError('git status', error);

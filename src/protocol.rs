@@ -112,11 +112,14 @@ pub struct TurnErrorParams {
 
 /// Result for `kqode.git.status`: the formatted working-tree label, or `null`
 /// when the workspace is not a git repository (or `git` could not be queried).
-/// `pullRequestLabel` is an optional GitHub PR segment such as `#3`.
-/// Kept in lockstep with the TypeScript `GitStatusResult`.
+/// `pullRequestLabel` is an optional GitHub PR segment such as `#3`, and
+/// `pullRequestUrl` is that PR's web URL when available (so the TUI can render
+/// the label as a hyperlink). Kept in lockstep with the TypeScript
+/// `GitStatusResult`.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitStatusResult {
     pub label: Option<String>,
     pub pull_request_label: Option<String>,
+    pub pull_request_url: Option<String>,
 }
