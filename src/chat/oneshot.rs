@@ -54,6 +54,7 @@ pub struct Completion {
 pub fn run_oneshot(
     config: KimiConfig,
     system: ChatMessage,
+    instructions: Option<ChatMessage>,
     prompt: &str,
     sampling: Sampling,
 ) -> Result<Completion, ProviderError> {
@@ -61,7 +62,13 @@ pub fn run_oneshot(
         .enable_all()
         .build()
         .map_err(|error| ProviderError::Network(format!("runtime error: {error}")))?;
-    runtime.block_on(stream_oneshot(config, system, prompt, sampling))
+    runtime.block_on(stream_oneshot(
+        config,
+        system,
+        instructions,
+        prompt,
+        sampling,
+    ))
 }
 
 /// Assembles the single-shot message list, opens the stream, and folds every
@@ -69,11 +76,18 @@ pub fn run_oneshot(
 async fn stream_oneshot(
     config: KimiConfig,
     system: ChatMessage,
+    instructions: Option<ChatMessage>,
     prompt: &str,
     sampling: Sampling,
 ) -> Result<Completion, ProviderError> {
     let model = config.model.clone();
-    let messages = assemble(system, None, &[], &CompactionState::default(), prompt);
+    let messages = assemble(
+        system,
+        instructions,
+        &[],
+        &CompactionState::default(),
+        prompt,
+    );
     let provider = KimiProvider::new(config)?;
     let request = ProviderRequest {
         model,

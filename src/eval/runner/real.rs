@@ -69,6 +69,7 @@ impl ModelDriver for OneshotModelDriver {
         let completion = run_oneshot(
             self.config.clone(),
             eval_system_message(),
+            None,
             prompt,
             self.sampling,
         )

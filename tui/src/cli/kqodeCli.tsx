@@ -10,6 +10,7 @@ import { KQODE_DEBUG_ENV_VAR } from '@constants/backend.ts';
 import { RESUME_ARG_NAME } from '@constants/cli.ts';
 import { BootResumeError } from '@backend/runtime/sessionResume.ts';
 import { bootResumeErrorMessage } from '@backend/runtime/bootResume.ts';
+import { runPackagedRustEntrypoint } from '@/cli/rustEntrypoint.ts';
 
 /** Inputs for the root CLI command; `loadPackagedAsset` is supplied only in packaged mode. */
 export type RunKqodeCliOptions = {
@@ -93,6 +94,9 @@ export function createKqodeCommand(options: RunKqodeCliOptions) {
 }
 
 /** Parses argv, answers `--help` / `--version`, or launches the TUI. */
-export function runKqodeCli(options: RunKqodeCliOptions): Promise<void> {
+export async function runKqodeCli(options: RunKqodeCliOptions): Promise<void> {
+  if (await runPackagedRustEntrypoint(options)) {
+    return;
+  }
   return runMain(createKqodeCommand(options));
 }
