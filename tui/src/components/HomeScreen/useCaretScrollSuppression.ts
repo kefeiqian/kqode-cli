@@ -16,11 +16,12 @@ export function useCaretScrollSuppression(settleMs: number = CARET_SCROLL_SETTLE
 
   useEffect(
     () => () => {
+      setSuppressed(false);
       if (timeoutRef.current !== null) {
         clearTimeout(timeoutRef.current);
       }
     },
-    []
+    [setSuppressed]
   );
 
   return useCallback(() => {

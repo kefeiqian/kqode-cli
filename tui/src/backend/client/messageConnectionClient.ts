@@ -16,7 +16,7 @@ import {
   turnErrorNotification
 } from '@backend/protocol/messageProtocol.ts';
 import { withRequestTimeout } from '@backend/client/backendClientErrors.ts';
-import { DEFAULT_REQUEST_TIMEOUT_MS } from '@constants/backend.ts';
+import { DEFAULT_REQUEST_TIMEOUT_MS, DEFAULT_STREAM_IDLE_TIMEOUT_MS } from '@constants/backend.ts';
 
 /** Per-turn hooks the notification handlers dispatch to, keyed by `turnId`. */
 type ActiveTurn = {
@@ -30,6 +30,8 @@ type ActiveTurn = {
 export type MessageConnectionClientOptions = {
   /** Ceiling for the streaming ack response (not the whole stream). */
   requestTimeoutMs?: number;
+  /** Ceiling while waiting for the next streaming notification after ack/delta. */
+  streamIdleTimeoutMs?: number;
 };
 
 /**
@@ -48,6 +50,7 @@ export function createMessageConnectionClient(
   options: MessageConnectionClientOptions = {}
 ): BackendClient {
   const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+  const streamIdleTimeoutMs = options.streamIdleTimeoutMs ?? DEFAULT_STREAM_IDLE_TIMEOUT_MS;
   const activeTurns = new Map<string, ActiveTurn>();
 
   connection.onNotification(tokenDeltaNotification, ({ turnId, delta }) => {
@@ -74,19 +77,39 @@ export function createMessageConnectionClient(
       return new Promise<StreamOutcome>((resolve, reject) => {
         let settled = false;
         let text = '';
+        let streamIdleTimer: ReturnType<typeof setTimeout> | undefined;
         const finish = (settle: () => void): void => {
           if (settled) {
             return;
           }
           settled = true;
+          if (streamIdleTimer !== undefined) {
+            clearTimeout(streamIdleTimer);
+          }
           activeTurns.delete(turnId);
           settle();
+        };
+        const refreshStreamIdleTimer = (): void => {
+          if (streamIdleTimer !== undefined) {
+            clearTimeout(streamIdleTimer);
+          }
+          streamIdleTimer = setTimeout(() => {
+            finish(() =>
+              reject(
+                new BackendClientError(
+                  BackendErrorKind.Timeout,
+                  `backend stream idled for ${streamIdleTimeoutMs}ms before the turn completed`
+                )
+              )
+            );
+          }, streamIdleTimeoutMs);
         };
 
         activeTurns.set(turnId, {
           onDelta: (delta) => {
             text += delta;
             callbacks.onDelta(delta);
+            refreshStreamIdleTimer();
           },
           complete: (finishReason) =>
             finish(() => resolve({ kind: 'completed', text, finishReason })),
@@ -102,10 +125,13 @@ export function createMessageConnectionClient(
           (ack) => {
             if (ack.status === SUBMIT_STATUS_NEEDS_CONFIGURATION) {
               finish(() => resolve({ kind: 'needsConfiguration' }));
+              return;
             }
-            // Otherwise the turn is streaming: wait for turnEnd/turnError.
+            // Otherwise the turn is streaming: wait for turnEnd/turnError, but
+            // keep a bounded idle timer so the prompt queue cannot wedge forever.
+            refreshStreamIdleTimer();
           },
-          (error: unknown) => finish(() => reject(toBackendClientError(error)))
+          (error: unknown) => finish(() => reject(toBackendClientError('message submit', error)))
         );
       });
     },
@@ -117,13 +143,13 @@ export function createMessageConnectionClient(
         );
         return result.label;
       } catch (error) {
-        throw toBackendClientError(error);
+        throw toBackendClientError('git status', error);
       }
     }
   };
 }
 
-function toBackendClientError(error: unknown): BackendClientError {
+function toBackendClientError(requestName: string, error: unknown): BackendClientError {
   if (error instanceof BackendClientError) {
     return error;
   }
@@ -131,7 +157,7 @@ function toBackendClientError(error: unknown): BackendClientError {
   if (error instanceof ResponseError) {
     return new BackendClientError(
       BackendErrorKind.Protocol,
-      `backend rejected message submit: ${error.message}`,
+      `backend rejected ${requestName}: ${error.message}`,
       { cause: error }
     );
   }

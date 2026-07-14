@@ -3,6 +3,7 @@ import {
   UPPER_HALF_BLOCK
 } from '@libs/tui/backgroundBlock.ts';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
+import { wrapBodyText } from '@libs/tui/wrapBodyText.ts';
 import { theme } from '@theme/themeConfig.ts';
 
 export type BodyEntry = {
@@ -176,26 +177,4 @@ function labelForEntry(entry: BodyEntry): string {
   }
 
   return entry.text;
-}
-
-// Splits on hard line breaks (`\n`, normalizing `\r\n`/`\r` first) so multi-line
-// backend output, errors, and prompts all keep their author-intended rows, then
-// wraps each line to `columns`. The display sanitizer preserves `\n` as a real
-// layout character, so newlines here are trusted content rather than escaped.
-function wrapBodyText(text: string, columns: number): string[] {
-  const wrappedRows: string[] = [];
-  const hardLines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-
-  for (const line of hardLines) {
-    if (line.length === 0) {
-      wrappedRows.push('');
-      continue;
-    }
-
-    for (let start = 0; start < line.length; start += columns) {
-      wrappedRows.push(line.slice(start, start + columns));
-    }
-  }
-
-  return wrappedRows;
 }

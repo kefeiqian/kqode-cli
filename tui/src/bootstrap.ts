@@ -15,6 +15,7 @@ import {
   enterAlternateScreen,
   leaveAlternateScreen
 } from '@libs/terminal/alternateScreen.ts';
+import { DISABLE_SGR_MOUSE_TRACKING } from '@libs/terminal/mouse.ts';
 import { resolveSessionSeed } from '@components/AppExitSummary/resolveSessionSeed.ts';
 import { windowColumnsAtom, windowRowsAtom } from '@state/ui/index.ts';
 import {
@@ -131,6 +132,7 @@ export async function createAppRuntime({
   // redundant restore. Mirror the enter order on teardown: reset the background
   // and window title, then leave the alt buffer.
   const restoreTerminal = () => {
+    process.stdout.write(DISABLE_SGR_MOUSE_TRACKING);
     resetTerminalBackground();
     resetTerminalWindowTitle();
     leaveAlternateScreen();

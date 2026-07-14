@@ -6,8 +6,20 @@ import {
   enqueuePromptAtom,
   promptQueueAtom
 } from '@state/promptQueue/atoms.ts';
+import { backendClientAtom } from '@state/global/index.ts';
 import { BACKEND_UNAVAILABLE_MESSAGE } from '@libs/promptQueue/promptQueue.ts';
 import { bodyScrollOffsetRowsAtom, submittedPromptEntriesAtom } from '@state/ui/index.ts';
+import type { BackendClient, StreamOutcome } from '@contracts/backend/index.ts';
+
+async function waitForCondition(condition: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (condition()) {
+      return;
+    }
+    await Promise.resolve();
+  }
+  throw new Error('condition was not met');
+}
 
 describe('enqueuePromptAtom', () => {
   it('settles a visible error entry when no backend client is wired into the seam', async () => {
@@ -19,6 +31,37 @@ describe('enqueuePromptAtom', () => {
     const errorEntry = entries.find((entry) => entry.kind === 'error');
     expect(errorEntry).toBeDefined();
     expect(errorEntry?.text).toContain(BACKEND_UNAVAILABLE_MESSAGE);
+  });
+
+  it('does not promote queued prompts when a cleared active turn settles late', async () => {
+    const store = createStore();
+    const resolvers: Array<(outcome: StreamOutcome) => void> = [];
+    const backendClient: BackendClient = {
+      gitStatus: async () => null,
+      submitStreaming: async () =>
+        new Promise<StreamOutcome>((resolve) => {
+          resolvers.push(resolve);
+        })
+    };
+    store.set(backendClientAtom, backendClient);
+
+    const first = store.set(enqueuePromptAtom, 'first');
+    store.set(clearTranscriptAtom);
+    const second = store.set(enqueuePromptAtom, 'second');
+    const third = store.set(enqueuePromptAtom, 'third');
+
+    resolvers[0]?.({ kind: 'needsConfiguration' });
+    await waitForCondition(() => resolvers.length === 2);
+
+    expect(store.get(promptQueueAtom).map((item) => ({ text: item.text, state: item.state }))).toEqual([
+      { text: 'second', state: 'active' },
+      { text: 'third', state: 'queued' }
+    ]);
+
+    resolvers[1]?.({ kind: 'needsConfiguration' });
+    await waitForCondition(() => resolvers.length === 3);
+    resolvers[2]?.({ kind: 'needsConfiguration' });
+    await Promise.all([first, second, third]);
   });
 });
 

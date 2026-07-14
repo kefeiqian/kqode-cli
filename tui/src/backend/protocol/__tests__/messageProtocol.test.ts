@@ -23,6 +23,7 @@ import {
 type PairedConnections = {
   client: MessageConnection;
   server: MessageConnection;
+  closeTransport: () => void;
   dispose: () => void;
 };
 
@@ -45,6 +46,10 @@ function pairedConnections(): PairedConnections {
   const pair: PairedConnections = {
     client,
     server,
+    closeTransport: () => {
+      clientToServer.end();
+      serverToClient.end();
+    },
     dispose: () => {
       client.dispose();
       server.dispose();
@@ -158,6 +163,36 @@ describe('message protocol client', () => {
     await expect(submit).rejects.toBeInstanceOf(BackendClientError);
     await expect(submit).rejects.toMatchObject({ kind: BackendErrorKind.Protocol });
   });
+
+  it('rejects when a streamed turn idles after the ack', async () => {
+    const { client, server } = pairedConnections();
+    server.onRequest(messageSubmitRequest, ({ turnId }) => ({
+      turnId,
+      status: SUBMIT_STATUS_STREAMING
+    }));
+
+    const submit = createMessageConnectionClient(client, { streamIdleTimeoutMs: 20 }).submitStreaming(
+      { text: 'wedged' },
+      { onDelta: () => {} }
+    );
+
+    await expect(submit).rejects.toMatchObject({ kind: BackendErrorKind.Timeout });
+  });
+
+  it('rejects when the connection closes while a streamed turn is active', async () => {
+    const { client, server, closeTransport } = pairedConnections();
+    server.onRequest(messageSubmitRequest, ({ turnId }) => {
+      queueMicrotask(closeTransport);
+      return { turnId, status: SUBMIT_STATUS_STREAMING };
+    });
+
+    const submit = createMessageConnectionClient(client).submitStreaming(
+      { text: 'crash' },
+      { onDelta: () => {} }
+    );
+
+    await expect(submit).rejects.toMatchObject({ kind: BackendErrorKind.Transport });
+  });
 });
 
 describe('git status request', () => {
@@ -189,5 +224,6 @@ describe('git status request', () => {
 
     await expect(status).rejects.toBeInstanceOf(BackendClientError);
     await expect(status).rejects.toMatchObject({ kind: BackendErrorKind.Protocol });
+    await expect(status).rejects.toThrow('git status');
   });
 });

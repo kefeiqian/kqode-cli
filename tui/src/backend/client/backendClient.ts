@@ -4,6 +4,8 @@ import type { BackendClient } from '@contracts/backend/index.ts';
 import { DEFAULT_REQUEST_TIMEOUT_MS, DEFAULT_STARTUP_TIMEOUT_MS } from '@constants/backend.ts';
 import type { LaunchedBackend } from '@backend/process/backendProcess.ts';
 import { createMessageConnectionClient } from '@backend/client/messageConnectionClient.ts';
+import { BackendLifecycleState } from '@backend/client/backendLifecycle.ts';
+import type { BackendLifecycleState as BackendLifecycleStateValue } from '@backend/client/backendLifecycle.ts';
 import { openReadyConnection } from '@backend/client/backendReadiness.ts';
 import {
   isFatalBackendError,
@@ -15,26 +17,11 @@ import type {
   StreamSubmitParams
 } from '@contracts/backend/index.ts';
 
-/** Lifecycle of the TUI-owned backend connection. */
-export const BackendLifecycleState = {
-  /** No backend has been launched yet. */
-  Idle: 'idle',
-  /** A backend launch/connect is in flight. */
-  Starting: 'starting',
-  /** The backend is connected and accepting requests. */
-  Ready: 'ready',
-  /** The TUI is disposing the backend on purpose. */
-  Closing: 'closing',
-  /** The backend exited, crashed, or a fatal transport error occurred. */
-  Dead: 'dead'
-} as const;
-
-export type BackendLifecycleState =
-  (typeof BackendLifecycleState)[keyof typeof BackendLifecycleState];
+export { BackendLifecycleState };
 
 /** Lifecycle handle over a {@link BackendClient} that owns one child backend at a time. */
 export type BackendClientHandle = BackendClient & {
-  getState(): BackendLifecycleState;
+  getState(): BackendLifecycleStateValue;
   ensureStarted(): Promise<void>;
   dispose(): void;
 };
@@ -44,6 +31,7 @@ export type BackendClientOptions = {
   /** Produces a freshly launched backend process; source/packaged factories inject this. */
   launch: () => Promise<LaunchedBackend>;
   requestTimeoutMs?: number;
+  streamIdleTimeoutMs?: number;
   /** Ceiling for the launched backend to signal JSON-RPC readiness before it is torn down. */
   startupTimeoutMs?: number;
 };
@@ -69,10 +57,11 @@ type BackendSession = {
  */
 export function createBackendClient(options: BackendClientOptions): BackendClientHandle {
   const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+  const streamIdleTimeoutMs = options.streamIdleTimeoutMs;
   const startupTimeoutMs = options.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS;
   const { launch } = options;
 
-  let state: BackendLifecycleState = BackendLifecycleState.Idle;
+  let state: BackendLifecycleStateValue = BackendLifecycleState.Idle;
   let session: BackendSession | null = null;
   let starting: Promise<BackendSession> | null = null;
   let disposed = false;
@@ -86,7 +75,7 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
       'backend launch was aborted before it became ready'
     );
 
-  const teardown = (nextState: BackendLifecycleState): void => {
+  const teardown = (nextState: BackendLifecycleStateValue): void => {
     const current = session;
     session = null;
     state = nextState;
@@ -145,7 +134,7 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     const opened: BackendSession = {
       backend,
       connection,
-      client: createMessageConnectionClient(connection, { requestTimeoutMs })
+      client: createMessageConnectionClient(connection, { requestTimeoutMs, streamIdleTimeoutMs })
     };
     session = opened;
     state = BackendLifecycleState.Ready;
@@ -194,14 +183,7 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
         throw disposedError();
       }
       const active = await ensureSession();
-      try {
-        return await active.client.gitStatus();
-      } catch (error) {
-        if (isFatalBackendError(error)) {
-          markDead();
-        }
-        throw error;
-      }
+      return active.client.gitStatus();
     },
     dispose() {
       disposed = true;

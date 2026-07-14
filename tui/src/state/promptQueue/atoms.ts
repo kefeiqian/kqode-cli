@@ -155,11 +155,13 @@ function updateStreamingText(
 function settleActive(set: Setter, id: number, result: BackendResult): void {
   set(promptQueueAtom, (queue) => {
     let promoted = false;
+    let settledTarget = false;
     return queue.map((item) => {
       if (item.id === id) {
+        settledTarget = true;
         return { ...item, state: 'settled' as const, result };
       }
-      if (!promoted && item.state === 'queued') {
+      if (settledTarget && !promoted && item.state === 'queued') {
         promoted = true;
         return { ...item, state: 'active' as const };
       }

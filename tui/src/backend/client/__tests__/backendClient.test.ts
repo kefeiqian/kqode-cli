@@ -14,6 +14,7 @@ import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.t
 import { type LaunchedBackend } from '@backend/process/backendProcess.ts';
 import { SUBMIT_STATUS_STREAMING } from '@contracts/backend/index.ts';
 import {
+  gitStatusRequest,
   messageSubmitRequest,
   backendReadyNotification,
   tokenDeltaNotification,
@@ -33,6 +34,7 @@ type FakeBackend = {
   launched: LaunchedBackend;
   disposed: () => boolean;
   emitExit: () => void;
+  closeTransport: () => void;
 };
 
 let openServers: MessageConnection[] = [];
@@ -90,6 +92,10 @@ function makeFakeBackend(
       for (const listener of exitListeners) {
         listener({ code: 1, signal: null });
       }
+    },
+    closeTransport: () => {
+      backendStdout.end();
+      backendStdin.end();
     }
   };
 }
@@ -145,6 +151,19 @@ describe('createBackendClient (fake backend)', () => {
     client.dispose();
   });
 
+  it('rejects with a transport error when the backend dies before readiness', async () => {
+    const fake = makeFakeBackend(ack, { signalReady: false });
+    const client = createBackendClient({ launch: async () => fake.launched });
+
+    const start = client.ensureStarted();
+    fake.closeTransport();
+
+    await expect(start).rejects.toMatchObject({ kind: BackendErrorKind.Transport });
+    expect(client.getState()).toBe(BackendLifecycleState.Dead);
+    expect(fake.disposed()).toBe(true);
+    client.dispose();
+  });
+
   it('keeps the backend alive after a recoverable JSON-RPC method error', async () => {
     const fake = makeFakeBackend((server) =>
       server.onRequest(messageSubmitRequest, () => {
@@ -192,6 +211,21 @@ describe('createBackendClient (fake backend)', () => {
     expect(result).toEqual({ kind: 'completed', text: 'second', finishReason: 'stop' });
     expect(client.getState()).toBe(BackendLifecycleState.Ready);
     expect(launch).toHaveBeenCalledTimes(2);
+    client.dispose();
+  });
+
+  it('does not mark the shared backend dead when best-effort git status times out', async () => {
+    const fake = makeFakeBackend((server) => {
+      ack(server);
+      server.onRequest(gitStatusRequest, () => new Promise(() => undefined));
+    });
+    const client = createBackendClient({ launch: async () => fake.launched, requestTimeoutMs: 50 });
+
+    await expect(client.gitStatus()).rejects.toMatchObject({ kind: BackendErrorKind.Timeout });
+    expect(client.getState()).toBe(BackendLifecycleState.Ready);
+
+    const result = await client.submitStreaming({ text: 'still alive' }, { onDelta: () => {} });
+    expect(result).toEqual({ kind: 'completed', text: 'still alive', finishReason: 'stop' });
     client.dispose();
   });
 

@@ -6,7 +6,12 @@
 //! formatting live here in the core runtime so the headless CLI and the TUI show
 //! the same string; the TUI only renders whatever label this returns.
 
-use std::process::{Command, Stdio};
+use std::{
+    io::Read,
+    process::{Command, Stdio},
+    thread,
+    time::{Duration, Instant},
+};
 
 /// Branch glyph prefixing every status label.
 const GIT_BRANCH_ICON: &str = "⎇";
@@ -24,6 +29,10 @@ const STATUS_UPSTREAM_SEPARATOR: &str = "...";
 const NO_COMMITS_BRANCH_PREFIX: &str = "No commits yet on ";
 /// Header text emitted for a detached HEAD.
 const DETACHED_HEAD_STATUS: &str = "HEAD (no branch)";
+/// Ceiling for the `git status` call before it is treated as unavailable.
+const GIT_STATUS_TIMEOUT: Duration = Duration::from_secs(2);
+/// Poll interval while waiting for a bounded `git status` child.
+const GIT_STATUS_POLL_INTERVAL: Duration = Duration::from_millis(10);
 /// Parsed porcelain status of the workspace worktree.
 #[derive(Debug, Eq, PartialEq)]
 struct GitStatus {
@@ -38,16 +47,38 @@ struct GitStatus {
 /// off the backend's request loop (e.g. on a thread).
 #[must_use]
 pub fn status_label() -> Option<String> {
-    let output = Command::new("git")
+    let mut child = Command::new("git")
         .args(["status", "--porcelain=v1", "--branch"])
         .stdin(Stdio::null())
-        .output()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
         .ok()?;
-    if !output.status.success() {
-        return None;
-    }
 
-    parse_status_label(&String::from_utf8_lossy(&output.stdout))
+    let deadline = Instant::now() + GIT_STATUS_TIMEOUT;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if !status.success() {
+                    return None;
+                }
+                let mut stdout = String::new();
+                child.stdout.take()?.read_to_string(&mut stdout).ok()?;
+                return parse_status_label(&stdout);
+            }
+            Ok(None) if Instant::now() >= deadline => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+            Ok(None) => thread::sleep(GIT_STATUS_POLL_INTERVAL),
+            Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
+    }
 }
 
 /// Formats the porcelain `git status --branch` output into a display label, or
