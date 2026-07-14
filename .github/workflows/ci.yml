@@ -5,6 +5,7 @@
 # unrelated build matrices:
 #   - rust: cargo fmt --check, clippy (warnings denied), build, and test.
 #   - tui:  cargo xtask tui-typecheck and tui-test (Bun + vscode-jsonrpc).
+#   - packaging: Node's built-in test runner for npm/Homebrew packaging helpers.
 #
 # Authenticity controls mirror the other workflows: read-only permissions and
 # third-party actions pinned by version. This workflow only reads the repo and
@@ -32,6 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
+      packaging: ${{ steps.paths.outputs.packaging }}
       rust: ${{ steps.paths.outputs.rust }}
       tui: ${{ steps.paths.outputs.tui }}
     steps:
@@ -58,6 +60,7 @@ jobs:
           fi
 
           git diff --name-only "$base" "$head" > changed-files.txt
+          packaging=false
           rust=false
           tui=false
 
@@ -73,12 +76,20 @@ jobs:
                 tui=true
                 ;;
             esac
+
+            case "$changed_path" in
+              .github/workflows/ci.yml|.github/workflows/homebrew-publish.yml|.github/workflows/npm-publish.yml|packaging/*)
+                packaging=true
+                ;;
+            esac
           done < changed-files.txt
 
           echo "Changed files:"
           cat changed-files.txt
+          echo "packaging=$packaging" >> "$GITHUB_OUTPUT"
           echo "rust=$rust" >> "$GITHUB_OUTPUT"
           echo "tui=$tui" >> "$GITHUB_OUTPUT"
+          echo "Packaging checks: $packaging"
           echo "Rust checks: $rust"
           echo "TUI checks: $tui"
 
@@ -123,3 +134,24 @@ jobs:
         run: cargo xtask tui-typecheck
       - name: Test
         run: cargo xtask tui-test
+
+  packaging:
+    name: Packaging (node tests)
+    needs: changes
+    if: needs.changes.outputs.packaging == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: npm packaging tests
+        run: node --test
+        working-directory: packaging/npm/kqode
+      - name: npm helper tests
+        run: node --test
+        working-directory: packaging/npm/scripts
+      - name: Homebrew packaging tests
+        run: node --test
+        working-directory: packaging/homebrew
