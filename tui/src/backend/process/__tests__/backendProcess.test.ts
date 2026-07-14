@@ -1,4 +1,6 @@
 import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
 import type { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -8,7 +10,7 @@ import {
   spawnBackend,
   type LaunchedBackend
 } from '@backend/process/backendProcess.ts';
-import { ACK_MESSAGE, MESSAGE_SUBMIT_METHOD } from '@contracts/backend/index.ts';
+import { MESSAGE_SUBMIT_METHOD, SUBMIT_STATUS_NEEDS_CONFIGURATION } from '@contracts/backend/index.ts';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..');
 const INTEGRATION_TIMEOUT_MS = 180_000;
@@ -20,7 +22,7 @@ function frameRequest(payload: unknown): Buffer {
 
 function readResponseFrame(
   stream: Readable
-): Promise<{ result: { message: string; receivedText: string } }> {
+): Promise<{ result: { turnId: string; status: string } }> {
   return new Promise((resolve, reject) => {
     let buffer = Buffer.alloc(0);
     const cleanup = () => {
@@ -62,12 +64,31 @@ function readResponseFrame(
   });
 }
 
-async function ackThroughLauncher(backend: LaunchedBackend, text: string): Promise<string> {
+async function submitThroughLauncher(
+  backend: LaunchedBackend,
+  text: string
+): Promise<{ turnId: string; status: string }> {
   const response = readResponseFrame(backend.stdout);
-  backend.stdin.write(frameRequest({ jsonrpc: '2.0', id: 1, method: MESSAGE_SUBMIT_METHOD, params: { text } }));
+  backend.stdin.write(
+    frameRequest({
+      jsonrpc: '2.0',
+      id: 1,
+      method: MESSAGE_SUBMIT_METHOD,
+      params: { text, turnId: 'turn-1' }
+    })
+  );
   const frame = await response;
-  expect(frame.result.message).toBe(ACK_MESSAGE);
-  return frame.result.receivedText;
+  return frame.result;
+}
+
+// Best-effort temp cleanup: on Windows a just-killed backend may still hold its
+// cwd handle for a moment; the OS reclaims the temp dir regardless.
+function safeRemove(dir: string): void {
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+  } catch {
+    /* ignore */
+  }
 }
 
 describe('spawnBackend', () => {
@@ -83,27 +104,36 @@ describe('spawnBackend', () => {
 
 describe('launchSourceBackend (integration)', () => {
   it(
-    'builds and launches the backend when invoked from the repo root workspace',
+    'builds and launches the backend and returns a well-formed ack',
     async () => {
-      const backend = await launchSourceBackend({ repoRoot, workspaceCwd: repoRoot });
+      // Provider setup lands later, so bootstrap submit deterministically returns
+      // needsConfiguration regardless of the workspace.
+      const workspaceCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-launch-'));
+      const backend = await launchSourceBackend({ repoRoot, workspaceCwd });
       try {
-        expect(await ackThroughLauncher(backend, 'hi from repo root')).toBe('hi from repo root');
+        const result = await submitThroughLauncher(backend, 'hi from a temp workspace');
+        expect(result.turnId).toBe('turn-1');
+        expect(result.status).toBe(SUBMIT_STATUS_NEEDS_CONFIGURATION);
       } finally {
         backend.dispose();
+        safeRemove(workspaceCwd);
       }
     },
     INTEGRATION_TIMEOUT_MS
   );
 
   it(
-    'preserves a distinct workspace cwd such as the dummy React fixture path',
+    'launches from a distinct workspace directory and still answers submit',
     async () => {
-      const workspaceCwd = path.join(repoRoot, 'tests', 'fixtures', 'dummy-react-app');
+      const workspaceCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-launch-alt-'));
       const backend = await launchSourceBackend({ repoRoot, workspaceCwd });
       try {
-        expect(await ackThroughLauncher(backend, 'café ☕')).toBe('café ☕');
+        const result = await submitThroughLauncher(backend, 'café ☕');
+        expect(result.turnId).toBe('turn-1');
+        expect(result.status).toBe(SUBMIT_STATUS_NEEDS_CONFIGURATION);
       } finally {
         backend.dispose();
+        safeRemove(workspaceCwd);
       }
     },
     INTEGRATION_TIMEOUT_MS

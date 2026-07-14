@@ -2,7 +2,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 /** Per-user KQode home directory holding local runtime/data state. */
-export const KQODE_HOME_DIRNAME = '.kqcode';
+export const KQODE_HOME_DIRNAME = '.kqode';
 
 /** Subdirectory under the KQode home for materialized backend binaries. */
 export const BACKENDS_DIRNAME = 'backends';
@@ -10,7 +10,7 @@ export const BACKENDS_DIRNAME = 'backends';
 /** Base name of the materialized packaged backend binary. */
 export const PACKAGED_BACKEND_BASENAME = 'kqode-backend';
 
-/** Default per-user cache base, e.g. `~/.kqcode`. */
+/** Default per-user cache base, e.g. `~/.kqode`. */
 export function defaultCacheBaseDir(homeDir: string = os.homedir()): string {
   return path.join(homeDir, KQODE_HOME_DIRNAME);
 }
@@ -21,7 +21,7 @@ export function packagedBackendBinaryName(platform: NodeJS.Platform = process.pl
 }
 
 export type PackagedBackendPaths = {
-  /** Content-addressed directory, e.g. `~/.kqcode/backends/0.1.0/<sha256>`. */
+  /** Content-addressed directory, e.g. `~/.kqode/backends/0.1.0/<sha256>`. */
   runtimeDir: string;
   /** Absolute path to the materialized backend binary inside `runtimeDir`. */
   binaryPath: string;

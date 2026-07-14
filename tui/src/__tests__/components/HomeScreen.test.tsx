@@ -11,7 +11,7 @@ import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import {
   bodyEntriesAtom,
   columnsTestOverrideAtom,
-  gitStatusLabelTestOverrideAtom,
+  gitStatusLabelAtom,
   rowsTestOverrideAtom
 } from '@state/ui/index.ts';
 import { productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
@@ -19,6 +19,9 @@ import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 import { theme } from '@theme/themeConfig.ts';
 
+// Build the workspace under the real home dir (not a hard-coded C:\ string) so
+// formatDisplayCwd collapses it to a `~`-relative path on every OS, keeping the
+// cwd-row assertions valid on the Linux CI runner as well as Windows.
 const workspaceCwd = path.join(os.homedir(), 'Projects', 'KQode');
 const displayCwd = `~${path.sep}${path.join('Projects', 'KQode')}`;
 const projectsKQode = path.join('Projects', 'KQode');
@@ -44,7 +47,7 @@ function renderHomeScreen({
   store.set(productVersionAtom, productVersion);
   store.set(workspaceCwdAtom, screenWorkspaceCwd);
   if (gitStatusLabel !== undefined) {
-    store.set(gitStatusLabelTestOverrideAtom, gitStatusLabel);
+    store.set(gitStatusLabelAtom, gitStatusLabel);
   }
   if (columns !== undefined) {
     store.set(columnsTestOverrideAtom, columns);

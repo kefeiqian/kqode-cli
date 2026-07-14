@@ -1,6 +1,7 @@
 import type { createStore } from 'jotai';
 import type { BackendClient } from '@contracts/backend/index.ts';
 import { backendClientAtom } from '@state/global/backend.ts';
+import { refreshGitStatusAtom } from '@state/ui/gitStatus.ts';
 import { BACKEND_LOADING_HINT, startupStatusHintAtom } from '@state/ui/statusHint.ts';
 
 type Store = ReturnType<typeof createStore>;
@@ -28,6 +29,10 @@ export function startBackendRuntime(store: Store, client: RuntimeBackendClient):
 
   void client
     .ensureStarted()
+    .then(() => {
+      // Backend is ready: fetch the initial git label off the render path.
+      void store.set(refreshGitStatusAtom);
+    })
     .catch(() => {
       // Keep the Dead-state client in the seam (do not dispose or clear it): the
       // next submit retries through ensureSession() and, on repeat failure,

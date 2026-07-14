@@ -1,6 +1,20 @@
-import { NotificationType0, RequestType } from 'vscode-jsonrpc';
-import { BACKEND_READY_METHOD, MESSAGE_SUBMIT_METHOD } from '@contracts/backend/index.ts';
-import type { MessageSubmitParams, MessageSubmitResult } from '@contracts/backend/index.ts';
+import { NotificationType, NotificationType0, RequestType, RequestType0 } from 'vscode-jsonrpc';
+import {
+  BACKEND_READY_METHOD,
+  GIT_STATUS_METHOD,
+  MESSAGE_SUBMIT_METHOD,
+  TOKEN_DELTA_METHOD,
+  TURN_END_METHOD,
+  TURN_ERROR_METHOD
+} from '@contracts/backend/index.ts';
+import type {
+  GitStatusResult,
+  MessageSubmitParams,
+  MessageSubmitResult,
+  TokenDeltaParams,
+  TurnEndParams,
+  TurnErrorParams
+} from '@contracts/backend/index.ts';
 
 /**
  * Typed request descriptor for `kqode.message.submit`.
@@ -14,6 +28,15 @@ export const messageSubmitRequest = new RequestType<MessageSubmitParams, Message
 );
 
 /**
+ * Typed descriptor for the parameterless `kqode.git.status` request.
+ *
+ * The backend queries `git` in its own workspace cwd, so the request carries no
+ * params; it resolves with the formatted label (or `null`). The method name and
+ * result shape come from the dependency-free `@contracts` seam.
+ */
+export const gitStatusRequest = new RequestType0<GitStatusResult, void>(GIT_STATUS_METHOD);
+
+/**
  * Typed descriptor for the backend's one-shot readiness notification.
  *
  * The backend sends this parameterless notification the moment it can serve
@@ -22,3 +45,12 @@ export const messageSubmitRequest = new RequestType<MessageSubmitParams, Message
  * and TypeScript sides stay in lockstep.
  */
 export const backendReadyNotification = new NotificationType0(BACKEND_READY_METHOD);
+
+/** Streamed assistant-text chunk for an in-flight turn. */
+export const tokenDeltaNotification = new NotificationType<TokenDeltaParams>(TOKEN_DELTA_METHOD);
+
+/** Terminal "turn finished" notification carrying the finish reason. */
+export const turnEndNotification = new NotificationType<TurnEndParams>(TURN_END_METHOD);
+
+/** Terminal "turn failed" notification carrying a sanitized provider error. */
+export const turnErrorNotification = new NotificationType<TurnErrorParams>(TURN_ERROR_METHOD);

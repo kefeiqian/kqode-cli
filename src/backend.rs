@@ -1,10 +1,11 @@
-use std::{error::Error, fmt};
+use std::{error::Error, fmt, thread};
 
 use lsp_server::{Connection, Message, Notification, Request, Response};
 
+use crate::git;
 use crate::protocol::{
-    BACKEND_READY_METHOD, JSON_RPC_INVALID_PARAMS, JSON_RPC_METHOD_NOT_FOUND, MessageSubmitParams,
-    MessageSubmitResult, RpcMethod,
+    BACKEND_READY_METHOD, GitStatusResult, JSON_RPC_INVALID_PARAMS, JSON_RPC_METHOD_NOT_FOUND,
+    MessageSubmitParams, MessageSubmitResult, RpcMethod, SUBMIT_STATUS_NEEDS_CONFIGURATION,
 };
 
 #[derive(Debug)]
@@ -27,6 +28,11 @@ impl Error for BackendError {}
 /// Emits a single [`BACKEND_READY_METHOD`] notification as soon as the stdio
 /// transport is established and before any request is handled, so clients bound
 /// startup on real JSON-RPC readiness rather than the OS process-spawn event.
+///
+/// After the receive loop ends (stdin closed), [`io_threads.join`] blocks until
+/// every `connection.sender` clone is dropped. Deferred handlers such as
+/// [`spawn_git_status`] hold such clones, so an in-flight response is flushed to
+/// stdout before the process exits rather than being cut off.
 ///
 /// # Errors
 ///
@@ -69,15 +75,9 @@ fn run_loop(connection: Connection) -> Result<(), BackendError> {
     while let Ok(message) = connection.receiver.recv() {
         match message {
             Message::Request(request) => {
-                let response = handle_request(request);
-                connection
-                    .sender
-                    .send(Message::Response(response))
-                    .map_err(|error| {
-                        BackendError::Transport(format!(
-                            "failed to write JSON-RPC response: {error}"
-                        ))
-                    })?;
+                if let Some(response) = handle_request(request, &connection) {
+                    send_response(&connection, response)?;
+                }
             }
             Message::Notification(_) => {}
             Message::Response(_) => {
@@ -91,21 +91,83 @@ fn run_loop(connection: Connection) -> Result<(), BackendError> {
     Ok(())
 }
 
-fn handle_request(request: Request) -> Response {
-    if request.method != RpcMethod::MessageSubmit.as_str() {
-        return Response::new_err(
+/// Writes one response over the transport, mapping a closed writer to a
+/// [`BackendError::Transport`].
+fn send_response(connection: &Connection, response: Response) -> Result<(), BackendError> {
+    connection
+        .sender
+        .send(Message::Response(response))
+        .map_err(|error| {
+            BackendError::Transport(format!("failed to write JSON-RPC response: {error}"))
+        })
+}
+
+/// Dispatches one JSON-RPC request.
+///
+/// Returns `Some(response)` to answer synchronously, or `None` when the handler
+/// owns its response and will send it later. `kqode.message.submit` answers
+/// immediately with a configuration-required ack in this bootstrap slice;
+/// `kqode.git.status` runs on a spawned thread and sends its response deferred,
+/// so a slow `git` never stalls the receive loop.
+fn handle_request(request: Request, connection: &Connection) -> Option<Response> {
+    match RpcMethod::from_method(&request.method) {
+        Some(RpcMethod::MessageSubmit) => Some(handle_message_submit(request, connection)),
+        Some(RpcMethod::GitStatus) => {
+            spawn_git_status(request, connection);
+            None
+        }
+        None => Some(Response::new_err(
             request.id,
             JSON_RPC_METHOD_NOT_FOUND,
             format!("unsupported method `{}`", request.method),
-        );
+        )),
     }
+}
 
-    match serde_json::from_value::<MessageSubmitParams>(request.params) {
-        Ok(params) => Response::new_ok(request.id, MessageSubmitResult::from(params)),
-        Err(error) => Response::new_err(
-            request.id,
-            JSON_RPC_INVALID_PARAMS,
-            format!("invalid message submit params: {error}"),
-        ),
-    }
+/// Handles `kqode.message.submit`.
+///
+/// Provider configuration lands in a later queue item, so this bootstrap handler
+/// accepts the streaming-ready wire shape but never reads plaintext credentials.
+fn handle_message_submit(request: Request, _connection: &Connection) -> Response {
+    let params = match serde_json::from_value::<MessageSubmitParams>(request.params) {
+        Ok(params) => params,
+        Err(error) => {
+            return Response::new_err(
+                request.id,
+                JSON_RPC_INVALID_PARAMS,
+                format!("invalid message submit params: {error}"),
+            );
+        }
+    };
+
+    let MessageSubmitParams { turn_id, .. } = params;
+
+    Response::new_ok(
+        request.id,
+        MessageSubmitResult {
+            turn_id,
+            status: SUBMIT_STATUS_NEEDS_CONFIGURATION,
+        },
+    )
+}
+
+/// Spawns a detached thread that computes the workspace git label and sends the
+/// deferred response for `request`.
+///
+/// Running `git` off the receive loop keeps a slow or hung call from stalling
+/// other requests; the thread's `sender` clone also keeps the transport alive
+/// until the response is flushed, so the answer is not lost if stdin closes
+/// first (see the shutdown note in [`run_stdio`]).
+fn spawn_git_status(request: Request, connection: &Connection) {
+    let id = request.id;
+    let sender = connection.sender.clone();
+    thread::spawn(move || {
+        let response = Response::new_ok(
+            id,
+            GitStatusResult {
+                label: git::status_label(),
+            },
+        );
+        let _ = sender.send(Message::Response(response));
+    });
 }

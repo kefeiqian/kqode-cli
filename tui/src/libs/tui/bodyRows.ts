@@ -53,7 +53,45 @@ function toBodyRowsWithEntryGaps(entries: readonly BodyEntry[], columns: number)
   return entries.flatMap((entry) => toBodyRows(entry, columns));
 }
 
+// Wrapping a `BodyEntry` depends only on its immutable kind/text and the column
+// width, so memoize the rendered rows per entry identity and width. During
+// streaming only the changed entry is a fresh object (new identity), so the rest
+// of the transcript hits the cache instead of re-wrapping on every token/render;
+// resizes and scrolls reuse it too. Entries are GC'd from the WeakMap once the
+// transcript drops them (e.g. on `/clear`).
+// NOTE: assumes `theme` colors are static for the process. If runtime theming is
+// added, include the active theme in the cache key.
+const MAX_CACHED_WIDTHS = 4;
+const bodyRowsByEntry = new WeakMap<BodyEntry, Map<number, BodyRow[]>>();
+
 function toBodyRows(entry: BodyEntry, columns: number): BodyRow[] {
+  let rowsByWidth = bodyRowsByEntry.get(entry);
+  if (rowsByWidth === undefined) {
+    rowsByWidth = new Map();
+    bodyRowsByEntry.set(entry, rowsByWidth);
+  }
+
+  const cached = rowsByWidth.get(columns);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  // Bound the per-entry width cache so a continuous terminal resize (many
+  // distinct widths) cannot grow it without limit; the current and scrollbar
+  // widths always stay resident.
+  if (rowsByWidth.size >= MAX_CACHED_WIDTHS) {
+    const oldest = rowsByWidth.keys().next().value;
+    if (oldest !== undefined) {
+      rowsByWidth.delete(oldest);
+    }
+  }
+
+  const rows = computeBodyRows(entry, columns);
+  rowsByWidth.set(columns, rows);
+  return rows;
+}
+
+function computeBodyRows(entry: BodyEntry, columns: number): BodyRow[] {
   if (entry.kind === BodyEntryKind.User) {
     return toPromptRows(entry.text, columns);
   }
