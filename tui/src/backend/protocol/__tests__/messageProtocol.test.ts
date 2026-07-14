@@ -198,20 +198,20 @@ describe('message protocol client', () => {
 describe('git status request', () => {
   it('resolves the formatted label the backend returns', async () => {
     const { client, server } = pairedConnections();
-    server.onRequest(gitStatusRequest, () => ({ label: '⎇ main*' }));
+    server.onRequest(gitStatusRequest, () => ({ label: '⎇ main*', pullRequestLabel: '#3' }));
 
-    const label = await createMessageConnectionClient(client).gitStatus();
+    const status = await createMessageConnectionClient(client).gitStatus();
 
-    expect(label).toBe('⎇ main*');
+    expect(status).toEqual({ label: '⎇ main*', pullRequestLabel: '#3' });
   });
 
   it('resolves null when the workspace is not a git repository', async () => {
     const { client, server } = pairedConnections();
-    server.onRequest(gitStatusRequest, () => ({ label: null }));
+    server.onRequest(gitStatusRequest, () => ({ label: null, pullRequestLabel: null }));
 
-    const label = await createMessageConnectionClient(client).gitStatus();
+    const status = await createMessageConnectionClient(client).gitStatus();
 
-    expect(label).toBeNull();
+    expect(status).toBeNull();
   });
 
   it('surfaces a JSON-RPC error as a typed protocol client error', async () => {

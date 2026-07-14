@@ -135,13 +135,18 @@ export function createMessageConnectionClient(
         );
       });
     },
-    async gitStatus(): Promise<string | null> {
+    async gitStatus() {
       try {
         const result = await withRequestTimeout(
           connection.sendRequest(gitStatusRequest),
           requestTimeoutMs
         );
-        return result.label;
+        return result.label === null
+          ? null
+          : {
+              label: result.label,
+              pullRequestLabel: result.pullRequestLabel ?? undefined
+            };
       } catch (error) {
         throw toBackendClientError('git status', error);
       }

@@ -7,11 +7,12 @@ import { App } from '@/App.tsx';
 import { BodyPane } from '@components/BodyPane.tsx';
 import { formatDisplayCwd } from '@libs/tui/cwdLine.ts';
 import type { BodyEntry } from '@libs/tui/bodyRows.ts';
+import type { GitStatus } from '@contracts/backend/index.ts';
 import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import {
   bodyEntriesAtom,
   columnsTestOverrideAtom,
-  gitStatusLabelAtom,
+  gitStatusAtom,
   rowsTestOverrideAtom
 } from '@state/ui/index.ts';
 import { productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
@@ -29,7 +30,7 @@ const projectsKQode = path.join('Projects', 'KQode');
 type RenderHomeScreenOptions = {
   productVersion?: string;
   workspaceCwd?: string;
-  gitStatusLabel?: string;
+  gitStatus?: GitStatus;
   columns?: number;
   rows?: number;
   bodyEntries?: readonly BodyEntry[];
@@ -38,7 +39,7 @@ type RenderHomeScreenOptions = {
 function renderHomeScreen({
   productVersion = '0.1.0',
   workspaceCwd: screenWorkspaceCwd = workspaceCwd,
-  gitStatusLabel,
+  gitStatus,
   columns,
   rows,
   bodyEntries
@@ -46,8 +47,8 @@ function renderHomeScreen({
   const store = createStore();
   store.set(productVersionAtom, productVersion);
   store.set(workspaceCwdAtom, screenWorkspaceCwd);
-  if (gitStatusLabel !== undefined) {
-    store.set(gitStatusLabelAtom, gitStatusLabel);
+  if (gitStatus !== undefined) {
+    store.set(gitStatusAtom, gitStatus);
   }
   if (columns !== undefined) {
     store.set(columnsTestOverrideAtom, columns);
@@ -214,9 +215,12 @@ describe('HomeScreen', () => {
     expect(outputRows.at(2)).toContain('  IJKLMNOPQRSTUVWXYZ');
   });
 
-  it('formats the cwd row with a home-relative path and bracketed git status', () => {
+  it('formats the cwd row with home-relative path, git status, and PR status', () => {
     const { lastFrame } = renderHomeScreen({
-      gitStatusLabel: '⎇ feat/first-ink-tui-jsonrpc-backend*+%',
+      gitStatus: {
+        label: '⎇ feat/first-ink-tui-jsonrpc-backend*+%',
+        pullRequestLabel: '#3'
+      },
       columns: 100,
       rows: 20
     });
@@ -224,7 +228,7 @@ describe('HomeScreen', () => {
     const output = lastFrame() ?? '';
 
     expect(formatDisplayCwd(workspaceCwd)).toBe(displayCwd);
-    expect(output).toContain(`${displayCwd} [⎇ feat/first-ink-tui-jsonrpc-backend*+%]`);
+    expect(output).toContain(`${displayCwd} [⎇ feat/first-ink-tui-jsonrpc-backend*+%] [#3]`);
     expect(output).not.toContain('cwd ');
   });
 

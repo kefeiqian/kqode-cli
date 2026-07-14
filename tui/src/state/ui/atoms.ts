@@ -13,7 +13,7 @@ import { clamp } from '@libs/math/clamp.ts';
 import { workspaceCwdAtom } from '@state/global/index.ts';
 import { bodyEntriesAtom } from '@state/ui/body.ts';
 import { columnsAtom, rowsAtom } from '@state/ui/dimensions.ts';
-import { gitStatusLabelAtom } from '@state/ui/gitStatus.ts';
+import { gitStatusAtom } from '@state/ui/gitStatus.ts';
 import { commandMenuDesiredRowsAtom, commandMenuOpenAtom } from '@state/ui/commands/index.ts';
 import { PROMPT_PREFIX } from '@constants/ui.ts';
 import {
@@ -39,7 +39,7 @@ export const cwdRowsAtom = atom((get) => {
   if (get(commandMenuOpenAtom)) {
     return 0;
   }
-  return countCwdRows(get(workspaceCwdAtom), get(gitStatusLabelAtom), get(columnsAtom));
+  return countCwdRows(get(workspaceCwdAtom), get(gitStatusAtom), get(columnsAtom));
 });
 
 export const displayedBodyEntriesAtom = atom((get) => {

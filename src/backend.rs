@@ -162,10 +162,12 @@ fn spawn_git_status(request: Request, connection: &Connection) {
     let id = request.id;
     let sender = connection.sender.clone();
     thread::spawn(move || {
+        let status = git::status();
         let response = Response::new_ok(
             id,
             GitStatusResult {
-                label: git::status_label(),
+                label: status.as_ref().map(|status| status.label.clone()),
+                pull_request_label: status.and_then(|status| status.pull_request_label),
             },
         );
         let _ = sender.send(Message::Response(response));

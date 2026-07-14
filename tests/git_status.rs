@@ -35,4 +35,9 @@ fn git_status_returns_a_formatted_label_for_the_workspace() {
         label.starts_with("⎇ "),
         "label should start with the branch glyph: {label}"
     );
+    assert!(
+        frames[0]["result"]["pullRequestLabel"].is_null()
+            || frames[0]["result"]["pullRequestLabel"].is_string(),
+        "pull request label should be null or a string"
+    );
 }

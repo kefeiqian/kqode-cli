@@ -48,6 +48,12 @@ export type StreamOutcome =
   | { kind: 'error'; errorKind: string; message: string }
   | { kind: 'needsConfiguration' };
 
+/** Workspace source-control status already formatted by the Rust backend. */
+export type GitStatus = {
+  label: string;
+  pullRequestLabel?: string;
+};
+
 /**
  * Narrow backend seam the TUI uses for streaming chat turns.
  *
@@ -60,10 +66,10 @@ export type StreamOutcome =
 export type BackendClient = {
   submitStreaming(params: StreamSubmitParams, callbacks: StreamCallbacks): Promise<StreamOutcome>;
   /**
-   * Fetches the workspace git status label (e.g. `⎇ main*`), or `null` when the
-   * workspace is not a git repository or `git` could not be queried. Rejects
-   * with a {@link BackendClientError} on transport/timeout failure. The backend
-   * formats the label; the TUI renders it verbatim.
+   * Fetches the workspace git/PR status, or `null` when the workspace is not a
+   * git repository or `git` could not be queried. Rejects with a
+   * {@link BackendClientError} on transport/timeout failure. The backend formats
+   * display segments; the TUI only wraps them.
    */
-  gitStatus(): Promise<string | null>;
+  gitStatus(): Promise<GitStatus | null>;
 };

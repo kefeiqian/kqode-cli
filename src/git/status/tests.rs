@@ -1,4 +1,8 @@
-use super::{format_label, parse_status, parse_status_label};
+use super::{format_label, format_pull_request_label, parse_pull_request_number, parse_status};
+
+fn parse_status_label(porcelain: &str) -> Option<String> {
+    parse_status(porcelain).map(|status| format_label(&status))
+}
 
 #[test]
 fn formats_branch_with_staged_unstaged_and_untracked_flags() {
@@ -69,6 +73,12 @@ fn treats_untracked_entries_as_untracked_only() {
     assert!(!status.has_staged_changes);
     assert!(!status.has_unstaged_changes);
     assert_eq!(format_label(&status), "⎇ main%");
+}
+
+#[test]
+fn formats_pull_request_label_from_number() {
+    assert_eq!(parse_pull_request_number("3\n"), Some(3));
+    assert_eq!(format_pull_request_label(3), "#3");
 }
 
 #[test]

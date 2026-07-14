@@ -178,7 +178,7 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
         throw error;
       }
     },
-    async gitStatus(): Promise<string | null> {
+    async gitStatus() {
       if (disposed) {
         throw disposedError();
       }
