@@ -232,6 +232,26 @@ describe('HomeScreen', () => {
     expect(output).not.toContain('cwd ');
   });
 
+  it('renders the PR label as a dotted-underline OSC 8 hyperlink when a PR url is present', () => {
+    const { lastFrame } = renderHomeScreen({
+      gitStatus: {
+        label: '⎇ main*',
+        pullRequestLabel: '#3',
+        pullRequestUrl: 'https://github.com/o/r/pull/3'
+      },
+      columns: 100,
+      rows: 20
+    });
+
+    const output = lastFrame() ?? '';
+
+    // OSC 8 hyperlink pointing at the PR, wrapping a #3 that carries a primed
+    // dotted underline (4m then 4:3m) with its 24m reset intact.
+    expect(output).toContain(
+      '\u001B]8;;https://github.com/o/r/pull/3\u0007\u001B[4m\u001B[4:3m#3\u001B[24m'
+    );
+  });
+
   it('soft-wraps a long cwd without truncating it', () => {
     const longWorkspace = path.join(
       workspaceCwd,

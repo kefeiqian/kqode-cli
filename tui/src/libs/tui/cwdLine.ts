@@ -1,13 +1,52 @@
 import os from 'node:os';
 import path from 'node:path';
 import type { GitStatus } from '@contracts/backend/index.ts';
+import { dottedUnderline, hyperlink } from '@libs/terminal/hyperlink.ts';
 
-export function formatCwdLine(workspaceCwd: string, gitStatus?: GitStatus): string {
+/** The cwd + git-label prefix shared by the plain and decorated renderings. */
+function cwdAndGitPrefix(workspaceCwd: string, gitStatus?: GitStatus): string {
   const cwdSegment = formatDisplayCwd(workspaceCwd);
   const gitSegment = gitStatus === undefined ? '' : ` [${gitStatus.label}]`;
+  return `${cwdSegment}${gitSegment}`;
+}
+
+/**
+ * The cwd row as plain text (no escape sequences), e.g. `~/proj [⎇ main*] [#3]`.
+ *
+ * Width and wrap math ({@link countCwdRows}) measure this string;
+ * {@link renderCwdLine} produces the display string, which has the same visible
+ * characters plus zero-width decoration, so both agree on the row's width.
+ */
+export function formatCwdLine(workspaceCwd: string, gitStatus?: GitStatus): string {
   const pullRequestSegment =
     gitStatus?.pullRequestLabel === undefined ? '' : ` [${gitStatus.pullRequestLabel}]`;
-  return `${cwdSegment}${gitSegment}${pullRequestSegment}`;
+  return `${cwdAndGitPrefix(workspaceCwd, gitStatus)}${pullRequestSegment}`;
+}
+
+/**
+ * The cwd row for display: identical visible text to {@link formatCwdLine}, but
+ * when the status carries a pull-request URL the PR label (e.g. `#3`) is wrapped
+ * in a dotted underline and an OSC 8 hyperlink so supporting terminals render it
+ * as a clickable link. Only zero-width escapes are added, so {@link formatCwdLine}
+ * stays the source of truth for width.
+ */
+export function renderCwdLine(workspaceCwd: string, gitStatus?: GitStatus): string {
+  return `${cwdAndGitPrefix(workspaceCwd, gitStatus)}${renderPullRequestSegment(gitStatus)}`;
+}
+
+/**
+ * The ` [#3]` pull-request segment for display. The label is decorated (dotted
+ * underline + OSC 8 link) only when a URL is present, so a bare label never
+ * implies a link that cannot be opened.
+ */
+function renderPullRequestSegment(gitStatus?: GitStatus): string {
+  const label = gitStatus?.pullRequestLabel;
+  if (label === undefined) {
+    return '';
+  }
+  const url = gitStatus?.pullRequestUrl;
+  const rendered = url === undefined ? label : hyperlink(dottedUnderline(label), url);
+  return ` [${rendered}]`;
 }
 
 export function countCwdRows(
