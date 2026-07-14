@@ -30,6 +30,7 @@ describe('MemoryForm', () => {
     expect(frame).toContain('Add project memory');
     expect(frame).toContain('Title:');
     expect(frame).toContain('Body:');
+    expect(frame).not.toContain('›');
     for (const line of frame.split('\n')) {
       expect(line.length).toBeLessThanOrEqual(30);
     }

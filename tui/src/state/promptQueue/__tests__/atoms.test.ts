@@ -42,6 +42,8 @@ import {
   visibleBodyRowsAtom
 } from '@state/ui/index.ts';
 import {
+  BackendClientError,
+  BackendErrorKind,
   SETTLED_KIND_NEEDS_CONFIGURATION,
   type BackendClient,
   type TranscriptEvent
@@ -112,6 +114,25 @@ describe('enqueuePromptAtom', () => {
 
     expect(submit).toHaveBeenCalledWith({ turnId: 'turn-1', text: 'hello' });
     expect(store.get(submittedPromptEntriesAtom)[0]).toMatchObject({ kind: 'user', text: 'hello' });
+  });
+
+  it('discards stale submits without rendering an error row', async () => {
+    const store = createStore();
+    store.set(newTurnIdAtom, { newTurnId: () => 'turn-1' });
+    store.set(
+      backendClientAtom,
+      clientWithSubmit(async () => {
+        throw new BackendClientError(
+          BackendErrorKind.Discarded,
+          'prompt discarded because the session switched'
+        );
+      })
+    );
+
+    await store.set(enqueuePromptAtom, 'old session prompt');
+
+    expect(store.get(promptQueueAtom)).toEqual([]);
+    expect(store.get(clientOnlyRowsAtom)).toEqual([]);
   });
 
   it('does not update the terminal title from the first prompt', async () => {

@@ -4,6 +4,7 @@ import { resolveDockedPanelRows } from '@libs/tui/layout.ts';
 import { rowsAtom } from '@state/ui/dimensions.ts';
 import { resumePanelOpenAtom } from '@state/ui/resume/index.ts';
 import { activeSurfaceAtom, Surface } from '@state/ui/surface/atoms.ts';
+import { userQuestionAtom } from '@state/ui/userQuestion/atoms.ts';
 
 /**
  * The mutually exclusive bottom-docked command popups. The resume panel is
@@ -18,7 +19,8 @@ export const DockedPanel = {
   Theme: 'theme',
   Model: 'model',
   Connect: 'connect',
-  Memory: 'memory'
+  Memory: 'memory',
+  UserQuestion: 'userQuestion'
 } as const;
 
 export type DockedPanel = (typeof DockedPanel)[keyof typeof DockedPanel];
@@ -31,6 +33,9 @@ export type DockedPanel = (typeof DockedPanel)[keyof typeof DockedPanel];
  * screen's wheel/click guards all key off this one predicate.
  */
 export const activeDockedPanelAtom = atom<DockedPanel | null>((get) => {
+  if (get(userQuestionAtom) !== null) {
+    return DockedPanel.UserQuestion;
+  }
   if (get(resumePanelOpenAtom)) {
     return DockedPanel.Resume;
   }

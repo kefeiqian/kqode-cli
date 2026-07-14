@@ -3,7 +3,11 @@ import type { Getter, Setter } from 'jotai';
 import { STREAM_RENDER_FLUSH_MS } from '@constants/backend.ts';
 import { PRODUCT_NAME } from '@constants/product.ts';
 import { setTerminalWindowTitle } from '@libs/terminal/windowTitle.ts';
-import { SETTLED_KIND_COMPLETED } from '@contracts/backend/index.ts';
+import {
+  BackendClientError,
+  BackendErrorKind,
+  SETTLED_KIND_COMPLETED
+} from '@contracts/backend/index.ts';
 import type { TranscriptEvent } from '@contracts/backend/index.ts';
 import type { SessionResumeResult } from '@contracts/backend/index.ts';
 import { backendClientAtom, currentSessionIdAtom, productVersionAtom } from '@state/global/index.ts';
@@ -75,6 +79,10 @@ export const enqueuePromptAtom = atom(
     try {
       await backendClient.submit({ turnId, text: rawText });
     } catch (error) {
+      if (isDiscardedSubmit(error)) {
+        discardLocalSubmit(set, turnId);
+        return;
+      }
       appendClientOnlyError(get, set, submissionSequence, backendErrorMessage(error));
       settleLocalSubmitFailure(set, turnId);
     }
@@ -235,4 +243,13 @@ function settleLocalSubmitFailure(set: Setter, turnId: string): void {
     queue.map((item) => (item.turnId === turnId ? { ...item, state: 'settled' } : item))
   );
   set(settledTurnIdsAtom, (turnIds) => new Set([...turnIds, turnId]));
+}
+
+function discardLocalSubmit(set: Setter, turnId: string): void {
+  set(promptQueueAtom, (queue) => queue.filter((item) => item.turnId !== turnId));
+  set(settledTurnIdsAtom, (turnIds) => new Set([...turnIds, turnId]));
+}
+
+function isDiscardedSubmit(error: unknown): boolean {
+  return error instanceof BackendClientError && error.kind === BackendErrorKind.Discarded;
 }

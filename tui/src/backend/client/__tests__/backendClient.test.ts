@@ -55,6 +55,7 @@ const INTEGRATION_TIMEOUT_MS = 180_000;
 type FakeBackend = {
   launched: LaunchedBackend;
   disposed: () => boolean;
+  signalReady: (sessionId?: string) => void;
   emitExit: (exit?: { code: number | null; signal: NodeJS.Signals | null }) => void;
   closeServer: () => void;
 };
@@ -93,8 +94,11 @@ function makeFakeBackend(
   );
   configure(server);
   server.listen();
+  const signalReadyNow = (sessionId = 'test-session'): void => {
+    void server.sendNotification(backendReadyNotification, { sessionId });
+  };
   if (signalReady) {
-    void server.sendNotification(backendReadyNotification, { sessionId: 'test-session' });
+    signalReadyNow();
   }
   openServers.push(server);
 
@@ -113,6 +117,7 @@ function makeFakeBackend(
       }
     },
     disposed: () => disposed,
+    signalReady: signalReadyNow,
     emitExit: (exit = { code: 1, signal: null }) => {
       for (const listener of exitListeners) {
         listener(exit);
@@ -290,6 +295,56 @@ describe('createBackendClient (fake backend)', () => {
     expect(launch).toHaveBeenNthCalledWith(1, 'C:\\one');
     expect(launch).toHaveBeenNthCalledWith(2, 'C:\\two');
     expect(first.disposed()).toBe(true);
+    expect(client.getState()).toBe(BackendLifecycleState.Ready);
+    client.dispose();
+  });
+
+  it('ignores old backend exit callbacks after a successful relaunch', async () => {
+    const first = makeFakeBackend(ack);
+    const second = makeFakeBackend(ack);
+    const launch = vi
+      .fn(async (_workspaceCwd?: string) => first.launched)
+      .mockResolvedValueOnce(first.launched)
+      .mockResolvedValueOnce(second.launched);
+    const client = createBackendClient({ launch, initialWorkspaceCwd: 'C:\\one' });
+
+    await client.ensureStarted();
+    await client.relaunch('C:\\two');
+    first.emitExit();
+
+    expect(client.getState()).toBe(BackendLifecycleState.Ready);
+    await client.submit({ turnId: 'turn-after-relaunch', text: 'still alive' });
+    expect(second.disposed()).toBe(false);
+    client.dispose();
+  });
+
+  it('discards submits made during an in-flight relaunch instead of replaying them into the new session', async () => {
+    const first = makeFakeBackend(ack);
+    const secondSubmit = vi.fn();
+    const second = makeFakeBackend((server) => {
+      server.onRequest(messageSubmitRequest, (params) => {
+        secondSubmit(params);
+        return { turnId: params.turnId };
+      });
+    }, { signalReady: false });
+    const launch = vi
+      .fn(async (_workspaceCwd?: string) => first.launched)
+      .mockResolvedValueOnce(first.launched)
+      .mockResolvedValueOnce(second.launched);
+    const client = createBackendClient({ launch, initialWorkspaceCwd: 'C:\\one' });
+
+    await client.ensureStarted();
+    const relaunch = client.relaunch('C:\\two');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const submit = client.submit({ turnId: 'turn-during-relaunch', text: 'after' });
+
+    expect(launch).toHaveBeenCalledTimes(2);
+    second.signalReady('second-session');
+    await relaunch;
+    await expect(submit).rejects.toMatchObject({ kind: BackendErrorKind.Discarded });
+
+    expect(launch).toHaveBeenCalledTimes(2);
+    expect(secondSubmit).not.toHaveBeenCalled();
     expect(client.getState()).toBe(BackendLifecycleState.Ready);
     client.dispose();
   });

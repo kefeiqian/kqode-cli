@@ -1,10 +1,14 @@
 import { createStore } from 'jotai';
-import { describe, expect, it } from 'vitest';
+import { useAtomValue } from 'jotai';
+import { describe, expect, it, vi } from 'vitest';
 import { ResumeSurface } from '@components/ResumeSurface/index.tsx';
+import { UserQuestionSurface } from '@components/UserQuestionSurface/index.tsx';
 import type { BackendClient } from '@contracts/backend/index.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/index.ts';
 import { openResumePanelAtom } from '@state/ui/resume/index.ts';
+import { promptQueueAtom } from '@state/promptQueue/index.ts';
+import { userQuestionAtom } from '@state/ui/userQuestion/index.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 import { memoryBackendStub } from '@test/backendMemoryStub.ts';
 import { themeBackendStub } from '@test/backendThemeStub.ts';
@@ -42,6 +46,19 @@ function renderResume(client: BackendClient, columns = 100, rows = 12) {
   store.set(rowsTestOverrideAtom, rows);
   store.set(openResumePanelAtom);
   return { store, ...renderWithJotai(<ResumeSurface />, store) };
+}
+
+function renderResumeHarness(client: BackendClient, store = createStore(), columns = 100, rows = 12) {
+  store.set(backendClientAtom, client);
+  store.set(columnsTestOverrideAtom, columns);
+  store.set(rowsTestOverrideAtom, rows);
+  store.set(openResumePanelAtom);
+  return { store, ...renderWithJotai(<ResumeQuestionHarness />, store) };
+}
+
+function ResumeQuestionHarness() {
+  const question = useAtomValue(userQuestionAtom);
+  return question === null ? <ResumeSurface /> : <UserQuestionSurface />;
 }
 
 async function waitForFrame(lastFrame: () => string | undefined, text: string) {
@@ -105,4 +122,57 @@ describe('ResumeSurface', () => {
     expect(frame).toContain('session 11');
     expect(frame).toContain('more ↑↓');
   });
+
+  it('asks before stopping an in-flight turn and resuming another session', async () => {
+    const store = createStore();
+    const stopTurn = vi.fn(async () => {
+      store.set(promptQueueAtom, []);
+    });
+    const resumeSession = vi.fn(async () => ({
+      sessionId: 'sess-1',
+      workspaceCwd: 'C:\\workspace',
+      canonicalWorkspaceCwd: 'C:\\workspace',
+      turns: []
+    }));
+    const client = {
+      ...fakeClient([
+        {
+          sessionId: 'sess-1',
+          summary: 'target session',
+          status: 'Idle',
+          modifiedAt: Date.now(),
+          createdAt: Date.now(),
+          folder: 'C:\\workspace'
+        }
+      ]),
+      stopTurn,
+      resumeSession,
+      relaunch: async () => undefined
+    };
+    store.set(promptQueueAtom, [
+      { id: 1, turnId: 'turn-running', text: 'running', state: 'active' }
+    ]);
+    const view = renderResumeHarness(client, store);
+
+    await waitForFrame(view.lastFrame, 'target session');
+    view.stdin.write('\r');
+    await waitForFrame(view.lastFrame, 'Switch sessions?');
+    expect(stopTurn).not.toHaveBeenCalled();
+
+    view.stdin.write('y');
+    await waitFor(() => expect(resumeSession).toHaveBeenCalledWith({ sessionId: 'sess-1' }));
+    expect(stopTurn).toHaveBeenCalledTimes(1);
+  });
 });
+
+async function waitFor(assertion: () => void) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    try {
+      assertion();
+      return;
+    } catch (error) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+  }
+  assertion();
+}

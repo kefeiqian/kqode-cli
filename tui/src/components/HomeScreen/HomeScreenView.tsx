@@ -9,6 +9,7 @@ import { ThemeSurface } from '@components/ThemeSurface/index.tsx';
 import { ModelSurface } from '@components/ModelSurface/index.tsx';
 import { MemorySurface } from '@components/MemorySurface/index.tsx';
 import { ConnectSurface } from '@components/ConnectSurface/index.tsx';
+import { UserQuestionSurface } from '@components/UserQuestionSurface/index.tsx';
 import { SlashCommandMenu } from '@components/SlashCommandMenu/index.tsx';
 import { StatusBar } from '@components/StatusBar.tsx';
 import { useHomeScreenInput } from '@components/HomeScreen/useHomeScreenInput.ts';
@@ -103,6 +104,8 @@ function DockedSurface({ panel }: { panel: DockedPanel }) {
       return <MemorySurface />;
     case DockedPanel.Connect:
       return <ConnectSurface />;
+    case DockedPanel.UserQuestion:
+      return <UserQuestionSurface />;
     default:
       return null;
   }

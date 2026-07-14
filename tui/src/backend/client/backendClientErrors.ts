@@ -32,7 +32,11 @@ export function withRequestTimeout<T>(promise: Promise<T>, timeoutMs: number): P
 
 /** Whether `error` should tear the connection down instead of being recoverable. */
 export function isFatalBackendError(error: unknown): boolean {
-  return error instanceof BackendClientError && error.kind !== BackendErrorKind.Protocol;
+  return (
+    error instanceof BackendClientError &&
+    error.kind !== BackendErrorKind.Protocol &&
+    error.kind !== BackendErrorKind.Discarded
+  );
 }
 
 /** Normalizes any thrown launch failure into a `launch`-kind {@link BackendClientError}. */

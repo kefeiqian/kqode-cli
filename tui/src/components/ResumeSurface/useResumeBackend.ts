@@ -9,12 +9,16 @@ import {
   setResumeResumingAtom,
   setResumeRowsAtom
 } from '@state/ui/resume/index.ts';
+import { openUserQuestionAtom } from '@state/ui/userQuestion/index.ts';
 import { backendErrorMessage } from '@libs/promptQueue/promptQueue.ts';
 import {
   applyResolvedResumeSession,
   resumeSessionById
 } from '@backend/runtime/sessionResume.ts';
 import type { RuntimeBackendClient } from '@backend/runtime/backendRuntime.ts';
+
+const WAIT_FOR_STOP_IDLE_TIMEOUT_MS = 5_000;
+const WAIT_FOR_STOP_IDLE_POLL_MS = 25;
 
 function isRuntimeBackendClient(client: unknown): client is RuntimeBackendClient {
   return typeof client === 'object' && client !== null && 'relaunch' in client;
@@ -28,6 +32,7 @@ export function useResumeBackend() {
   const setResumeFailure = useSetAtom(setResumeFailureAtom);
   const setResumeResuming = useSetAtom(setResumeResumingAtom);
   const closeResumePanel = useSetAtom(closeResumePanelAtom);
+  const openQuestion = useSetAtom(openUserQuestionAtom);
 
   const refreshSessions = useCallback(async () => {
     resetResume();
@@ -50,21 +55,34 @@ export function useResumeBackend() {
         return;
       }
       if (store.get(turnInFlightAtom)) {
-        setResumeFailure('Finish or cancel the current turn before switching sessions.');
+        openQuestion({
+          title: 'Switch sessions?',
+          message: 'A turn is still running. Stop it and resume the selected session?',
+          choices: [
+            {
+              id: 'stop-and-resume',
+              label: 'Stop turn and resume',
+              shortcut: 'y',
+              action: () => stopAndResume({ client, sessionId, store, setResumeFailure, setResumeResuming, closeResumePanel })
+            },
+            {
+              id: 'stay',
+              label: 'Stay in current session',
+              shortcut: 'n',
+              isCancel: true,
+              action: () => undefined
+            }
+          ],
+          footerHint: 'y stop/resume · n/Esc stay'
+        });
         return;
       }
-      setResumeResuming();
-      try {
-        const result = await resumeSessionById({ store, client, sessionId });
-        applyResolvedResumeSession({ store, ...result });
-        closeResumePanel();
-      } catch (error) {
-        setResumeFailure(backendErrorMessage(error));
-      }
+      await performResume({ client, sessionId, store, setResumeFailure, setResumeResuming, closeResumePanel });
     },
     [
       client,
       closeResumePanel,
+      openQuestion,
       setResumeFailure,
       setResumeResuming,
       store
@@ -72,4 +90,53 @@ export function useResumeBackend() {
   );
 
   return { refreshSessions, resumeSelected };
+}
+
+type ResumeActionDeps = {
+  client: RuntimeBackendClient;
+  sessionId: string;
+  store: ReturnType<typeof useStore>;
+  setResumeFailure: (message: string) => void;
+  setResumeResuming: () => void;
+  closeResumePanel: () => void;
+};
+
+async function stopAndResume(deps: ResumeActionDeps): Promise<void> {
+  const { client, setResumeFailure, setResumeResuming, store } = deps;
+  setResumeResuming();
+  try {
+    await client.stopTurn();
+    await waitForTurnIdle(store);
+    await performResume(deps);
+  } catch (error) {
+    setResumeFailure(backendErrorMessage(error));
+  }
+}
+
+async function performResume({
+  client,
+  sessionId,
+  store,
+  setResumeFailure,
+  setResumeResuming,
+  closeResumePanel
+}: ResumeActionDeps): Promise<void> {
+  setResumeResuming();
+  try {
+    const result = await resumeSessionById({ store, client, sessionId });
+    applyResolvedResumeSession({ store, ...result });
+    closeResumePanel();
+  } catch (error) {
+    setResumeFailure(backendErrorMessage(error));
+  }
+}
+
+async function waitForTurnIdle(store: ReturnType<typeof useStore>): Promise<void> {
+  const started = Date.now();
+  while (store.get(turnInFlightAtom)) {
+    if (Date.now() - started > WAIT_FOR_STOP_IDLE_TIMEOUT_MS) {
+      throw new Error('timed out waiting for the running turn to stop');
+    }
+    await new Promise((resolve) => setTimeout(resolve, WAIT_FOR_STOP_IDLE_POLL_MS));
+  }
 }

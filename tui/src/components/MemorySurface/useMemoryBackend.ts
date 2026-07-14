@@ -1,11 +1,13 @@
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { useCallback } from 'react';
 import type { InboxAction, MemoryItem } from '@contracts/backend/index.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { backendErrorMessage } from '@libs/promptQueue/promptQueue.ts';
+import { activeSurfaceAtom, Surface } from '@state/ui/surface/index.ts';
 import {
   resetMemoryDataAtom,
   closeMemoryFormAtom,
+  memoryRequestGenerationAtom,
   openEditMemoryFormAtom,
   setMemoryBusyAtom,
   setMemoryDataAtom,
@@ -21,6 +23,7 @@ import {
  */
 export function useMemoryBackend() {
   const client = useAtomValue(backendClientAtom);
+  const store = useStore();
   const resetMemoryData = useSetAtom(resetMemoryDataAtom);
   const closeForm = useSetAtom(closeMemoryFormAtom);
   const setMemoryData = useSetAtom(setMemoryDataAtom);
@@ -52,18 +55,25 @@ export function useMemoryBackend() {
       if (client === undefined) {
         return;
       }
+      const generation = store.get(memoryRequestGenerationAtom);
       try {
         const result = await client.showMemory({
           scope: item.scope,
           scopeId: item.scopeId ?? undefined,
           id: item.id
         });
+        if (!isCurrentMemoryRequest(store, generation)) {
+          return;
+        }
         setMemoryDetail(result.body);
       } catch (error) {
+        if (!isCurrentMemoryRequest(store, generation)) {
+          return;
+        }
         setMemoryFailure(backendErrorMessage(error));
       }
     },
-    [client, setMemoryDetail, setMemoryFailure]
+    [client, setMemoryDetail, setMemoryFailure, store]
   );
 
   const forgetItem = useCallback(
@@ -109,18 +119,25 @@ export function useMemoryBackend() {
         setMemoryFailure('Rust backend unavailable');
         return;
       }
+      const generation = store.get(memoryRequestGenerationAtom);
       try {
         const result = await client.showMemory({
           scope: item.scope,
           scopeId: item.scopeId ?? undefined,
           id: item.id
         });
+        if (!isCurrentMemoryRequest(store, generation)) {
+          return;
+        }
         openEditMemoryForm({ item: result.item, body: result.body });
       } catch (error) {
+        if (!isCurrentMemoryRequest(store, generation)) {
+          return;
+        }
         setMemoryFailure(backendErrorMessage(error));
       }
     },
-    [client, openEditMemoryForm, setMemoryFailure]
+    [client, openEditMemoryForm, setMemoryFailure, store]
   );
 
   const editItem = useCallback(
@@ -179,4 +196,14 @@ export function useMemoryBackend() {
   );
 
   return { refresh, showDetail, forgetItem, addItem, beginEdit, editItem, applyInbox, undoInbox };
+}
+
+function isCurrentMemoryRequest(
+  store: ReturnType<typeof useStore>,
+  generation: number
+): boolean {
+  return (
+    store.get(activeSurfaceAtom) === Surface.Memory &&
+    store.get(memoryRequestGenerationAtom) === generation
+  );
 }

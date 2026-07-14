@@ -3,15 +3,19 @@ import { describe, expect, it, vi } from 'vitest';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
 import { SELECTION_COPIED_HINT, SELECTION_COPY_FAILED_HINT } from '@constants/ui.ts';
 import { copySelection } from '@components/HomeScreen/copySelection.ts';
+import { handleRightClick } from '@components/HomeScreen/useHomeScreenInput.ts';
 import { clipboardClientAtom } from '@state/global/index.ts';
 import {
+  activeSurfaceAtom,
   bodyEntriesAtom,
   bodySelectionAtom,
   columnsTestOverrideAtom,
   rowsTestOverrideAtom,
+  Surface,
   transientStatusHintAtom,
   visibleBodyRowsAtom
 } from '@state/ui/index.ts';
+import { composerStateAtom } from '@state/ui/composer/index.ts';
 
 const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -85,5 +89,37 @@ describe('copySelection', () => {
 
     expect(copySelection(store)).toBe(true);
     expect(store.get(transientStatusHintAtom)?.text).toBe(SELECTION_COPY_FAILED_HINT);
+  });
+});
+
+describe('handleRightClick', () => {
+  it('pastes into the composer when no docked panel is active', async () => {
+    const store = createStore();
+    seedTranscript(store);
+    store.set(bodySelectionAtom, null);
+    store.set(clipboardClientAtom, {
+      readText: vi.fn(async () => 'from clipboard'),
+      writeText: vi.fn()
+    });
+
+    handleRightClick(store);
+    await flushPromises();
+
+    expect(store.get(composerStateAtom).text).toBe('from clipboard');
+  });
+
+  it('does not paste into the hidden composer while a docked panel is active', async () => {
+    const store = createStore();
+    seedTranscript(store);
+    store.set(activeSurfaceAtom, Surface.Memory);
+    store.set(bodySelectionAtom, null);
+    const readText = vi.fn(async () => 'from clipboard');
+    store.set(clipboardClientAtom, { readText, writeText: vi.fn() });
+
+    handleRightClick(store);
+    await flushPromises();
+
+    expect(readText).not.toHaveBeenCalled();
+    expect(store.get(composerStateAtom).text).toBe('');
   });
 });

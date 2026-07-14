@@ -41,7 +41,7 @@ function FieldRow({
 }) {
   const theme = useAtomValue(activeThemeAtom);
   const lines = value.split('\n');
-  const prefix = `${active ? '›' : ' '} ${label}: `;
+  const prefix = `  ${label}: `;
   return (
     <Box flexDirection="column" width={columns}>
       {lines.map((line, index) => (

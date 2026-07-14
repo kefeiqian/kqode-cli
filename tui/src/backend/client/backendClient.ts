@@ -50,6 +50,12 @@ type BackendSession = {
   backend: LaunchedBackend;
   connection: MessageConnection;
   client: MessageConnectionBackendClient;
+  generation: number;
+};
+type BackendTransition = {
+  workspaceCwd: string | undefined;
+  promise: Promise<BackendSession>;
+  kind: 'start' | 'relaunch';
 };
 /** Creates a lifecycle-managed JSON-RPC client over a launched child backend. */
 export function createBackendClient(options: BackendClientOptions): BackendClientHandle {
@@ -60,7 +66,9 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
   let workspaceCwd = options.initialWorkspaceCwd;
   let state: BackendLifecycleState = BackendLifecycleState.Idle;
   let session: BackendSession | null = null;
-  let starting: Promise<BackendSession> | null = null;
+  let starting: BackendTransition | null = null;
+  let generationCounter = 0;
+  let activeGeneration = 0;
   let disposed = false;
   const readyListeners: Array<(sessionId: string) => void> = [];
   const transcriptListeners = new Set<(event: TranscriptEvent) => void>();
@@ -72,26 +80,43 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
       BackendErrorKind.Launch,
       'backend launch was aborted before it became ready'
     );
+  const discardedSubmitError = (): BackendClientError =>
+    new BackendClientError(
+      BackendErrorKind.Discarded,
+      'prompt discarded because the session switched before it could be submitted'
+    );
+  const nextGeneration = (): number => {
+    generationCounter += 1;
+    activeGeneration = generationCounter;
+    return generationCounter;
+  };
+  const disposeSession = (target: BackendSession): void => {
+    target.client.failInFlight('backend connection closed before the turn completed');
+    target.connection.dispose();
+    target.backend.dispose();
+  };
   const teardown = (nextState: BackendLifecycleState): void => {
     const current = session;
     session = null;
     state = nextState;
     if (current !== null) {
-      current.client.failInFlight('backend connection closed before the turn completed');
-      current.connection.dispose();
+      disposeSession(current);
       detachTranscriptEvents?.();
       detachTranscriptEvents = undefined;
-      current.backend.dispose();
     }
   };
-  const markDead = (): void => {
+  const markDead = (generation: number): void => {
+    if (generation !== activeGeneration) {
+      return;
+    }
     if (state === BackendLifecycleState.Closing || state === BackendLifecycleState.Dead) {
       return;
     }
     teardown(BackendLifecycleState.Dead);
   };
   const launchSession = async (
-    nextWorkspaceCwd: string | undefined
+    nextWorkspaceCwd: string | undefined,
+    generation: number
   ): Promise<{ opened: BackendSession; sessionId: string }> => {
     let backend: LaunchedBackend;
     try {
@@ -102,7 +127,7 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     const { connection, sessionId } = await openReadyConnection({
       backend,
       startupTimeoutMs,
-      onFatal: markDead
+      onFatal: () => markDead(generation)
     });
     const innerClient = createMessageConnectionClient(connection, {
       requestTimeoutMs,
@@ -112,7 +137,8 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
       opened: {
         backend,
         connection,
-        client: innerClient
+        client: innerClient,
+        generation
       },
       sessionId
     };
@@ -129,26 +155,43 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
       listener(sessionId);
     }
   };
-  const start = async (): Promise<BackendSession> => {
+  const adoptStartedSession = (opened: BackendSession, sessionId: string): BackendSession => {
+    attachTranscriptListener(opened.client);
+    session = opened;
+    state = BackendLifecycleState.Ready;
+    announceReady(sessionId);
+    return opened;
+  };
+  const start = async (targetWorkspaceCwd: string | undefined): Promise<BackendSession> => {
+    const generation = nextGeneration();
     state = BackendLifecycleState.Starting;
     try {
-      const { opened, sessionId } = await launchSession(workspaceCwd);
-      if (state !== BackendLifecycleState.Starting) {
-        opened.connection.dispose();
-        opened.backend.dispose();
+      const { opened, sessionId } = await launchSession(targetWorkspaceCwd, generation);
+      if (generation !== activeGeneration || state !== BackendLifecycleState.Starting) {
+        disposeSession(opened);
         throw abortedError();
       }
-      attachTranscriptListener(opened.client);
-      session = opened;
-      state = BackendLifecycleState.Ready;
-      announceReady(sessionId);
-      return opened;
+      workspaceCwd = targetWorkspaceCwd;
+      return adoptStartedSession(opened, sessionId);
     } catch (error) {
-      if (state === BackendLifecycleState.Starting) {
+      if (generation === activeGeneration && state === BackendLifecycleState.Starting) {
         state = BackendLifecycleState.Dead;
       }
       throw error;
     }
+  };
+  const beginStart = (
+    targetWorkspaceCwd: string | undefined,
+    kind: BackendTransition['kind'] = 'start'
+  ): Promise<BackendSession> => {
+    let promise!: Promise<BackendSession>;
+    promise = start(targetWorkspaceCwd).finally(() => {
+      if (starting?.promise === promise) {
+        starting = null;
+      }
+    });
+    starting = { workspaceCwd: targetWorkspaceCwd, promise, kind };
+    return promise;
   };
   const ensureSession = (): Promise<BackendSession> => {
     if (disposed) {
@@ -157,12 +200,18 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     if (session !== null && state === BackendLifecycleState.Ready) {
       return Promise.resolve(session);
     }
-    if (starting === null) {
-      starting = start().finally(() => {
-        starting = null;
-      });
+    if (starting !== null && starting.workspaceCwd === workspaceCwd) {
+      return starting.promise;
     }
-    return starting;
+    return beginStart(workspaceCwd);
+  };
+  const submit = async (params: StreamSubmitParams): Promise<void> => {
+    const transition = starting?.kind === 'relaunch' ? starting : null;
+    if (transition !== null) {
+      await transition.promise;
+      throw discardedSubmitError();
+    }
+    await withClient((client) => client.submit(params));
   };
   const withClient = async <T>(operation: (client: BackendClient) => Promise<T>): Promise<T> => {
     if (disposed) {
@@ -173,7 +222,7 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
       return await operation(active.client);
     } catch (error) {
       if (isFatalBackendError(error)) {
-        markDead();
+        markDead(activeGeneration);
       }
       throw error;
     }
@@ -194,33 +243,45 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
       }
       if (state !== BackendLifecycleState.Ready || session === null) {
         workspaceCwd = nextWorkspaceCwd;
-        await ensureSession();
+        await beginStart(nextWorkspaceCwd, 'relaunch');
         return;
       }
       const previousSession = session;
       const previousWorkspaceCwd = workspaceCwd;
+      const previousGeneration = previousSession.generation;
+      const generation = nextGeneration();
       state = BackendLifecycleState.Starting;
-      try {
-        const { opened, sessionId } = await launchSession(nextWorkspaceCwd);
-        previousSession.client.failInFlight('backend connection closed before the turn completed');
-        previousSession.connection.dispose();
-        previousSession.backend.dispose();
-        detachTranscriptEvents?.();
-        detachTranscriptEvents = undefined;
-        attachTranscriptListener(opened.client);
-        session = opened;
-        workspaceCwd = nextWorkspaceCwd;
-        state = BackendLifecycleState.Ready;
-        announceReady(sessionId);
-      } catch (error) {
-        session = previousSession;
-        workspaceCwd = previousWorkspaceCwd;
-        state = BackendLifecycleState.Ready;
-        throw error;
-      }
+      workspaceCwd = nextWorkspaceCwd;
+      let promise!: Promise<BackendSession>;
+      promise = (async () => {
+        try {
+          const { opened, sessionId } = await launchSession(nextWorkspaceCwd, generation);
+          if (generation !== activeGeneration || state !== BackendLifecycleState.Starting) {
+            disposeSession(opened);
+            throw abortedError();
+          }
+          disposeSession(previousSession);
+          detachTranscriptEvents?.();
+          detachTranscriptEvents = undefined;
+          return adoptStartedSession(opened, sessionId);
+        } catch (error) {
+          if (generation === activeGeneration) {
+            session = previousSession;
+            workspaceCwd = previousWorkspaceCwd;
+            activeGeneration = previousGeneration;
+            state = BackendLifecycleState.Ready;
+          }
+          throw error;
+        } finally {
+          if (starting?.promise === promise) {
+            starting = null;
+          }
+        }
+      })();
+      starting = { workspaceCwd: nextWorkspaceCwd, promise, kind: 'relaunch' };
+      await promise;
     },
-    submit: async (params: StreamSubmitParams): Promise<void> =>
-      void (await withClient((client) => client.submit(params))),
+    submit,
     clearConversation: async (): Promise<void> =>
       void (await withClient((client) => client.clearConversation())),
     cancelTurn: async (turnId: string): Promise<void> =>

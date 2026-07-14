@@ -2,10 +2,17 @@ import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import type { BackendClient, MemoryInboxEntry, MemoryItem } from '@contracts/backend/index.ts';
 import { backendClientAtom } from '@state/global/index.ts';
-import { activeSurfaceAtom, columnsTestOverrideAtom, rowsTestOverrideAtom, Surface } from '@state/ui/index.ts';
+import {
+  activeSurfaceAtom,
+  closeActiveSurfaceAtom,
+  columnsTestOverrideAtom,
+  rowsTestOverrideAtom,
+  Surface
+} from '@state/ui/index.ts';
 import {
   MemoryMode,
   PendingMemoryItemAction,
+  memoryDetailBodyAtom,
   memoryFormAtom,
   memoryModeAtom,
   openAddMemoryFormAtom,
@@ -251,6 +258,26 @@ describe('MemorySurface', () => {
     expect(store.get(memoryFormAtom)).toBeNull();
   });
 
+  it('ignores a late detail response after the memory surface closes', async () => {
+    const deferred = deferredValue({ item: sampleItem(), body: 'late body' });
+    const client = fakeClient({ items: [sampleItem()] });
+    client.showMemory = vi.fn(() => deferred.promise);
+    const { store, stdin, lastFrame } = renderMemory(client);
+    await waitForFrame(lastFrame, 'Use tabs in Go');
+
+    stdin.write('\r');
+    await flushInput();
+    expect(client.showMemory).toHaveBeenCalledWith({ scope: 'user', id: 'item-1' });
+    store.set(closeActiveSurfaceAtom);
+
+    deferred.resolve();
+    await deferred.promise;
+    await flushInput();
+
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Home);
+    expect(store.get(memoryDetailBodyAtom)).toBeNull();
+  });
+
   it('routes x through confirmation before forgetting', async () => {
     const forgetMemory = vi.fn(async () => ({ id: 'item-1', forgotten: true }));
     const client = fakeClient({ items: [sampleItem()] });
@@ -273,6 +300,14 @@ describe('MemorySurface', () => {
     await flushInput();
     expect(forgetMemory).toHaveBeenCalledWith({ scope: 'user', id: 'item-1' });
   });
+
+  function deferredValue<T>(value: T): { promise: Promise<T>; resolve: () => void } {
+    let resolve!: () => void;
+    const promise = new Promise<T>((done) => {
+      resolve = () => done(value);
+    });
+    return { promise, resolve };
+  }
 
   it('picks and confirms forget from the pending action flow', async () => {
     const forgetMemory = vi.fn(async () => ({ id: 'item-1', forgotten: true }));

@@ -67,6 +67,10 @@ export const memoryDetailBodyAtom = atom<string | null>(null);
 export const memoryFormAtom = atom<MemoryFormState | null>(null);
 export const pendingMemoryItemActionAtom = atom<PendingMemoryItemAction | null>(null);
 export const forgetConfirmAtom = atom<MemoryItem | null>(null);
+export const memoryRequestGenerationAtom = atom(0);
+export const bumpMemoryRequestGenerationAtom = atom(null, (_get, set) => {
+  set(memoryRequestGenerationAtom, (generation) => generation + 1);
+});
 
 export const memorySurfaceConsumesEscAtom = atom(
   (get) =>
@@ -157,6 +161,7 @@ export const resetMemorySubStateAtom = atom(null, (_get, set) => {
 
 /** Full reset: loaded data plus every transient sub-state overlay. */
 export const resetMemorySurfaceAtom = atom(null, (_get, set) => {
+  set(bumpMemoryRequestGenerationAtom);
   set(resetMemoryDataAtom);
   set(resetMemorySubStateAtom);
 });

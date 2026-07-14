@@ -47,7 +47,9 @@ export const BackendErrorKind = {
   /** A startup or per-request deadline elapsed. */
   Timeout: 'timeout',
   /** The backend process could not be started. */
-  Launch: 'launch'
+  Launch: 'launch',
+  /** A user action was intentionally dropped because its session became stale. */
+  Discarded: 'discarded'
 } as const;
 
 export type BackendErrorKind = (typeof BackendErrorKind)[keyof typeof BackendErrorKind];

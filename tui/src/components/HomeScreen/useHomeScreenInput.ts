@@ -31,6 +31,7 @@ import {
   safeChromeColumnsAtom,
   scrollBodyByRowsAtom
 } from '@state/ui/index.ts';
+import { activeDockedPanelAtom } from '@state/ui/dock/atoms.ts';
 import {
   composerScrollOffsetRowsAtom,
   composerStateAtom,
@@ -78,6 +79,15 @@ function positionComposerCaret(store: Store, point: { row: number; column: numbe
   if (result !== null) {
     store.set(setComposerCursorWithOffsetAtom, result);
   }
+}
+
+/** Handles right-click copy/paste routing. */
+export function handleRightClick(store: Store): void {
+  store.set(markRightClickPasteSuppressionAtom);
+  if (!copySelection(store) && store.get(activeDockedPanelAtom) === null) {
+    pasteFromClipboard(store, PROMPT_MAX_BYTES);
+  }
+  store.set(clearBodySelectionAtom);
 }
 
 /**
@@ -153,11 +163,7 @@ export function useHomeScreenInput(): void {
     // suppress only that immediate bracketed-paste fallout so this app-owned
     // branch is the single source of truth.
     if (parseMouseRightClickEvent(input) !== null) {
-      store.set(markRightClickPasteSuppressionAtom);
-      if (!copySelection(store)) {
-        pasteFromClipboard(store, PROMPT_MAX_BYTES);
-      }
-      store.set(clearBodySelectionAtom);
+      handleRightClick(store);
       return;
     }
 

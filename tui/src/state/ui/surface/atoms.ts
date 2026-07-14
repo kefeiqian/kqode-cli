@@ -1,6 +1,11 @@
 import { atom } from 'jotai';
 import { connectReturnToModelAtom, connectTargetProviderIdAtom } from '@state/ui/connect/index.ts';
-import { MemoryMode, memoryModeAtom, resetMemorySubStateAtom } from '@state/ui/memory/index.ts';
+import {
+  MemoryMode,
+  bumpMemoryRequestGenerationAtom,
+  memoryModeAtom,
+  resetMemorySubStateAtom
+} from '@state/ui/memory/index.ts';
 
 /** Mutually exclusive fullscreen surfaces the TUI shell can render. */
 export const Surface = {
@@ -22,7 +27,10 @@ const setActiveSurfaceAtom = atom(null, (_get, set, surface: Surface) => {
 });
 
 /** Returns to the transcript/composer surface from any active overlay. */
-export const closeActiveSurfaceAtom = atom(null, (_get, set) => {
+export const closeActiveSurfaceAtom = atom(null, (get, set) => {
+  if (get(activeSurfaceAtom) === Surface.Memory) {
+    set(bumpMemoryRequestGenerationAtom);
+  }
   set(setActiveSurfaceAtom, Surface.Home);
 });
 
@@ -47,6 +55,7 @@ export const openModelSurfaceAtom = atom(null, (_get, set) => {
 
 /** Opens the fullscreen local memory management surface. */
 export const openMemorySurfaceAtom = atom(null, (_get, set, mode: MemoryMode = MemoryMode.Active) => {
+  set(bumpMemoryRequestGenerationAtom);
   set(resetMemorySubStateAtom);
   set(memoryModeAtom, mode);
   set(setActiveSurfaceAtom, Surface.Memory);
