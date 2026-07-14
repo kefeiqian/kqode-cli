@@ -1,15 +1,16 @@
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { useCallback } from 'react';
-import { backendClientAtom } from '@state/global/index.ts';
+import { backendClientAtom, workspaceCwdAtom } from '@state/global/index.ts';
 import { turnInFlightAtom } from '@state/promptQueue/store.ts';
 import {
   closeResumePanelAtom,
   resetResumeSurfaceAtom,
+  resumeSessionsAtom,
   setResumeFailureAtom,
   setResumeResumingAtom,
   setResumeRowsAtom
 } from '@state/ui/resume/index.ts';
-import { openUserQuestionAtom } from '@state/ui/userQuestion/index.ts';
+import { openUserQuestionAtom, type UserQuestion } from '@state/ui/userQuestion/index.ts';
 import { backendErrorMessage } from '@libs/promptQueue/promptQueue.ts';
 import {
   applyResolvedResumeSession,
@@ -63,7 +64,16 @@ export function useResumeBackend() {
               id: 'stop-and-resume',
               label: 'Stop turn and resume',
               shortcut: 'y',
-              action: () => stopAndResume({ client, sessionId, store, setResumeFailure, setResumeResuming, closeResumePanel })
+              action: () =>
+                stopAndResume({
+                  client,
+                  sessionId,
+                  store,
+                  openQuestion,
+                  setResumeFailure,
+                  setResumeResuming,
+                  closeResumePanel
+                })
             },
             {
               id: 'stay',
@@ -77,7 +87,15 @@ export function useResumeBackend() {
         });
         return;
       }
-      await performResume({ client, sessionId, store, setResumeFailure, setResumeResuming, closeResumePanel });
+      confirmWorkspaceOrResume({
+        client,
+        sessionId,
+        store,
+        openQuestion,
+        setResumeFailure,
+        setResumeResuming,
+        closeResumePanel
+      });
     },
     [
       client,
@@ -96,6 +114,7 @@ type ResumeActionDeps = {
   client: RuntimeBackendClient;
   sessionId: string;
   store: ReturnType<typeof useStore>;
+  openQuestion: (question: UserQuestion) => void;
   setResumeFailure: (message: string) => void;
   setResumeResuming: () => void;
   closeResumePanel: () => void;
@@ -107,10 +126,47 @@ async function stopAndResume(deps: ResumeActionDeps): Promise<void> {
   try {
     await client.stopTurn();
     await waitForTurnIdle(store);
-    await performResume(deps);
+    confirmWorkspaceOrResume(deps);
   } catch (error) {
     setResumeFailure(backendErrorMessage(error));
   }
+}
+
+function confirmWorkspaceOrResume(deps: ResumeActionDeps): void {
+  const { closeResumePanel, openQuestion, sessionId, store } = deps;
+  const target = store
+    .get(resumeSessionsAtom)
+    .find((session) => session.sessionId === sessionId);
+  const currentFolder = store.get(workspaceCwdAtom);
+  if (
+    target === undefined ||
+    currentFolder === '' ||
+    target.folder === currentFolder
+  ) {
+    void performResume(deps);
+    return;
+  }
+
+  openQuestion({
+    title: 'Resume from another folder?',
+    message: `Current: ${currentFolder}  Target: ${target.folder}`,
+    choices: [
+      {
+        id: 'switch-folder',
+        label: 'Switch folder and resume',
+        shortcut: 'y',
+        action: () => performResume(deps)
+      },
+      {
+        id: 'stay',
+        label: 'Stay in current folder',
+        shortcut: 'n',
+        isCancel: true,
+        action: closeResumePanel
+      }
+    ],
+    footerHint: 'y switch/resume · n/Esc stay'
+  });
 }
 
 async function performResume({

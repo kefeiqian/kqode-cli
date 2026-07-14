@@ -5,6 +5,7 @@ import { ResumeSurface } from '@components/ResumeSurface/index.tsx';
 import { UserQuestionSurface } from '@components/UserQuestionSurface/index.tsx';
 import type { BackendClient } from '@contracts/backend/index.ts';
 import { backendClientAtom } from '@state/global/index.ts';
+import { workspaceCwdAtom } from '@state/global/workspace.ts';
 import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/index.ts';
 import { openResumePanelAtom } from '@state/ui/resume/index.ts';
 import { promptQueueAtom } from '@state/promptQueue/index.ts';
@@ -42,6 +43,7 @@ function fakeClient(sessions: Awaited<ReturnType<BackendClient['listSessions']>>
 function renderResume(client: BackendClient, columns = 100, rows = 12) {
   const store = createStore();
   store.set(backendClientAtom, client);
+  store.set(workspaceCwdAtom, 'C:\\workspace');
   store.set(columnsTestOverrideAtom, columns);
   store.set(rowsTestOverrideAtom, rows);
   store.set(openResumePanelAtom);
@@ -50,6 +52,7 @@ function renderResume(client: BackendClient, columns = 100, rows = 12) {
 
 function renderResumeHarness(client: BackendClient, store = createStore(), columns = 100, rows = 12) {
   store.set(backendClientAtom, client);
+  store.set(workspaceCwdAtom, 'C:\\workspace');
   store.set(columnsTestOverrideAtom, columns);
   store.set(rowsTestOverrideAtom, rows);
   store.set(openResumePanelAtom);
@@ -162,6 +165,40 @@ describe('ResumeSurface', () => {
     view.stdin.write('y');
     await waitFor(() => expect(resumeSession).toHaveBeenCalledWith({ sessionId: 'sess-1' }));
     expect(stopTurn).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks before resuming a session from another folder', async () => {
+    const store = createStore();
+    store.set(workspaceCwdAtom, 'C:\\workspace-a');
+    const resumeSession = vi.fn(async () => ({
+      sessionId: 'sess-1',
+      workspaceCwd: 'C:\\workspace-b',
+      canonicalWorkspaceCwd: 'C:\\workspace-b',
+      turns: []
+    }));
+    const client = {
+      ...fakeClient([
+        {
+          sessionId: 'sess-1',
+          summary: 'other folder session',
+          status: 'Idle',
+          modifiedAt: Date.now(),
+          createdAt: Date.now(),
+          folder: 'C:\\workspace-b'
+        }
+      ]),
+      resumeSession,
+      relaunch: async () => undefined
+    };
+    const view = renderResumeHarness(client, store);
+
+    await waitForFrame(view.lastFrame, 'other folder session');
+    view.stdin.write('\r');
+    await waitForFrame(view.lastFrame, 'Resume from another folder?');
+    expect(resumeSession).not.toHaveBeenCalled();
+
+    view.stdin.write('y');
+    await waitFor(() => expect(resumeSession).toHaveBeenCalledWith({ sessionId: 'sess-1' }));
   });
 });
 
