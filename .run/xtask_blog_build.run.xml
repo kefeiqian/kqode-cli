@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="xtask: blog-build" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
-    <option name="command" value="run -p xtask -- blog-build" />
+    <option name="command" value="xtask blog-build" />
     <option name="workingDirectory" value="$PROJECT_DIR$" />
     <method v="2" />
   </configuration>

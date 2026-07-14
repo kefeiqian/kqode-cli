@@ -58,7 +58,14 @@ cargo xtask blog-serve-en
 cargo xtask blog-preview
 ```
 
-Running two or more `cargo xtask` commands at once fails on Windows: `cargo xtask` expands to `cargo run -p xtask`, which relinks the shared `target\debug\xtask.exe` on each call, and a long-running command keeps that executable locked so the next call cannot replace it (os error 32, or os error 5 on the remove step). To run long-lived or multiple commands in parallel, use the launcher, which builds once then runs a per-invocation copy under `target/debug/xtask-run/`:
+`cargo xtask` is parallel-safe on Windows: the alias builds and runs xtask in a private `target\xtask` directory (separate from the workspace `target\`), so ordinary fast commands never relink a binary another `cargo xtask` or a `cargo build --workspace` is holding. Run fast commands normally, including concurrently:
+
+```powershell
+cargo xtask tui-typecheck
+cargo xtask blog-build
+```
+
+The long-running servers (`blog-serve`, `blog-serve-en`, `blog-preview`, `tui-dev`, `tui-dev-here`, `tui-prod`) hold the binary for their whole session, so run those through the launcher — it builds once, then runs a per-invocation copy under `target\xtask\debug\xtask-run\`, leaving the canonical binary free to relink:
 
 ```powershell
 ./scripts/xtask.ps1 blog-serve   # Windows (PowerShell)
@@ -68,7 +75,7 @@ Running two or more `cargo xtask` commands at once fails on Windows: `cargo xtas
 ./scripts/xtask.sh blog-serve    # macOS/Linux
 ```
 
-Keep xtask command modules as thin wrappers around reusable implementation modules. When adding or renaming an xtask command, add a matching checked-in IDE run profile under `.run/` using the `xtask: <command>` naming pattern.
+Keep xtask command modules as thin wrappers around reusable implementation modules. When adding or renaming an xtask command, add a matching checked-in IDE run profile under `.run/` using the `xtask: <command>` naming pattern, with its Cargo command routed through the `xtask` alias (`xtask <command>`) so IDE runs inherit the private-dir isolation.
 
 ## Architecture
 
