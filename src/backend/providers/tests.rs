@@ -121,6 +121,42 @@ fn provider_list_uses_cached_key_present_bit_for_keychain_status() {
 }
 
 #[test]
+fn clear_provider_key_clears_store_bit_after_keychain_delete() {
+    let (_dir, store, _env) = bootstrap();
+    seed_kimi_key_present(&store);
+
+    let result = clear_provider_key_with(&store, ProviderId::Kimi, |_provider| Ok(()));
+
+    assert!(result.ok);
+    assert!(
+        !store
+            .provider_settings(ProviderId::Kimi)
+            .unwrap()
+            .unwrap()
+            .key_present
+    );
+}
+
+#[test]
+fn clear_provider_key_leaves_store_bit_when_keychain_unavailable() {
+    let (_dir, store, _env) = bootstrap();
+    seed_kimi_key_present(&store);
+
+    let result = clear_provider_key_with(&store, ProviderId::Kimi, |_provider| {
+        Err(KeychainError::Unavailable)
+    });
+
+    assert!(!result.ok);
+    assert!(
+        store
+            .provider_settings(ProviderId::Kimi)
+            .unwrap()
+            .unwrap()
+            .key_present
+    );
+}
+
+#[test]
 fn provider_list_ignores_custom_environment_configuration() {
     let (_dir, store, _env) = bootstrap();
     unsafe {
@@ -168,4 +204,16 @@ fn provider_list_gates_custom_key_present_without_base_url() {
         ),
         ProviderStatus::NotConfigured
     );
+}
+
+fn seed_kimi_key_present(store: &Store) {
+    store
+        .upsert_provider_settings(&ProviderSettings {
+            provider: ProviderId::Kimi,
+            base_url: "https://api.moonshot.cn/v1".to_owned(),
+            label: Some("Kimi".to_owned()),
+            key_present: true,
+            last_connected_at: None,
+        })
+        .unwrap();
 }

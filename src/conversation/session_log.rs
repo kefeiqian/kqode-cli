@@ -7,6 +7,7 @@ use std::fs::{OpenOptions, create_dir_all};
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 /// One append-only durable session-log event.
@@ -61,4 +62,90 @@ pub fn append_event(path: &Path, event: &SessionLogEvent) -> std::io::Result<()>
     serde_json::to_writer(&mut writer, event)?;
     writer.write_all(b"\n")?;
     writer.flush()
+}
+
+/// Malformed JSONL session-log line that is not a crash-truncated tail.
+#[derive(Debug)]
+pub struct SessionLogParseError {
+    line: usize,
+    source: serde_json::Error,
+}
+
+impl std::fmt::Display for SessionLogParseError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "line {} is not a valid session-log event: {}",
+            self.line, self.source
+        )
+    }
+}
+
+impl std::error::Error for SessionLogParseError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
+/// Parses JSONL session events, tolerating only a malformed unterminated tail.
+///
+/// A crash can leave the final append without a newline and with partial JSON.
+/// That tail is ignored so the valid prefix remains resumable. Malformed lines
+/// before the tail, or any malformed line in a newline-terminated file, still
+/// fail closed because they indicate real corruption rather than an interrupted
+/// append.
+pub fn parse_jsonl_prefix<T: DeserializeOwned>(
+    contents: &str,
+) -> Result<Vec<T>, SessionLogParseError> {
+    let lines = contents.lines().collect::<Vec<_>>();
+    let final_line_may_be_truncated = !contents.is_empty() && !contents.ends_with('\n');
+    let mut events = Vec::with_capacity(lines.len());
+    for (index, line) in lines.iter().enumerate() {
+        match serde_json::from_str::<T>(line) {
+            Ok(event) => events.push(event),
+            Err(_) if final_line_may_be_truncated && index + 1 == lines.len() => break,
+            Err(source) => {
+                return Err(SessionLogParseError {
+                    line: index + 1,
+                    source,
+                });
+            }
+        }
+    }
+    Ok(events)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_jsonl_prefix_ignores_a_truncated_tail() {
+        let first = serde_json::to_string(&SessionLogEvent::SessionStarted {
+            session_id: "sess".to_owned(),
+            created_at_ms: 1,
+            workspace_cwd: "w".to_owned(),
+            canonical_workspace_cwd: "w".to_owned(),
+        })
+        .unwrap();
+        let events = parse_jsonl_prefix::<SessionLogEvent>(&format!("{first}\n{{\"kind\""))
+            .expect("valid prefix");
+
+        assert_eq!(events.len(), 1);
+    }
+
+    #[test]
+    fn parse_jsonl_prefix_rejects_malformed_middle_lines() {
+        let first = serde_json::to_string(&SessionLogEvent::SessionStarted {
+            session_id: "sess".to_owned(),
+            created_at_ms: 1,
+            workspace_cwd: "w".to_owned(),
+            canonical_workspace_cwd: "w".to_owned(),
+        })
+        .unwrap();
+        let error =
+            parse_jsonl_prefix::<SessionLogEvent>(&format!("{first}\nnot-json\n{{")).unwrap_err();
+
+        assert_eq!(error.line, 2);
+    }
 }

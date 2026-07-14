@@ -1,10 +1,35 @@
 use lsp_server::{Connection, Message, Request, RequestId};
+use std::path::Path;
 
 use super::*;
+use crate::build_env::BuildEnv;
 use crate::conversation::session_log::SessionLogEvent;
-use crate::conversation::{Coordinator, SessionPersistence};
+use crate::conversation::{ConversationStatus, Coordinator, SessionPersistence};
 use crate::protocol::{SESSION_LIST_METHOD, SESSION_RESUME_METHOD};
 use crate::store::StoredSession;
+
+struct CwdGuard {
+    previous: std::path::PathBuf,
+}
+
+impl Drop for CwdGuard {
+    fn drop(&mut self) {
+        std::env::set_current_dir(&self.previous).expect("restore cwd");
+    }
+}
+
+fn switch_to(path: &Path) -> CwdGuard {
+    let previous = std::env::current_dir().expect("current dir");
+    std::env::set_current_dir(path).expect("switch cwd");
+    CwdGuard { previous }
+}
+
+#[test]
+fn workspace_dotenv_loads_only_in_dev_builds() {
+    assert!(should_load_workspace_dotenv(BuildEnv::Dev));
+    assert!(!should_load_workspace_dotenv(BuildEnv::Test));
+    assert!(!should_load_workspace_dotenv(BuildEnv::Prod));
+}
 
 #[test]
 fn set_key_rejects_bad_custom_url_immediately_without_worker() {
@@ -172,14 +197,21 @@ fn healthy_store_announces_ready_before_loop() {
 fn session_resume_attaches_and_marks_the_row_current() {
     let (backend, _client) = Connection::memory();
     let dir = tempfile::tempdir().unwrap();
+    let workspace = dir.path().join("workspace");
+    std::fs::create_dir_all(&workspace).unwrap();
+    let canonical_workspace = std::fs::canonicalize(&workspace)
+        .unwrap()
+        .display()
+        .to_string();
+    let _cwd = switch_to(&workspace);
     let session_log_path = dir.path().join("sessions").join("sess-1.jsonl");
     std::fs::create_dir_all(session_log_path.parent().unwrap()).unwrap();
     let log = [
         SessionLogEvent::SessionStarted {
             session_id: "sess-1".to_owned(),
             created_at_ms: 10,
-            workspace_cwd: "C:\\workspace".to_owned(),
-            canonical_workspace_cwd: "C:\\workspace".to_owned(),
+            workspace_cwd: workspace.display().to_string(),
+            canonical_workspace_cwd: canonical_workspace.clone(),
         },
         SessionLogEvent::TurnEnqueued {
             turn_id: "turn-1".to_owned(),
@@ -209,8 +241,8 @@ fn session_resume_attaches_and_marks_the_row_current() {
             id: "sess-1".to_owned(),
             created_at: 10,
             modified_at: 12,
-            workspace_cwd: "C:\\workspace".to_owned(),
-            canonical_workspace_cwd: "C:\\workspace".to_owned(),
+            workspace_cwd: workspace.display().to_string(),
+            canonical_workspace_cwd: canonical_workspace,
             session_log_path: session_log_path.display().to_string(),
             first_prompt_summary: Some("hello".to_owned()),
         })
@@ -255,10 +287,115 @@ fn session_resume_attaches_and_marks_the_row_current() {
                 "status": "Current",
                 "modifiedAt": 12,
                 "createdAt": 10,
-                "folder": "C:\\workspace"
+                "folder": workspace.display().to_string()
             }]
         })
     );
 
     coordinator.shutdown_and_join();
+}
+
+#[test]
+fn session_list_errors_when_coordinator_is_unavailable() {
+    let (backend, _client) = Connection::memory();
+    let (coordinator, receiver) = std::sync::mpsc::channel();
+    drop(receiver);
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open_or_bootstrap_at(dir.path().join("kqode.db")).unwrap();
+
+    let list = handle_request(
+        Request {
+            id: RequestId::from(1),
+            method: SESSION_LIST_METHOD.to_owned(),
+            params: serde_json::json!({}),
+        },
+        &backend,
+        &store,
+        &coordinator,
+    )
+    .expect("list response");
+
+    let error = list.error.expect("coordinator error");
+    assert_eq!(error.code, JSON_RPC_INVALID_PARAMS);
+    assert!(error.message.contains("coordinator is unavailable"));
+}
+
+#[test]
+fn session_resume_errors_when_attach_ack_is_missing() {
+    let (backend, _client) = Connection::memory();
+    let dir = tempfile::tempdir().unwrap();
+    let workspace = dir.path().join("workspace");
+    std::fs::create_dir_all(&workspace).unwrap();
+    let canonical_workspace = std::fs::canonicalize(&workspace)
+        .unwrap()
+        .display()
+        .to_string();
+    let _cwd = switch_to(&workspace);
+    let session_log_path = dir.path().join("sessions").join("sess-1.jsonl");
+    std::fs::create_dir_all(session_log_path.parent().unwrap()).unwrap();
+    let log = [
+        SessionLogEvent::SessionStarted {
+            session_id: "sess-1".to_owned(),
+            created_at_ms: 10,
+            workspace_cwd: workspace.display().to_string(),
+            canonical_workspace_cwd: canonical_workspace.clone(),
+        },
+        SessionLogEvent::TurnEnqueued {
+            turn_id: "turn-1".to_owned(),
+            seq: 0,
+            prompt: "hello".to_owned(),
+            at_ms: 11,
+        },
+    ]
+    .into_iter()
+    .map(|event| serde_json::to_string(&event).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n");
+    std::fs::write(&session_log_path, format!("{log}\n")).unwrap();
+
+    let store = Store::open_or_bootstrap_at(dir.path().join("kqode.db")).unwrap();
+    store
+        .upsert_session(&StoredSession {
+            id: "sess-1".to_owned(),
+            created_at: 10,
+            modified_at: 11,
+            workspace_cwd: workspace.display().to_string(),
+            canonical_workspace_cwd: canonical_workspace,
+            session_log_path: session_log_path.display().to_string(),
+            first_prompt_summary: Some("hello".to_owned()),
+        })
+        .unwrap();
+
+    let (coordinator, receiver) = std::sync::mpsc::channel();
+    let worker = std::thread::spawn(move || {
+        while let Ok(command) = receiver.recv() {
+            match command {
+                Command::QueryStatus { respond_to } => {
+                    let _ = respond_to.send(ConversationStatus {
+                        current_session_id: None,
+                        has_unsettled_turns: false,
+                    });
+                }
+                Command::ResumeSession { .. } => break,
+                _ => {}
+            }
+        }
+    });
+
+    let resume = handle_request(
+        Request {
+            id: RequestId::from(1),
+            method: SESSION_RESUME_METHOD.to_owned(),
+            params: serde_json::json!({ "sessionId": "sess-1" }),
+        },
+        &backend,
+        &store,
+        &coordinator,
+    )
+    .expect("resume response");
+    worker.join().unwrap();
+
+    let error = resume.error.expect("missing ack error");
+    assert_eq!(error.code, JSON_RPC_INVALID_PARAMS);
+    assert!(error.message.contains("could not attach session"));
 }

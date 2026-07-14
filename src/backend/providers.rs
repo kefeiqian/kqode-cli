@@ -80,19 +80,25 @@ pub(crate) fn set_active_selection(
     }
 }
 
-/// Clears the provider key best-effort and clears SQLite's key-present bit.
+/// Clears the provider key and then clears SQLite's key-present bit.
 #[must_use]
 pub(crate) fn clear_provider_key(store: &Store, params: ClearKeyParams) -> ClearKeyResult {
     let Some(provider) = ProviderId::parse(&params.provider_id) else {
         return ClearKeyResult { ok: false };
     };
-    let keychain_ok = matches!(
-        crate::secrets::clear_key(provider),
-        Ok(()) | Err(KeychainError::Unavailable)
-    );
-    let store_ok = store.set_key_present(provider, false).is_ok();
+    clear_provider_key_with(store, provider, crate::secrets::clear_key)
+}
+
+fn clear_provider_key_with(
+    store: &Store,
+    provider: ProviderId,
+    clear_key: impl FnOnce(ProviderId) -> Result<(), KeychainError>,
+) -> ClearKeyResult {
+    if clear_key(provider).is_err() {
+        return ClearKeyResult { ok: false };
+    }
     ClearKeyResult {
-        ok: keychain_ok && store_ok,
+        ok: store.set_key_present(provider, false).is_ok(),
     }
 }
 

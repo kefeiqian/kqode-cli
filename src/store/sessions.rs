@@ -9,6 +9,7 @@ use rusqlite::{OptionalExtension, params};
 
 use super::Store;
 use super::recovery::sidecar_path;
+use crate::conversation::session_log::parse_jsonl_prefix;
 
 #[derive(serde::Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
@@ -166,8 +167,7 @@ fn parse_session_log(path: &std::path::Path) -> Option<StoredSession> {
     let mut canonical_workspace_cwd = None;
     let mut modified_at = None;
     let mut first_prompt_summary = None;
-    for line in contents.lines() {
-        let event = serde_json::from_str::<SessionLogEventWire>(line).ok()?;
+    for event in parse_jsonl_prefix::<SessionLogEventWire>(&contents).ok()? {
         match event {
             SessionLogEventWire::SessionStarted {
                 session_id,

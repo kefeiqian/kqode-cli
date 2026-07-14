@@ -4,6 +4,7 @@ use std::sync::mpsc::Sender;
 
 use lsp_server::{Connection, Message, Notification, Request, Response};
 
+use crate::build_env::BuildEnv;
 use crate::conversation::{
     Command, ConversationEvent, Coordinator, SessionPersistence, SettledKind, TurnResult,
 };
@@ -71,7 +72,7 @@ impl Error for BackendError {
 /// Returns an error when the ready signal cannot be sent, the transport threads
 /// fail, or a response cannot be written.
 pub fn run_stdio() -> Result<(), BackendError> {
-    dotenvy::dotenv().ok();
+    load_workspace_dotenv(BuildEnv::current());
     crate::secrets::init_keychain_backend();
     let session_id = debug_log::new_session_id();
     // Hold the guard for the whole session so buffered log lines flush on exit;
@@ -86,6 +87,16 @@ pub fn run_stdio() -> Result<(), BackendError> {
         }),
         Err(error) => Err(error),
     }
+}
+
+fn load_workspace_dotenv(build_env: BuildEnv) {
+    if should_load_workspace_dotenv(build_env) {
+        dotenvy::dotenv().ok();
+    }
+}
+
+fn should_load_workspace_dotenv(build_env: BuildEnv) -> bool {
+    matches!(build_env, BuildEnv::Dev)
 }
 
 fn run_stdio_with(

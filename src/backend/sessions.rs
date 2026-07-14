@@ -1,10 +1,11 @@
 use std::collections::HashMap;
-use std::sync::mpsc;
+use std::sync::mpsc::{self, RecvTimeoutError};
+use std::time::Duration;
 
 use lsp_server::{Request, Response};
 
 use crate::chat::CompactionState;
-use crate::conversation::session_log::SessionLogEvent;
+use crate::conversation::session_log::{SessionLogEvent, parse_jsonl_prefix};
 use crate::conversation::transcript::TranscriptTurn;
 use crate::conversation::{Command, ConversationStatus, SettledKind, TurnResult, TurnState};
 use crate::protocol::{
@@ -14,12 +15,23 @@ use crate::protocol::{
 };
 use crate::store::{Store, StoredSession};
 
+const COORDINATOR_REPLY_TIMEOUT: Duration = Duration::from_millis(250);
+
 pub(super) fn list_sessions(
     request: Request,
     store: &Store,
     coordinator: &std::sync::mpsc::Sender<Command>,
 ) -> Response {
-    let status = current_status(coordinator);
+    let status = match current_status(coordinator) {
+        Ok(status) => status,
+        Err(error) => {
+            return Response::new_err(
+                request.id,
+                JSON_RPC_INVALID_PARAMS,
+                format!("could not read session status: {error}"),
+            );
+        }
+    };
     let sessions = match store.list_resumable_sessions() {
         Ok(sessions) => sessions,
         Err(error) => {
@@ -67,7 +79,16 @@ pub(super) fn resume_session(
             );
         }
     };
-    let status = current_status(coordinator);
+    let status = match current_status(coordinator) {
+        Ok(status) => status,
+        Err(error) => {
+            return Response::new_err(
+                request.id,
+                JSON_RPC_INVALID_PARAMS,
+                format!("could not read session status: {error}"),
+            );
+        }
+    };
     if status.has_unsettled_turns {
         return Response::new_err(
             request.id,
@@ -82,6 +103,13 @@ pub(super) fn resume_session(
             format!("unknown session `{}`", params.session_id),
         );
     };
+    if let Err(error) = validate_current_workspace(&session) {
+        return Response::new_err(
+            request.id,
+            JSON_RPC_INVALID_PARAMS,
+            format!("cannot resume session `{}`: {error}", params.session_id),
+        );
+    }
     let (turns, compaction) = match restore_turns(&session) {
         Ok(restored) => restored,
         Err(error) => {
@@ -93,13 +121,28 @@ pub(super) fn resume_session(
         }
     };
     let (tx, rx) = mpsc::channel();
-    let _ = coordinator.send(Command::ResumeSession {
-        session: session.clone(),
-        turns: turns.clone(),
-        compaction,
-        respond_to: tx,
-    });
-    let _ = rx.recv();
+    if coordinator
+        .send(Command::ResumeSession {
+            session: session.clone(),
+            turns: turns.clone(),
+            compaction,
+            respond_to: tx,
+        })
+        .is_err()
+    {
+        return Response::new_err(
+            request.id,
+            JSON_RPC_INVALID_PARAMS,
+            "could not attach session: conversation coordinator is unavailable".to_owned(),
+        );
+    }
+    if let Err(error) = wait_for_coordinator_ack(rx) {
+        return Response::new_err(
+            request.id,
+            JSON_RPC_INVALID_PARAMS,
+            format!("could not attach session: {error}"),
+        );
+    }
     Response::new_ok(
         request.id,
         SessionResumeResult {
@@ -111,13 +154,48 @@ pub(super) fn resume_session(
     )
 }
 
-fn current_status(coordinator: &std::sync::mpsc::Sender<Command>) -> ConversationStatus {
+fn validate_current_workspace(session: &StoredSession) -> Result<(), String> {
+    if session.canonical_workspace_cwd.trim().is_empty() {
+        return Ok(());
+    }
+    let current = std::env::current_dir()
+        .and_then(std::fs::canonicalize)
+        .map_err(|error| format!("could not canonicalize current workspace: {error}"))?
+        .display()
+        .to_string();
+    if current == session.canonical_workspace_cwd {
+        Ok(())
+    } else {
+        Err(format!(
+            "stored canonical workspace `{}` does not match current workspace `{current}`",
+            session.canonical_workspace_cwd
+        ))
+    }
+}
+
+fn current_status(
+    coordinator: &std::sync::mpsc::Sender<Command>,
+) -> Result<ConversationStatus, String> {
     let (tx, rx) = mpsc::channel();
-    let _ = coordinator.send(Command::QueryStatus { respond_to: tx });
-    rx.recv().unwrap_or(ConversationStatus {
-        current_session_id: None,
-        has_unsettled_turns: false,
-    })
+    coordinator
+        .send(Command::QueryStatus { respond_to: tx })
+        .map_err(|_| "conversation coordinator is unavailable".to_owned())?;
+    rx.recv_timeout(COORDINATOR_REPLY_TIMEOUT)
+        .map_err(coordinator_wait_error)
+}
+
+fn wait_for_coordinator_ack(rx: mpsc::Receiver<()>) -> Result<(), String> {
+    rx.recv_timeout(COORDINATOR_REPLY_TIMEOUT)
+        .map_err(coordinator_wait_error)
+}
+
+fn coordinator_wait_error(error: RecvTimeoutError) -> String {
+    match error {
+        RecvTimeoutError::Timeout => "timed out waiting for conversation coordinator".to_owned(),
+        RecvTimeoutError::Disconnected => {
+            "conversation coordinator stopped before replying".to_owned()
+        }
+    }
 }
 
 fn restore_turns(
@@ -127,9 +205,9 @@ fn restore_turns(
         .map_err(|error| format!("could not read session log: {error}"))?;
     let mut turns = HashMap::<String, TranscriptTurn>::new();
     let mut compaction = CompactionState::default();
-    for line in contents.lines() {
-        let event = serde_json::from_str::<SessionLogEvent>(line)
-            .map_err(|error| format!("could not parse session log event: {error}"))?;
+    for event in parse_jsonl_prefix::<SessionLogEvent>(&contents)
+        .map_err(|error| format!("could not parse session log event: {error}"))?
+    {
         match event {
             SessionLogEvent::SessionStarted { .. } => {}
             SessionLogEvent::TurnEnqueued {
@@ -333,6 +411,27 @@ mod tests {
 
         let (turns, compaction) = restore_turns(&session).expect("restore");
         assert_eq!(turns.len(), 1);
+        assert_eq!(compaction, CompactionState::default());
+    }
+
+    #[test]
+    fn restore_turns_tolerates_truncated_tail() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let session = session_with_events(
+            dir.path(),
+            &[started(), settled("t0", 0, "a0", 1)[0].clone()],
+        );
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&session.session_log_path)
+            .unwrap();
+        write!(file, "{{\"kind\"").unwrap();
+
+        let (turns, compaction) = restore_turns(&session).expect("restore");
+
+        assert_eq!(turns.len(), 1);
+        assert_eq!(turns[0].seq, 0);
+        assert_eq!(turns[0].result.as_ref().unwrap().kind, SettledKind::Error);
         assert_eq!(compaction, CompactionState::default());
     }
 }
