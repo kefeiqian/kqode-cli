@@ -63,7 +63,7 @@ struct GitStatus {
 #[must_use]
 pub fn status() -> Option<WorkspaceGitStatus> {
     let parsed_status = read_status()?;
-    let pull_request = pull_request();
+    let pull_request = read_pull_request();
 
     Some(WorkspaceGitStatus {
         label: format_label(&parsed_status),
@@ -79,7 +79,7 @@ fn read_status() -> Option<GitStatus> {
     parse_status(&porcelain)
 }
 
-fn pull_request() -> Option<PullRequest> {
+fn read_pull_request() -> Option<PullRequest> {
     let stdout = run_stdout(GITHUB_COMMAND, PULL_REQUEST_ARGS, COMMAND_TIMEOUT)?;
     parse_pull_request(&stdout)
 }
