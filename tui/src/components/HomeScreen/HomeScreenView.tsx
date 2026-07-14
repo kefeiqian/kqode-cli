@@ -15,6 +15,7 @@ import {
 } from '@libs/terminal/mouse.ts';
 import { resolveWheelTarget } from '@components/HomeScreen/wheelRouting.ts';
 import { useCaretScrollSuppression } from '@components/HomeScreen/useCaretScrollSuppression.ts';
+import { usePullRequestClick } from '@components/HomeScreen/usePullRequestClick.ts';
 import { resolveClickResult } from '@libs/composer/composerWindow.ts';
 import { BODY_CWD_GAP_ROWS } from '@libs/tui/layout.ts';
 import {
@@ -49,6 +50,7 @@ export function HomeScreenView() {
   const scrollBodyByRows = useSetAtom(scrollBodyByRowsAtom);
   const scrollComposerByRows = useSetAtom(scrollComposerByRowsAtom);
   const notifyScroll = useCaretScrollSuppression();
+  const handlePullRequestClick = usePullRequestClick();
   const store = useStore();
 
   useEffect(() => {
@@ -86,10 +88,15 @@ export function HomeScreenView() {
 
     const click = parseMouseClickEvent(input);
     if (click !== null) {
-      // Map the click to a cursor index + the scroll offset that keeps the
-      // visible window fixed (clicking repositions the caret without scrolling).
-      // Text rows start one row below composerTop (the top half-line cap); the
-      // prompt prefix offsets columns.
+      // A plain click on the PR label (#3) opens the pull request; otherwise the
+      // click maps to a composer cursor index + the scroll offset that keeps the
+      // visible window fixed (repositioning the caret without scrolling). Text
+      // rows start one row below composerTop (the top half-line cap); the prompt
+      // prefix offsets columns.
+      if (handlePullRequestClick(click)) {
+        return;
+      }
+
       const composerState = store.get(composerStateAtom);
       const result = resolveClickResult({
         text: composerState.text,

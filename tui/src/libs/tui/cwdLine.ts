@@ -49,6 +49,23 @@ function renderPullRequestSegment(gitStatus?: GitStatus): string {
   return ` [${rendered}]`;
 }
 
+/**
+ * The visible character offset at which the pull-request label (e.g. `#3`)
+ * starts within {@link formatCwdLine}, or `undefined` when no PR label is shown.
+ *
+ * The click router uses it to map a pointer position back to the label's span.
+ * The PR segment is ` [<label>]`, so the label begins after the leading ` [`.
+ */
+export function pullRequestLabelOffset(
+  workspaceCwd: string,
+  gitStatus?: GitStatus
+): number | undefined {
+  if (gitStatus?.pullRequestLabel === undefined) {
+    return undefined;
+  }
+  return `${cwdAndGitPrefix(workspaceCwd, gitStatus)} [`.length;
+}
+
 export function countCwdRows(
   workspaceCwd: string,
   gitStatus: GitStatus | undefined,

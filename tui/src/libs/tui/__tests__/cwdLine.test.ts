@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCwdLine, renderCwdLine } from '@libs/tui/cwdLine.ts';
+import { formatCwdLine, pullRequestLabelOffset, renderCwdLine } from '@libs/tui/cwdLine.ts';
 
 const statusWithPr = {
   label: '⎇ main*',
@@ -43,5 +43,19 @@ describe('renderCwdLine (decorated, for display)', () => {
 
   it('matches formatCwdLine exactly when there is no git status', () => {
     expect(renderCwdLine('/tmp/x', undefined)).toBe(formatCwdLine('/tmp/x', undefined));
+  });
+});
+
+describe('pullRequestLabelOffset', () => {
+  it('points at the first character of the PR label within the plain line', () => {
+    const offset = pullRequestLabelOffset('/tmp/x', statusWithPr);
+    const line = formatCwdLine('/tmp/x', statusWithPr);
+    expect(offset).toBeGreaterThan(0);
+    // The label runs to the end of the line, just before the closing bracket.
+    expect(line.slice(offset)).toBe('#3]');
+  });
+
+  it('is undefined when there is no PR label', () => {
+    expect(pullRequestLabelOffset('/tmp/x', { label: '⎇ main' })).toBeUndefined();
   });
 });
