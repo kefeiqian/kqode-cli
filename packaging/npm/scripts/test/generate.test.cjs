@@ -22,13 +22,16 @@ function makeArchive(dir, relName, ext, binName, contents) {
   const stage = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-stage-'));
   fs.writeFileSync(path.join(stage, binName), contents);
   const archivePath = path.join(dir, `${relName}.${ext}`);
-  const args =
+  const result =
     ext === 'tar.gz'
-      ? ['-czf', archivePath, '-C', stage, binName]
-      : ['-a', '-cf', archivePath, '-C', stage, binName];
-  const status = spawnSync('tar', args, { stdio: 'ignore' }).status;
+      ? spawnSync('tar', ['-czf', archivePath, '-C', stage, binName], { stdio: 'ignore' })
+      : spawnSync('zip', ['-q', archivePath, binName], { cwd: stage, stdio: 'ignore' });
+  const fallback =
+    ext === 'zip' && result.error
+      ? spawnSync('tar', ['-a', '-cf', archivePath, '-C', stage, binName], { stdio: 'ignore' })
+      : result;
   fs.rmSync(stage, { recursive: true, force: true });
-  if (status !== 0) return null;
+  if (fallback.error || fallback.status !== 0) return null;
   fs.writeFileSync(path.join(dir, `${relName}.sha256`), `${sha256(archivePath)}  ${relName}.${ext}\n`);
   return archivePath;
 }
