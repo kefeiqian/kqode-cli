@@ -1,5 +1,7 @@
 import { render } from 'ink-testing-library';
 import { createStore } from 'jotai';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { App } from '@/App.tsx';
 import { BodyPane } from '@components/BodyPane.tsx';
@@ -17,7 +19,9 @@ import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 import { theme } from '@theme/themeConfig.ts';
 
-const workspaceCwd = 'C:\\Users\\kefeiqian\\Projects\\KQode';
+const workspaceCwd = path.join(os.homedir(), 'Projects', 'KQode');
+const displayCwd = `~${path.sep}${path.join('Projects', 'KQode')}`;
+const projectsKQode = path.join('Projects', 'KQode');
 
 type RenderHomeScreenOptions = {
   productVersion?: string;
@@ -65,7 +69,7 @@ describe('HomeScreen', () => {
     expect(output).not.toContain('Preview mode: local Rust backend only');
     expect(output).not.toContain('uses AI');
     expect(output).not.toContain('Check for mistakes');
-    expect(output).toContain('~\\Projects\\KQode');
+    expect(output).toContain(displayCwd);
     expect(output.split('\n')).toContain('>');
     expect(output).not.toContain('Ask KQode...');
     expect(output).toContain('/ commands');
@@ -76,15 +80,14 @@ describe('HomeScreen', () => {
   });
 
   it('displays the copied dummy React workspace cwd rather than the TUI package path', () => {
-    const copiedWorkspace =
-      'C:\\Users\\kefeiqian\\Projects\\KQode\\target\\kqode-test-workspaces\\workspace';
+    const copiedWorkspace = path.join(workspaceCwd, 'target', 'kqode-test-workspaces', 'workspace');
     const { lastFrame } = renderHomeScreen({ workspaceCwd: copiedWorkspace, columns: 120, rows: 20 });
 
     const output = lastFrame() ?? '';
 
-    expect(output).toContain('~\\Projects\\KQode\\target\\kqode-test-workspaces\\workspace');
-    expect(output).toContain('target\\kqode-test-workspaces\\workspace');
-    expect(output).not.toContain('~\\Projects\\KQode\\tui');
+    expect(output).toContain(path.join(displayCwd, 'target', 'kqode-test-workspaces', 'workspace'));
+    expect(output).toContain(path.join('target', 'kqode-test-workspaces', 'workspace'));
+    expect(output).not.toContain(path.join(displayCwd, 'tui'));
   });
 
   it('centralizes Dracula theme tokens including error red', () => {
@@ -146,7 +149,7 @@ describe('HomeScreen', () => {
     }));
     const { lastFrame } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 16 });
     const outputRows = (lastFrame() ?? '').split('\n');
-    const cwdRow = outputRows.findIndex((row) => row.includes('Projects\\KQode'));
+    const cwdRow = outputRows.findIndex((row) => row.includes(projectsKQode));
 
     expect(cwdRow).toBe(11);
     expect(outputRows.at(cwdRow - 1)).toBe('');
@@ -217,14 +220,19 @@ describe('HomeScreen', () => {
 
     const output = lastFrame() ?? '';
 
-    expect(formatDisplayCwd(workspaceCwd, 'C:\\Users\\kefeiqian')).toBe('~\\Projects\\KQode');
-    expect(output).toContain('~\\Projects\\KQode [⎇ feat/first-ink-tui-jsonrpc-backend*+%]');
+    expect(formatDisplayCwd(workspaceCwd)).toBe(displayCwd);
+    expect(output).toContain(`${displayCwd} [⎇ feat/first-ink-tui-jsonrpc-backend*+%]`);
     expect(output).not.toContain('cwd ');
   });
 
   it('soft-wraps a long cwd without truncating it', () => {
-    const longWorkspace =
-      'C:\\Users\\kefeiqian\\Projects\\KQode\\target\\kqode-test-workspaces\\workspace\\dummy-react-app';
+    const longWorkspace = path.join(
+      workspaceCwd,
+      'target',
+      'kqode-test-workspaces',
+      'workspace',
+      'dummy-react-app'
+    );
 
     const { lastFrame } = renderHomeScreen({ workspaceCwd: longWorkspace, columns: 60, rows: 15 });
     const output = lastFrame() ?? '';
@@ -238,7 +246,7 @@ describe('HomeScreen', () => {
     expect(output).not.toContain('...');
     expect(output).not.toContain('Ask KQode...');
     expect(flattened).toContain(
-      '~\\Projects\\KQode\\target\\kqode-test-workspaces\\workspace\\dummy-react-app'
+      path.join(displayCwd, 'target', 'kqode-test-workspaces', 'workspace', 'dummy-react-app')
     );
     expect(output.split('\n')).toHaveLength(15);
     expect(output.split('\n').at(-1)).toContain('/ commands | @ mention | ? help');
@@ -251,7 +259,7 @@ describe('HomeScreen', () => {
     }));
     const { lastFrame } = renderHomeScreen({ bodyEntries: entries, columns: 80, rows: 15 });
     const outputRows = (lastFrame() ?? '').split('\n');
-    const cwdRow = outputRows.findIndex((row) => row.includes('Projects\\KQode'));
+    const cwdRow = outputRows.findIndex((row) => row.includes(projectsKQode));
 
     expect(outputRows.at(cwdRow - 1)).toBe('');
     expect(outputRows.at(cwdRow - 2)).toContain('entry 10');
@@ -262,13 +270,13 @@ describe('HomeScreen', () => {
   it('hides the cwd line while the command palette is open, keeping the status row pinned', async () => {
     const { lastFrame, stdin } = renderHomeScreen({ columns: 80, rows: 16 });
     await flushInput();
-    expect(lastFrame() ?? '').toContain('Projects\\KQode');
+    expect(lastFrame() ?? '').toContain(projectsKQode);
 
     stdin.write('/');
     await flushInput();
 
     const openOutput = lastFrame() ?? '';
-    expect(openOutput).not.toContain('Projects\\KQode');
+    expect(openOutput).not.toContain(projectsKQode);
     expect(openOutput).toContain('/clear');
     expect(openOutput).toContain('/exit');
     expect(openOutput).toContain('/help');
