@@ -64,6 +64,41 @@ fn add_creates_active_item_then_lists_and_shows_it() {
 }
 
 #[test]
+fn repo_scope_ids_must_be_backend_registered_before_use() {
+    let fixture = setup();
+    let item = fixture
+        .service
+        .add(
+            MemoryScope::Repo,
+            None,
+            MemoryType::Project,
+            "Repo convention".to_owned(),
+            "Use cargo xtask checks.".to_owned(),
+        )
+        .expect("add repo memory");
+    let scope_id = item.scope_id.as_deref().expect("repo scope id");
+
+    let (_shown, body) = fixture
+        .service
+        .show(MemoryScope::Repo, Some(scope_id), &item.id)
+        .expect("registered scope id is usable");
+    assert_eq!(body, "Use cargo xtask checks.");
+
+    assert!(matches!(
+        fixture
+            .service
+            .show(MemoryScope::Repo, Some("unknown-scope"), &item.id),
+        Err(MemoryError::ScopeAmbiguous)
+    ));
+    assert!(matches!(
+        fixture
+            .service
+            .show(MemoryScope::Repo, Some("../../outside"), &item.id),
+        Err(MemoryError::PathEscape)
+    ));
+}
+
+#[test]
 fn add_refuses_secret_shaped_content_and_persists_nothing() {
     let fixture = setup();
     let error = fixture

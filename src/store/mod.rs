@@ -98,6 +98,7 @@ impl Store {
     /// See [`Store::open_or_bootstrap`].
     pub fn open_or_bootstrap_at(path: PathBuf) -> Result<Self, StoreError> {
         let result = (|| {
+            let db_existed = path.exists();
             if let Some(parent) = path
                 .parent()
                 .filter(|parent| !parent.as_os_str().is_empty())
@@ -109,17 +110,14 @@ impl Store {
             let mut conn =
                 open_connection(&path, BOOTSTRAP_BUSY_TIMEOUT_MS).map_err(StoreError::Open)?;
             ensure_wal(&conn).map_err(StoreError::Open)?;
-            migrations::migrate(&mut conn)?;
+            let migrations_applied = migrations::migrate(&mut conn)?;
             sanity_check(&conn)?;
             drop(conn);
             set_private_db_permissions(&path);
             let store = Self { path: path.clone() };
-            store
-                .reindex_sessions_from_logs()
-                .map_err(StoreError::Sanity)?;
-            store
-                .reindex_memory_from_files()
-                .map_err(StoreError::Sanity)?;
+            if !db_existed || migrations_applied {
+                store.reindex_from_file_truth()?;
+            }
             Ok::<Self, StoreError>(store)
         })();
         result.map_err(|err| err.with_path(path))
@@ -139,6 +137,12 @@ impl Store {
     #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    fn reindex_from_file_truth(&self) -> Result<(), StoreError> {
+        self.reindex_sessions_from_logs()
+            .map_err(StoreError::Sanity)?;
+        self.reindex_memory_from_files().map_err(StoreError::Sanity)
     }
 }
 

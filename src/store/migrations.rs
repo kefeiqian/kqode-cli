@@ -78,15 +78,25 @@ pub(super) fn applied_max_version(conn: &Connection) -> rusqlite::Result<Option<
 
 /// Migrates `conn` forward to the latest embedded refinery migration.
 ///
+/// Returns `true` when the applied migration version changed, which callers use
+/// to decide whether rebuildable projections need a one-time refresh.
+///
 /// # Errors
 /// - [`StoreError::MigrationHistory`] if refinery detects missing or divergent
 ///   applied migrations via schema-history validation.
 /// - [`StoreError::Migrate`] if refinery cannot assert history or apply the
 ///   embedded migration chain.
-pub(super) fn migrate(conn: &mut Connection) -> Result<(), StoreError> {
+pub(super) fn migrate(conn: &mut Connection) -> Result<bool, StoreError> {
     detect_pre_refinery_schema(conn)?;
     validate_history_rows(conn)?;
-    runner().run(conn).map(|_| ()).map_err(map_refinery_error)
+    let before = if history_table_exists(conn).map_err(StoreError::Sanity)? {
+        applied_max_version(conn).map_err(StoreError::Sanity)?
+    } else {
+        None
+    };
+    runner().run(conn).map_err(map_refinery_error)?;
+    let after = applied_max_version(conn).map_err(StoreError::Sanity)?;
+    Ok(before != after)
 }
 
 fn detect_pre_refinery_schema(conn: &Connection) -> Result<(), StoreError> {
@@ -105,7 +115,18 @@ fn app_table_count(conn: &Connection) -> rusqlite::Result<i64> {
     conn.query_row(
         "SELECT COUNT(*) FROM sqlite_master
          WHERE type = 'table'
-           AND name IN ('provider_settings', 'active_selection', 'sessions', 'turns', 'ui_preferences')",
+           AND name IN (
+                'provider_settings',
+                'active_selection',
+                'sessions',
+                'turns',
+                'ui_preferences',
+                'memory_items',
+                'memory_inbox_entries',
+                'memory_cursors',
+                'memory_corrections',
+                'memory_scope_mappings'
+           )",
         [],
         |row| row.get(0),
     )

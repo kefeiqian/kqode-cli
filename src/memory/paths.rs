@@ -24,6 +24,15 @@ pub struct ScopeRoots {
     base: PathBuf,
 }
 
+/// Backend-owned mapping between an opaque scope id and its canonical identity.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScopeIdentity {
+    /// Opaque id used in memory paths and protocol metadata.
+    pub id: String,
+    /// Canonical identity the id was derived from.
+    pub canonical_key: String,
+}
+
 impl ScopeRoots {
     /// Creates a resolver rooted at `base` (`<...>/memory`).
     #[must_use]
@@ -84,8 +93,17 @@ impl ScopeRoots {
 /// (e.g. it does not exist), signalling the caller to fail closed (KTD4).
 #[must_use]
 pub fn repo_scope_id(workspace_cwd: &Path) -> Option<String> {
+    repo_scope_identity(workspace_cwd).map(|identity| identity.id)
+}
+
+/// Derives both the opaque repo scope id and the canonical workspace identity.
+#[must_use]
+pub fn repo_scope_identity(workspace_cwd: &Path) -> Option<ScopeIdentity> {
     let canonical = std::fs::canonicalize(workspace_cwd).ok()?;
-    Some(stable_hash_hex(canonical.as_os_str().as_encoded_bytes()))
+    Some(ScopeIdentity {
+        id: stable_hash_hex(canonical.as_os_str().as_encoded_bytes()),
+        canonical_key: canonical.display().to_string(),
+    })
 }
 
 /// Derives an opaque folder scope id from a repo-relative subpath.

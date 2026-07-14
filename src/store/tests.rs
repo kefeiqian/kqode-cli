@@ -26,12 +26,13 @@ fn table_names(conn: &Connection) -> Vec<String> {
         .collect()
 }
 
-const EXPECTED_TABLES: [&str; 10] = [
+const EXPECTED_TABLES: [&str; 11] = [
     "active_selection",
     "memory_corrections",
     "memory_cursors",
     "memory_inbox_entries",
     "memory_items",
+    "memory_scope_mappings",
     "provider_settings",
     "refinery_schema_history",
     "sessions",
@@ -112,10 +113,10 @@ fn fresh_path_bootstraps_to_latest_with_all_tables() {
     let store = Store::open_or_bootstrap_at(path).expect("bootstrap");
     let conn = store.connect().expect("connect");
     assert_eq!(migrations::user_version(&conn).unwrap(), 0);
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(4));
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(5));
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
     let rows = history_rows(&conn);
-    assert_eq!(rows.len(), 4);
+    assert_eq!(rows.len(), 5);
     assert_eq!(rows[0].version, 1);
     assert_eq!(rows[0].name, "initial_schema");
     assert_eq!(rows[0].checksum, migrations::v1_checksum().to_string());
@@ -126,6 +127,8 @@ fn fresh_path_bootstraps_to_latest_with_all_tables() {
     assert_eq!(rows[3].version, 4);
     assert_eq!(rows[3].name, "theme_preferences");
     assert_eq!(rows[3].checksum, migrations::v4_checksum().to_string());
+    assert_eq!(rows[4].version, 5);
+    assert_eq!(rows[4].name, "memory_scope_mappings");
 }
 
 #[test]
@@ -181,8 +184,8 @@ fn concurrent_bootstraps_across_processes_all_succeed() {
 
     let store = Store::open_or_bootstrap_at(path).unwrap();
     let conn = store.connect().unwrap();
-    assert_eq!(history_rows(&conn).len(), 4);
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(4));
+    assert_eq!(history_rows(&conn).len(), 5);
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(5));
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
 }
 
@@ -223,8 +226,8 @@ fn reopening_a_migrated_db_is_idempotent() {
     Store::open_or_bootstrap_at(path.clone()).expect("first bootstrap");
     let store = Store::open_or_bootstrap_at(path).expect("second bootstrap is a no-op");
     let conn = store.connect().unwrap();
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(4));
-    assert_eq!(history_rows(&conn).len(), 4);
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(5));
+    assert_eq!(history_rows(&conn).len(), 5);
     assert_eq!(table_names(&conn), EXPECTED_TABLES);
 }
 
@@ -240,7 +243,7 @@ fn a_version_zero_db_migrates_forward() {
     let store = Store::open_or_bootstrap_at(path).expect("bootstrap");
     let conn = store.connect().unwrap();
     assert_eq!(migrations::user_version(&conn).unwrap(), 0);
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(4));
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(5));
 }
 
 #[test]
@@ -305,7 +308,7 @@ fn db_ahead_of_embedded_migrations_refuses_to_bootstrap() {
     {
         let conn = Connection::open(&path).unwrap();
         create_refinery_history(&conn);
-        seed_history_row(&conn, 5, "future_schema", 1);
+        seed_history_row(&conn, 6, "future_schema", 1);
     }
     let err = Store::open_or_bootstrap_at(path.clone()).unwrap_err();
     match err.root_cause() {
@@ -353,7 +356,7 @@ fn legacy_user_version_one_db_gets_reset_message_and_can_rebootstrap_after_delet
     remove_db_with_sidecars(&path);
     let store = Store::open_or_bootstrap_at(path).expect("fresh bootstrap after reset");
     let conn = store.connect().unwrap();
-    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(4));
+    assert_eq!(migrations::applied_max_version(&conn).unwrap(), Some(5));
 }
 
 #[test]
@@ -381,6 +384,34 @@ fn dirty_app_table_without_history_gets_reset_message_not_table_exists() {
     assert!(
         !message.contains("table provider_settings already exists"),
         "dirty schema should be classified before refinery runs"
+    );
+}
+
+#[test]
+fn dirty_memory_table_without_history_gets_reset_message_not_table_exists() {
+    let (_dir, path) = temp_db();
+    {
+        let conn = Connection::open(&path).unwrap();
+        conn.execute_batch("CREATE TABLE memory_items (id TEXT);")
+            .unwrap();
+    }
+    let err = Store::open_or_bootstrap_at(path.clone()).unwrap_err();
+    match err.root_cause() {
+        StoreError::LegacyReset {
+            user_version,
+            table_count,
+        } => {
+            assert_eq!(*user_version, 0);
+            assert_eq!(*table_count, 1);
+        }
+        other => panic!("expected dirty reset error, got {other:?}"),
+    }
+    let message = err.to_string();
+    assert!(message.contains(&path.display().to_string()));
+    assert!(message.to_lowercase().contains("delete"));
+    assert!(
+        !message.contains("table memory_items already exists"),
+        "dirty memory schema should be classified before refinery runs"
     );
 }
 
@@ -450,7 +481,7 @@ fn sanity_check_reports_history_version_mismatch() {
         err,
         StoreError::SchemaHistoryMismatch {
             found: None,
-            known: 4
+            known: 5
         }
     ));
 }
@@ -599,6 +630,85 @@ fn bootstrap_reindexes_sessions_from_saved_logs_after_db_reset() {
             session_log_path: log_path.display().to_string(),
             first_prompt_summary: Some("hello world".to_owned()),
         }]
+    );
+}
+
+#[test]
+fn bootstrap_reindex_tolerates_truncated_session_log_tail() {
+    let (dir, path) = temp_db();
+    let sessions_dir = dir.path().join("sessions");
+    std::fs::create_dir_all(&sessions_dir).unwrap();
+    let log_path = sessions_dir.join("sess-1.jsonl");
+    let log = [
+        SessionLogEvent::SessionStarted {
+            session_id: "sess-1".to_owned(),
+            created_at_ms: 10,
+            workspace_cwd: "C:\\workspace".to_owned(),
+            canonical_workspace_cwd: "C:\\workspace".to_owned(),
+        },
+        SessionLogEvent::TurnEnqueued {
+            turn_id: "turn-1".to_owned(),
+            seq: 0,
+            prompt: "hello world".to_owned(),
+            at_ms: 11,
+        },
+    ]
+    .into_iter()
+    .map(|event| serde_json::to_string(&event).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n");
+    std::fs::write(&log_path, format!("{log}\n{{\"kind\"")).unwrap();
+
+    let store = Store::open_or_bootstrap_at(path).unwrap();
+
+    assert_eq!(
+        store.list_resumable_sessions().unwrap(),
+        vec![StoredSession {
+            id: "sess-1".to_owned(),
+            created_at: 10,
+            modified_at: 11,
+            workspace_cwd: "C:\\workspace".to_owned(),
+            canonical_workspace_cwd: "C:\\workspace".to_owned(),
+            session_log_path: log_path.display().to_string(),
+            first_prompt_summary: Some("hello world".to_owned()),
+        }]
+    );
+}
+
+#[test]
+fn healthy_reopen_skips_full_session_log_reindex() {
+    let (dir, path) = temp_db();
+    let store = Store::open_or_bootstrap_at(path.clone()).unwrap();
+    assert!(store.list_resumable_sessions().unwrap().is_empty());
+
+    let sessions_dir = dir.path().join("sessions");
+    std::fs::create_dir_all(&sessions_dir).unwrap();
+    let log_path = sessions_dir.join("sess-late.jsonl");
+    let log = [
+        SessionLogEvent::SessionStarted {
+            session_id: "sess-late".to_owned(),
+            created_at_ms: 10,
+            workspace_cwd: "C:\\workspace".to_owned(),
+            canonical_workspace_cwd: "C:\\workspace".to_owned(),
+        },
+        SessionLogEvent::TurnEnqueued {
+            turn_id: "turn-1".to_owned(),
+            seq: 0,
+            prompt: "late file".to_owned(),
+            at_ms: 11,
+        },
+    ]
+    .into_iter()
+    .map(|event| serde_json::to_string(&event).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n");
+    std::fs::write(&log_path, format!("{log}\n")).unwrap();
+
+    let reopened = Store::open_or_bootstrap_at(path).unwrap();
+
+    assert!(
+        reopened.list_resumable_sessions().unwrap().is_empty(),
+        "healthy reopen should not replay file truth unless a migration/recovery path needs it"
     );
 }
 

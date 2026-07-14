@@ -6,7 +6,7 @@
 //! write so a crash between the two is reconcilable, and a rollback snapshot so
 //! a later change can be undone.
 
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -58,12 +58,24 @@ impl MemoryService {
             .map(|dir| dir.join("memory"))
             .ok_or(MemoryError::NoHome)?;
         let roots = ScopeRoots::new(base);
-        Ok(Self::with_roots(
+        let repo_identity = paths::repo_scope_identity(workspace_cwd);
+        let service = Self::with_roots(
             store,
             roots,
-            paths::repo_scope_id(workspace_cwd),
+            repo_identity.as_ref().map(|identity| identity.id.clone()),
             session_id,
-        ))
+        );
+        if let Some(identity) = repo_identity {
+            service.register_scope_mapping(
+                MemoryScope::Repo,
+                &identity.id,
+                &identity.canonical_key,
+            )?;
+        }
+        if let Some(session_id) = service.session_id.as_deref() {
+            service.register_scope_mapping(MemoryScope::Session, session_id, session_id)?;
+        }
+        Ok(service)
     }
 
     /// Builds a service against explicit roots (test-friendly).
@@ -104,19 +116,23 @@ impl MemoryService {
         match scope {
             MemoryScope::User => Ok((None, self.roots.user())),
             MemoryScope::Repo => {
+                let supplied = scope_id.is_some();
                 let id = scope_id
                     .map(str::to_owned)
                     .or_else(|| self.repo_scope_id.clone())
                     .ok_or(MemoryError::ScopeAmbiguous)?;
                 let root = self.roots.repo(&id);
+                self.validate_scope_root(scope, &id, &root, supplied)?;
                 Ok((Some(id), root))
             }
             MemoryScope::Session => {
+                let supplied = scope_id.is_some();
                 let id = scope_id
                     .map(str::to_owned)
                     .or_else(|| self.session_id.clone())
                     .ok_or(MemoryError::ScopeAmbiguous)?;
                 let root = self.roots.session(&id);
+                self.validate_scope_root(scope, &id, &root, supplied)?;
                 Ok((Some(id), root))
             }
             MemoryScope::Folder => {
@@ -126,9 +142,40 @@ impl MemoryService {
                     .ok_or(MemoryError::ScopeAmbiguous)?;
                 let folder = scope_id.ok_or(MemoryError::ScopeAmbiguous)?.to_owned();
                 let root = self.roots.folder(&repo, &folder);
+                self.validate_scope_root(scope, &folder, &root, true)?;
                 Ok((Some(folder), root))
             }
         }
+    }
+
+    fn register_scope_mapping(
+        &self,
+        scope: MemoryScope,
+        scope_id: &str,
+        canonical_key: &str,
+    ) -> Result<(), MemoryError> {
+        self.store
+            .upsert_memory_scope_mapping(scope, scope_id, canonical_key)
+            .map_err(store_err)
+    }
+
+    fn validate_scope_root(
+        &self,
+        scope: MemoryScope,
+        scope_id: &str,
+        root: &Path,
+        caller_supplied: bool,
+    ) -> Result<(), MemoryError> {
+        ensure_within_base(self.roots.base(), root)?;
+        if caller_supplied
+            && !self
+                .store
+                .memory_scope_mapping_exists(scope, scope_id)
+                .map_err(store_err)?
+        {
+            return Err(MemoryError::ScopeAmbiguous);
+        }
+        Ok(())
     }
 
     /// Adds a new active memory item and projects it into the index.
@@ -419,6 +466,28 @@ fn slugify(input: &str, max: usize) -> String {
         }
     }
     out.trim_matches('-').to_owned()
+}
+
+fn ensure_within_base(base: &Path, root: &Path) -> Result<(), MemoryError> {
+    if normalize_lexical(root).starts_with(normalize_lexical(base)) {
+        Ok(())
+    } else {
+        Err(MemoryError::PathEscape)
+    }
+}
+
+fn normalize_lexical(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                out.pop();
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
 }
 
 pub(super) fn new_op_id() -> String {

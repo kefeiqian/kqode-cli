@@ -8,6 +8,7 @@
 
 mod items;
 mod lifecycle;
+mod scope_mappings;
 
 use std::collections::HashSet;
 use std::path::Path;
