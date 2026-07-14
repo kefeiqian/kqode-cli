@@ -69,6 +69,7 @@ cargo xtask tui-install    # 安装内嵌 TUI 的依赖
 cargo xtask tui-typecheck  # 对 TUI 做类型检查（tsc --noEmit）
 cargo xtask tui-test       # 运行 TUI 测试（vitest）
 cargo xtask tui-dev        # 在一次性 fixture 工作区中运行 TUI
+cargo xtask tui-dev-here   # 从源码运行 TUI，并使用当前终端目录作为 cwd
 ```
 
 ### 文档站点

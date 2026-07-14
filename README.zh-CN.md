@@ -92,10 +92,13 @@ cargo xtask tui-install    # 安装内嵌 TUI 的依赖
 cargo xtask tui-typecheck  # 对 TUI 做类型检查（tsc --noEmit）
 cargo xtask tui-test       # 运行 TUI 测试（vitest）
 cargo xtask tui-dev        # 在一次性 fixture 工作区中运行 TUI
+cargo xtask tui-dev-here   # 从源码运行 TUI，并使用当前终端目录作为 cwd
 ```
 
 `cargo xtask tui-dev` 会针对一份复制出来的 fixture 工作区运行 Ink TUI，因此显示的
-工作目录是一个真实的项目，而不是 KQode 仓库本身。目前 TUI 与一个本地 Rust
+工作目录是一个真实的项目，而不是 KQode 仓库本身。如果要在已有项目中 dogfood，
+可以从该项目目录运行 `/path/to/KQode/scripts/xtask.sh tui-dev-here`，让源码模式
+使用当前终端目录，与打包后的 `kqode` 可执行文件保持一致。目前 TUI 与一个本地 Rust
 JSON-RPC 后端通信，该后端只会对每个提交的 prompt 做确认（`ACK: message
 received`）；它尚未调用模型、运行工具或执行智能体循环，斜杠命令、提及（mention）
 与模型相关的交互目前都只是无实际作用的占位符。

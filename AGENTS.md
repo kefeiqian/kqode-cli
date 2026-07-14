@@ -40,11 +40,12 @@ For the nested TUI package, prefer Cargo-facing xtask commands instead of runnin
 cargo xtask tui-install
 cargo xtask tui-typecheck
 cargo xtask tui-test
-cargo xtask tui-dev    # run the TUI from TypeScript source against a workspace fixture
-cargo xtask tui-prod   # package the standalone kqode binary and run it from the workspace
+cargo xtask tui-dev       # run the TUI from TypeScript source against a workspace fixture
+cargo xtask tui-dev-here  # run the TUI from TypeScript source against the terminal cwd
+cargo xtask tui-prod      # package the standalone kqode binary and run it from the workspace
 ```
 
-`tui-dev` and `tui-prod` both run against a workspace fixture; seed one first with `cargo xtask fixture-prepare-react-simple` (or `fixture-prepare-react-complex`) to skip the interactive fixture prompt.
+`tui-dev` and `tui-prod` both run against a workspace fixture; seed one first with `cargo xtask fixture-prepare-react-simple` (or `fixture-prepare-react-complex`) to skip the interactive fixture prompt. Use `tui-dev-here` through `scripts/xtask.sh`/`scripts/xtask.ps1` from another project directory when source-mode TUI should see that directory as its cwd.
 
 For the Docusaurus blog/docs site under `blog/`, prefer Cargo-facing xtask commands instead of running package-manager commands directly:
 

@@ -70,6 +70,7 @@ cargo xtask tui-install    # install nested TUI dependencies
 cargo xtask tui-typecheck  # type-check the TUI (tsc --noEmit)
 cargo xtask tui-test       # run TUI tests (vitest)
 cargo xtask tui-dev        # run the TUI from a throwaway fixture workspace
+cargo xtask tui-dev-here   # run the TUI from source against the current cwd
 ```
 
 ### Documentation site
