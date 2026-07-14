@@ -218,6 +218,9 @@ describe('materializePackagedBackend', () => {
     const losingWrite = (binaryPath: string, runtimeDir: string): void => {
       fs.mkdirSync(runtimeDir, { recursive: true });
       fs.writeFileSync(binaryPath, bytes);
+      if (!isWindows) {
+        fs.chmodSync(binaryPath, 0o700);
+      }
       throw new Error('EBUSY: binary is locked by the winning instance');
     };
 
@@ -257,6 +260,9 @@ describe('materializePackagedBackend', () => {
     const write = (binaryPath: string, runtimeDir: string): void => {
       fs.mkdirSync(runtimeDir, { recursive: true });
       fs.writeFileSync(binaryPath, bytes);
+      if (!isWindows) {
+        fs.chmodSync(binaryPath, 0o700);
+      }
     };
     // ...but the immediate post-write read-back observes the atomic-replace gap
     // once (ENOENT), which must fall back to reusing the valid cache.
