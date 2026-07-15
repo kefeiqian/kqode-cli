@@ -29,16 +29,6 @@ describe('queueToBodyEntries memoization', () => {
     expect(first[1]).toMatchObject({ kind: BodyEntryKind.Assistant, text: 'reply' });
   });
 
-  it('rebuilds the streaming entry when its text grows', () => {
-    const item: QueueItem = { id: 3, text: 'ask', state: 'active' };
-
-    const partial = queueToBodyEntries([item], new Map([[3, 'he']]));
-    const more = queueToBodyEntries([item], new Map([[3, 'hello']]));
-
-    expect(more[1]).not.toBe(partial[1]);
-    expect(more[1]).toMatchObject({ kind: BodyEntryKind.Assistant, text: 'hello' });
-  });
-
   it('does not share cached entries between distinct item objects', () => {
     const a: QueueItem = { id: 4, text: 'x', state: 'active' };
     const b: QueueItem = { id: 4, text: 'x', state: 'active' };

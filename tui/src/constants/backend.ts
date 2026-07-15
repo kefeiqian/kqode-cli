@@ -20,17 +20,5 @@ export const DEFAULT_STARTUP_TIMEOUT_MS = 10_000;
 /** Default ceiling for a single message-submit round trip. */
 export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 
-/** Default idle ceiling while waiting for streaming turn notifications. */
-export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 30_000;
-
 /** Captured Cargo stderr is capped so a noisy build cannot exhaust memory. */
 export const BUILD_STDERR_CAP_BYTES = 16 * 1024;
-
-/**
- * Trailing-edge flush ceiling for streamed assistant tokens: the transcript
- * re-renders at most once per this many ms (~15fps) rather than once per token.
- * Windows with no new tokens emit nothing, so the effective rate floats down to
- * the token arrival rate — a max-fps cap, not a forced cadence. See
- * `createDeltaCoalescer`.
- */
-export const STREAM_RENDER_FLUSH_MS = 66;

@@ -5,7 +5,7 @@ import { backendClientAtom } from '@state/global/index.ts';
 import { gitStatusAtom, refreshGitStatusAtom } from '@state/ui/gitStatus.ts';
 
 function clientWithGitStatus(gitStatus: BackendClient['gitStatus']): BackendClient {
-  return { submitStreaming: vi.fn(), gitStatus };
+  return { submit: vi.fn(), gitStatus };
 }
 
 describe('refreshGitStatusAtom', () => {

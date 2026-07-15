@@ -4,12 +4,7 @@ import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '@/App.tsx';
 import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.ts';
-import type {
-  BackendClient,
-  StreamCallbacks,
-  StreamOutcome,
-  StreamSubmitParams
-} from '@contracts/backend/index.ts';
+import type { BackendClient, SubmitOutcome, SubmitParams } from '@contracts/backend/index.ts';
 import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/index.ts';
 import { backendClientAtom, productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
 import { promptQueueAtom } from '@state/promptQueue/index.ts';
@@ -18,6 +13,7 @@ import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
 const workspaceCwd = path.join(os.homedir(), 'Projects', 'dummy-react-app');
+const needsConfigurationHeadline = NEEDS_CONFIGURATION_MESSAGE.split('.')[0];
 
 function renderApp(backendClient: Partial<BackendClient>, columns = 80, rows = 40) {
   const store = createStore();
@@ -26,11 +22,11 @@ function renderApp(backendClient: Partial<BackendClient>, columns = 80, rows = 4
   store.set(columnsTestOverrideAtom, columns);
   store.set(rowsTestOverrideAtom, rows);
   // Fill the full seam so the after-turn git refresh has a gitStatus to call;
-  // streaming tests only supply submitStreaming.
+  // submit tests only override submit.
   const client: BackendClient = {
     gitStatus: async () => null,
-    submitStreaming: async () => {
-      throw new Error('submitStreaming not provided');
+    submit: async () => {
+      throw new Error('submit not provided');
     },
     ...backendClient
   };
@@ -38,16 +34,10 @@ function renderApp(backendClient: Partial<BackendClient>, columns = 80, rows = 4
   return { store, ...renderWithJotai(<App />, store) };
 }
 
-// A fake backend that streams a canned reply (default: echoes the prompt with a
-// prefix so the assistant text is distinguishable from the echoed prompt row).
-function streamingBackend(reply: (text: string) => string = (text) => `reply: ${text}`) {
-  return vi.fn(
-    async ({ text }: StreamSubmitParams, { onDelta }: StreamCallbacks): Promise<StreamOutcome> => {
-      const output = reply(text);
-      onDelta(output);
-      return { kind: 'completed', text: output, finishReason: 'stop' };
-    }
-  );
+// A fake backend that acks needsConfiguration, matching the bootstrap slice where
+// no provider is wired yet.
+function needsConfigurationBackend() {
+  return vi.fn(async (): Promise<SubmitOutcome> => ({ kind: 'needsConfiguration' }));
 }
 
 async function waitForFrame(
@@ -71,45 +61,39 @@ async function submit(stdin: { write: (data: string) => void }, text: string): P
   await flushInput();
 }
 
-describe('App submit and streaming output', () => {
-  it('appends the prompt and streams the assistant reply when Enter is pressed', async () => {
-    const submitStreaming = streamingBackend();
-    const { lastFrame, stdin } = renderApp({ submitStreaming });
+describe('App submit and configuration notice', () => {
+  it('appends the prompt and routes to the configuration notice when Enter is pressed', async () => {
+    const submitFn = needsConfigurationBackend();
+    const { lastFrame, stdin } = renderApp({ submit: submitFn });
 
     await submit(stdin, 'hello from tui');
 
     const frame = await waitForFrame(lastFrame, (output) =>
-      output.includes('reply: hello from tui')
+      output.includes(needsConfigurationHeadline)
     );
     expect(frame).toContain('❯ hello from tui');
-    expect(submitStreaming).toHaveBeenCalledWith(
-      { text: 'hello from tui' },
-      expect.objectContaining({ onDelta: expect.any(Function) })
-    );
+    expect(submitFn).toHaveBeenCalledWith({ text: 'hello from tui' });
   });
 
-  it('preserves Unicode and surrounding spaces in the backend result', async () => {
-    const submitStreaming = streamingBackend();
-    const { lastFrame, stdin } = renderApp({ submitStreaming }, 120);
+  it('preserves Unicode and surrounding spaces in the submitted text', async () => {
+    const submitFn = needsConfigurationBackend();
+    const { lastFrame, stdin } = renderApp({ submit: submitFn }, 120);
 
     await submit(stdin, ' café ☕ ');
 
     await waitForFrame(lastFrame, (output) => output.includes('café ☕'));
-    expect(submitStreaming).toHaveBeenCalledWith(
-      { text: ' café ☕ ' },
-      expect.objectContaining({ onDelta: expect.any(Function) })
-    );
+    expect(submitFn).toHaveBeenCalledWith({ text: ' café ☕ ' });
   });
 
   it('queues consecutive submits, marking only the later prompts pending', async () => {
-    const pending: Array<{ text: string; resolve: (outcome: StreamOutcome) => void }> = [];
-    const submitStreaming = vi.fn(
-      (params: StreamSubmitParams): Promise<StreamOutcome> =>
+    const pending: Array<{ text: string; resolve: (outcome: SubmitOutcome) => void }> = [];
+    const submitFn = vi.fn(
+      (params: SubmitParams): Promise<SubmitOutcome> =>
         new Promise((resolve) => {
           pending.push({ text: params.text, resolve });
         })
     );
-    const { lastFrame, stdin } = renderApp({ submitStreaming });
+    const { lastFrame, stdin } = renderApp({ submit: submitFn });
 
     await submit(stdin, 'first');
     await submit(stdin, 'second');
@@ -119,35 +103,28 @@ describe('App submit and streaming output', () => {
       lastFrame,
       (output) => output.includes('second (pending)') && output.includes('third (pending)')
     );
-    expect(submitStreaming).toHaveBeenCalledTimes(1);
-    expect(submitStreaming).toHaveBeenNthCalledWith(
-      1,
-      { text: 'first' },
-      expect.objectContaining({ onDelta: expect.any(Function) })
-    );
+    expect(submitFn).toHaveBeenCalledTimes(1);
+    expect(submitFn).toHaveBeenNthCalledWith(1, { text: 'first' });
     expect(queuedFrame).toContain('❯ first');
     expect(queuedFrame).not.toContain('first (pending)');
 
-    pending[0]?.resolve({ kind: 'completed', text: 'first reply', finishReason: 'stop' });
+    pending[0]?.resolve({ kind: 'needsConfiguration' });
 
     const drainedFrame = await waitForFrame(
       lastFrame,
-      (output) => output.includes('first reply') && !output.includes('second (pending)')
+      (output) =>
+        output.includes(needsConfigurationHeadline) && !output.includes('second (pending)')
     );
-    expect(submitStreaming).toHaveBeenCalledTimes(2);
-    expect(submitStreaming).toHaveBeenNthCalledWith(
-      2,
-      { text: 'second' },
-      expect.objectContaining({ onDelta: expect.any(Function) })
-    );
+    expect(submitFn).toHaveBeenCalledTimes(2);
+    expect(submitFn).toHaveBeenNthCalledWith(2, { text: 'second' });
     expect(drainedFrame).toContain('third (pending)');
   });
 
   it('shows a red backend failure for the matching prompt', async () => {
-    const submitStreaming = vi.fn(async (): Promise<StreamOutcome> => {
+    const submitFn = vi.fn(async (): Promise<SubmitOutcome> => {
       throw new BackendClientError(BackendErrorKind.Transport, 'connection died');
     });
-    const { lastFrame, stdin } = renderApp({ submitStreaming });
+    const { lastFrame, stdin } = renderApp({ submit: submitFn });
 
     await submit(stdin, 'will fail');
 
@@ -158,9 +135,11 @@ describe('App submit and streaming output', () => {
     expect(frame).toContain('connection died');
   });
 
-  it('escapes terminal-control characters in backend output before rendering', async () => {
-    const submitStreaming = streamingBackend(() => 'evil\u001b[2Jcleared');
-    const { lastFrame, stdin } = renderApp({ submitStreaming }, 120, 20);
+  it('escapes terminal-control characters in backend error output before rendering', async () => {
+    const submitFn = vi.fn(async (): Promise<SubmitOutcome> => {
+      throw new BackendClientError(BackendErrorKind.Transport, 'evil\u001b[2Jcleared');
+    });
+    const { lastFrame, stdin } = renderApp({ submit: submitFn }, 120, 20);
 
     await submit(stdin, 'trigger');
 
@@ -169,18 +148,18 @@ describe('App submit and streaming output', () => {
   });
 
   it('does not call the backend for whitespace-only submits', async () => {
-    const submitStreaming = streamingBackend();
-    const { stdin } = renderApp({ submitStreaming });
+    const submitFn = needsConfigurationBackend();
+    const { stdin } = renderApp({ submit: submitFn });
 
     await submit(stdin, '   ');
     await flushInput();
 
-    expect(submitStreaming).not.toHaveBeenCalled();
+    expect(submitFn).not.toHaveBeenCalled();
   });
 
   it('posts an unknown slash command and its error into the body without a backend call', async () => {
-    const submitStreaming = streamingBackend();
-    const { lastFrame, stdin, store } = renderApp({ submitStreaming });
+    const submitFn = needsConfigurationBackend();
+    const { lastFrame, stdin, store } = renderApp({ submit: submitFn });
 
     await submit(stdin, '/nope');
 
@@ -188,39 +167,7 @@ describe('App submit and streaming output', () => {
       output.includes('Unknown command: /nope')
     );
     expect(frame).toContain('❯ /nope');
-    expect(submitStreaming).not.toHaveBeenCalled();
+    expect(submitFn).not.toHaveBeenCalled();
     expect(store.get(promptQueueAtom).some((item) => item.state === 'active')).toBe(false);
-  });
-
-  it('renders a themed provider error when the streamed turn fails', async () => {
-    const submitStreaming = vi.fn(
-      async (): Promise<StreamOutcome> => ({
-        kind: 'error',
-        errorKind: 'auth',
-        message: 'Kimi rejected the API key'
-      })
-    );
-    const { lastFrame, stdin } = renderApp({ submitStreaming });
-
-    await submit(stdin, 'needs a good key');
-
-    const frame = await waitForFrame(lastFrame, (output) =>
-      output.includes('Kimi rejected the API key')
-    );
-    expect(frame).toContain('❯ needs a good key');
-    expect(frame).toContain('ERROR:');
-  });
-
-  it('routes to configuration guidance when no key is set', async () => {
-    const submitStreaming = vi.fn(
-      async (): Promise<StreamOutcome> => ({ kind: 'needsConfiguration' })
-    );
-    const { lastFrame, stdin } = renderApp({ submitStreaming });
-
-    await submit(stdin, 'hello');
-
-    await waitForFrame(lastFrame, (output) =>
-      output.includes(NEEDS_CONFIGURATION_MESSAGE.split('.')[0])
-    );
   });
 });

@@ -10,7 +10,7 @@ import type { RuntimeBackendClient } from '@backend/runtime/backendRuntime.ts';
 
 function fakeClient(overrides: Partial<RuntimeBackendClient> = {}): RuntimeBackendClient {
   return {
-    submitStreaming: vi.fn(),
+    submit: vi.fn(),
     gitStatus: vi.fn().mockResolvedValue(null),
     ensureStarted: vi.fn().mockResolvedValue(undefined),
     dispose: vi.fn(),
@@ -70,7 +70,7 @@ describe('startBackendRuntime', () => {
     const failure = new BackendClientError(BackendErrorKind.Launch, 'backend unavailable');
     const client = fakeClient({
       ensureStarted: vi.fn().mockRejectedValue(failure),
-      submitStreaming: vi.fn().mockRejectedValue(failure)
+      submit: vi.fn().mockRejectedValue(failure)
     });
 
     startBackendRuntime(store, client);
@@ -81,9 +81,6 @@ describe('startBackendRuntime', () => {
 
     const entries = store.get(submittedPromptEntriesAtom);
     expect(entries.some((entry) => entry.kind === 'error')).toBe(true);
-    expect(client.submitStreaming).toHaveBeenCalledWith(
-      { text: 'still here?' },
-      expect.objectContaining({ onDelta: expect.any(Function) })
-    );
+    expect(client.submit).toHaveBeenCalledWith({ text: 'still here?' });
   });
 });

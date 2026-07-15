@@ -1,5 +1,5 @@
 import { BackendClientError } from '@contracts/backend/index.ts';
-import type { StreamOutcome } from '@contracts/backend/index.ts';
+import type { SubmitOutcome } from '@contracts/backend/index.ts';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
 import { sanitizeDisplayText } from '@libs/text/sanitizeDisplayText.ts';
 import type { BodyEntry } from '@libs/tui/bodyRows.ts';
@@ -28,46 +28,37 @@ export type QueueItem = {
   result?: BackendResult;
 };
 
-/** Cached body entries for one queue item plus the streaming text they reflect. */
-type ItemEntriesCacheSlot = { streamingText: string | undefined; entries: BodyEntry[] };
+/** Cached body entries for one queue item. */
+type ItemEntriesCacheSlot = { entries: BodyEntry[] };
 
 // Body entries for an unchanged item are stable, so memoize them per item
 // identity. `QueueItem` objects are immutable — state/result transitions create a
-// new object (see the prompt-queue atoms) and only the active turn's streaming
-// text mutates in place — so a cache hit needs just an identity match plus an
-// unchanged streaming string. This keeps `BodyEntry` references stable across
-// tokens (so downstream row wrapping stays cached) and skips re-sanitizing the
-// whole transcript on every delta. Settled/cleared items are GC'd from the
-// WeakMap once the queue drops them.
+// new object (see the prompt-queue atoms) — so a cache hit needs only an identity
+// match. This keeps `BodyEntry` references stable (so downstream row wrapping
+// stays cached) and skips re-sanitizing the whole transcript on every render.
+// Settled/cleared items are GC'd from the WeakMap once the queue drops them.
 const entriesByItem = new WeakMap<QueueItem, ItemEntriesCacheSlot>();
 
 /**
- * Maps the prompt queue to transcript body entries. `streamingTextById` carries
- * the live assistant text for in-flight turns (see `streamingTextByIdAtom`); an
- * entry keyed by an unsettled item's `id` renders the streaming assistant row.
+ * Maps the prompt queue to transcript body entries.
  *
  * Results are memoized per item (see `entriesByItem`), so an unchanged item
- * returns identical `BodyEntry` references and only a mutated (streaming) item is
- * rebuilt.
+ * returns identical `BodyEntry` references and only a new item object is rebuilt.
  */
-export function queueToBodyEntries(
-  queue: readonly QueueItem[],
-  streamingTextById?: ReadonlyMap<number, string>
-): BodyEntry[] {
+export function queueToBodyEntries(queue: readonly QueueItem[]): BodyEntry[] {
   return queue.flatMap((item) => {
-    const streamingText = streamingTextById?.get(item.id);
     const cached = entriesByItem.get(item);
-    if (cached !== undefined && cached.streamingText === streamingText) {
+    if (cached !== undefined) {
       return cached.entries;
     }
 
-    const entries = buildItemEntries(item, streamingText);
-    entriesByItem.set(item, { streamingText, entries });
+    const entries = buildItemEntries(item);
+    entriesByItem.set(item, { entries });
     return entries;
   });
 }
 
-function buildItemEntries(item: QueueItem, streamingText: string | undefined): BodyEntry[] {
+function buildItemEntries(item: QueueItem): BodyEntry[] {
   const promptText = sanitizeDisplayText(item.text);
   const promptEntry: BodyEntry =
     item.state === 'queued'
@@ -81,29 +72,18 @@ function buildItemEntries(item: QueueItem, streamingText: string | undefined): B
     ];
   }
 
-  if (streamingText !== undefined) {
-    return [
-      promptEntry,
-      {
-        id: `stream-${item.id}`,
-        kind: BodyEntryKind.Assistant,
-        text: sanitizeDisplayText(streamingText)
-      }
-    ];
-  }
-
   return [promptEntry];
 }
 
-/** Maps a streamed turn's terminal {@link StreamOutcome} to a transcript result. */
-export function outcomeToResult(outcome: StreamOutcome): BackendResult {
-  if (outcome.kind === 'completed') {
-    return { kind: BodyEntryKind.Assistant, text: sanitizeDisplayText(outcome.text) };
+/** Maps a submitted turn's terminal {@link SubmitOutcome} to a transcript result. */
+export function outcomeToResult(outcome: SubmitOutcome): BackendResult {
+  switch (outcome.kind) {
+    case 'needsConfiguration':
+      return {
+        kind: BodyEntryKind.Error,
+        text: sanitizeDisplayText(NEEDS_CONFIGURATION_MESSAGE)
+      };
   }
-  if (outcome.kind === 'needsConfiguration') {
-    return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(NEEDS_CONFIGURATION_MESSAGE) };
-  }
-  return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(outcome.message) };
 }
 
 export function backendErrorMessage(error: unknown): string {

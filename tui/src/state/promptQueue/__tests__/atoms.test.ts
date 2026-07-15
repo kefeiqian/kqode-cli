@@ -9,7 +9,7 @@ import {
 import { backendClientAtom } from '@state/global/index.ts';
 import { BACKEND_UNAVAILABLE_MESSAGE } from '@libs/promptQueue/promptQueue.ts';
 import { bodyScrollOffsetRowsAtom, submittedPromptEntriesAtom } from '@state/ui/index.ts';
-import type { BackendClient, StreamOutcome } from '@contracts/backend/index.ts';
+import type { BackendClient, SubmitOutcome } from '@contracts/backend/index.ts';
 
 async function waitForCondition(condition: () => boolean): Promise<void> {
   for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -35,11 +35,11 @@ describe('enqueuePromptAtom', () => {
 
   it('does not promote queued prompts when a cleared active turn settles late', async () => {
     const store = createStore();
-    const resolvers: Array<(outcome: StreamOutcome) => void> = [];
+    const resolvers: Array<(outcome: SubmitOutcome) => void> = [];
     const backendClient: BackendClient = {
       gitStatus: async () => null,
-      submitStreaming: async () =>
-        new Promise<StreamOutcome>((resolve) => {
+      submit: async () =>
+        new Promise<SubmitOutcome>((resolve) => {
           resolvers.push(resolve);
         })
     };

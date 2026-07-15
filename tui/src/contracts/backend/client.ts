@@ -32,21 +32,19 @@ export class BackendClientError extends Error {
 }
 
 /** Params the TUI submits; the client generates the wire `turnId` internally. */
-export type StreamSubmitParams = {
+export type SubmitParams = {
   text: string;
 };
 
-/** Callbacks invoked while a streamed turn is in flight. */
-export type StreamCallbacks = {
-  /** Called for each chunk of assistant text as it streams in. */
-  onDelta: (delta: string) => void;
-};
-
-/** Terminal outcome of a streamed turn (transport failures reject instead). */
-export type StreamOutcome =
-  | { kind: 'completed'; text: string; finishReason: string | null }
-  | { kind: 'error'; errorKind: string; message: string }
-  | { kind: 'needsConfiguration' };
+/**
+ * Terminal outcome of a submitted prompt in this bootstrap slice.
+ *
+ * No provider is wired yet, so every accepted submit resolves
+ * `needsConfiguration`. Streaming outcomes (completed assistant text, provider
+ * errors) arrive with the provider PR. Transport/timeout failures reject with a
+ * {@link BackendClientError} instead of resolving.
+ */
+export type SubmitOutcome = { kind: 'needsConfiguration' };
 
 /** Workspace source-control status already formatted by the Rust backend. */
 export type GitStatus = {
@@ -56,16 +54,17 @@ export type GitStatus = {
 };
 
 /**
- * Narrow backend seam the TUI uses for streaming chat turns.
+ * Narrow backend seam the TUI uses to submit chat turns.
  *
- * `submitStreaming` streams assistant text through `callbacks.onDelta` and
- * resolves with a {@link StreamOutcome} when the turn ends (completed, provider
- * error, or needs-configuration). It rejects with a {@link BackendClientError}
- * only for transport/timeout failures; display components depend only on this
- * interface so process and protocol mechanics stay out of the render tree.
+ * `submit` sends the prompt and resolves with a {@link SubmitOutcome} when the
+ * backend acks. In this bootstrap slice that outcome is always
+ * `needsConfiguration` (no provider is wired yet); it rejects with a
+ * {@link BackendClientError} only for transport/timeout failures. Display
+ * components depend only on this interface so process and protocol mechanics stay
+ * out of the render tree.
  */
 export type BackendClient = {
-  submitStreaming(params: StreamSubmitParams, callbacks: StreamCallbacks): Promise<StreamOutcome>;
+  submit(params: SubmitParams): Promise<SubmitOutcome>;
   /**
    * Fetches the workspace git/PR status, or `null` when the workspace is not a
    * git repository or `git` could not be queried. Rejects with a

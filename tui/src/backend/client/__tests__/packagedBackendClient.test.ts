@@ -32,9 +32,7 @@ describe('createPackagedBackendClient', () => {
       cacheBaseDir: tempCacheBase()
     });
 
-    await expect(
-      client.submitStreaming({ text: 'hello' }, { onDelta: () => {} })
-    ).rejects.toMatchObject({
+    await expect(client.submit({ text: 'hello' })).rejects.toMatchObject({
       kind: BackendErrorKind.Launch
     });
     expect(client.getState()).toBe(BackendLifecycleState.Dead);

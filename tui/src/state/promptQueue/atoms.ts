@@ -5,10 +5,8 @@ import { sanitizeDisplayText } from '@libs/text/sanitizeDisplayText.ts';
 import { unknownCommandMessage } from '@libs/commands/unknownCommand.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { bodyScrollOffsetRowsAtom } from '@state/ui/index.ts';
-import { promptQueueAtom, streamingTextByIdAtom } from '@state/promptQueue/store.ts';
+import { promptQueueAtom } from '@state/promptQueue/store.ts';
 import { refreshGitStatusAtom } from '@state/ui/index.ts';
-import { createDeltaCoalescer } from '@libs/promptQueue/streamCoalescer.ts';
-import { STREAM_RENDER_FLUSH_MS } from '@constants/backend.ts';
 import {
   BACKEND_UNAVAILABLE_MESSAGE,
   backendErrorMessage,
@@ -16,7 +14,7 @@ import {
 } from '@libs/promptQueue/promptQueue.ts';
 import type { BackendResult, QueueItem } from '@libs/promptQueue/promptQueue.ts';
 
-export { promptQueueAtom, streamingTextByIdAtom };
+export { promptQueueAtom };
 
 let nextQueueItemId = 0;
 
@@ -46,7 +44,6 @@ export const enqueuePromptAtom = atom(null, async (get, set, rawText: string) =>
 /** Clears all transcript entries (prompts and results) and resets scroll. */
 export const clearTranscriptAtom = atom(null, (_get, set) => {
   set(promptQueueAtom, []);
-  set(streamingTextByIdAtom, new Map());
   set(bodyScrollOffsetRowsAtom, 0);
 });
 
@@ -77,10 +74,11 @@ async function drainQueue(get: Getter, set: Setter): Promise<void> {
   try {
     let active = findActive(get);
     while (active !== undefined) {
-      const result = await streamActive(get, set, active.id, active.text);
+      const result = await submitActive(get, active.text);
       settleActive(set, active.id, result);
-      // A completed turn may have changed the working tree; refresh the git label
-      // (fire-and-forget so it never delays draining the next queued prompt).
+      // A settled turn may have changed the working tree once providers land;
+      // refresh the git label (fire-and-forget so it never delays draining the
+      // next queued prompt).
       void set(refreshGitStatusAtom);
       active = findActive(get);
     }
@@ -90,66 +88,24 @@ async function drainQueue(get: Getter, set: Setter): Promise<void> {
 }
 
 /**
- * Streams one prompt to the backend, rendering assistant deltas live into the
- * active item, and resolves the terminal transcript result.
+ * Submits one prompt to the backend and resolves the terminal transcript result.
  *
- * The assistant marker appears immediately (empty streaming text), then token
- * deltas are coalesced (see `createDeltaCoalescer`) and flushed at most ~15fps
- * into the live streaming text; the derived body sticks to the bottom so new
- * output stays visible. The final result is rendered by `settleActive`, so the
- * coalescer's trailing sub-frame buffer is safely discarded on completion.
- * Provider errors and the no-key path settle as themed body entries rather than
- * throwing.
+ * The needs-configuration ack and any backend transport/timeout error settle as
+ * themed body entries rather than throwing (see `settleActive` and
+ * `outcomeToResult`). Streamed assistant text lands with the provider PR.
  */
-async function streamActive(
-  get: Getter,
-  set: Setter,
-  id: number,
-  text: string
-): Promise<BackendResult> {
+async function submitActive(get: Getter, text: string): Promise<BackendResult> {
   const backendClient = get(backendClientAtom);
   if (backendClient === undefined) {
     return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(BACKEND_UNAVAILABLE_MESSAGE) };
   }
 
-  updateStreamingText(set, id, () => '');
-
-  const coalescer = createDeltaCoalescer((batch) => {
-    updateStreamingText(set, id, (current) => current + batch);
-    set(bodyScrollOffsetRowsAtom, 0);
-  }, STREAM_RENDER_FLUSH_MS);
-
   try {
-    const outcome = await backendClient.submitStreaming(
-      { text },
-      { onDelta: (delta) => coalescer.push(delta) }
-    );
+    const outcome = await backendClient.submit({ text });
     return outcomeToResult(outcome);
   } catch (error) {
     return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(backendErrorMessage(error)) };
-  } finally {
-    coalescer.cancel();
   }
-}
-
-/**
- * Appends to the active item's live streaming text in O(1).
- *
- * The text lives in `streamingTextByIdAtom` (at most one entry) rather than in
- * the queue array, so a token delta rewrites only that single map entry instead
- * of cloning the whole queue. `submittedPromptEntriesAtom` derives its body rows
- * from this map, so there is no manual re-sync.
- */
-function updateStreamingText(
-  set: Setter,
-  id: number,
-  update: (current: string) => string
-): void {
-  set(streamingTextByIdAtom, (previous) => {
-    const next = new Map(previous);
-    next.set(id, update(previous.get(id) ?? ''));
-    return next;
-  });
 }
 
 function settleActive(set: Setter, id: number, result: BackendResult): void {
@@ -167,19 +123,6 @@ function settleActive(set: Setter, id: number, result: BackendResult): void {
       }
       return item;
     });
-  });
-  discardStreamingText(set, id);
-}
-
-/** Drops a settled item's streaming buffer so the map holds at most one entry. */
-function discardStreamingText(set: Setter, id: number): void {
-  set(streamingTextByIdAtom, (previous) => {
-    if (!previous.has(id)) {
-      return previous;
-    }
-    const next = new Map(previous);
-    next.delete(id);
-    return next;
   });
 }
 

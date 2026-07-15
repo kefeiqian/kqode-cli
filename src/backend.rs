@@ -126,8 +126,10 @@ fn handle_request(request: Request, connection: &Connection) -> Option<Response>
 
 /// Handles `kqode.message.submit`.
 ///
-/// Provider configuration lands in a later queue item, so this bootstrap handler
-/// accepts the streaming-ready wire shape but never reads plaintext credentials.
+/// No provider is wired in this bootstrap slice, so every accepted submit is
+/// acknowledged with [`SUBMIT_STATUS_NEEDS_CONFIGURATION`]; it never reads
+/// plaintext credentials or contacts a model. Streaming lands with the provider
+/// PR.
 fn handle_message_submit(request: Request, _connection: &Connection) -> Response {
     let params = match serde_json::from_value::<MessageSubmitParams>(request.params) {
         Ok(params) => params,

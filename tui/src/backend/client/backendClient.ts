@@ -11,11 +11,7 @@ import {
   isFatalBackendError,
   toLaunchError
 } from '@backend/client/backendClientErrors.ts';
-import type {
-  StreamCallbacks,
-  StreamOutcome,
-  StreamSubmitParams
-} from '@contracts/backend/index.ts';
+import type { SubmitOutcome, SubmitParams } from '@contracts/backend/index.ts';
 
 export { BackendLifecycleState };
 
@@ -31,7 +27,6 @@ export type BackendClientOptions = {
   /** Produces a freshly launched backend process; source/packaged factories inject this. */
   launch: () => Promise<LaunchedBackend>;
   requestTimeoutMs?: number;
-  streamIdleTimeoutMs?: number;
   /** Ceiling for the launched backend to signal JSON-RPC readiness before it is torn down. */
   startupTimeoutMs?: number;
 };
@@ -51,13 +46,12 @@ type BackendSession = {
  * backend (persisted session restore is added with the session methods), never
  * silently and never auto-replaying interrupted work.
  *
- * `dispose()` is terminal: once disposed, `ensureStarted`/`submitStreaming` reject
+ * `dispose()` is terminal: once disposed, `ensureStarted`/`submit` reject
  * with a `launch`-kind {@link BackendClientError} without spawning a replacement,
  * so a torn-down client can never orphan a new backend process.
  */
 export function createBackendClient(options: BackendClientOptions): BackendClientHandle {
   const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
-  const streamIdleTimeoutMs = options.streamIdleTimeoutMs;
   const startupTimeoutMs = options.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS;
   const { launch } = options;
 
@@ -134,7 +128,7 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     const opened: BackendSession = {
       backend,
       connection,
-      client: createMessageConnectionClient(connection, { requestTimeoutMs, streamIdleTimeoutMs })
+      client: createMessageConnectionClient(connection, { requestTimeoutMs })
     };
     session = opened;
     state = BackendLifecycleState.Ready;
@@ -161,16 +155,13 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     async ensureStarted(): Promise<void> {
       await ensureSession();
     },
-    async submitStreaming(
-      params: StreamSubmitParams,
-      callbacks: StreamCallbacks
-    ): Promise<StreamOutcome> {
+    async submit(params: SubmitParams): Promise<SubmitOutcome> {
       if (disposed) {
         throw disposedError();
       }
       const active = await ensureSession();
       try {
-        return await active.client.submitStreaming(params, callbacks);
+        return await active.client.submit(params);
       } catch (error) {
         if (isFatalBackendError(error)) {
           markDead();

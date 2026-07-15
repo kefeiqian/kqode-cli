@@ -2,138 +2,54 @@ import { randomUUID } from 'node:crypto';
 import { type MessageConnection, ResponseError } from 'vscode-jsonrpc';
 import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.ts';
 import { SUBMIT_STATUS_NEEDS_CONFIGURATION } from '@contracts/backend/index.ts';
-import type {
-  BackendClient,
-  StreamCallbacks,
-  StreamOutcome,
-  StreamSubmitParams
-} from '@contracts/backend/index.ts';
-import {
-  gitStatusRequest,
-  messageSubmitRequest,
-  tokenDeltaNotification,
-  turnEndNotification,
-  turnErrorNotification
-} from '@backend/protocol/messageProtocol.ts';
+import type { BackendClient, SubmitOutcome, SubmitParams } from '@contracts/backend/index.ts';
+import { gitStatusRequest, messageSubmitRequest } from '@backend/protocol/messageProtocol.ts';
 import { withRequestTimeout } from '@backend/client/backendClientErrors.ts';
-import { DEFAULT_REQUEST_TIMEOUT_MS, DEFAULT_STREAM_IDLE_TIMEOUT_MS } from '@constants/backend.ts';
-
-/** Per-turn hooks the notification handlers dispatch to, keyed by `turnId`. */
-type ActiveTurn = {
-  onDelta: (delta: string) => void;
-  complete: (finishReason: string | null) => void;
-  fail: (errorKind: string, message: string) => void;
-  die: (reason: string) => void;
-};
+import { DEFAULT_REQUEST_TIMEOUT_MS } from '@constants/backend.ts';
 
 /** Composition inputs for {@link createMessageConnectionClient}. */
 export type MessageConnectionClientOptions = {
-  /** Ceiling for the streaming ack response (not the whole stream). */
+  /** Ceiling for the submit ack response. */
   requestTimeoutMs?: number;
-  /** Ceiling while waiting for the next streaming notification after ack/delta. */
-  streamIdleTimeoutMs?: number;
 };
 
 /**
  * Builds a {@link BackendClient} over an already-established JSON-RPC connection.
  *
- * The caller owns the connection lifecycle. Streamed turns are correlated by a
- * client-generated `turnId`: the notification handlers are registered before the
- * submit request is sent, so a `tokenDelta`/`turnEnd` that races ahead of the ack
- * still matches. A turn resolves on `kqode/turnEnd` (completed) or
- * `kqode/turnError`, and rejects only if the ack times out or the connection
- * dies mid-stream — so it can be exercised over in-memory streams without a Rust
- * child process.
+ * The caller owns the connection lifecycle. `submit` sends the prompt and
+ * resolves on the backend's ack; in this bootstrap slice that ack is always
+ * `needsConfiguration` because no provider is wired yet. Transport/timeout
+ * failures reject with a {@link BackendClientError} (connection death is also
+ * surfaced to the caller through its own fatal-teardown listeners), so this can
+ * be exercised over in-memory streams without a Rust child process. The
+ * streaming notification channel arrives with the provider PR.
  */
 export function createMessageConnectionClient(
   connection: MessageConnection,
   options: MessageConnectionClientOptions = {}
 ): BackendClient {
   const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
-  const streamIdleTimeoutMs = options.streamIdleTimeoutMs ?? DEFAULT_STREAM_IDLE_TIMEOUT_MS;
-  const activeTurns = new Map<string, ActiveTurn>();
-
-  connection.onNotification(tokenDeltaNotification, ({ turnId, delta }) => {
-    activeTurns.get(turnId)?.onDelta(delta);
-  });
-  connection.onNotification(turnEndNotification, ({ turnId, finishReason }) => {
-    activeTurns.get(turnId)?.complete(finishReason);
-  });
-  connection.onNotification(turnErrorNotification, ({ turnId, errorKind, message }) => {
-    activeTurns.get(turnId)?.fail(errorKind, message);
-  });
-
-  const failAllTurns = (reason: string): void => {
-    for (const turn of [...activeTurns.values()]) {
-      turn.die(reason);
-    }
-  };
-  connection.onClose(() => failAllTurns('backend connection closed before the turn completed'));
-  connection.onError(() => failAllTurns('backend connection errored before the turn completed'));
 
   return {
-    submitStreaming(params: StreamSubmitParams, callbacks: StreamCallbacks): Promise<StreamOutcome> {
+    async submit(params: SubmitParams): Promise<SubmitOutcome> {
+      // `turnId` is client-generated so the turn has a stable identity the ack
+      // echoes back; the provider PR reuses it to correlate stream notifications.
       const turnId = randomUUID();
-      return new Promise<StreamOutcome>((resolve, reject) => {
-        let settled = false;
-        let text = '';
-        let streamIdleTimer: ReturnType<typeof setTimeout> | undefined;
-        const finish = (settle: () => void): void => {
-          if (settled) {
-            return;
-          }
-          settled = true;
-          if (streamIdleTimer !== undefined) {
-            clearTimeout(streamIdleTimer);
-          }
-          activeTurns.delete(turnId);
-          settle();
-        };
-        const refreshStreamIdleTimer = (): void => {
-          if (streamIdleTimer !== undefined) {
-            clearTimeout(streamIdleTimer);
-          }
-          streamIdleTimer = setTimeout(() => {
-            finish(() =>
-              reject(
-                new BackendClientError(
-                  BackendErrorKind.Timeout,
-                  `backend stream idled for ${streamIdleTimeoutMs}ms before the turn completed`
-                )
-              )
-            );
-          }, streamIdleTimeoutMs);
-        };
-
-        activeTurns.set(turnId, {
-          onDelta: (delta) => {
-            text += delta;
-            callbacks.onDelta(delta);
-            refreshStreamIdleTimer();
-          },
-          complete: (finishReason) =>
-            finish(() => resolve({ kind: 'completed', text, finishReason })),
-          fail: (errorKind, message) => finish(() => resolve({ kind: 'error', errorKind, message })),
-          die: (reason) =>
-            finish(() => reject(new BackendClientError(BackendErrorKind.Transport, reason)))
-        });
-
-        withRequestTimeout(
+      try {
+        const ack = await withRequestTimeout(
           connection.sendRequest(messageSubmitRequest, { text: params.text, turnId }),
           requestTimeoutMs
-        ).then(
-          (ack) => {
-            if (ack.status === SUBMIT_STATUS_NEEDS_CONFIGURATION) {
-              finish(() => resolve({ kind: 'needsConfiguration' }));
-              return;
-            }
-            // Otherwise the turn is streaming: wait for turnEnd/turnError, but
-            // keep a bounded idle timer so the prompt queue cannot wedge forever.
-            refreshStreamIdleTimer();
-          },
-          (error: unknown) => finish(() => reject(toBackendClientError('message submit', error)))
         );
-      });
+        if (ack.status === SUBMIT_STATUS_NEEDS_CONFIGURATION) {
+          return { kind: 'needsConfiguration' };
+        }
+        throw new BackendClientError(
+          BackendErrorKind.Protocol,
+          `backend returned an unsupported submit status \`${ack.status}\``
+        );
+      } catch (error) {
+        throw toBackendClientError('message submit', error);
+      }
     },
     async gitStatus() {
       try {
