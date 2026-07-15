@@ -5,6 +5,7 @@ const unixSource: NodeJS.ProcessEnv = {
   PATH: '/usr/bin',
   HOME: '/home/dev',
   TMPDIR: '/tmp',
+  XDG_CONFIG_HOME: '/home/dev/.config',
   GITHUB_TOKEN: 'should-be-dropped',
   AWS_SECRET_ACCESS_KEY: 'should-be-dropped',
   CARGO_HOME: '/home/dev/.cargo',
@@ -18,6 +19,8 @@ describe('buildHardenedEnv', () => {
     expect(env.PATH).toBe('/usr/bin');
     expect(env.HOME).toBe('/home/dev');
     expect(env.TMPDIR).toBe('/tmp');
+    // gh resolves its auth config under XDG roots, so they must survive hardening.
+    expect(env.XDG_CONFIG_HOME).toBe('/home/dev/.config');
     expect(env.GITHUB_TOKEN).toBeUndefined();
     expect(env.AWS_SECRET_ACCESS_KEY).toBeUndefined();
     expect(env.RANDOM_UNRELATED_VAR).toBeUndefined();
@@ -38,6 +41,8 @@ describe('buildHardenedEnv', () => {
         PATHEXT: '.COM;.EXE',
         SystemRoot: 'C:\\Windows',
         USERPROFILE: 'C:\\Users\\dev',
+        APPDATA: 'C:\\Users\\dev\\AppData\\Roaming',
+        LOCALAPPDATA: 'C:\\Users\\dev\\AppData\\Local',
         AZURE_CLIENT_SECRET: 'should-be-dropped'
       }
     });
@@ -46,6 +51,10 @@ describe('buildHardenedEnv', () => {
     expect(env.PATHEXT).toBe('.COM;.EXE');
     expect(env.SystemRoot).toBe('C:\\Windows');
     expect(env.USERPROFILE).toBe('C:\\Users\\dev');
+    // gh loads its host auth config from %APPDATA%\GitHub CLI, so APPDATA (and
+    // LOCALAPPDATA for state) must survive hardening or `gh pr view` fails auth.
+    expect(env.APPDATA).toBe('C:\\Users\\dev\\AppData\\Roaming');
+    expect(env.LOCALAPPDATA).toBe('C:\\Users\\dev\\AppData\\Local');
     expect(env.AZURE_CLIENT_SECRET).toBeUndefined();
   });
 });
