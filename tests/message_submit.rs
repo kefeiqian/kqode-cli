@@ -64,11 +64,7 @@ fn message_submit_answers_each_request_with_needs_configuration() {
                 RpcMethod::MessageSubmit.as_str(),
                 json!({ "text": "first" }),
             ),
-            request_frame(
-                2,
-                RpcMethod::MessageSubmit.as_str(),
-                json!({ "text": "" }),
-            ),
+            request_frame(2, RpcMethod::MessageSubmit.as_str(), json!({ "text": "" })),
         ]
         .concat(),
     );
