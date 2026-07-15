@@ -31,8 +31,16 @@ const NO_COMMITS_BRANCH_PREFIX: &str = "No commits yet on ";
 const DETACHED_HEAD_STATUS: &str = "HEAD (no branch)";
 /// Prefix for a pull-request status segment.
 const PULL_REQUEST_LABEL_PREFIX: &str = "#";
-/// Ceiling for each git/GitHub status command before it is treated as unavailable.
-const COMMAND_TIMEOUT: Duration = Duration::from_secs(2);
+/// Ceiling for the local `git status` call before it is treated as unavailable.
+/// This is a fast, offline command, so a tight budget is fine.
+const GIT_STATUS_TIMEOUT: Duration = Duration::from_secs(2);
+/// Ceiling for the `gh pr view` call before it is treated as unavailable.
+///
+/// Unlike `git status`, this performs a network round-trip to the GitHub API,
+/// whose latency is variable and regularly exceeds the local-git budget. It is
+/// therefore given a larger timeout so a slow-but-succeeding lookup is not
+/// killed, which would drop the PR label from the status line.
+const PULL_REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 /// Formatted workspace source-control status returned to clients.
 #[derive(Debug, Eq, PartialEq)]
 pub struct WorkspaceGitStatus {
@@ -75,12 +83,12 @@ pub fn status() -> Option<WorkspaceGitStatus> {
 }
 
 fn read_status() -> Option<GitStatus> {
-    let porcelain = run_stdout(GIT_COMMAND, GIT_STATUS_ARGS, COMMAND_TIMEOUT)?;
+    let porcelain = run_stdout(GIT_COMMAND, GIT_STATUS_ARGS, GIT_STATUS_TIMEOUT)?;
     parse_status(&porcelain)
 }
 
 fn read_pull_request() -> Option<PullRequest> {
-    let stdout = run_stdout(GITHUB_COMMAND, PULL_REQUEST_ARGS, COMMAND_TIMEOUT)?;
+    let stdout = run_stdout(GITHUB_COMMAND, PULL_REQUEST_ARGS, PULL_REQUEST_TIMEOUT)?;
     parse_pull_request(&stdout)
 }
 

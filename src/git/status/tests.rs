@@ -1,4 +1,7 @@
-use super::{format_label, format_pull_request_label, parse_pull_request, parse_status};
+use super::{
+    GIT_STATUS_TIMEOUT, PULL_REQUEST_TIMEOUT, format_label, format_pull_request_label,
+    parse_pull_request, parse_status,
+};
 
 fn parse_status_label(porcelain: &str) -> Option<String> {
     parse_status(porcelain).map(|status| format_label(&status))
@@ -88,6 +91,15 @@ fn parses_pull_request_number_and_url_and_formats_the_label() {
 fn ignores_unparseable_pull_request_output() {
     assert!(parse_pull_request("").is_none());
     assert!(parse_pull_request("not json").is_none());
+}
+
+#[test]
+fn gives_the_networked_pull_request_lookup_at_least_the_local_git_budget() {
+    // `gh pr view` performs a network round-trip to the GitHub API, so its
+    // timeout must not be smaller than the fast, offline `git status` budget;
+    // otherwise a slow-but-succeeding lookup is killed and the PR label and
+    // hyperlink silently disappear from the status line.
+    assert!(PULL_REQUEST_TIMEOUT >= GIT_STATUS_TIMEOUT);
 }
 
 #[test]
