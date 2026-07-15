@@ -1,11 +1,13 @@
 use std::{error::Error, fmt, thread};
 
 use lsp_server::{Connection, Message, Notification, Request, Response};
+use serde::Serialize;
 
 use crate::git;
 use crate::protocol::{
     BACKEND_READY_METHOD, GitStatusResult, JSON_RPC_INVALID_PARAMS, JSON_RPC_METHOD_NOT_FOUND,
-    MessageSubmitParams, MessageSubmitResult, RpcMethod, SUBMIT_STATUS_NEEDS_CONFIGURATION,
+    MessageSubmitParams, MessageSubmitResult, PullRequestResult, RpcMethod,
+    SUBMIT_STATUS_NEEDS_CONFIGURATION,
 };
 
 #[derive(Debug)]
@@ -107,13 +109,26 @@ fn send_response(connection: &Connection, response: Response) -> Result<(), Back
 /// Returns `Some(response)` to answer synchronously, or `None` when the handler
 /// owns its response and will send it later. `kqode.message.submit` answers
 /// immediately with a configuration-required ack in this bootstrap slice;
-/// `kqode.git.status` runs on a spawned thread and sends its response deferred,
-/// so a slow `git` never stalls the receive loop.
+/// `kqode.git.status` and `kqode.git.pullRequest` each run on a spawned thread
+/// and send their response deferred, so a slow `git`/`gh` never stalls the
+/// receive loop.
 fn handle_request(request: Request, connection: &Connection) -> Option<Response> {
     match RpcMethod::from_method(&request.method) {
         Some(RpcMethod::MessageSubmit) => Some(handle_message_submit(request, connection)),
         Some(RpcMethod::GitStatus) => {
-            spawn_git_status(request, connection);
+            spawn_deferred(request, connection, || GitStatusResult {
+                label: git::status_label(),
+            });
+            None
+        }
+        Some(RpcMethod::PullRequest) => {
+            spawn_deferred(request, connection, || {
+                let pull_request = git::pull_request();
+                PullRequestResult {
+                    label: pull_request.as_ref().map(|pr| pr.label.clone()),
+                    url: pull_request.map(|pr| pr.url),
+                }
+            });
             None
         }
         None => Some(Response::new_err(
@@ -131,50 +146,40 @@ fn handle_request(request: Request, connection: &Connection) -> Option<Response>
 /// plaintext credentials or contacts a model. Streaming lands with the provider
 /// PR.
 fn handle_message_submit(request: Request, _connection: &Connection) -> Response {
-    let params = match serde_json::from_value::<MessageSubmitParams>(request.params) {
-        Ok(params) => params,
-        Err(error) => {
-            return Response::new_err(
-                request.id,
-                JSON_RPC_INVALID_PARAMS,
-                format!("invalid message submit params: {error}"),
-            );
-        }
-    };
-
-    let MessageSubmitParams { turn_id, .. } = params;
+    // Deserialize to validate the request shape (deny_unknown_fields); the
+    // bootstrap handler acks without reading the prompt text or a provider.
+    if let Err(error) = serde_json::from_value::<MessageSubmitParams>(request.params) {
+        return Response::new_err(
+            request.id,
+            JSON_RPC_INVALID_PARAMS,
+            format!("invalid message submit params: {error}"),
+        );
+    }
 
     Response::new_ok(
         request.id,
         MessageSubmitResult {
-            turn_id,
             status: SUBMIT_STATUS_NEEDS_CONFIGURATION,
         },
     )
 }
 
-/// Spawns a detached thread that computes the workspace git label and sends the
-/// deferred response for `request`.
+/// Spawns a detached thread that runs `compute` (a blocking git/GitHub query)
+/// and sends its serialized result as the deferred response for `request`.
 ///
-/// Running `git` off the receive loop keeps a slow or hung call from stalling
+/// Running these off the receive loop keeps a slow or hung command from stalling
 /// other requests; the thread's `sender` clone also keeps the transport alive
 /// until the response is flushed, so the answer is not lost if stdin closes
 /// first (see the shutdown note in [`run_stdio`]).
-fn spawn_git_status(request: Request, connection: &Connection) {
+fn spawn_deferred<T, F>(request: Request, connection: &Connection, compute: F)
+where
+    T: Serialize,
+    F: FnOnce() -> T + Send + 'static,
+{
     let id = request.id;
     let sender = connection.sender.clone();
     thread::spawn(move || {
-        let status = git::status();
-        let response = Response::new_ok(
-            id,
-            GitStatusResult {
-                label: status.as_ref().map(|status| status.label.clone()),
-                pull_request_label: status
-                    .as_ref()
-                    .and_then(|status| status.pull_request_label.clone()),
-                pull_request_url: status.and_then(|status| status.pull_request_url),
-            },
-        );
+        let response = Response::new_ok(id, compute());
         let _ = sender.send(Message::Response(response));
     });
 }

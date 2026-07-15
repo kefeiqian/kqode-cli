@@ -25,6 +25,7 @@ function renderApp(backendClient: Partial<BackendClient>, columns = 80, rows = 4
   // submit tests only override submit.
   const client: BackendClient = {
     gitStatus: async () => null,
+    pullRequest: async () => null,
     submit: async () => {
       throw new Error('submit not provided');
     },

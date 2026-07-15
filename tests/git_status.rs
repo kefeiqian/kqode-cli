@@ -35,14 +35,34 @@ fn git_status_returns_a_formatted_label_for_the_workspace() {
         label.starts_with("⎇ "),
         "label should start with the branch glyph: {label}"
     );
+}
+
+#[test]
+fn pull_request_returns_a_nullable_label_and_url_for_the_workspace() {
+    // The branch/PR state of the test checkout is non-deterministic (and `gh`
+    // may be unavailable or offline in CI), so assert only the stable wire
+    // shape: `label` and `url` are each either null or a string.
+    let output = backend_output(&request_frame(
+        1,
+        RpcMethod::PullRequest.as_str(),
+        json!(null),
+    ));
+
+    assert!(output.status.success(), "{output:?}");
+
+    let frames = response_frames(&output.stdout);
+    assert_eq!(
+        frames.len(),
+        1,
+        "expected one pull request response after the ready notification: {frames:?}"
+    );
+    assert_eq!(frames[0]["id"], 1);
     assert!(
-        frames[0]["result"]["pullRequestLabel"].is_null()
-            || frames[0]["result"]["pullRequestLabel"].is_string(),
+        frames[0]["result"]["label"].is_null() || frames[0]["result"]["label"].is_string(),
         "pull request label should be null or a string"
     );
     assert!(
-        frames[0]["result"]["pullRequestUrl"].is_null()
-            || frames[0]["result"]["pullRequestUrl"].is_string(),
+        frames[0]["result"]["url"].is_null() || frames[0]["result"]["url"].is_string(),
         "pull request url should be null or a string"
     );
 }

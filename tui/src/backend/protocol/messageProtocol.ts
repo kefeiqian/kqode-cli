@@ -2,12 +2,14 @@ import { NotificationType0, RequestType, RequestType0 } from 'vscode-jsonrpc';
 import {
   BACKEND_READY_METHOD,
   GIT_STATUS_METHOD,
-  MESSAGE_SUBMIT_METHOD
+  MESSAGE_SUBMIT_METHOD,
+  PULL_REQUEST_METHOD
 } from '@contracts/backend/index.ts';
 import type {
   GitStatusResult,
   MessageSubmitParams,
-  MessageSubmitResult
+  MessageSubmitResult,
+  PullRequestResult
 } from '@contracts/backend/index.ts';
 
 /**
@@ -29,6 +31,16 @@ export const messageSubmitRequest = new RequestType<MessageSubmitParams, Message
  * result shape come from the dependency-free `@contracts` seam.
  */
 export const gitStatusRequest = new RequestType0<GitStatusResult, void>(GIT_STATUS_METHOD);
+
+/**
+ * Typed descriptor for the parameterless `kqode.git.pullRequest` request.
+ *
+ * The backend runs `gh` in its own workspace cwd, so the request carries no
+ * params; it resolves with the PR label + URL (or nulls). Fetched once at
+ * bootstrap because a branch's PR is static for the session. The method name and
+ * result shape come from the dependency-free `@contracts` seam.
+ */
+export const pullRequestRequest = new RequestType0<PullRequestResult, void>(PULL_REQUEST_METHOD);
 
 /**
  * Typed descriptor for the backend's one-shot readiness notification.

@@ -41,12 +41,12 @@ const GIT_STATUS_TIMEOUT: Duration = Duration::from_secs(2);
 /// therefore given a larger timeout so a slow-but-succeeding lookup is not
 /// killed, which would drop the PR label from the status line.
 const PULL_REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
-/// Formatted workspace source-control status returned to clients.
+/// The current branch's pull request, formatted for display: a `#N` `label` and
+/// the PR's web `url`. Returned to clients so the TUI can render a hyperlink.
 #[derive(Debug, Eq, PartialEq)]
-pub struct WorkspaceGitStatus {
+pub struct PullRequestStatus {
     pub label: String,
-    pub pull_request_label: Option<String>,
-    pub pull_request_url: Option<String>,
+    pub url: String,
 }
 
 /// The current branch's GitHub pull request, as reported by `gh pr view`.
@@ -65,20 +65,29 @@ struct GitStatus {
     has_untracked_changes: bool,
 }
 
-/// Returns the formatted git/GitHub status for the workspace, or `None` when
-/// the directory is not a git repository or `git` is unavailable. Blocking; call
-/// it off the backend's request loop (e.g. on a thread).
+/// Returns the formatted working-tree label (e.g. `⎇ main*`), or `None` when the
+/// directory is not a git repository or `git` is unavailable.
+///
+/// This is a fast, local query with no network I/O, so the TUI refreshes it
+/// after every turn. Blocking; call it off the backend's request loop (e.g. on a
+/// thread).
 #[must_use]
-pub fn status() -> Option<WorkspaceGitStatus> {
-    let parsed_status = read_status()?;
-    let pull_request = read_pull_request();
+pub fn status_label() -> Option<String> {
+    Some(format_label(&read_status()?))
+}
 
-    Some(WorkspaceGitStatus {
-        label: format_label(&parsed_status),
-        pull_request_label: pull_request
-            .as_ref()
-            .map(|pull_request| format_pull_request_label(pull_request.number)),
-        pull_request_url: pull_request.map(|pull_request| pull_request.url),
+/// Returns the current branch's GitHub pull request as a display label and URL,
+/// or `None` when there is no PR (or `gh` is unavailable).
+///
+/// Unlike [`status_label`], this performs a network round-trip via `gh`, so the
+/// TUI fetches it once at session bootstrap rather than on every turn. Blocking;
+/// call it off the backend's request loop (e.g. on a thread).
+#[must_use]
+pub fn pull_request() -> Option<PullRequestStatus> {
+    let pull_request = read_pull_request()?;
+    Some(PullRequestStatus {
+        label: format_pull_request_label(pull_request.number),
+        url: pull_request.url,
     })
 }
 

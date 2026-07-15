@@ -9,4 +9,4 @@
 mod command;
 mod status;
 
-pub use status::{WorkspaceGitStatus, status};
+pub use status::{PullRequestStatus, pull_request, status_label};

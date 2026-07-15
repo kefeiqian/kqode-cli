@@ -10,7 +10,11 @@ import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.t
 import { createMessageConnectionClient } from '@backend/client/messageConnectionClient.ts';
 import { SUBMIT_STATUS_NEEDS_CONFIGURATION } from '@contracts/backend/index.ts';
 import type { MessageSubmitResult } from '@contracts/backend/index.ts';
-import { gitStatusRequest, messageSubmitRequest } from '@backend/protocol/messageProtocol.ts';
+import {
+  gitStatusRequest,
+  messageSubmitRequest,
+  pullRequestRequest
+} from '@backend/protocol/messageProtocol.ts';
 
 type PairedConnections = {
   client: MessageConnection;
@@ -61,8 +65,7 @@ afterEach(() => {
 describe('message protocol client', () => {
   it('resolves needs-configuration when the ack reports no key', async () => {
     const { client, server } = pairedConnections();
-    server.onRequest(messageSubmitRequest, ({ turnId }) => ({
-      turnId,
+    server.onRequest(messageSubmitRequest, () => ({
       status: SUBMIT_STATUS_NEEDS_CONFIGURATION
     }));
 
@@ -71,24 +74,23 @@ describe('message protocol client', () => {
     expect(outcome).toEqual({ kind: 'needsConfiguration' });
   });
 
-  it('sends the prompt text with a client-generated turnId the ack echoes', async () => {
+  it('sends the prompt text to the backend', async () => {
     const { client, server } = pairedConnections();
-    const received: Array<{ text: string; turnId: string }> = [];
+    const received: Array<{ text: string }> = [];
     server.onRequest(messageSubmitRequest, (params) => {
       received.push(params);
-      return { turnId: params.turnId, status: SUBMIT_STATUS_NEEDS_CONFIGURATION };
+      return { status: SUBMIT_STATUS_NEEDS_CONFIGURATION };
     });
 
     await createMessageConnectionClient(client).submit({ text: '  café ☕  ' });
 
     expect(received).toHaveLength(1);
     expect(received[0]?.text).toBe('  café ☕  ');
-    expect(received[0]?.turnId).toMatch(/\S/);
   });
 
   it('rejects an unsupported ack status as a protocol error', async () => {
     const { client, server } = pairedConnections();
-    server.onRequest(messageSubmitRequest, ({ turnId }) => ({ turnId, status: 'streaming' }));
+    server.onRequest(messageSubmitRequest, () => ({ status: 'streaming' }));
 
     const submit = createMessageConnectionClient(client).submit({ text: 'too early' });
 
@@ -128,28 +130,16 @@ describe('message protocol client', () => {
 describe('git status request', () => {
   it('resolves the formatted label the backend returns', async () => {
     const { client, server } = pairedConnections();
-    server.onRequest(gitStatusRequest, () => ({
-      label: '⎇ main*',
-      pullRequestLabel: '#3',
-      pullRequestUrl: 'https://github.com/o/r/pull/3'
-    }));
+    server.onRequest(gitStatusRequest, () => ({ label: '⎇ main*' }));
 
     const status = await createMessageConnectionClient(client).gitStatus();
 
-    expect(status).toEqual({
-      label: '⎇ main*',
-      pullRequestLabel: '#3',
-      pullRequestUrl: 'https://github.com/o/r/pull/3'
-    });
+    expect(status).toEqual({ label: '⎇ main*' });
   });
 
   it('resolves null when the workspace is not a git repository', async () => {
     const { client, server } = pairedConnections();
-    server.onRequest(gitStatusRequest, () => ({
-      label: null,
-      pullRequestLabel: null,
-      pullRequestUrl: null
-    }));
+    server.onRequest(gitStatusRequest, () => ({ label: null }));
 
     const status = await createMessageConnectionClient(client).gitStatus();
 
@@ -167,5 +157,41 @@ describe('git status request', () => {
     await expect(status).rejects.toBeInstanceOf(BackendClientError);
     await expect(status).rejects.toMatchObject({ kind: BackendErrorKind.Protocol });
     await expect(status).rejects.toThrow('git status');
+  });
+});
+
+describe('pull request request', () => {
+  it('resolves the branch pull request label and url', async () => {
+    const { client, server } = pairedConnections();
+    server.onRequest(pullRequestRequest, () => ({
+      label: '#3',
+      url: 'https://github.com/o/r/pull/3'
+    }));
+
+    const pullRequest = await createMessageConnectionClient(client).pullRequest();
+
+    expect(pullRequest).toEqual({ label: '#3', url: 'https://github.com/o/r/pull/3' });
+  });
+
+  it('resolves null when the branch has no pull request', async () => {
+    const { client, server } = pairedConnections();
+    server.onRequest(pullRequestRequest, () => ({ label: null, url: null }));
+
+    const pullRequest = await createMessageConnectionClient(client).pullRequest();
+
+    expect(pullRequest).toBeNull();
+  });
+
+  it('surfaces a JSON-RPC error as a typed protocol client error', async () => {
+    const { client, server } = pairedConnections();
+    server.onRequest(pullRequestRequest, () => {
+      throw new ResponseError(ErrorCodes.InternalError, 'gh failed');
+    });
+
+    const pullRequest = createMessageConnectionClient(client).pullRequest();
+
+    await expect(pullRequest).rejects.toBeInstanceOf(BackendClientError);
+    await expect(pullRequest).rejects.toMatchObject({ kind: BackendErrorKind.Protocol });
+    await expect(pullRequest).rejects.toThrow('pull request');
   });
 });

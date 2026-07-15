@@ -27,6 +27,7 @@ pub const JSON_RPC_INVALID_PARAMS: i32 = -32602;
 pub enum RpcMethod {
     MessageSubmit,
     GitStatus,
+    PullRequest,
 }
 
 impl RpcMethod {
@@ -34,6 +35,7 @@ impl RpcMethod {
         match self {
             Self::MessageSubmit => "kqode.message.submit",
             Self::GitStatus => "kqode.git.status",
+            Self::PullRequest => "kqode.git.pullRequest",
         }
     }
 
@@ -41,7 +43,7 @@ impl RpcMethod {
     /// backend does not implement it (yielding a method-not-found response).
     #[must_use]
     pub fn from_method(method: &str) -> Option<Self> {
-        [Self::MessageSubmit, Self::GitStatus]
+        [Self::MessageSubmit, Self::GitStatus, Self::PullRequest]
             .into_iter()
             .find(|candidate| candidate.as_str() == method)
     }
@@ -49,39 +51,49 @@ impl RpcMethod {
 
 /// Params for `kqode.message.submit`.
 ///
-/// `turnId` is a client-generated identity for the turn that the backend echoes
-/// back in its ack. The streaming notification channel that will correlate on
-/// this id lands with the provider PR; today it simply travels with the request.
-/// Kept in lockstep with the TypeScript `MessageSubmitParams`.
+/// Carries only the prompt `text` in this bootstrap slice. Kept in lockstep with
+/// the TypeScript `MessageSubmitParams`.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct MessageSubmitParams {
     pub text: String,
-    pub turn_id: String,
 }
 
 /// Result for `kqode.message.submit`: an immediate ack.
 ///
 /// `status` is [`SUBMIT_STATUS_NEEDS_CONFIGURATION`] in this bootstrap slice
-/// because no provider is wired yet; `turnId` echoes the client's id. Streaming
-/// statuses arrive with the provider PR.
+/// because no provider is wired yet.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MessageSubmitResult {
-    pub turn_id: String,
     pub status: &'static str,
 }
 
-/// Result for `kqode.git.status`: the formatted working-tree label, or `null`
-/// when the workspace is not a git repository (or `git` could not be queried).
-/// `pullRequestLabel` is an optional GitHub PR segment such as `#3`, and
-/// `pullRequestUrl` is that PR's web URL when available (so the TUI can render
-/// the label as a hyperlink). Kept in lockstep with the TypeScript
-/// `GitStatusResult`.
+/// Result for `kqode.git.status`: the formatted working-tree label (e.g.
+/// `⎇ main*`), or `null` when the workspace is not a git repository (or `git`
+/// could not be queried).
+///
+/// This is a fast, local query refreshed after every turn; the branch's pull
+/// request is a separate, network-bound `kqode.git.pullRequest` call
+/// ([`PullRequestResult`]) fetched once per session. Kept in lockstep with the
+/// TypeScript `GitStatusResult`.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitStatusResult {
     pub label: Option<String>,
-    pub pull_request_label: Option<String>,
-    pub pull_request_url: Option<String>,
+}
+
+/// Result for `kqode.git.pullRequest`: the current branch's GitHub PR as a
+/// display `label` (e.g. `#3`) and web `url`, or both `null` when there is no PR
+/// (or `gh` could not be queried).
+///
+/// Fetched once at session bootstrap because a branch's PR is static for the
+/// session, and kept separate from [`GitStatusResult`] so the per-turn status
+/// refresh never incurs the `gh` network round-trip. Kept in lockstep with the
+/// TypeScript `PullRequestResult`.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PullRequestResult {
+    pub label: Option<String>,
+    pub url: Option<String>,
 }

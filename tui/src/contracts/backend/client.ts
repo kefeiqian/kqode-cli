@@ -31,7 +31,7 @@ export class BackendClientError extends Error {
   }
 }
 
-/** Params the TUI submits; the client generates the wire `turnId` internally. */
+/** Params the TUI submits. */
 export type SubmitParams = {
   text: string;
 };
@@ -54,6 +54,15 @@ export type GitStatus = {
 };
 
 /**
+ * The current branch's pull request, formatted by the Rust backend: a `#N`
+ * `label` and (when available) its web `url`.
+ */
+export type PullRequestStatus = {
+  label: string;
+  url?: string;
+};
+
+/**
  * Narrow backend seam the TUI uses to submit chat turns.
  *
  * `submit` sends the prompt and resolves with a {@link SubmitOutcome} when the
@@ -66,10 +75,17 @@ export type GitStatus = {
 export type BackendClient = {
   submit(params: SubmitParams): Promise<SubmitOutcome>;
   /**
-   * Fetches the workspace git/PR status, or `null` when the workspace is not a
-   * git repository or `git` could not be queried. Rejects with a
-   * {@link BackendClientError} on transport/timeout failure. The backend formats
-   * display segments; the TUI only wraps them.
+   * Fetches the workspace working-tree label, or `null` when the workspace is
+   * not a git repository or `git` could not be queried. Refreshed after every
+   * turn. Rejects with a {@link BackendClientError} on transport/timeout
+   * failure. The backend formats display segments; the TUI only wraps them.
    */
   gitStatus(): Promise<GitStatus | null>;
+  /**
+   * Fetches the current branch's GitHub pull request (label + URL), or `null`
+   * when there is no PR (or `gh` could not be queried). Fetched once at bootstrap
+   * because a branch's PR is static for the session. Rejects with a
+   * {@link BackendClientError} on transport/timeout failure.
+   */
+  pullRequest(): Promise<PullRequestStatus | null>;
 };

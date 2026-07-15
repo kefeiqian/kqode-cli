@@ -38,6 +38,7 @@ describe('enqueuePromptAtom', () => {
     const resolvers: Array<(outcome: SubmitOutcome) => void> = [];
     const backendClient: BackendClient = {
       gitStatus: async () => null,
+      pullRequest: async () => null,
       submit: async () =>
         new Promise<SubmitOutcome>((resolve) => {
           resolvers.push(resolve);

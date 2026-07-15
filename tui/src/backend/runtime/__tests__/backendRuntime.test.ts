@@ -12,6 +12,7 @@ function fakeClient(overrides: Partial<RuntimeBackendClient> = {}): RuntimeBacke
   return {
     submit: vi.fn(),
     gitStatus: vi.fn().mockResolvedValue(null),
+    pullRequest: vi.fn().mockResolvedValue(null),
     ensureStarted: vi.fn().mockResolvedValue(undefined),
     dispose: vi.fn(),
     ...overrides
@@ -37,6 +38,11 @@ describe('startBackendRuntime', () => {
 
     expect(store.get(startupStatusHintAtom)).toBeUndefined();
     expect(store.get(backendClientAtom)).toBe(client);
+
+    // The working-tree label refreshes at bootstrap; the pull request is fetched
+    // exactly once here (not per turn) because it is static for the session.
+    expect(client.gitStatus).toHaveBeenCalledTimes(1);
+    expect(client.pullRequest).toHaveBeenCalledTimes(1);
 
     dispose();
     expect(client.dispose).toHaveBeenCalledTimes(1);

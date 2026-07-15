@@ -176,6 +176,13 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
       const active = await ensureSession();
       return active.client.gitStatus();
     },
+    async pullRequest() {
+      if (disposed) {
+        throw disposedError();
+      }
+      const active = await ensureSession();
+      return active.client.pullRequest();
+    },
     dispose() {
       disposed = true;
       if (state === BackendLifecycleState.Dead) {

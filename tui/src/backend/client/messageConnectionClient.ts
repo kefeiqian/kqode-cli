@@ -1,9 +1,12 @@
-import { randomUUID } from 'node:crypto';
 import { type MessageConnection, ResponseError } from 'vscode-jsonrpc';
 import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.ts';
 import { SUBMIT_STATUS_NEEDS_CONFIGURATION } from '@contracts/backend/index.ts';
 import type { BackendClient, SubmitOutcome, SubmitParams } from '@contracts/backend/index.ts';
-import { gitStatusRequest, messageSubmitRequest } from '@backend/protocol/messageProtocol.ts';
+import {
+  gitStatusRequest,
+  messageSubmitRequest,
+  pullRequestRequest
+} from '@backend/protocol/messageProtocol.ts';
 import { withRequestTimeout } from '@backend/client/backendClientErrors.ts';
 import { DEFAULT_REQUEST_TIMEOUT_MS } from '@constants/backend.ts';
 
@@ -32,12 +35,9 @@ export function createMessageConnectionClient(
 
   return {
     async submit(params: SubmitParams): Promise<SubmitOutcome> {
-      // `turnId` is client-generated so the turn has a stable identity the ack
-      // echoes back; the provider PR reuses it to correlate stream notifications.
-      const turnId = randomUUID();
       try {
         const ack = await withRequestTimeout(
-          connection.sendRequest(messageSubmitRequest, { text: params.text, turnId }),
+          connection.sendRequest(messageSubmitRequest, { text: params.text }),
           requestTimeoutMs
         );
         if (ack.status === SUBMIT_STATUS_NEEDS_CONFIGURATION) {
@@ -57,15 +57,22 @@ export function createMessageConnectionClient(
           connection.sendRequest(gitStatusRequest),
           requestTimeoutMs
         );
-        return result.label === null
-          ? null
-          : {
-              label: result.label,
-              pullRequestLabel: result.pullRequestLabel ?? undefined,
-              pullRequestUrl: result.pullRequestUrl ?? undefined
-            };
+        return result.label === null ? null : { label: result.label };
       } catch (error) {
         throw toBackendClientError('git status', error);
+      }
+    },
+    async pullRequest() {
+      try {
+        const result = await withRequestTimeout(
+          connection.sendRequest(pullRequestRequest),
+          requestTimeoutMs
+        );
+        return result.label === null
+          ? null
+          : { label: result.label, url: result.url ?? undefined };
+      } catch (error) {
+        throw toBackendClientError('pull request', error);
       }
     }
   };
