@@ -66,18 +66,6 @@ fn kqode_home_joins_home_with_dotkqode() {
 }
 
 #[test]
-fn eval_dir_joins_kqode_home_with_eval() {
-    let _guard = env_guard();
-    let _saved = HomeEnv::save();
-    let base = env::temp_dir().join("kqode-eval-test");
-    HomeEnv::set_home(base.to_str().unwrap());
-    assert_eq!(
-        eval_dir(),
-        Some(base.join(KQODE_HOME_DIRNAME).join(super::EVAL_DIRNAME))
-    );
-}
-
-#[test]
 fn unset_home_env_yields_none_without_panicking() {
     let _guard = env_guard();
     let _saved = HomeEnv::save();

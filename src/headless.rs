@@ -3,8 +3,7 @@
 //! Resolves the active provider from the store (fail-closed when none is
 //! configured), drives a single completion via [`run_oneshot`] with KQode's
 //! as-shipped system prompt, and returns the text — or a one-line JSON object —
-//! for the CLI to print. Shares the provider/one-shot machinery with the eval
-//! runner; only the system prompt and output formatting differ.
+//! for the CLI to print.
 
 use crate::chat::system_prompt::system_message;
 use crate::chat::{Completion, run_oneshot};

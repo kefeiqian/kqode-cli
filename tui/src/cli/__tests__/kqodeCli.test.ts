@@ -28,7 +28,6 @@ describe('createKqodeCommand', () => {
 
 describe('isRustEntrypointArgs', () => {
   it('recognizes Rust-owned packaged entrypoints before citty parses TUI flags', () => {
-    expect(isRustEntrypointArgs(['eval', 'evalplus'])).toBe(true);
     expect(isRustEntrypointArgs(['--prompt', 'hello', '--json'])).toBe(true);
     expect(isRustEntrypointArgs(['--resume', 'session-id'])).toBe(false);
     expect(isRustEntrypointArgs([])).toBe(false);

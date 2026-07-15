@@ -2,9 +2,8 @@
 //!
 //! [`run_oneshot`] drives one non-interactive turn — resolve nothing, no
 //! coordinator, no compaction, no history — and returns the accumulated
-//! [`Completion`]. It is the shared foundation for the `--prompt` headless CLI
-//! and the eval runner, which supply their own system message (the as-shipped
-//! prompt or [`crate::chat::system_prompt::eval_system_message`]) and sampling.
+//! [`Completion`]. It is the foundation for the `--prompt` headless CLI, which
+//! supplies its own system message (the as-shipped prompt) and sampling.
 //!
 //! The per-event fold lives in [`Accumulator`] (a pure state update tested on
 //! canned events); the async driver applies it incrementally so a runaway
@@ -21,10 +20,9 @@ use crate::provider::{
     ChatMessage, KimiProvider, ProviderError, ProviderRequest, Sampling, StreamEvent, Usage,
 };
 
-/// Upper bound on accumulated completion text. Model output is untrusted and an
-/// eval run drives hundreds of tasks sequentially, so a runaway or adversarial
-/// generation must not exhaust host memory; accumulation stops at this cap and
-/// records the truncation.
+/// Upper bound on accumulated completion text. Model output is untrusted, so a
+/// runaway or adversarial generation must not exhaust host memory; accumulation
+/// stops at this cap and records the truncation.
 const MAX_OUTPUT_BYTES: usize = 1 << 20; // 1 MiB
 
 /// The result of one non-interactive completion.
@@ -43,9 +41,9 @@ pub struct Completion {
 /// Runs one completion on a current-thread `tokio` runtime and returns the
 /// accumulated [`Completion`].
 ///
-/// `system` is the caller-supplied system message (as-shipped or eval-mode);
-/// `sampling` pins temperature/seed for reproducible eval runs. Token usage is
-/// always requested so `--json` and eval metrics can report it.
+/// `system` is the caller-supplied system message; `sampling` pins
+/// temperature/seed for reproducible runs. Token usage is always requested so
+/// `--json` output can report it.
 ///
 /// # Errors
 ///

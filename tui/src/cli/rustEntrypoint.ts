@@ -6,7 +6,6 @@ import {
   type EmbeddedBackendAsset
 } from '@backend/packaged/materializeBackend.ts';
 
-const EVAL_SUBCOMMAND = 'eval';
 const PROMPT_FLAG = '--prompt';
 
 export type RustEntrypointOptions = {
@@ -23,7 +22,7 @@ type RustEntrypointDeps = {
 
 /** Whether `args` address a Rust-owned CLI path rather than the Ink TUI. */
 export function isRustEntrypointArgs(args: readonly string[]): boolean {
-  return args[0] === EVAL_SUBCOMMAND || args.includes(PROMPT_FLAG);
+  return args.includes(PROMPT_FLAG);
 }
 
 /**

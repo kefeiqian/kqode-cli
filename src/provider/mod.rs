@@ -69,8 +69,8 @@ impl ChatMessage {
 }
 
 /// Sampling controls for a completion. `None` fields defer to the provider's own
-/// defaults; eval pins `temperature: Some(0.0)` (and `seed` when honored) for
-/// reproducibility, while the interactive path leaves both `None`.
+/// defaults; pinning `temperature: Some(0.0)` (and `seed` when honored) requests
+/// reproducible, greedy decoding, while the interactive path leaves both `None`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Sampling {
     /// Sampling temperature; `Some(0.0)` requests greedy decoding.

@@ -1,8 +1,8 @@
 //! Submit-time provider selection and credential resolution.
 //!
-//! Lives in the neutral `connect` module (not `backend`) so the headless CLI and
-//! the eval runner can resolve the active provider/model/key without depending
-//! on the backend transport layer.
+//! Lives in the neutral `connect` module (not `backend`) so the headless CLI can
+//! resolve the active provider/model/key without depending on the backend
+//! transport layer.
 
 use crate::config::KimiConfig;
 use crate::provider::ProviderId;

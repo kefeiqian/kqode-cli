@@ -1,7 +1,6 @@
 use std::path::Path;
 
 pub mod blog;
-pub mod eval;
 pub mod fixture;
 pub mod help;
 pub mod package;
@@ -18,7 +17,6 @@ pub struct CommandSpec {
 }
 
 const HELP_COMMANDS: &[CommandSpec] = &[help::COMMAND];
-const EVAL_COMMANDS: &[CommandSpec] = &[eval::COMMAND];
 const PACKAGE_COMMANDS: &[CommandSpec] = &[
     package::COMMAND,
     package_release::COMMAND,
@@ -28,7 +26,6 @@ const COMMAND_GROUPS: &[&[CommandSpec]] = &[
     fixture::COMMANDS,
     tui::COMMANDS,
     blog::COMMANDS,
-    EVAL_COMMANDS,
     PACKAGE_COMMANDS,
     HELP_COMMANDS,
 ];

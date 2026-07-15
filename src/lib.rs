@@ -5,7 +5,6 @@ pub mod config;
 pub mod connect;
 pub mod conversation;
 pub mod debug_log;
-pub mod eval;
 pub mod git;
 pub mod headless;
 pub mod memory;

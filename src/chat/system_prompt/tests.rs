@@ -72,27 +72,6 @@ fn system_message_orders_stable_sections_before_the_environment() {
 }
 
 #[test]
-fn eval_system_message_has_persona_without_environment_noise() {
-    let message = eval_system_message();
-    assert_eq!(message.role, Role::System);
-    assert!(message.content.contains("You are KQode"));
-    assert!(message.content.contains("# Tone and style"));
-    assert!(message.content.contains("# Safety"));
-    assert!(!message.content.contains("Environment:"));
-    assert!(!message.content.contains("Working directory:"));
-    assert!(!message.content.contains("Current time:"));
-    assert!(!message.content.contains("Git:"));
-    assert!(!message.content.contains("Active model:"));
-}
-
-#[test]
-fn eval_system_message_is_deterministic() {
-    // No volatile environment block (notably the timestamp), so repeated calls
-    // must be byte-identical for reproducible eval runs.
-    assert_eq!(eval_system_message().content, eval_system_message().content);
-}
-
-#[test]
 fn utc_now_label_is_fixed_width_utc() {
     let label = utc_now_label();
     // `YYYY-MM-DD HH:MM:SS UTC`

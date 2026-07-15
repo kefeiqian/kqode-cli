@@ -19,7 +19,7 @@ pub const ENV_VAR: &str = "KQODE_ENV";
 pub enum BuildEnv {
     /// Source checkout run with Cargo; the default when `KQODE_ENV` is unset.
     Dev,
-    /// Test/eval build where product-wide test seams are active.
+    /// Test build where product-wide test seams are active.
     Test,
     /// Packaged release that embeds and runs the backend.
     Prod,

@@ -33,32 +33,6 @@ pub fn build_release_bin(repo_root: &Path, bin: &str) -> Result<(), String> {
     }
 }
 
-/// Builds and runs a Cargo binary target from the repository root, forwarding
-/// `args` to the built binary after `--`.
-///
-/// Used by the `eval` dev wrapper so `cargo xtask eval <args>` is a thin
-/// front-end over `kqode eval <args>`; the real behavior lives in the `kqode`
-/// binary, keeping the xtask command a wrapper (per the AGENTS.md thin-wrapper
-/// rule).
-///
-/// # Errors
-///
-/// Returns an error when Cargo cannot be started or the binary exits non-zero.
-pub fn run_bin(repo_root: &Path, bin: &str, args: &[String]) -> Result<(), String> {
-    let status = Command::new(command())
-        .args(["run", "--bin", bin, "--"])
-        .args(args)
-        .current_dir(repo_root)
-        .status()
-        .map_err(|error| format!("run cargo run --bin {bin}: {error}"))?;
-
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!("cargo run --bin {bin} exited with {status}"))
-    }
-}
-
 /// Refreshes `Cargo.lock` so workspace members' locked versions match their
 /// manifests, without upgrading external dependencies.
 ///

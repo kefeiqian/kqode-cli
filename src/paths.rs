@@ -16,9 +16,6 @@ const DB_FILENAME: &str = "kqode.db";
 /// Local memory directory name under the KQode home.
 const MEMORY_DIRNAME: &str = "memory";
 
-/// Eval-run artifacts directory name under the KQode home.
-const EVAL_DIRNAME: &str = "eval";
-
 /// Best-effort home directory from `USERPROFILE` (Windows) or `HOME` (Unix).
 ///
 /// Returns `None` when neither variable is set to a non-empty value, so callers
@@ -57,15 +54,6 @@ pub fn db_path() -> Option<PathBuf> {
 #[must_use]
 pub fn memory_dir() -> Option<PathBuf> {
     Some(kqode_home()?.join(MEMORY_DIRNAME))
-}
-
-/// Resolves the eval-run artifacts root: `<kqode_home>/eval`.
-///
-/// Each run writes a `<run-id>/` subdirectory of file-truth artifacts here.
-/// Returns `None` when the home cannot be resolved.
-#[must_use]
-pub fn eval_dir() -> Option<PathBuf> {
-    Some(kqode_home()?.join(EVAL_DIRNAME))
 }
 
 #[cfg(test)]
