@@ -40,8 +40,7 @@ let openServers: MessageConnection[] = [];
 // A fake backend whose submit deterministically acks needsConfiguration, since no
 // provider is wired in this bootstrap slice.
 function ack(server: MessageConnection): void {
-  server.onRequest(messageSubmitRequest, ({ turnId }) => ({
-    turnId,
+  server.onRequest(messageSubmitRequest, () => ({
     status: SUBMIT_STATUS_NEEDS_CONFIGURATION
   }));
 }

@@ -35,7 +35,7 @@ fn message_submit_without_key_returns_needs_configuration() {
     let output = backend_output(&request_frame(
         1,
         RpcMethod::MessageSubmit.as_str(),
-        json!({ "text": "hello from tui", "turnId": "turn-1" }),
+        json!({ "text": "hello from tui" }),
     ));
 
     assert!(output.status.success(), "{output:?}");
@@ -53,22 +53,21 @@ fn message_submit_without_key_returns_needs_configuration() {
         frames[0]["result"]["status"],
         SUBMIT_STATUS_NEEDS_CONFIGURATION
     );
-    assert_eq!(frames[0]["result"]["turnId"], "turn-1");
 }
 
 #[test]
-fn message_submit_echoes_the_client_turn_id_for_each_submit() {
+fn message_submit_answers_each_request_with_needs_configuration() {
     let output = backend_output(
         &[
             request_frame(
                 1,
                 RpcMethod::MessageSubmit.as_str(),
-                json!({ "text": "first", "turnId": "turn-a" }),
+                json!({ "text": "first" }),
             ),
             request_frame(
                 2,
                 RpcMethod::MessageSubmit.as_str(),
-                json!({ "text": "", "turnId": "turn-b" }),
+                json!({ "text": "" }),
             ),
         ]
         .concat(),
@@ -77,13 +76,11 @@ fn message_submit_echoes_the_client_turn_id_for_each_submit() {
     assert!(output.status.success(), "{output:?}");
     let frames = response_frames(&output.stdout);
     assert_eq!(frames[0]["id"], 1);
-    assert_eq!(frames[0]["result"]["turnId"], "turn-a");
     assert_eq!(
         frames[0]["result"]["status"],
         SUBMIT_STATUS_NEEDS_CONFIGURATION
     );
     assert_eq!(frames[1]["id"], 2);
-    assert_eq!(frames[1]["result"]["turnId"], "turn-b");
     assert_eq!(
         frames[1]["result"]["status"],
         SUBMIT_STATUS_NEEDS_CONFIGURATION

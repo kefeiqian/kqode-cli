@@ -22,7 +22,7 @@ function frameRequest(payload: unknown): Buffer {
 
 function readResponseFrame(
   stream: Readable
-): Promise<{ result: { turnId: string; status: string } }> {
+): Promise<{ result: { status: string } }> {
   return new Promise((resolve, reject) => {
     let buffer = Buffer.alloc(0);
     const cleanup = () => {
@@ -67,14 +67,14 @@ function readResponseFrame(
 async function submitThroughLauncher(
   backend: LaunchedBackend,
   text: string
-): Promise<{ turnId: string; status: string }> {
+): Promise<{ status: string }> {
   const response = readResponseFrame(backend.stdout);
   backend.stdin.write(
     frameRequest({
       jsonrpc: '2.0',
       id: 1,
       method: MESSAGE_SUBMIT_METHOD,
-      params: { text, turnId: 'turn-1' }
+      params: { text }
     })
   );
   const frame = await response;
@@ -112,7 +112,6 @@ describe('launchSourceBackend (integration)', () => {
       const backend = await launchSourceBackend({ repoRoot, workspaceCwd });
       try {
         const result = await submitThroughLauncher(backend, 'hi from a temp workspace');
-        expect(result.turnId).toBe('turn-1');
         expect(result.status).toBe(SUBMIT_STATUS_NEEDS_CONFIGURATION);
       } finally {
         backend.dispose();
@@ -129,7 +128,6 @@ describe('launchSourceBackend (integration)', () => {
       const backend = await launchSourceBackend({ repoRoot, workspaceCwd });
       try {
         const result = await submitThroughLauncher(backend, 'café ☕');
-        expect(result.turnId).toBe('turn-1');
         expect(result.status).toBe(SUBMIT_STATUS_NEEDS_CONFIGURATION);
       } finally {
         backend.dispose();
