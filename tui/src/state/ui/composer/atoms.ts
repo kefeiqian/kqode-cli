@@ -37,12 +37,11 @@ export const composerStateAtom = atom<ComposerState>(initialComposerState);
 export const composerScrollOffsetRowsAtom = atom(0);
 
 /**
- * True while the user is actively scrolling (wheel / page keys). The composer
- * hides its caret while this holds and re-shows it once scrolling settles, so
- * the terminal cursor's blink is not reset on every scrolled frame. Driven by
- * `useCaretScrollSuppression`.
+ * Monotonic tick bumped after body/composer scrolling changes the visible
+ * window. The composer subscribes to re-assert the same terminal caret position
+ * on scroll repaints without hiding or moving the caret.
  */
-export const caretSuppressedWhileScrollingAtom = atom(false);
+export const composerCaretRefreshTickAtom = atom(0);
 
 export const insertComposerTextAtom = atom(
   null,

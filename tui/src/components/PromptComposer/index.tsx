@@ -16,7 +16,7 @@ import { openHelpAtom } from '@state/ui/help/index.ts';
 import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import { resolveComposerWindow } from '@libs/composer/composerWindow.ts';
 import {
-  caretSuppressedWhileScrollingAtom,
+  composerCaretRefreshTickAtom,
   composerScrollOffsetRowsAtom,
   composerStateAtom
 } from '@state/ui/composer/index.ts';
@@ -46,13 +46,9 @@ export function PromptComposer({
 }: PromptComposerProps) {
   const state = useAtomValue(composerStateAtom);
   const scrollOffsetRows = useAtomValue(composerScrollOffsetRowsAtom);
-  // Hide the caret while the user is actively scrolling (body or composer) and
-  // re-show it once scrolling settles, so the terminal cursor's blink is not
-  // reset on every scrolled frame. Subscribing here also re-renders the composer
-  // when suppression toggles, which re-asserts the caret after a scroll — Ink
-  // only draws the cursor on a frame where setCursorPosition ran (its cursorDirty
-  // flag resets each render).
-  const caretSuppressed = useAtomValue(caretSuppressedWhileScrollingAtom);
+  // Scroll repaints reset Ink's cursorDirty flag. Subscribe to the refresh tick
+  // so this component re-renders and re-asserts the same visible caret position.
+  useAtomValue(composerCaretRefreshTickAtom);
   const atomColumns = useAtomValue(columnsAtom);
   const atomInputLocked = useAtomValue(inputLockedAtom);
   const atomLayout = useAtomValue(layoutAtom);
@@ -121,8 +117,7 @@ export function PromptComposer({
   if (
     resolvedIsActive &&
     composerMetrics.hasMeasured &&
-    composerWindow.cursorVisible &&
-    !caretSuppressed
+    composerWindow.cursorVisible
   ) {
     setCursorPosition(
       resolveComposerCursorPosition(

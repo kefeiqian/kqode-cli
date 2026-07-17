@@ -14,7 +14,7 @@ import {
   parseMouseWheelEvent
 } from '@libs/terminal/mouse.ts';
 import { resolveWheelTarget } from '@components/HomeScreen/wheelRouting.ts';
-import { useCaretScrollSuppression } from '@components/HomeScreen/useCaretScrollSuppression.ts';
+import { useComposerCaretRefresh } from '@components/HomeScreen/useComposerCaretRefresh.ts';
 import { usePullRequestClick } from '@components/HomeScreen/usePullRequestClick.ts';
 import { resolveClickResult } from '@libs/composer/composerWindow.ts';
 import { BODY_CWD_GAP_ROWS } from '@libs/tui/layout.ts';
@@ -49,7 +49,7 @@ export function HomeScreenView() {
   const composerCanScroll = useAtomValue(composerCanScrollAtom);
   const scrollBodyByRows = useSetAtom(scrollBodyByRowsAtom);
   const scrollComposerByRows = useSetAtom(scrollComposerByRowsAtom);
-  const notifyScroll = useCaretScrollSuppression();
+  const notifyScroll = useComposerCaretRefresh();
   const handlePullRequestClick = usePullRequestClick();
   const store = useStore();
 
