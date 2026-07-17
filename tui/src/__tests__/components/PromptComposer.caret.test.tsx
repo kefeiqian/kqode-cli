@@ -1,8 +1,9 @@
 import { createStore } from 'jotai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { PromptComposer } from '@components/PromptComposer/index.tsx';
+import { HomeScreenView } from '@components/HomeScreen/HomeScreenView.tsx';
 import { composerCaretRefreshTickAtom } from '@state/ui/composer/index.ts';
 import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/dimensions.ts';
+import { bodyEntriesAtom } from '@state/ui/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
@@ -27,8 +28,15 @@ describe('PromptComposer caret during scrolling', () => {
     const store = createStore();
     store.set(columnsTestOverrideAtom, 60);
     store.set(rowsTestOverrideAtom, 24);
+    store.set(
+      bodyEntriesAtom,
+      Array.from({ length: 20 }, (_, index) => ({
+        kind: 'assistant' as const,
+        text: `entry ${index + 1}`
+      }))
+    );
 
-    const { unmount } = renderWithJotai(<PromptComposer />, store);
+    const { stdin, unmount } = renderWithJotai(<HomeScreenView />, store);
     await flushInput();
     await vi.waitFor(() => {
       expect(setCursorPositionSpy.mock.calls.at(-1)?.[0]).toBeDefined();
@@ -36,8 +44,10 @@ describe('PromptComposer caret during scrolling', () => {
     const initialPosition = setCursorPositionSpy.mock.calls.at(-1)?.[0];
     setCursorPositionSpy.mockClear();
 
-    store.set(composerCaretRefreshTickAtom, 1);
+    stdin.write('\u001B[5~');
+    await flushInput();
 
+    expect(store.get(composerCaretRefreshTickAtom)).toBe(1);
     await vi.waitFor(() => {
       expect(setCursorPositionSpy.mock.calls.at(-1)?.[0]).toEqual(initialPosition);
     });
