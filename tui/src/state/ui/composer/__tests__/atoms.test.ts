@@ -44,6 +44,35 @@ describe('composerAtoms', () => {
     expect(deleted.cursorIndex).toBe(2);
     expect(store.get(composerStateAtom).text).toBe('abXcY');
   });
+
+  it('moves across and deletes whole grapheme clusters', () => {
+    const store = createStore();
+    const family = '👨‍👩‍👧‍👦';
+    store.set(composerStateAtom, {
+      text: `${family}x`,
+      cursorIndex: family.length,
+      validationError: null
+    });
+
+    store.set(moveComposerCursorBackwardAtom);
+    expect(store.get(composerStateAtom).cursorIndex).toBe(0);
+    store.set(moveComposerCursorForwardAtom);
+    expect(store.get(composerStateAtom).cursorIndex).toBe(family.length);
+    store.set(deleteComposerBackwardAtom, {});
+    expect(store.get(composerStateAtom)).toMatchObject({ text: 'x', cursorIndex: 0 });
+  });
+
+  it('places the cursor after a grapheme formed with following text', () => {
+    const store = createStore();
+    store.set(composerStateAtom, { text: '👩x', cursorIndex: 0, validationError: null });
+
+    store.set(insertComposerTextAtom, { text: '👨‍' });
+
+    expect(store.get(composerStateAtom)).toMatchObject({
+      text: '👨‍👩x',
+      cursorIndex: '👨‍👩'.length
+    });
+  });
 });
 
 describe('composer scroll offset preservation', () => {

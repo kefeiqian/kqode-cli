@@ -18,6 +18,18 @@ describe('wrapPromptText', () => {
     expect(countWrappedPromptRows('abcdefghij', 4)).toBe(3);
   });
 
+  it('wraps CJK text by terminal display columns', () => {
+    expect(wrapPromptText('界界界', 4).map((row) => row.text)).toEqual(['界界', '界']);
+  });
+
+  it('does not split combining or joined emoji graphemes', () => {
+    expect(wrapPromptText('e\u0301e\u0301', 1).map((row) => row.text)).toEqual([
+      'e\u0301',
+      'e\u0301'
+    ]);
+    expect(wrapPromptText('👨‍👩‍👧‍👦x', 2).map((row) => row.text)).toEqual(['👨‍👩‍👧‍👦', 'x']);
+  });
+
   it('reuses the cached row array for repeated identical inputs', () => {
     const first = wrapPromptText('cache\nme', 10);
     const second = wrapPromptText('cache\nme', 10);

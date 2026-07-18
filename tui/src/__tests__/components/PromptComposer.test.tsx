@@ -136,6 +136,10 @@ describe('PromptComposer', () => {
     expect(resolveComposerCursorPosition('123', 38, 7)).toEqual({ x: 5, y: 9 });
   });
 
+  it('places the terminal cursor using display width for wide glyphs', () => {
+    expect(resolveComposerCursorPosition('界a', 38, 7)).toEqual({ x: 5, y: 9 });
+  });
+
   it('places the terminal cursor on the active authored multiline composer row', () => {
     expect(resolveComposerCursorPosition('first\nsecond', 38, 7)).toEqual({ x: 8, y: 10 });
   });

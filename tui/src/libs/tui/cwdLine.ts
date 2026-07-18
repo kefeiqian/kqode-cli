@@ -1,12 +1,15 @@
 import os from 'node:os';
 import path from 'node:path';
 import type { GitStatus } from '@contracts/backend/index.ts';
+import { displayWidth } from '@libs/text/displayWidth.ts';
+import { sanitizeDisplayText } from '@libs/text/sanitizeDisplayText.ts';
 import { dottedUnderline, hyperlink } from '@libs/terminal/hyperlink.ts';
 
 /** The cwd + git-label prefix shared by the plain and decorated renderings. */
 function cwdAndGitPrefix(workspaceCwd: string, gitStatus?: GitStatus): string {
-  const cwdSegment = formatDisplayCwd(workspaceCwd);
-  const gitSegment = gitStatus === undefined ? '' : ` [${gitStatus.label}]`;
+  const cwdSegment = sanitizeSingleLine(formatDisplayCwd(workspaceCwd));
+  const gitSegment =
+    gitStatus === undefined ? '' : ` [${sanitizeSingleLine(gitStatus.label)}]`;
   return `${cwdSegment}${gitSegment}`;
 }
 
@@ -19,7 +22,9 @@ function cwdAndGitPrefix(workspaceCwd: string, gitStatus?: GitStatus): string {
  */
 export function formatCwdLine(workspaceCwd: string, gitStatus?: GitStatus): string {
   const pullRequestSegment =
-    gitStatus?.pullRequestLabel === undefined ? '' : ` [${gitStatus.pullRequestLabel}]`;
+    gitStatus?.pullRequestLabel === undefined
+      ? ''
+      : ` [${sanitizeSingleLine(gitStatus.pullRequestLabel)}]`;
   return `${cwdAndGitPrefix(workspaceCwd, gitStatus)}${pullRequestSegment}`;
 }
 
@@ -44,14 +49,16 @@ function renderPullRequestSegment(gitStatus?: GitStatus): string {
   if (label === undefined) {
     return '';
   }
+  const sanitizedLabel = sanitizeSingleLine(label);
   const url = gitStatus?.pullRequestUrl;
-  const rendered = url === undefined ? label : hyperlink(dottedUnderline(label), url);
+  const rendered =
+    url === undefined ? sanitizedLabel : hyperlink(dottedUnderline(sanitizedLabel), url);
   return ` [${rendered}]`;
 }
 
 /**
- * The visible character offset at which the pull-request label (e.g. `#3`)
- * starts within {@link formatCwdLine}, or `undefined` when no PR label is shown.
+ * The visible column offset at which the pull-request label (e.g. `#3`) starts
+ * within {@link formatCwdLine}, or `undefined` when no PR label is shown.
  *
  * The click router uses it to map a pointer position back to the label's span.
  * The PR segment is ` [<label>]`, so the label begins after the leading ` [`.
@@ -63,7 +70,7 @@ export function pullRequestLabelOffset(
   if (gitStatus?.pullRequestLabel === undefined) {
     return undefined;
   }
-  return `${cwdAndGitPrefix(workspaceCwd, gitStatus)} [`.length;
+  return displayWidth(`${cwdAndGitPrefix(workspaceCwd, gitStatus)} [`);
 }
 
 export function countCwdRows(
@@ -72,7 +79,10 @@ export function countCwdRows(
   columns: number
 ): number {
   const visibleColumns = Math.max(1, columns);
-  return Math.max(1, Math.ceil(formatCwdLine(workspaceCwd, gitStatus).length / visibleColumns));
+  return Math.max(
+    1,
+    Math.ceil(displayWidth(formatCwdLine(workspaceCwd, gitStatus)) / visibleColumns)
+  );
 }
 
 export function formatDisplayCwd(workspaceCwd: string, homeDir = os.homedir()): string {
@@ -95,4 +105,8 @@ export function formatDisplayCwd(workspaceCwd: string, homeDir = os.homedir()): 
 
 function normalizePathForComparison(pathName: string): string {
   return process.platform === 'win32' ? pathName.toLowerCase() : pathName;
+}
+
+function sanitizeSingleLine(text: string): string {
+  return sanitizeDisplayText(text).replace(/\t/g, '\\x09').replace(/\n/g, '\\x0a');
 }

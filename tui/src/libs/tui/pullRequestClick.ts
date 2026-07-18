@@ -1,4 +1,5 @@
 import type { GitStatus } from '@contracts/backend/index.ts';
+import { displayWidth } from '@libs/text/displayWidth.ts';
 import { pullRequestLabelOffset } from '@libs/tui/cwdLine.ts';
 
 /** Inputs for locating a left click on the cwd line's pull-request label. */
@@ -49,5 +50,7 @@ export function resolvePullRequestClickTarget(
   }
 
   const flatOffset = rowOffset * columns + (params.clickColumn - 1);
-  return flatOffset >= labelStart && flatOffset < labelStart + label.length ? url : undefined;
+  return flatOffset >= labelStart && flatOffset < labelStart + displayWidth(label)
+    ? url
+    : undefined;
 }

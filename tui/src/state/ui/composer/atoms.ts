@@ -2,6 +2,11 @@ import { atom } from 'jotai';
 import { clamp } from '@libs/math/clamp.ts';
 import { overLimitMessage, PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import { resolveVerticalCursorIndex } from '@libs/composer/composerWindow.ts';
+import {
+  clampToGraphemeBoundary,
+  nextGraphemeEnd,
+  previousGraphemeStart
+} from '@libs/text/displayWidth.ts';
 
 export type ComposerState = {
   text: string;
@@ -53,10 +58,15 @@ export const insertComposerTextAtom = atom(
     set(composerStateAtom, (state) => {
       const cursorIndex = clampCursorIndex(state.text, state.cursorIndex);
       const text = state.text.slice(0, cursorIndex) + insertedText + state.text.slice(cursorIndex);
+      const insertedEnd = cursorIndex + insertedText.length;
+      const nextCursorIndex =
+        clampToGraphemeBoundary(text, insertedEnd) === insertedEnd
+          ? insertedEnd
+          : nextGraphemeEnd(text, insertedEnd);
 
       return {
         text,
-        cursorIndex: cursorIndex + insertedText.length,
+        cursorIndex: nextCursorIndex,
         validationError: overLimitMessage(text, maxBytes)
       };
     });
@@ -72,7 +82,7 @@ export const deleteComposerBackwardAtom = atom(
         return state;
       }
 
-      const previousCursorIndex = previousCodePointStart(state.text, cursorIndex);
+      const previousCursorIndex = previousGraphemeStart(state.text, cursorIndex);
       const text = state.text.slice(0, previousCursorIndex) + state.text.slice(cursorIndex);
       if (text === state.text) {
         return state;
@@ -96,7 +106,7 @@ export const moveComposerCursorBackwardAtom = atom(null, (_get, set) => {
 
     return {
       ...state,
-      cursorIndex: previousCodePointStart(state.text, cursorIndex)
+      cursorIndex: previousGraphemeStart(state.text, cursorIndex)
     };
   });
 });
@@ -110,7 +120,7 @@ export const moveComposerCursorForwardAtom = atom(null, (_get, set) => {
 
     return {
       ...state,
-      cursorIndex: nextCodePointEnd(state.text, cursorIndex)
+      cursorIndex: nextGraphemeEnd(state.text, cursorIndex)
     };
   });
 });
@@ -174,18 +184,5 @@ export const setComposerValidationErrorAtom = atom(null, (_get, set, message: st
 });
 
 function clampCursorIndex(text: string, cursorIndex: number): number {
-  return clamp(cursorIndex, 0, text.length);
-}
-
-function previousCodePointStart(text: string, cursorIndex: number): number {
-  const previousIndex = cursorIndex - 1;
-  const previousCodeUnit = text.charCodeAt(previousIndex);
-  const offset = previousCodeUnit >= 0xdc00 && previousCodeUnit <= 0xdfff ? 2 : 1;
-  return Math.max(0, cursorIndex - offset);
-}
-
-function nextCodePointEnd(text: string, cursorIndex: number): number {
-  const currentCodeUnit = text.charCodeAt(cursorIndex);
-  const offset = currentCodeUnit >= 0xd800 && currentCodeUnit <= 0xdbff ? 2 : 1;
-  return Math.min(text.length, cursorIndex + offset);
+  return clampToGraphemeBoundary(text, clamp(cursorIndex, 0, text.length));
 }

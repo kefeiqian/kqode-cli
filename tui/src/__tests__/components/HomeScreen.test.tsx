@@ -215,7 +215,7 @@ describe('HomeScreen', () => {
     expect(outputRows.at(2)).toContain('  IJKLMNOPQRSTUVWXYZ');
   });
 
-  it('formats the cwd row with home-relative path, git status, and PR status', () => {
+  it('formats the cwd row with home-relative path and git status', () => {
     const { lastFrame } = renderHomeScreen({
       gitStatus: {
         label: '⎇ feat/first-ink-tui-jsonrpc-backend*+%',

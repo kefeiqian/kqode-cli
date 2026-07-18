@@ -2,6 +2,7 @@ import { Box, Text } from 'ink';
 import { LOWER_HALF_BLOCK, UPPER_HALF_BLOCK } from '@libs/tui/backgroundBlock.ts';
 import { PROMPT_PREFIX } from '@constants/ui.ts';
 import { formatValidationError } from '@components/PromptComposer/promptTextView.ts';
+import { padEndToWidth } from '@libs/text/displayWidth.ts';
 import { theme } from '@theme/themeConfig.ts';
 
 type ComposerFrameProps = {
@@ -68,7 +69,7 @@ function ComposerTextRow({
         backgroundColor={backgroundColor(shouldRenderBackground)}
         color={theme.colors.foreground}
       >
-        {shouldRenderBackground ? row.padEnd(rowColumns, ' ') : row}
+        {shouldRenderBackground ? padEndToWidth(row, rowColumns) : row}
       </Text>
     </Box>
   );

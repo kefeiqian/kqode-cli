@@ -4,9 +4,8 @@ import { BodyEntryKind } from '@constants/bodyEntry.ts';
 import { sanitizeDisplayText } from '@libs/text/sanitizeDisplayText.ts';
 import { unknownCommandMessage } from '@libs/commands/unknownCommand.ts';
 import { backendClientAtom } from '@state/global/index.ts';
-import { bodyScrollOffsetRowsAtom } from '@state/ui/index.ts';
+import { bodyScrollOffsetRowsAtom, refreshGitStatusAtom } from '@state/ui/index.ts';
 import { promptQueueAtom } from '@state/promptQueue/store.ts';
-import { refreshGitStatusAtom } from '@state/ui/index.ts';
 import {
   BACKEND_UNAVAILABLE_MESSAGE,
   backendErrorMessage,
@@ -78,7 +77,7 @@ async function drainQueue(get: Getter, set: Setter): Promise<void> {
       settleActive(set, active.id, result);
       // A settled turn may have changed the working tree once providers land;
       // refresh the git label (fire-and-forget so it never delays draining the
-      // next queued prompt).
+      // next queued prompt). The PR lookup stays session-static.
       void set(refreshGitStatusAtom);
       active = findActive(get);
     }

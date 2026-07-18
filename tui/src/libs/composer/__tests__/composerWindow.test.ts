@@ -96,6 +96,10 @@ describe('resolveVerticalCursorIndex', () => {
     expect(resolveVerticalCursorIndex('abcdefghij', 4, 2, 'down')).toBe(6);
     expect(resolveVerticalCursorIndex('abcdefghij', 4, 6, 'up')).toBe(2);
   });
+
+  it('preserves the visual column across wide glyphs', () => {
+    expect(resolveVerticalCursorIndex('界a\n123', 40, 2, 'down')).toBe(6);
+  });
 });
 
 describe('resolveClickResult', () => {
@@ -105,6 +109,25 @@ describe('resolveClickResult', () => {
   it('maps a click on a visible row + column to the absolute index', () => {
     expect(resolveClickResult({ ...base, visibleRow: 0, column: 1 })?.index).toBe(1);
     expect(resolveClickResult({ ...base, visibleRow: 1, column: 2 })?.index).toBe(6);
+  });
+
+  it('maps clicks inside wide and joined graphemes to safe boundaries', () => {
+    const wide = { text: '界a', columns: 40, maxVisibleLines: 1, cursorIndex: 2, offset: 0 };
+    expect(resolveClickResult({ ...wide, visibleRow: 0, column: 1 })?.index).toBe(0);
+    expect(resolveClickResult({ ...wide, visibleRow: 0, column: 2 })?.index).toBe(1);
+
+    const emoji = '👨‍👩‍👧‍👦x';
+    expect(
+      resolveClickResult({
+        text: emoji,
+        columns: 40,
+        maxVisibleLines: 1,
+        cursorIndex: emoji.length,
+        offset: 0,
+        visibleRow: 0,
+        column: 1
+      })?.index
+    ).toBe(0);
   });
 
   it('clamps the column to the clicked row length (and floors at 0)', () => {
