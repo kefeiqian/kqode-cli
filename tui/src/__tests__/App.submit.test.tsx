@@ -21,8 +21,6 @@ function renderApp(backendClient: Partial<BackendClient>, columns = 80, rows = 4
   store.set(workspaceCwdAtom, workspaceCwd);
   store.set(columnsTestOverrideAtom, columns);
   store.set(rowsTestOverrideAtom, rows);
-  // Fill the full seam so the after-turn git refresh has a gitStatus to call;
-  // submit tests only override submit.
   const client: BackendClient = {
     gitStatus: async () => null,
     pullRequest: async () => null,

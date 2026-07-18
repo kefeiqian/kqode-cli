@@ -39,8 +39,8 @@ describe('startBackendRuntime', () => {
     expect(store.get(startupStatusHintAtom)).toBeUndefined();
     expect(store.get(backendClientAtom)).toBe(client);
 
-    // The working-tree label refreshes at bootstrap; the pull request is fetched
-    // exactly once here (not per turn) because it is static for the session.
+    // The working-tree label refreshes once at bootstrap, then the static PR
+    // lookup runs once for the session.
     expect(client.gitStatus).toHaveBeenCalledTimes(1);
     expect(client.pullRequest).toHaveBeenCalledTimes(1);
 

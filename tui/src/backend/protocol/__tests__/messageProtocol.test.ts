@@ -160,26 +160,26 @@ describe('git status request', () => {
   });
 });
 
-describe('pull request request', () => {
-  it('resolves the branch pull request label and url', async () => {
+describe('pull request status request', () => {
+  it('resolves the formatted PR label and URL the backend returns', async () => {
     const { client, server } = pairedConnections();
     server.onRequest(pullRequestRequest, () => ({
       label: '#3',
       url: 'https://github.com/o/r/pull/3'
     }));
 
-    const pullRequest = await createMessageConnectionClient(client).pullRequest();
+    const status = await createMessageConnectionClient(client).pullRequest();
 
-    expect(pullRequest).toEqual({ label: '#3', url: 'https://github.com/o/r/pull/3' });
+    expect(status).toEqual({ label: '#3', url: 'https://github.com/o/r/pull/3' });
   });
 
   it('resolves null when the branch has no pull request', async () => {
     const { client, server } = pairedConnections();
     server.onRequest(pullRequestRequest, () => ({ label: null, url: null }));
 
-    const pullRequest = await createMessageConnectionClient(client).pullRequest();
+    const status = await createMessageConnectionClient(client).pullRequest();
 
-    expect(pullRequest).toBeNull();
+    expect(status).toBeNull();
   });
 
   it('surfaces a JSON-RPC error as a typed protocol client error', async () => {
@@ -188,10 +188,10 @@ describe('pull request request', () => {
       throw new ResponseError(ErrorCodes.InternalError, 'gh failed');
     });
 
-    const pullRequest = createMessageConnectionClient(client).pullRequest();
+    const status = createMessageConnectionClient(client).pullRequest();
 
-    await expect(pullRequest).rejects.toBeInstanceOf(BackendClientError);
-    await expect(pullRequest).rejects.toMatchObject({ kind: BackendErrorKind.Protocol });
-    await expect(pullRequest).rejects.toThrow('pull request');
+    await expect(status).rejects.toBeInstanceOf(BackendClientError);
+    await expect(status).rejects.toMatchObject({ kind: BackendErrorKind.Protocol });
+    await expect(status).rejects.toThrow('pull request');
   });
 });
