@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   isMouseInput,
   parseMouseClickEvent,
+  parseMouseInputEvents,
   parseMouseWheelEvent,
-  parseMouseWheelInput
+  parseMouseWheelEvents
 } from '@libs/terminal/mouse.ts';
 
 describe('parseMouseWheelEvent', () => {
@@ -30,11 +31,23 @@ describe('parseMouseWheelEvent', () => {
   });
 });
 
-describe('parseMouseWheelInput (delegates to parseMouseWheelEvent)', () => {
-  it('returns the direction only', () => {
-    expect(parseMouseWheelInput('\u001B[<64;1;1M')).toBe('up');
-    expect(parseMouseWheelInput('\u001B[<65;1;1M')).toBe('down');
-    expect(parseMouseWheelInput('hello')).toBeNull();
+describe('parseMouseWheelEvents', () => {
+  it('returns every wheel notch in a batched chunk', () => {
+    expect(parseMouseWheelEvents('\u001B[<64;1;1M\u001B[<65;2;7M')).toEqual([
+      { direction: 'up', row: 1 },
+      { direction: 'down', row: 7 }
+    ]);
+  });
+
+  it('does not consume pasted text containing a wheel-like substring', () => {
+    expect(parseMouseWheelEvents('prefix [<64;1;1M suffix')).toEqual([]);
+    expect(isMouseInput('prefix [<64;1;1M suffix')).toBe(false);
+  });
+
+  it('recognizes a batched click press and release as mouse input', () => {
+    const input = '\u001B[<0;12;5M\u001B[<0;12;5m';
+    expect(isMouseInput(input)).toBe(true);
+    expect(parseMouseInputEvents(input)).toEqual([{ kind: 'click', row: 5, column: 12 }]);
   });
 });
 

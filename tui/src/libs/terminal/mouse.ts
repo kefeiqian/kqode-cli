@@ -15,30 +15,34 @@ export type MouseClickEvent = {
   row: number;
   column: number;
 };
+export type MouseInputEvent =
+  | ({ kind: 'wheel' } & MouseWheelEvent)
+  | ({ kind: 'click' } & MouseClickEvent);
 
 // SGR mouse reports are `ESC[<button;col;row(M|m)`; col/row are 1-based.
-const SGR_MOUSE_INPUT_PATTERN =
-  /^(?:\u001B)?\[<(?<buttonCode>\d+);(?<column>\d+);(?<row>\d+)(?<eventType>[mM])$/;
+const SGR_MOUSE_INPUT_PATTERN_ALL =
+  /(?:\u001B)?\[<(?<buttonCode>\d+);(?<column>\d+);(?<row>\d+)(?<eventType>[mM])/g;
 const WHEEL_BUTTON_OFFSET = 64;
 const WHEEL_BUTTON_COUNT = 4;
 const LEFT_BUTTON_CODE = 0;
 
 export function isMouseInput(input: string): boolean {
-  return SGR_MOUSE_INPUT_PATTERN.test(input);
+  return parseMouseInputEvents(input) !== null;
 }
 
-/**
- * Parses a wheel-button press into its direction and 1-based pointer row, or
- * `null` when `input` is not a wheel press (`M`) event. The row lets a caller
- * route the notch to whichever pane the pointer is over.
- */
-export function parseMouseWheelEvent(input: string): MouseWheelEvent | null {
-  const match = SGR_MOUSE_INPUT_PATTERN.exec(input);
-  if (match?.groups === undefined || match.groups.eventType !== 'M') {
+type SgrMouseGroups = {
+  buttonCode: string;
+  column: string;
+  row: string;
+  eventType: string;
+};
+
+function wheelEventFromGroups(groups: SgrMouseGroups): MouseWheelEvent | null {
+  if (groups.eventType !== 'M') {
     return null;
   }
 
-  const buttonCode = Number.parseInt(match.groups.buttonCode, 10);
+  const buttonCode = Number.parseInt(groups.buttonCode, 10);
   if (buttonCode < WHEEL_BUTTON_OFFSET) {
     return null;
   }
@@ -51,12 +55,31 @@ export function parseMouseWheelEvent(input: string): MouseWheelEvent | null {
     return null;
   }
 
-  return { direction, row: Number.parseInt(match.groups.row, 10) };
+  return { direction, row: Number.parseInt(groups.row, 10) };
 }
 
-/** Back-compat helper: the wheel direction only. Prefer {@link parseMouseWheelEvent}. */
-export function parseMouseWheelInput(input: string): MouseWheelDirection | null {
-  return parseMouseWheelEvent(input)?.direction ?? null;
+/** Parses one wheel-button press, or `null` for any other input. */
+export function parseMouseWheelEvent(input: string): MouseWheelEvent | null {
+  const events = parseMouseInputEvents(input);
+  return events?.length === 1 && events[0]?.kind === 'wheel'
+    ? { direction: events[0].direction, row: events[0].row }
+    : null;
+}
+
+/** Parses every wheel notch in a possibly batched stdin chunk. */
+export function parseMouseWheelEvents(input: string): MouseWheelEvent[] {
+  const events = parseMouseInputEvents(input);
+  if (events === null) {
+    return [];
+  }
+  const wheels: MouseWheelEvent[] = [];
+  for (const event of events) {
+    if (event.kind !== 'wheel') {
+      return [];
+    }
+    wheels.push({ direction: event.direction, row: event.row });
+  }
+  return wheels;
 }
 
 /**
@@ -65,17 +88,42 @@ export function parseMouseWheelInput(input: string): MouseWheelDirection | null 
  * input). Lets a caller move the cursor to the click position.
  */
 export function parseMouseClickEvent(input: string): MouseClickEvent | null {
-  const match = SGR_MOUSE_INPUT_PATTERN.exec(input);
-  if (match?.groups === undefined || match.groups.eventType !== 'M') {
+  const events = parseMouseInputEvents(input);
+  return events?.length === 1 && events[0]?.kind === 'click'
+    ? { row: events[0].row, column: events[0].column }
+    : null;
+}
+
+/**
+ * Parses a chunk made entirely of SGR mouse reports. Release and unsupported
+ * reports are recognized but omitted from the actionable event list.
+ */
+export function parseMouseInputEvents(input: string): MouseInputEvent[] | null {
+  if (input.length === 0) {
     return null;
   }
 
-  if (Number.parseInt(match.groups.buttonCode, 10) !== LEFT_BUTTON_CODE) {
-    return null;
+  const events: MouseInputEvent[] = [];
+  let consumed = 0;
+  for (const match of input.matchAll(SGR_MOUSE_INPUT_PATTERN_ALL)) {
+    if (match.groups === undefined || match.index !== consumed) {
+      return null;
+    }
+    const groups = match.groups as SgrMouseGroups;
+    const wheel = wheelEventFromGroups(groups);
+    if (wheel !== null) {
+      events.push({ kind: 'wheel', ...wheel });
+    } else if (
+      groups.eventType === 'M' &&
+      Number.parseInt(groups.buttonCode, 10) === LEFT_BUTTON_CODE
+    ) {
+      events.push({
+        kind: 'click',
+        row: Number.parseInt(groups.row, 10),
+        column: Number.parseInt(groups.column, 10)
+      });
+    }
+    consumed += match[0].length;
   }
-
-  return {
-    row: Number.parseInt(match.groups.row, 10),
-    column: Number.parseInt(match.groups.column, 10)
-  };
+  return consumed === input.length ? events : null;
 }

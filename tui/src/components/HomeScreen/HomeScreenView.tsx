@@ -10,21 +10,18 @@ import { StatusBar } from '@components/StatusBar.tsx';
 import {
   DISABLE_SGR_MOUSE_TRACKING,
   ENABLE_SGR_MOUSE_TRACKING,
-  parseMouseClickEvent,
-  parseMouseWheelEvent
+  parseMouseInputEvents
 } from '@libs/terminal/mouse.ts';
-import { resolveWheelTarget } from '@components/HomeScreen/wheelRouting.ts';
+import { handleWheelScroll } from '@components/HomeScreen/wheelScroll.ts';
 import { useComposerCaretRefresh } from '@components/HomeScreen/useComposerCaretRefresh.ts';
 import { usePullRequestClick } from '@components/HomeScreen/usePullRequestClick.ts';
 import { resolveClickResult } from '@libs/composer/composerWindow.ts';
 import { BODY_CWD_GAP_ROWS } from '@libs/tui/layout.ts';
 import {
   bottomSpacerRowsAtom,
-  composerCanScrollAtom,
   composerTopAtom,
   layoutAtom,
-  scrollBodyByRowsAtom,
-  scrollComposerByRowsAtom
+  scrollBodyByRowsAtom
 } from '@state/ui/index.ts';
 import { columnsAtom, rowsAtom } from '@state/ui/index.ts';
 import { commandMenuOpenAtom } from '@state/ui/commands/index.ts';
@@ -36,7 +33,6 @@ import {
 import { theme } from '@theme/themeConfig.ts';
 import {
   COMPOSER_BACKGROUND_TOP_PADDING_ROWS,
-  MOUSE_WHEEL_SCROLL_ROWS,
   PROMPT_PREFIX
 } from '@constants/ui.ts';
 
@@ -46,9 +42,7 @@ export function HomeScreenView() {
   const rows = useAtomValue(rowsAtom);
   const layout = useAtomValue(layoutAtom);
   const composerTop = useAtomValue(composerTopAtom);
-  const composerCanScroll = useAtomValue(composerCanScrollAtom);
   const scrollBodyByRows = useSetAtom(scrollBodyByRowsAtom);
-  const scrollComposerByRows = useSetAtom(scrollComposerByRowsAtom);
   const notifyScroll = useComposerCaretRefresh();
   const handlePullRequestClick = usePullRequestClick();
   const store = useStore();
@@ -65,50 +59,37 @@ export function HomeScreenView() {
   }, [stdout]);
 
   useInput((input, key) => {
-    const wheel = parseMouseWheelEvent(input);
-    if (wheel !== null) {
-      notifyScroll();
-      const target = resolveWheelTarget({
-        mouseRow: wheel.row,
-        composerTop,
-        rows,
-        composerCanScroll
-      });
-      if (target === 'composer') {
-        // A body-sized notch is near-full-page in a small composer; clamp it.
-        const step = Math.max(1, Math.min(MOUSE_WHEEL_SCROLL_ROWS, layout.composerVisibleRows - 1));
-        scrollComposerByRows(wheel.direction === 'up' ? step : -step);
-      } else {
-        scrollBodyByRows(
-          wheel.direction === 'up' ? MOUSE_WHEEL_SCROLL_ROWS : -MOUSE_WHEEL_SCROLL_ROWS
-        );
-      }
-      return;
-    }
-
-    const click = parseMouseClickEvent(input);
-    if (click !== null) {
-      // A plain click on the PR label (#3) opens the pull request; otherwise the
-      // click maps to a composer cursor index + the scroll offset that keeps the
-      // visible window fixed (repositioning the caret without scrolling). Text
-      // rows start one row below composerTop (the top half-line cap); the prompt
-      // prefix offsets columns.
-      if (handlePullRequestClick(click)) {
-        return;
-      }
-
-      const composerState = store.get(composerStateAtom);
-      const result = resolveClickResult({
-        text: composerState.text,
-        columns: Math.max(1, columns - PROMPT_PREFIX.length),
-        maxVisibleLines: layout.composerVisibleRows,
-        cursorIndex: composerState.cursorIndex,
-        offset: store.get(composerScrollOffsetRowsAtom),
-        visibleRow: click.row - 1 - (composerTop + COMPOSER_BACKGROUND_TOP_PADDING_ROWS),
-        column: click.column - 1 - PROMPT_PREFIX.length
-      });
-      if (result !== null) {
-        store.set(setComposerCursorWithOffsetAtom, result);
+    const mouseEvents = parseMouseInputEvents(input);
+    if (mouseEvents !== null) {
+      let scrollNotified = false;
+      for (const event of mouseEvents) {
+        if (event.kind === 'wheel') {
+          handleWheelScroll(store, [event], () => {
+            if (!scrollNotified) {
+              scrollNotified = true;
+              notifyScroll();
+            }
+          });
+          continue;
+        }
+        if (handlePullRequestClick(event)) {
+          continue;
+        }
+        // Text rows start below the top half-line cap. Resolve each press in
+        // source order so a batched release or later click is never inserted.
+        const composerState = store.get(composerStateAtom);
+        const result = resolveClickResult({
+          text: composerState.text,
+          columns: Math.max(1, columns - PROMPT_PREFIX.length),
+          maxVisibleLines: layout.composerVisibleRows,
+          cursorIndex: composerState.cursorIndex,
+          offset: store.get(composerScrollOffsetRowsAtom),
+          visibleRow: event.row - 1 - (composerTop + COMPOSER_BACKGROUND_TOP_PADDING_ROWS),
+          column: event.column - 1 - PROMPT_PREFIX.length
+        });
+        if (result !== null) {
+          store.set(setComposerCursorWithOffsetAtom, result);
+        }
       }
       return;
     }
