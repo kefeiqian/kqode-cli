@@ -11,7 +11,7 @@ const GITHUB_COMMAND: &str = "gh";
 /// Arguments that ask git for stable branch/status porcelain.
 const GIT_STATUS_ARGS: &[&str] = &["status", "--porcelain=v1", "--branch"];
 /// Arguments that ask GitHub CLI for the current branch's pull-request number
-/// and URL as a JSON object (e.g. `{"number":3,"url":"https://…/pull/3"}`).
+/// and URL as a JSON object (e.g. `{"number":3,"url":"https://.../pull/3"}`).
 const PULL_REQUEST_ARGS: &[&str] = &["pr", "view", "--json", "number,url"];
 /// Branch glyph prefixing every status label.
 const GIT_BRANCH_ICON: &str = "⎇";
@@ -41,6 +41,7 @@ const GIT_STATUS_TIMEOUT: Duration = Duration::from_secs(2);
 /// therefore given a larger timeout so a slow-but-succeeding lookup is not
 /// killed, which would drop the PR label from the status line.
 const PULL_REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
+
 /// The current branch's pull request, formatted for display: a `#N` `label` and
 /// the PR's web `url`. Returned to clients so the TUI can render a hyperlink.
 #[derive(Debug, Eq, PartialEq)]
