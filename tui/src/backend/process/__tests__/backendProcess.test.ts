@@ -1,6 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
+import { execFileSync } from 'node:child_process';
 import type { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -10,7 +11,11 @@ import {
   spawnBackend,
   type LaunchedBackend
 } from '@backend/process/backendProcess.ts';
-import { MESSAGE_SUBMIT_METHOD, SUBMIT_STATUS_NEEDS_CONFIGURATION } from '@contracts/backend/index.ts';
+import {
+  GIT_STATUS_METHOD,
+  MESSAGE_SUBMIT_METHOD,
+  SUBMIT_STATUS_NEEDS_CONFIGURATION
+} from '@contracts/backend/index.ts';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..');
 const INTEGRATION_TIMEOUT_MS = 180_000;
@@ -20,9 +25,7 @@ function frameRequest(payload: unknown): Buffer {
   return Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`, 'utf8'), body]);
 }
 
-function readResponseFrame(
-  stream: Readable
-): Promise<{ result: { status: string } }> {
+function readResponseFrame(stream: Readable): Promise<{ result: unknown }> {
   return new Promise((resolve, reject) => {
     let buffer = Buffer.alloc(0);
     const cleanup = () => {
@@ -78,7 +81,21 @@ async function submitThroughLauncher(
     })
   );
   const frame = await response;
-  return frame.result;
+  return frame.result as { status: string };
+}
+
+async function gitStatusThroughLauncher(backend: LaunchedBackend): Promise<{ label: string | null }> {
+  const response = readResponseFrame(backend.stdout);
+  backend.stdin.write(
+    frameRequest({
+      jsonrpc: '2.0',
+      id: 2,
+      method: GIT_STATUS_METHOD,
+      params: null
+    })
+  );
+  const frame = await response;
+  return frame.result as { label: string | null };
 }
 
 // Best-effort temp cleanup: on Windows a just-killed backend may still hold its
@@ -122,11 +139,17 @@ describe('launchSourceBackend (integration)', () => {
   );
 
   it(
-    'launches from a distinct workspace directory and still answers submit',
+    'uses the distinct workspace directory for git status and submit',
     async () => {
       const workspaceCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-launch-alt-'));
+      execFileSync('git', ['init', '--quiet', '--initial-branch=workspace-branch'], {
+        cwd: workspaceCwd
+      });
       const backend = await launchSourceBackend({ repoRoot, workspaceCwd });
       try {
+        const status = await gitStatusThroughLauncher(backend);
+        expect(status.label).toBe('⎇ workspace-branch');
+
         const result = await submitThroughLauncher(backend, 'café ☕');
         expect(result.status).toBe(SUBMIT_STATUS_NEEDS_CONFIGURATION);
       } finally {
