@@ -1,7 +1,8 @@
-import { Box, useApp, useBoxMetrics, useCursor } from 'ink';
+import { Box, useApp, useBoxMetrics } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
 import type { DOMElement } from 'ink';
 import { useEffect, useMemo, useRef } from 'react';
+import { ComposerCaret } from '@components/PromptComposer/ComposerCaret.tsx';
 import { ComposerFrame } from '@components/PromptComposer/ComposerFrame.tsx';
 import { PROMPT_PREFIX } from '@constants/ui.ts';
 import { resolveComposerCursorPosition } from '@components/PromptComposer/cursorPosition.ts';
@@ -16,7 +17,6 @@ import { openHelpAtom } from '@state/ui/help/index.ts';
 import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import { resolveComposerWindow } from '@libs/composer/composerWindow.ts';
 import {
-  composerCaretRefreshTickAtom,
   composerScrollOffsetRowsAtom,
   composerStateAtom
 } from '@state/ui/composer/index.ts';
@@ -46,9 +46,6 @@ export function PromptComposer({
 }: PromptComposerProps) {
   const state = useAtomValue(composerStateAtom);
   const scrollOffsetRows = useAtomValue(composerScrollOffsetRowsAtom);
-  // Scroll repaints reset Ink's cursorDirty flag. Subscribe to the refresh tick
-  // so this component re-renders and re-asserts the same visible caret position.
-  useAtomValue(composerCaretRefreshTickAtom);
   const atomColumns = useAtomValue(columnsAtom);
   const atomInputLocked = useAtomValue(inputLockedAtom);
   const atomLayout = useAtomValue(layoutAtom);
@@ -61,7 +58,6 @@ export function PromptComposer({
   const openHelp = useSetAtom(openHelpAtom);
   const composerRef = useRef<DOMElement | null>(null);
   const composerMetrics = useBoxMetrics(composerRef);
-  const { setCursorPosition } = useCursor();
 
   const resolvedColumns = columns ?? atomColumns;
   const resolvedSubmit = onSubmit ?? ((prompt: string) => void enqueuePrompt(prompt));
@@ -114,26 +110,22 @@ export function PromptComposer({
     scrollCursorIntoView();
   }, [state.cursorIndex, state.text, scrollCursorIntoView]);
 
-  if (
+  const caretPosition =
     resolvedIsActive &&
     composerMetrics.hasMeasured &&
     composerWindow.cursorVisible
-  ) {
-    setCursorPosition(
-      resolveComposerCursorPosition(
-        visibleText,
-        inputColumns,
-        resolvedCursorTop ?? composerMetrics.top,
-        composerWindow.cursorIndex,
-        shouldRenderBackground
-      )
-    );
-  } else {
-    setCursorPosition(undefined);
-  }
+      ? resolveComposerCursorPosition(
+          visibleText,
+          inputColumns,
+          resolvedCursorTop ?? composerMetrics.top,
+          composerWindow.cursorIndex,
+          shouldRenderBackground
+        )
+      : undefined;
 
   return (
     <Box ref={composerRef} flexDirection="column">
+      <ComposerCaret position={caretPosition} />
       <ComposerFrame
         columns={resolvedColumns}
         shouldRenderBackground={shouldRenderBackground}
