@@ -18,7 +18,8 @@ import {
   composerStateAtom
 } from '@state/ui/composer/index.ts';
 import { composerRowsAtom, composerTopAtom, layoutAtom, scrollComposerCursorIntoViewAtom } from '@state/ui/index.ts';
-import { columnsAtom, inputLockedAtom } from '@state/ui/index.ts';
+import { chromeColumnsAtom, inputLockedAtom } from '@state/ui/index.ts';
+import { resolveChromeColumns } from '@libs/tui/layout.ts';
 
 type PromptComposerProps = {
   columns?: number;
@@ -41,7 +42,7 @@ export function PromptComposer({
 }: PromptComposerProps) {
   const state = useAtomValue(composerStateAtom);
   const scrollOffsetRows = useAtomValue(composerScrollOffsetRowsAtom);
-  const atomColumns = useAtomValue(columnsAtom);
+  const atomColumns = useAtomValue(chromeColumnsAtom);
   const atomInputLocked = useAtomValue(inputLockedAtom);
   const atomLayout = useAtomValue(layoutAtom);
   const atomComposerTop = useAtomValue(composerTopAtom);
@@ -54,7 +55,7 @@ export function PromptComposer({
   const composerRef = useRef<DOMElement | null>(null);
   const composerMetrics = useBoxMetrics(composerRef);
 
-  const resolvedColumns = columns ?? atomColumns;
+  const resolvedColumns = columns === undefined ? atomColumns : resolveChromeColumns(columns);
   const resolvedSubmit = onSubmit ?? ((prompt: string) => void enqueuePrompt(prompt));
   const resolvedIsActive = isActive ?? !atomInputLocked;
   const resolvedMaxVisibleLines = maxVisibleLines ?? atomLayout.composerVisibleRows ?? DEFAULT_COMPOSER_VISIBLE_LINES;

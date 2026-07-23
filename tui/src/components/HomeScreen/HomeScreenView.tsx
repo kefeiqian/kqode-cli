@@ -19,6 +19,7 @@ import { resolveClickResult } from '@libs/composer/composerWindow.ts';
 import { BODY_CWD_GAP_ROWS } from '@libs/tui/layout.ts';
 import {
   bottomSpacerRowsAtom,
+  chromeColumnsAtom,
   composerTopAtom,
   layoutAtom,
   scrollBodyByRowsAtom
@@ -39,6 +40,7 @@ import {
 export function HomeScreenView() {
   const { stdout } = useStdout();
   const columns = useAtomValue(columnsAtom);
+  const chromeColumns = useAtomValue(chromeColumnsAtom);
   const rows = useAtomValue(rowsAtom);
   const layout = useAtomValue(layoutAtom);
   const composerTop = useAtomValue(composerTopAtom);
@@ -80,7 +82,7 @@ export function HomeScreenView() {
         const composerState = store.get(composerStateAtom);
         const result = resolveClickResult({
           text: composerState.text,
-          columns: Math.max(1, columns - PROMPT_PREFIX.length),
+          columns: Math.max(1, chromeColumns - PROMPT_PREFIX.length),
           maxVisibleLines: layout.composerVisibleRows,
           cursorIndex: composerState.cursorIndex,
           offset: store.get(composerScrollOffsetRowsAtom),

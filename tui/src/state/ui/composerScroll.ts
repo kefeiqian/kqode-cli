@@ -9,12 +9,12 @@ import {
   composerScrollOffsetRowsAtom,
   composerStateAtom
 } from '@state/ui/composer/index.ts';
-import { columnsAtom } from '@state/ui/dimensions.ts';
+import { chromeColumnsAtom } from '@state/ui/dimensions.ts';
 import { layoutAtom } from '@state/ui/layout.ts';
 
 /** Visible composer window shared by wheel routing and scroll actions. */
 const composerWindowAtom = atom((get) => {
-  const inputColumns = Math.max(1, get(columnsAtom) - PROMPT_PREFIX.length);
+  const inputColumns = Math.max(1, get(chromeColumnsAtom) - PROMPT_PREFIX.length);
   const { text, cursorIndex } = get(composerStateAtom);
   return resolveComposerWindow({
     text,
@@ -36,7 +36,7 @@ export const scrollComposerByRowsAtom = atom(null, (get, set, deltaRows: number)
 
 /** Minimally scrolls the composer when an edit or cursor move hides the caret. */
 export const scrollComposerCursorIntoViewAtom = atom(null, (get, set) => {
-  const inputColumns = Math.max(1, get(columnsAtom) - PROMPT_PREFIX.length);
+  const inputColumns = Math.max(1, get(chromeColumnsAtom) - PROMPT_PREFIX.length);
   const { text, cursorIndex } = get(composerStateAtom);
   set(
     composerScrollOffsetRowsAtom,

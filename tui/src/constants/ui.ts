@@ -11,6 +11,8 @@ export const DEFAULT_ROWS = 24;
 export const MIN_ROWS = 15;
 export const MIN_COLUMNS = 60;
 export const DEFAULT_COMPOSER_VISIBLE_LINES = 3;
+/** Physical terminal cells reserved from meaningful non-body chrome content. */
+export const TERMINAL_FINAL_COLUMN_GUARD = 1;
 export const FULLSCREEN_GUARD_ROWS = 0;
 export const MIN_USABLE_TERMINAL_ROWS = MIN_ROWS + FULLSCREEN_GUARD_ROWS;
 export const MIN_USABLE_TERMINAL_COLUMNS = MIN_COLUMNS;

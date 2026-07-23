@@ -14,6 +14,14 @@ import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
 describe('PromptComposer', () => {
+  it('keeps every composer row out of the terminal final column', () => {
+    const { lastFrame } = renderWithJotai(<PromptComposer columns={20} />);
+
+    for (const line of (lastFrame() ?? '').split('\n')) {
+      expect(line.length).toBeLessThanOrEqual(19);
+    }
+  });
+
   it('indents authored continuation lines under the prompt text', async () => {
     const onSubmit = vi.fn();
     const { lastFrame, stdin } = renderWithJotai(

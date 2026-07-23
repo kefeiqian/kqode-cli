@@ -32,4 +32,12 @@ describe('StatusBar', () => {
     const { lastFrame } = renderWithJotai(<StatusBar />, store);
     expect(lastFrame() ?? '').toContain('ctrl+c again to exit');
   });
+
+  it('keeps the model label out of the terminal final column', () => {
+    const { lastFrame } = renderWithJotai(<StatusBar />, makeStore());
+    const line = (lastFrame() ?? '').split('\n')[0] ?? '';
+
+    expect(line).toHaveLength(79);
+    expect(line.endsWith('GPT-5.5')).toBe(true);
+  });
 });

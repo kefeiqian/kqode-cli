@@ -1,6 +1,7 @@
 import {
   COMPOSER_BACKGROUND_PADDING_ROWS,
-  COMPOSER_MAX_HEIGHT_DIVISOR
+  COMPOSER_MAX_HEIGHT_DIVISOR,
+  TERMINAL_FINAL_COLUMN_GUARD
 } from '@constants/ui.ts';
 
 /**
@@ -14,6 +15,11 @@ export const DEFAULT_COMPOSER_ROWS = 3;
 export const BODY_CWD_GAP_ROWS = 1;
 
 const COMPOSER_ERROR_RESERVE_ROWS = 1;
+
+/** Width available to chrome that must not place glyphs in the final cell. */
+export function resolveChromeColumns(columns: number): number {
+  return Math.max(1, columns - TERMINAL_FINAL_COLUMN_GUARD);
+}
 
 /**
  * Resolves the home screen's vertical budget from the terminal `rows`, returning
@@ -65,4 +71,3 @@ export function resolveHomeScreenLayout(
     cwdRows: resolvedCwdRows
   };
 }
-

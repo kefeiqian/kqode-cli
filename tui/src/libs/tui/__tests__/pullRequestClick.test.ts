@@ -90,4 +90,22 @@ describe('resolvePullRequestClickTarget', () => {
       })
     ).toBe(url);
   });
+
+  it('does not map the reserved final-column gutter onto the next wrapped row', () => {
+    const columns = Math.max(1, labelStart);
+    const cwdRows = 2;
+    const firstRow = composerTop - cwdRows + 1;
+
+    expect(
+      resolvePullRequestClickTarget({
+        composerTop,
+        cwdRows,
+        columns,
+        workspaceCwd,
+        gitStatus,
+        clickRow: firstRow,
+        clickColumn: columns + 1
+      })
+    ).toBeUndefined();
+  });
 });

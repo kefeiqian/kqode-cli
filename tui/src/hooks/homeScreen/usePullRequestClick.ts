@@ -2,7 +2,12 @@ import { useAtomValue, useStore } from 'jotai';
 import type { MouseClickEvent } from '@libs/terminal/mouse.ts';
 import { openExternalUrl } from '@libs/os/openExternalUrl.ts';
 import { resolvePullRequestClickTarget } from '@libs/tui/pullRequestClick.ts';
-import { columnsAtom, composerTopAtom, cwdRowsAtom, gitStatusAtom } from '@state/ui/index.ts';
+import {
+  chromeColumnsAtom,
+  composerTopAtom,
+  cwdRowsAtom,
+  gitStatusAtom
+} from '@state/ui/index.ts';
 import { workspaceCwdAtom } from '@state/global/index.ts';
 
 /**
@@ -17,7 +22,7 @@ import { workspaceCwdAtom } from '@state/global/index.ts';
  */
 export function usePullRequestClick(): (click: MouseClickEvent) => boolean {
   const store = useStore();
-  const columns = useAtomValue(columnsAtom);
+  const columns = useAtomValue(chromeColumnsAtom);
   const composerTop = useAtomValue(composerTopAtom);
 
   return (click: MouseClickEvent): boolean => {

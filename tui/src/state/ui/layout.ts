@@ -10,7 +10,7 @@ import {
 import { workspaceCwdAtom } from '@state/global/index.ts';
 import { displayedBodyEntriesAtom } from '@state/ui/body.ts';
 import { commandMenuDesiredRowsAtom, commandMenuOpenAtom } from '@state/ui/commands/index.ts';
-import { columnsAtom, rowsAtom } from '@state/ui/dimensions.ts';
+import { chromeColumnsAtom, columnsAtom, rowsAtom } from '@state/ui/dimensions.ts';
 import { gitStatusAtom } from '@state/ui/gitStatus/index.ts';
 
 export const composerRowsAtom = atom(DEFAULT_COMPOSER_ROWS);
@@ -19,7 +19,7 @@ export const composerRowsAtom = atom(DEFAULT_COMPOSER_ROWS);
 export const cwdRowsAtom = atom((get) =>
   get(commandMenuOpenAtom)
     ? 0
-    : countCwdRows(get(workspaceCwdAtom), get(gitStatusAtom), get(columnsAtom))
+    : countCwdRows(get(workspaceCwdAtom), get(gitStatusAtom), get(chromeColumnsAtom))
 );
 
 /** Command-menu height clamped to the space above a one-row-minimum body. */

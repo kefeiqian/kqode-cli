@@ -1,7 +1,7 @@
 import { Box, Text } from 'ink';
 import { useAtomValue } from 'jotai';
 import { useEffect, useState } from 'react';
-import { armedActionAtom, columnsAtom, statusHintAtom } from '@state/ui/index.ts';
+import { armedActionAtom, chromeColumnsAtom, statusHintAtom } from '@state/ui/index.ts';
 import { modelLabelAtom } from '@state/global/index.ts';
 import {
   ArmedAction,
@@ -14,7 +14,7 @@ import {
 import { theme } from '@theme/themeConfig.ts';
 
 export function StatusBar() {
-  const columns = useAtomValue(columnsAtom);
+  const columns = useAtomValue(chromeColumnsAtom);
   const modelLabel = useAtomValue(modelLabelAtom);
   const statusHint = useAtomValue(statusHintAtom);
   const armedAction = useAtomValue(armedActionAtom);
@@ -31,11 +31,9 @@ export function StatusBar() {
     (statusHint?.kind === 'loading' ? `${baseHints}${'.'.repeat(loadingFrame)}` : baseHints);
 
   return (
-    // Fill the terminal's final column for a tight right edge. Ink erases to
-    // end-of-line after each row, and some terminals (WezTerm) drop a glyph in
-    // the last column — Windows Terminal renders it fine, so the model label is
-    // allowed to reach the edge. Restore paddingRight={1} if a terminal clips it.
-    <Box width={columns}>
+    // Chrome stops before the physical final cell; the root body background
+    // paints that safety gutter. BodyPane alone owns scrollbar rendering.
+    <Box width={columns} backgroundColor={theme.colors.bodyBackground}>
       <Text color={theme.colors.muted}>{leftHints}</Text>
       <Box flexGrow={1} justifyContent="flex-end">
         <Text color={theme.colors.accentGreen}>{modelLabel}</Text>

@@ -16,6 +16,7 @@ import {
   rowsTestOverrideAtom
 } from '@state/ui/index.ts';
 import { productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
+import { composerStateAtom } from '@state/ui/composer/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 import { theme } from '@theme/themeConfig.ts';
@@ -59,7 +60,7 @@ function renderHomeScreen({
   if (bodyEntries !== undefined) {
     store.set(bodyEntriesAtom, bodyEntries);
   }
-  return renderWithJotai(<App />, store);
+  return { store, ...renderWithJotai(<App />, store) };
 }
 
 describe('HomeScreen', () => {
@@ -311,7 +312,7 @@ describe('HomeScreen', () => {
   });
 
   it('keeps cwd, composer, status hints, and model label visible at the minimum 60x15', async () => {
-    const { lastFrame, stdin } = renderHomeScreen({ columns: 60, rows: 15 });
+    const { lastFrame, stdin, store } = renderHomeScreen({ columns: 60, rows: 15 });
 
     const output = lastFrame() ?? '';
 
@@ -329,17 +330,10 @@ describe('HomeScreen', () => {
 
     const wrappedOutput = lastFrame() ?? '';
     const wrappedRows = wrappedOutput.split('\n');
-    // The composer soft-wraps across rows; rejoining the rows and dropping the
-    // one prompt prefix plus the 2-space padding/indent runs (continuations are
-    // indented under `> `) must reproduce the full typed prompt.
-    const composerFlattened = wrappedRows
-      .map((row) => row.replace(/\s+$/, ''))
-      .join('')
-      .replace(/ {2,}/g, '')
-      .replace('> ', '');
-
     expect(wrappedOutput).not.toContain('...');
-    expect(composerFlattened).toContain(typed);
+    expect(store.get(composerStateAtom).text).toBe(typed);
+    expect(wrappedOutput).toContain('a long prompt that wraps across several visible composer');
+    expect(wrappedOutput).toContain('rows');
     expect(wrappedRows).toHaveLength(15);
     expect(wrappedRows.at(-2)).toContain('▀');
     expect(wrappedRows.at(-1)).toContain('/ commands | @ mention | ? help');
@@ -347,7 +341,11 @@ describe('HomeScreen', () => {
 
   it('soft-wraps long prompts instead of truncating them with an ellipsis', async () => {
     const longPrompt = 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const { lastFrame, stdin } = renderHomeScreen({ bodyEntries: [], columns: 60, rows: 15 });
+    const { lastFrame, stdin } = renderHomeScreen({
+      bodyEntries: [],
+      columns: 60,
+      rows: 15
+    });
 
     stdin.write(longPrompt);
     await flushInput();

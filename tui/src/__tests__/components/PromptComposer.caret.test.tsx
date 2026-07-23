@@ -81,7 +81,9 @@ describe('PromptComposer caret during scrolling', () => {
     const store = createStore();
     store.set(columnsTestOverrideAtom, 60);
     store.set(rowsTestOverrideAtom, 24);
-    const text = 'a'.repeat(116);
+    // 60 terminal columns - 1 final-cell gutter - 2 prompt-prefix columns.
+    const inputColumns = 57;
+    const text = 'a'.repeat(inputColumns * 2);
     store.set(composerStateAtom, { text, cursorIndex: 0, validationError: null });
 
     const { unmount } = renderWithJotai(<HomeScreenView />, store);
@@ -90,7 +92,7 @@ describe('PromptComposer caret during scrolling', () => {
     });
     const firstRowPosition = setCursorPositionSpy.mock.calls.at(-1)?.[0];
 
-    store.set(composerStateAtom, { text, cursorIndex: 58, validationError: null });
+    store.set(composerStateAtom, { text, cursorIndex: inputColumns, validationError: null });
 
     await vi.waitFor(() => {
       const boundaryPosition = setCursorPositionSpy.mock.calls.at(-1)?.[0];

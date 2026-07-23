@@ -12,7 +12,7 @@ export type PullRequestClickParams = {
   composerTop: number;
   /** Rows the cwd line occupies; `0` while it is hidden (command palette open). */
   cwdRows: number;
-  /** Terminal width used for the cwd line's hard-wrap math. */
+  /** Guarded chrome width used for the cwd line's hard-wrap math. */
   columns: number;
   workspaceCwd: string;
   gitStatus?: GitStatus;
@@ -34,7 +34,14 @@ export function resolvePullRequestClickTarget(
   const { gitStatus, cwdRows, columns } = params;
   const url = gitStatus?.pullRequestUrl;
   const label = gitStatus?.pullRequestLabel;
-  if (url === undefined || label === undefined || cwdRows <= 0 || columns <= 0) {
+  if (
+    url === undefined ||
+    label === undefined ||
+    cwdRows <= 0 ||
+    columns <= 0 ||
+    params.clickColumn < 1 ||
+    params.clickColumn > columns
+  ) {
     return undefined;
   }
 

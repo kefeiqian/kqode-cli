@@ -7,6 +7,7 @@ import {
   MIN_USABLE_TERMINAL_COLUMNS,
   MIN_USABLE_TERMINAL_ROWS
 } from '@constants/ui.ts';
+import { resolveChromeColumns } from '@libs/tui/layout.ts';
 
 // Test-only seams that pin a deterministic viewport ahead of the live terminal
 // size. Only read when `__TEST__` (see `src/globals.d.ts`): the `prod` build
@@ -22,6 +23,8 @@ export const columnsAtom = atom((get) => {
   const override = __TEST__ ? get(columnsTestOverrideAtom) : undefined;
   return override ?? get(windowColumnsAtom) ?? DEFAULT_COLUMNS;
 });
+
+export const chromeColumnsAtom = atom((get) => resolveChromeColumns(get(columnsAtom)));
 
 /**
  * Rows reserved below the UI. Now `0`: the UI fills the full terminal height so

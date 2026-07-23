@@ -1,6 +1,6 @@
 import type { ComposerKeyHandler } from '@hooks/promptComposer/input/types.ts';
 import { PROMPT_PREFIX } from '@constants/ui.ts';
-import { columnsAtom } from '@state/ui/index.ts';
+import { chromeColumnsAtom } from '@state/ui/index.ts';
 import {
   moveComposerCursorBackwardAtom,
   moveComposerCursorDownAtom,
@@ -27,7 +27,7 @@ export const handleCursorMove: ComposerKeyHandler = (context) => {
   }
 
   if (key.upArrow || key.downArrow) {
-    const columns = Math.max(1, store.get(columnsAtom) - PROMPT_PREFIX.length);
+    const columns = Math.max(1, store.get(chromeColumnsAtom) - PROMPT_PREFIX.length);
     store.set(key.upArrow ? moveComposerCursorUpAtom : moveComposerCursorDownAtom, { columns });
     return true;
   }

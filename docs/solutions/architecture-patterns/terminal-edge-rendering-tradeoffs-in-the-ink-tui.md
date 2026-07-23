@@ -128,11 +128,12 @@ On Windows you cannot have both on WezTerm:
 | Fullscreen (`FULLSCREEN_GUARD_ROWS = 0`) | WezTerm blinks per keystroke; WT fine | Yes (full repaint, no `ESC[K`) |
 | Non-fullscreen (guard row `= 1`) | No blink | No — incremental `ESC[K` clips the last column of rewritten rows on WezTerm |
 
-**Decision: prioritize Windows Terminal.** Render edge-to-edge unconditionally
+**Updated decision:** keep the full-height canvas unconditionally
 (`FULLSCREEN_GUARD_ROWS = 0`, `INK_CURSOR_ROW_ORIGIN_OFFSET = 1`, no per-terminal
-branching) and accept WezTerm's blink/clip as a known limitation. Windows
-Terminal, macOS, and Linux get a clean full-height, edge-to-edge UI. The revert
-knobs are documented inline for anyone who later wants to re-optimize WezTerm.
+branching), but reserve the status bar's final cell with `paddingRight={1}`.
+Its background still paints the full row, so the surface looks edge-to-edge
+while the right-aligned model label does not depend on final-cell glyph support.
+Only the body pane uses the last column for scrollbar chrome.
 
 ## Why This Matters
 
@@ -180,9 +181,10 @@ export const INK_CURSOR_ROW_ORIGIN_OFFSET = 1; // constants/ui.ts
 Status bar reaching the final column (`tui/src/components/StatusBar.tsx`):
 
 ```tsx
-// paddingRight={1} reserved the last column to avoid WezTerm clipping the model
-// label; removed to reach the edge on Windows Terminal (WezTerm may clip).
-<Box width={columns}>{/* ...hints... model label ... */}</Box>
+// The background fills the row; the final cell stays free of meaningful text.
+<Box width={columns} paddingRight={1} backgroundColor={bodyBackground}>
+  {/* ...hints... model label ... */}
+</Box>
 ```
 
 Observed on WezTerm-on-Windows with `FULLSCREEN_GUARD_ROWS = 1`: no flicker, but
