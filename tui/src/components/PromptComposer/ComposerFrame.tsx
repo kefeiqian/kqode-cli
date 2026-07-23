@@ -1,8 +1,5 @@
-import { Box, Text, useStdout } from 'ink';
-import {
-  resolveHalfLineGlyph,
-  type HalfLineEdge
-} from '@libs/tui/backgroundBlock.ts';
+import { Box, Text } from 'ink';
+import { LOWER_HALF_BLOCK, UPPER_HALF_BLOCK } from '@libs/tui/backgroundBlock.ts';
 import {
   COMPOSER_RIGHT_PADDING_COLUMNS,
   PROMPT_PREFIX
@@ -27,7 +24,7 @@ export function ComposerFrame({
 }: ComposerFrameProps) {
   return (
     <>
-      {shouldRenderBackground ? <ComposerHalfLine edge="top" columns={columns} /> : null}
+      {shouldRenderBackground ? <ComposerHalfLine glyph={LOWER_HALF_BLOCK} columns={columns} /> : null}
       {visibleTextRows.map((row, index) => (
         <ComposerTextRow
           columns={columns}
@@ -59,7 +56,7 @@ export function ComposerFrame({
           ) : null}
         </Box>
       )}
-      {shouldRenderBackground ? <ComposerHalfLine edge="bottom" columns={columns} /> : null}
+      {shouldRenderBackground ? <ComposerHalfLine glyph={UPPER_HALF_BLOCK} columns={columns} /> : null}
     </>
   );
 }
@@ -108,15 +105,11 @@ function ComposerTextRow({
   );
 }
 
-function ComposerHalfLine({ edge, columns }: { edge: HalfLineEdge; columns: number }) {
-  const { stdout } = useStdout();
-  const supportsColor = stdout.getColorDepth?.() !== 1;
-  const glyph = resolveHalfLineGlyph(edge, supportsColor);
-
+function ComposerHalfLine({ glyph, columns }: { glyph: string; columns: number }) {
   return (
     <Text
-      backgroundColor={theme.colors.inputBackground}
-      color={theme.colors.bodyBackground}
+      backgroundColor={theme.colors.bodyBackground}
+      color={theme.colors.inputBackground}
     >
       {glyph.repeat(Math.max(1, columns))}
     </Text>
