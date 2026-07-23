@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countWrappedPromptRows, wrapPromptText } from '@libs/composer/wrapPromptText.ts';
+import { wrapPromptText } from '@libs/composer/wrapPromptText.ts';
 
 describe('wrapPromptText', () => {
   it('wraps a long logical line every `columns` characters', () => {
@@ -12,10 +12,6 @@ describe('wrapPromptText', () => {
 
   it('returns a single empty row for empty text', () => {
     expect(wrapPromptText('', 10)).toEqual([{ text: '', start: 0, end: 0 }]);
-  });
-
-  it('counts wrapped rows', () => {
-    expect(countWrappedPromptRows('abcdefghij', 4)).toBe(3);
   });
 
   it('wraps CJK text by terminal display columns', () => {

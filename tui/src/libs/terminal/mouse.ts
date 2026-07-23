@@ -58,42 +58,6 @@ function wheelEventFromGroups(groups: SgrMouseGroups): MouseWheelEvent | null {
   return { direction, row: Number.parseInt(groups.row, 10) };
 }
 
-/** Parses one wheel-button press, or `null` for any other input. */
-export function parseMouseWheelEvent(input: string): MouseWheelEvent | null {
-  const events = parseMouseInputEvents(input);
-  return events?.length === 1 && events[0]?.kind === 'wheel'
-    ? { direction: events[0].direction, row: events[0].row }
-    : null;
-}
-
-/** Parses every wheel notch in a possibly batched stdin chunk. */
-export function parseMouseWheelEvents(input: string): MouseWheelEvent[] {
-  const events = parseMouseInputEvents(input);
-  if (events === null) {
-    return [];
-  }
-  const wheels: MouseWheelEvent[] = [];
-  for (const event of events) {
-    if (event.kind !== 'wheel') {
-      return [];
-    }
-    wheels.push({ direction: event.direction, row: event.row });
-  }
-  return wheels;
-}
-
-/**
- * Parses a left-button press (button 0, `M`) into its 1-based row/column, or
- * `null` for any other event (release `m`, wheel, other buttons, or non-mouse
- * input). Lets a caller move the cursor to the click position.
- */
-export function parseMouseClickEvent(input: string): MouseClickEvent | null {
-  const events = parseMouseInputEvents(input);
-  return events?.length === 1 && events[0]?.kind === 'click'
-    ? { row: events[0].row, column: events[0].column }
-    : null;
-}
-
 /**
  * Parses a chunk made entirely of SGR mouse reports. Release and unsupported
  * reports are recognized but omitted from the actionable event list.

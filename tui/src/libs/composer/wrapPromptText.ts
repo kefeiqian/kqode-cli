@@ -38,11 +38,6 @@ export function wrapPromptText(text: string, columns: number): WrappedPromptRow[
   return rows;
 }
 
-/** Number of visual rows `text` wraps into at `columns` width. */
-export function countWrappedPromptRows(text: string, columns: number): number {
-  return wrapPromptText(text, columns).length;
-}
-
 function computeWrappedPromptRows(text: string, safeColumns: number): WrappedPromptRow[] {
   if (text.length === 0) {
     return [{ text: '', start: 0, end: 0 }];

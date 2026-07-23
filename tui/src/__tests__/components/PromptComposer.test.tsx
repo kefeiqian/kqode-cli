@@ -1,10 +1,7 @@
 import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  formatVisiblePrompt,
-  PromptComposer,
-  resolveComposerCursorPosition
-} from '@components/PromptComposer/index.tsx';
+import { PromptComposer } from '@components/PromptComposer/index.tsx';
+import { resolveComposerCursorPosition } from '@components/PromptComposer/cursorPosition.ts';
 import { enqueuePromptAtom } from '@state/promptQueue/index.ts';
 import { commandMenuDismissedAtom, highlightedCommandAtom } from '@state/ui/commands/index.ts';
 import { armedActionAtom } from '@state/ui/index.ts';
@@ -17,14 +14,6 @@ import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
 describe('PromptComposer', () => {
-  it('preserves long prompt content while rendering a wrapped visible view', () => {
-    expect(formatVisiblePrompt('abcdefghijklmnop', 8, 3)).toBe('abcdefgh\nijklmnop');
-  });
-
-  it('keeps authored newlines in the visible prompt window', () => {
-    expect(formatVisiblePrompt('first\nsecond', 10, 3)).toBe('first\nsecond');
-  });
-
   it('indents authored continuation lines under the prompt text', async () => {
     const onSubmit = vi.fn();
     const { lastFrame, stdin } = renderWithJotai(
@@ -145,9 +134,7 @@ describe('PromptComposer', () => {
   });
 
   it('places the terminal cursor on the active soft-wrapped composer row', () => {
-    const visibleText = formatVisiblePrompt('abcdefghijklmnop', 8, 3);
-
-    expect(visibleText).toBe('abcdefgh\nijklmnop');
+    const visibleText = 'abcdefgh\nijklmnop';
     expect(resolveComposerCursorPosition(visibleText, 8, 7)).toEqual({ x: 10, y: 10 });
   });
 

@@ -6,10 +6,7 @@ import { ComposerCaret } from '@components/PromptComposer/ComposerCaret.tsx';
 import { ComposerFrame } from '@components/PromptComposer/ComposerFrame.tsx';
 import { PROMPT_PREFIX } from '@constants/ui.ts';
 import { resolveComposerCursorPosition } from '@components/PromptComposer/cursorPosition.ts';
-import {
-  countVisibleComposerRows,
-  formatVisiblePrompt
-} from '@components/PromptComposer/promptTextView.ts';
+import { countVisibleComposerRows } from '@components/PromptComposer/promptTextView.ts';
 import { usePromptComposerInput } from '@components/PromptComposer/usePromptComposerInput.ts';
 import { DEFAULT_COMPOSER_VISIBLE_LINES } from '@constants/ui.ts';
 import { clearTranscriptAtom, enqueuePromptAtom } from '@state/promptQueue/index.ts';
@@ -32,8 +29,6 @@ type PromptComposerProps = {
   cursorTop?: number;
   onVisibleRowsChange?: (rows: number) => void;
 };
-
-export { formatVisiblePrompt, resolveComposerCursorPosition };
 
 export function PromptComposer({
   columns,

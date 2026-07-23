@@ -1,7 +1,7 @@
 import { Box, Text } from 'ink';
 import { useAtomValue } from 'jotai';
 import { DEFAULT_BODY_ENTRIES, resolveBodyRows } from '@libs/tui/bodyRows.ts';
-import type { BodyEntry, BodyRow } from '@libs/tui/bodyRows.ts';
+import type { BodyEntry } from '@libs/tui/bodyRows.ts';
 import { clamp } from '@libs/math/clamp.ts';
 import {
   bodyScrollOffsetRowsAtom,
@@ -11,9 +11,6 @@ import {
 import { columnsAtom } from '@state/ui/index.ts';
 import { theme } from '@theme/themeConfig.ts';
 import { SCROLLBAR_THUMB, SCROLLBAR_TRACK } from '@constants/ui.ts';
-
-export type { BodyEntry } from '@libs/tui/bodyRows.ts';
-export { countBodyRows, DEFAULT_BODY_ENTRIES } from '@libs/tui/bodyRows.ts';
 
 type ScrollbarCell = {
   color: string;
