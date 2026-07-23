@@ -11,7 +11,7 @@ import { workspaceCwdAtom } from '@state/global/index.ts';
 import { displayedBodyEntriesAtom } from '@state/ui/body.ts';
 import { commandMenuDesiredRowsAtom, commandMenuOpenAtom } from '@state/ui/commands/index.ts';
 import { columnsAtom, rowsAtom } from '@state/ui/dimensions.ts';
-import { gitStatusAtom } from '@state/ui/gitStatus.ts';
+import { gitStatusAtom } from '@state/ui/gitStatus/index.ts';
 
 export const composerRowsAtom = atom(DEFAULT_COMPOSER_ROWS);
 

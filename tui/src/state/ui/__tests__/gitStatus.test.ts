@@ -6,7 +6,7 @@ import {
   gitStatusAtom,
   refreshGitStatusAtom,
   refreshPullRequestAtom
-} from '@state/ui/gitStatus.ts';
+} from '@state/ui/gitStatus/index.ts';
 
 function fakeClient(overrides: Partial<BackendClient> = {}): BackendClient {
   return {

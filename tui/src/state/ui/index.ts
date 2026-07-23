@@ -2,7 +2,7 @@ export * from '@state/ui/body.ts';
 export * from '@state/ui/bodyScroll.ts';
 export * from '@state/ui/composerScroll.ts';
 export * from '@state/ui/dimensions.ts';
-export * from '@state/ui/gitStatus.ts';
+export * from '@state/ui/gitStatus/index.ts';
 export * from '@state/ui/inputLock.ts';
 export * from '@state/ui/keyArm.ts';
 export * from '@state/ui/layout.ts';

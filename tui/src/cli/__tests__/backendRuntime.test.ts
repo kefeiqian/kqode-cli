@@ -1,8 +1,9 @@
 import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
+import { BACKEND_LOADING_HINT } from '@constants/statusHint.ts';
 import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.ts';
 import { backendClientAtom } from '@state/global/backend.ts';
-import { BACKEND_LOADING_HINT, startupStatusHintAtom } from '@state/ui/statusHint.ts';
+import { startupStatusHintAtom } from '@state/ui/statusHint.ts';
 import { enqueuePromptAtom } from '@state/promptQueue/index.ts';
 import { submittedPromptEntriesAtom } from '@state/ui/index.ts';
 import { startBackendRuntime } from '@/cli/backendRuntime.ts';

@@ -11,13 +11,7 @@ const layerViolationBaseline: string[] = [];
 
 const unknownLayerBaseline: string[] = [];
 
-const stateExportBaseline = [
-  'state/global/model.ts:DEFAULT_MODEL_LABEL',
-  'state/ui/dimensions.ts:FULLSCREEN_GUARD_ROWS',
-  'state/ui/dimensions.ts:MIN_USABLE_TERMINAL_COLUMNS',
-  'state/ui/dimensions.ts:MIN_USABLE_TERMINAL_ROWS',
-  'state/ui/statusHint.ts:BACKEND_LOADING_HINT'
-];
+const stateExportBaseline: string[] = [];
 
 describe('TUI architecture boundaries', () => {
   const report = analyzeArchitecture(srcRoot);

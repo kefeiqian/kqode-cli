@@ -5,7 +5,7 @@ import {
   clearTranscriptAtom,
   enqueuePromptAtom,
   promptQueueAtom
-} from '@state/promptQueue/atoms.ts';
+} from '@state/promptQueue/index.ts';
 import { backendClientAtom } from '@state/global/index.ts';
 import { BACKEND_UNAVAILABLE_MESSAGE } from '@libs/promptQueue/promptQueue.ts';
 import { bodyScrollOffsetRowsAtom, submittedPromptEntriesAtom } from '@state/ui/index.ts';

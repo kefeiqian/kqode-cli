@@ -1,8 +1,12 @@
 import type { createStore } from 'jotai';
+import { BACKEND_LOADING_HINT } from '@constants/statusHint.ts';
 import type { BackendClient } from '@contracts/backend/index.ts';
 import { backendClientAtom } from '@state/global/backend.ts';
-import { refreshGitStatusAtom, refreshPullRequestAtom } from '@state/ui/gitStatus.ts';
-import { BACKEND_LOADING_HINT, startupStatusHintAtom } from '@state/ui/statusHint.ts';
+import {
+  refreshGitStatusAtom,
+  refreshPullRequestAtom
+} from '@state/ui/gitStatus/index.ts';
+import { startupStatusHintAtom } from '@state/ui/statusHint.ts';
 
 type Store = ReturnType<typeof createStore>;
 

@@ -13,8 +13,6 @@ import {
 } from '@libs/promptQueue/promptQueue.ts';
 import type { BackendResult, QueueItem } from '@libs/promptQueue/promptQueue.ts';
 
-export { promptQueueAtom };
-
 let nextQueueItemId = 0;
 
 const drainingAtom = atom(false);

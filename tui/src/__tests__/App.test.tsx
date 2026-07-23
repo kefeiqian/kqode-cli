@@ -6,9 +6,9 @@ import { App } from '@/App.tsx';
 import {
   armedActionAtom,
   columnsTestOverrideAtom,
-  FULLSCREEN_GUARD_ROWS,
   rowsTestOverrideAtom
 } from '@state/ui/index.ts';
+import { FULLSCREEN_GUARD_ROWS } from '@constants/ui.ts';
 import { ArmedAction } from '@constants/ui.ts';
 import { productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
 import { helpVisibleAtom } from '@state/ui/help/index.ts';
