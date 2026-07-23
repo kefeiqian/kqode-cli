@@ -56,6 +56,8 @@ const layerViolationBaseline = [
   'backend/runtime/backendRuntime.ts -> state/ui/statusHint.ts'
 ];
 
+const unknownLayerBaseline = ['useGlobalKeys.ts'];
+
 describe('TUI architecture boundaries', () => {
   const report = analyzeArchitecture(srcRoot);
 
@@ -67,6 +69,11 @@ describe('TUI architecture boundaries', () => {
 
   it('has no circular module dependencies', () => {
     expect(report.cycles).toEqual([]);
+  });
+
+  it('keeps entrypoints at the composition layer and rejects unknown layers', () => {
+    expect(report.entryPointViolations).toEqual([]);
+    expect(report.unknownLayerFiles).toEqual(unknownLayerBaseline);
   });
 
   it('exports only React components from component modules', () => {

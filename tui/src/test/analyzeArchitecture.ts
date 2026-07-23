@@ -3,41 +3,55 @@ import path from 'node:path';
 import ts from 'typescript';
 import { analyzeModulePolicy } from '@test/analyzeModulePolicy.ts';
 
-const aliases: Readonly<Record<string, string>> = {
-  '@/': '',
-  '@backend/': 'backend/',
-  '@components/': 'components/',
-  '@constants/': 'constants/',
-  '@contracts/': 'contracts/',
-  '@hooks/': 'hooks/',
-  '@libs/': 'libs/',
-  '@state/': 'state/',
-  '@test/': 'test/',
-  '@theme/': 'theme/'
-};
-
 export function analyzeArchitecture(srcRoot: string) {
+  const packageRoot = path.dirname(srcRoot);
+  const compilerOptions = loadCompilerOptions(packageRoot);
   const files = sourceFiles(srcRoot);
   const relativeFile = (file: string): string =>
     path.relative(srcRoot, file).split(path.sep).join('/');
   const graph = new Map(
-    files.map((file) => [file, dependencies(file, srcRoot)])
+    files.map((file) => [file, dependencies(file, compilerOptions)])
   );
   const modulePolicy = analyzeModulePolicy(files, relativeFile);
+  const unknownLayerFiles = files
+    .filter((file) => !isTestFile(file, relativeFile) && layer(file, relativeFile) === null)
+    .map(relativeFile)
+    .sort();
 
   return {
     ...modulePolicy,
     cycles: findCycles(files, graph, relativeFile),
     edgeCount: [...graph.values()].reduce((count, dependencies) => count + dependencies.length, 0),
+    entryPointViolations: dependencies(path.join(packageRoot, 'main.tsx'), compilerOptions)
+      .filter((dependency) => layer(dependency, relativeFile) !== 4)
+      .map((dependency) => `main.tsx -> ${relativeFile(dependency)}`),
     fileCount: files.length,
     layerViolations: [...graph].flatMap(([file, imports]) =>
       isTestFile(file, relativeFile)
         ? []
         : imports
-            .filter((dependency) => layer(file, relativeFile) < layer(dependency, relativeFile))
+            .filter((dependency) => {
+              const sourceLayer = layer(file, relativeFile);
+              const dependencyLayer = layer(dependency, relativeFile);
+              return (
+                sourceLayer !== null &&
+                dependencyLayer !== null &&
+                sourceLayer < dependencyLayer
+              );
+            })
             .map((dependency) => `${relativeFile(file)} -> ${relativeFile(dependency)}`)
-    )
+    ),
+    unknownLayerFiles
   };
+}
+
+function loadCompilerOptions(packageRoot: string): ts.CompilerOptions {
+  const configPath = path.join(packageRoot, 'tsconfig.json');
+  const config = ts.readConfigFile(configPath, ts.sys.readFile);
+  if (config.error !== undefined) {
+    throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n'));
+  }
+  return ts.parseJsonConfigFileContent(config.config, ts.sys, packageRoot).options;
 }
 
 function sourceFiles(directory: string): string[] {
@@ -51,7 +65,7 @@ function sourceFiles(directory: string): string[] {
   });
 }
 
-function dependencies(file: string, srcRoot: string): string[] {
+function dependencies(file: string, compilerOptions: ts.CompilerOptions): string[] {
   const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
   const specs: string[] = [];
   const visit = (node: ts.Node): void => {
@@ -73,43 +87,38 @@ function dependencies(file: string, srcRoot: string): string[] {
   };
   visit(source);
   return specs.flatMap((specifier) => {
-    const resolved = resolveImport(specifier, file, srcRoot);
-    return resolved === null ? [] : [resolved];
+    const resolved = ts.resolveModuleName(
+      specifier,
+      file,
+      compilerOptions,
+      ts.sys
+    ).resolvedModule;
+    return resolved === undefined || resolved.isExternalLibraryImport
+      ? []
+      : [resolved.resolvedFileName];
   });
 }
 
-function resolveImport(specifier: string, from: string, srcRoot: string): string | null {
-  const alias = Object.entries(aliases).find(([prefix]) => specifier.startsWith(prefix));
-  const base =
-    alias === undefined
-      ? specifier.startsWith('.')
-        ? path.resolve(path.dirname(from), specifier)
-        : null
-      : path.join(srcRoot, alias[1], specifier.slice(alias[0].length));
-  if (base === null) {
-    return null;
-  }
-  return [
-    base,
-    `${base}.ts`,
-    `${base}.tsx`,
-    path.join(base, 'index.ts'),
-    path.join(base, 'index.tsx')
-  ].find((candidate) => fs.existsSync(candidate) && fs.statSync(candidate).isFile()) ?? null;
-}
-
-function layer(file: string, relativeFile: (file: string) => string): number {
-  const top = relativeFile(file).split('/')[0];
+function layer(file: string, relativeFile: (file: string) => string): number | null {
+  const relative = relativeFile(file);
+  const top = relative.split('/')[0];
   if (top === 'constants' || top === 'contracts' || top === 'theme') return 0;
   if (top === 'libs' || top === 'backend') return 1;
   if (top === 'state' || top === 'hooks') return 2;
   if (top === 'components') return 3;
-  return 4;
+  if (top === 'cli' || ['App.tsx', 'bootstrap.ts', 'devGlobals.ts', 'globals.d.ts'].includes(relative)) {
+    return 4;
+  }
+  return null;
 }
 
 function isTestFile(file: string, relativeFile: (file: string) => string): boolean {
   const relative = relativeFile(file);
-  return relative.includes('/__tests__/') || relative.startsWith('test/');
+  return (
+    relative.startsWith('__tests__/') ||
+    relative.includes('/__tests__/') ||
+    relative.startsWith('test/')
+  );
 }
 
 function findCycles(
