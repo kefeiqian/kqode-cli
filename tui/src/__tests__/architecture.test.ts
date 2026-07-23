@@ -13,7 +13,6 @@ const unknownLayerBaseline: string[] = [];
 
 const stateExportBaseline = [
   'state/global/model.ts:DEFAULT_MODEL_LABEL',
-  'state/ui/composer/atoms.ts:initialComposerState',
   'state/ui/dimensions.ts:FULLSCREEN_GUARD_ROWS',
   'state/ui/dimensions.ts:MIN_USABLE_TERMINAL_COLUMNS',
   'state/ui/dimensions.ts:MIN_USABLE_TERMINAL_ROWS',
