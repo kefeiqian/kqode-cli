@@ -1,6 +1,6 @@
 import { createStore } from 'jotai';
 import { describe, expect, it } from 'vitest';
-import { computeExitSummary } from '@components/AppExitSummary/computeExitSummary.ts';
+import { computeExitSummary } from '@/cli/exitSummary/computeExitSummary.ts';
 import type { GitLineDelta } from '@libs/git/lineDelta.ts';
 import {
   sessionGitBaselineAtom,

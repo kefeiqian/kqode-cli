@@ -5,7 +5,7 @@ import type { EmbeddedBackendAsset } from '@backend/packaged/materializeBackend.
 import { App } from '@/App.tsx';
 import { buildKqodeMeta } from '@/cli/meta.ts';
 import { createAppRuntime } from '@/bootstrap.ts';
-import { finishSession } from '@components/AppExitSummary/finishSession.ts';
+import { finishSession } from '@/cli/exitSummary/finishSession.ts';
 
 /** Inputs for the root CLI command; `loadPackagedAsset` is supplied only in packaged mode. */
 export type RunKqodeCliOptions = {

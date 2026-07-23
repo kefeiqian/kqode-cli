@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { formatExitSummaryCard } from '@components/AppExitSummary/formatExitSummaryCard.ts';
-import type { Colorize } from '@components/AppExitSummary/types.ts';
+import { formatExitSummaryCard } from '@libs/exitSummary/formatExitSummaryCard.ts';
+import type { Colorize } from '@libs/exitSummary/types.ts';
 
 const identity: Colorize = (text) => text;
 

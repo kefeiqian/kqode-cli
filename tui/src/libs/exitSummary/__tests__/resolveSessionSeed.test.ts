@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveSessionSeed } from '@components/AppExitSummary/resolveSessionSeed.ts';
+import { resolveSessionSeed } from '@libs/exitSummary/resolveSessionSeed.ts';
 
 describe('resolveSessionSeed', () => {
   it('captures the start time and git baseline from the injected seams', () => {

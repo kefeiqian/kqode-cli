@@ -1,6 +1,6 @@
 import type { createStore } from 'jotai';
 import { readWorkingTreeLineDelta, type GitLineDelta } from '@libs/git/lineDelta.ts';
-import type { ExitSummaryData } from '@components/AppExitSummary/types.ts';
+import type { ExitSummaryData } from '@libs/exitSummary/types.ts';
 import { sessionGitBaselineAtom, sessionStartedAtAtom, workspaceCwdAtom } from '@state/global/index.ts';
 
 type Store = ReturnType<typeof createStore>;

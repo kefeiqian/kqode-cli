@@ -16,7 +16,7 @@ import {
   leaveAlternateScreen
 } from '@libs/terminal/alternateScreen.ts';
 import { DISABLE_SGR_MOUSE_TRACKING } from '@libs/terminal/mouse.ts';
-import { resolveSessionSeed } from '@components/AppExitSummary/resolveSessionSeed.ts';
+import { resolveSessionSeed } from '@libs/exitSummary/resolveSessionSeed.ts';
 import { windowColumnsAtom, windowRowsAtom } from '@state/ui/index.ts';
 import {
   productVersionAtom,

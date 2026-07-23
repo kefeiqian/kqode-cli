@@ -1,7 +1,7 @@
-import { bannerLines } from '@components/AppExitSummary/banner.ts';
-import { boxed } from '@components/AppExitSummary/border.ts';
-import { formatDuration } from '@components/AppExitSummary/formatDuration.ts';
-import type { Colorize, ExitSummaryData } from '@components/AppExitSummary/types.ts';
+import { bannerLines } from '@libs/exitSummary/banner.ts';
+import { boxed } from '@libs/exitSummary/border.ts';
+import { formatDuration } from '@libs/exitSummary/formatDuration.ts';
+import type { Colorize, ExitSummaryData } from '@libs/exitSummary/types.ts';
 import { PRODUCT_NAME } from '@constants/product.ts';
 import { visibleLength } from '@libs/terminal/ansiColor.ts';
 import { maxWidth } from '@libs/text/maxWidth.ts';

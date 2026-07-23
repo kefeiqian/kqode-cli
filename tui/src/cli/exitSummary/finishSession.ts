@@ -1,5 +1,5 @@
 import type { createStore } from 'jotai';
-import { printExitSummary } from '@components/AppExitSummary/printExitSummary.ts';
+import { printExitSummary } from '@/cli/exitSummary/printExitSummary.ts';
 
 type Store = ReturnType<typeof createStore>;
 

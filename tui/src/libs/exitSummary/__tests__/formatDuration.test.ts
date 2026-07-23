@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDuration } from '@components/AppExitSummary/formatDuration.ts';
+import { formatDuration } from '@libs/exitSummary/formatDuration.ts';
 
 describe('formatDuration', () => {
   it('renders seconds only under a minute', () => {

@@ -5,25 +5,7 @@ import { analyzeArchitecture } from '@test/analyzeArchitecture.ts';
 
 const srcRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const componentExportBaseline = [
-  'components/AppExitSummary/banner.ts:bannerLines',
-  'components/AppExitSummary/border.ts:BoxOptions',
-  'components/AppExitSummary/border.ts:boxed',
-  'components/AppExitSummary/computeExitSummary.ts:ComputeExitSummaryDeps',
-  'components/AppExitSummary/computeExitSummary.ts:computeExitSummary',
-  'components/AppExitSummary/finishSession.ts:FinishSessionDeps',
-  'components/AppExitSummary/finishSession.ts:finishSession',
-  'components/AppExitSummary/formatDuration.ts:formatDuration',
-  'components/AppExitSummary/formatExitSummaryCard.ts:FormatExitSummaryCardOptions',
-  'components/AppExitSummary/formatExitSummaryCard.ts:formatExitSummaryCard',
-  'components/AppExitSummary/printExitSummary.ts:PrintExitSummaryDeps',
-  'components/AppExitSummary/printExitSummary.ts:printExitSummary',
-  'components/AppExitSummary/resolveSessionSeed.ts:ResolveSessionSeedDeps',
-  'components/AppExitSummary/resolveSessionSeed.ts:SessionSeed',
-  'components/AppExitSummary/resolveSessionSeed.ts:resolveSessionSeed',
-  'components/AppExitSummary/types.ts:Colorize',
-  'components/AppExitSummary/types.ts:ExitSummaryData'
-];
+const componentExportBaseline: string[] = [];
 
 const layerViolationBaseline = [
   'backend/runtime/backendRuntime.ts -> state/global/backend.ts',
