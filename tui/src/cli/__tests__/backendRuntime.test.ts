@@ -5,8 +5,8 @@ import { backendClientAtom } from '@state/global/backend.ts';
 import { BACKEND_LOADING_HINT, startupStatusHintAtom } from '@state/ui/statusHint.ts';
 import { enqueuePromptAtom } from '@state/promptQueue/index.ts';
 import { submittedPromptEntriesAtom } from '@state/ui/index.ts';
-import { startBackendRuntime } from '@backend/runtime/backendRuntime.ts';
-import type { RuntimeBackendClient } from '@backend/runtime/backendRuntime.ts';
+import { startBackendRuntime } from '@/cli/backendRuntime.ts';
+import type { RuntimeBackendClient } from '@/cli/backendRuntime.ts';
 
 function fakeClient(overrides: Partial<RuntimeBackendClient> = {}): RuntimeBackendClient {
   return {

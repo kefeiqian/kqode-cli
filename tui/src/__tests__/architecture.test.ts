@@ -7,13 +7,9 @@ const srcRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 const componentExportBaseline: string[] = [];
 
-const layerViolationBaseline = [
-  'backend/runtime/backendRuntime.ts -> state/global/backend.ts',
-  'backend/runtime/backendRuntime.ts -> state/ui/gitStatus.ts',
-  'backend/runtime/backendRuntime.ts -> state/ui/statusHint.ts'
-];
+const layerViolationBaseline: string[] = [];
 
-const unknownLayerBaseline = ['useGlobalKeys.ts'];
+const unknownLayerBaseline: string[] = [];
 
 describe('TUI architecture boundaries', () => {
   const report = analyzeArchitecture(srcRoot);

@@ -2,7 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore } from 'jotai';
 import type { BackendClientHandle } from '@backend/client/backendClient.ts';
-import { startBackendRuntime } from '@backend/runtime/backendRuntime.ts';
+import { startBackendRuntime } from '@/cli/backendRuntime.ts';
 import { resolveRepoRoot, resolveWorkspaceCwd } from '@libs/path/runtimePaths.ts';
 import { PRODUCT_NAME } from '@constants/product.ts';
 import { resolveProductVersion } from '@libs/product/productMetadata.ts';
