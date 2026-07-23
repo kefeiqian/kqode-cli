@@ -1,16 +1,16 @@
 import { useInput } from 'ink';
 import { useStore } from 'jotai';
-import { handleCursorMove } from '@components/PromptComposer/input/handleCursorMove.ts';
-import { handleEscArmedClear } from '@components/PromptComposer/input/handleEscArmedClear.ts';
-import { handleNewline } from '@components/PromptComposer/input/handleNewline.ts';
-import { handleSubmit } from '@components/PromptComposer/input/handleSubmit.ts';
-import { handleTextEdit } from '@components/PromptComposer/input/handleTextEdit.ts';
+import { handleCursorMove } from '@hooks/promptComposer/input/handleCursorMove.ts';
+import { handleEscArmedClear } from '@hooks/promptComposer/input/handleEscArmedClear.ts';
+import { handleMenuKey } from '@hooks/promptComposer/input/handleMenuKey.ts';
+import { handleNewline } from '@hooks/promptComposer/input/handleNewline.ts';
+import { handleSubmit } from '@hooks/promptComposer/input/handleSubmit.ts';
+import { handleTextEdit } from '@hooks/promptComposer/input/handleTextEdit.ts';
 import type {
   ComposerInputState,
   ComposerKeyContext,
   ComposerKeyHandler
-} from '@components/PromptComposer/input/types.ts';
-import { handleMenuKey } from '@components/SlashCommandMenu/handleMenuKey.ts';
+} from '@hooks/promptComposer/input/types.ts';
 import { isMouseInput } from '@libs/terminal/mouse.ts';
 import type { CommandActions } from '@libs/commands/executeCommand.ts';
 import { armedActionAtom } from '@state/ui/index.ts';

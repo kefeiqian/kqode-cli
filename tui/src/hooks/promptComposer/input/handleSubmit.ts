@@ -1,4 +1,4 @@
-import type { ComposerKeyContext, ComposerKeyHandler } from '@components/PromptComposer/input/types.ts';
+import type { ComposerKeyContext, ComposerKeyHandler } from '@hooks/promptComposer/input/types.ts';
 import { appendUnknownCommandAtom } from '@state/promptQueue/index.ts';
 import { executeCommand } from '@libs/commands/executeCommand.ts';
 import { exactCommandMatch } from '@libs/commands/matchCommand.ts';

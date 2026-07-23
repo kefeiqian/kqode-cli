@@ -34,20 +34,7 @@ const componentExportBaseline = [
   'components/HomeScreen/wheelRouting.ts:WheelTarget',
   'components/HomeScreen/wheelRouting.ts:isPointerOverComposer',
   'components/HomeScreen/wheelRouting.ts:resolveWheelTarget',
-  'components/HomeScreen/wheelScroll.ts:handleWheelScroll',
-  'components/PromptComposer/cursorPosition.ts:resolveComposerCursorPosition',
-  'components/PromptComposer/input/handleCursorMove.ts:handleCursorMove',
-  'components/PromptComposer/input/handleEscArmedClear.ts:handleEscArmedClear',
-  'components/PromptComposer/input/handleNewline.ts:handleNewline',
-  'components/PromptComposer/input/handleSubmit.ts:handleSubmit',
-  'components/PromptComposer/input/handleTextEdit.ts:handleTextEdit',
-  'components/PromptComposer/input/types.ts:ComposerInputState',
-  'components/PromptComposer/input/types.ts:ComposerKeyContext',
-  'components/PromptComposer/input/types.ts:ComposerKeyHandler',
-  'components/PromptComposer/promptTextView.ts:countVisibleComposerRows',
-  'components/PromptComposer/promptTextView.ts:formatValidationError',
-  'components/PromptComposer/usePromptComposerInput.ts:usePromptComposerInput',
-  'components/SlashCommandMenu/handleMenuKey.ts:handleMenuKey'
+  'components/HomeScreen/wheelScroll.ts:handleWheelScroll'
 ];
 
 const layerViolationBaseline = [

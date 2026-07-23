@@ -1,5 +1,5 @@
 import { MODIFIED_ENTER_INPUTS } from '@constants/ui.ts';
-import type { ComposerKeyContext, ComposerKeyHandler } from '@components/PromptComposer/input/types.ts';
+import type { ComposerKeyContext, ComposerKeyHandler } from '@hooks/promptComposer/input/types.ts';
 import { deleteComposerBackwardAtom, insertComposerTextAtom } from '@state/ui/composer/index.ts';
 
 type PromptNewlineInput = 'insert-newline' | 'replace-backslash';

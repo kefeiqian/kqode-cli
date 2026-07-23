@@ -1,4 +1,4 @@
-import type { ComposerKeyHandler } from '@components/PromptComposer/input/types.ts';
+import type { ComposerKeyHandler } from '@hooks/promptComposer/input/types.ts';
 import { PROMPT_PREFIX } from '@constants/ui.ts';
 import { columnsAtom } from '@state/ui/index.ts';
 import {

@@ -1,5 +1,5 @@
 import { ArmedAction } from '@constants/ui.ts';
-import type { ComposerKeyHandler } from '@components/PromptComposer/input/types.ts';
+import type { ComposerKeyHandler } from '@hooks/promptComposer/input/types.ts';
 import { clearComposerAtom } from '@state/ui/composer/index.ts';
 import { armedActionAtom } from '@state/ui/index.ts';
 

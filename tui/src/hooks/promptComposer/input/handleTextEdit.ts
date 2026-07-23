@@ -1,4 +1,4 @@
-import type { ComposerKeyHandler } from '@components/PromptComposer/input/types.ts';
+import type { ComposerKeyHandler } from '@hooks/promptComposer/input/types.ts';
 import { commandMenuDismissedAtom, resetCommandHighlightAtom } from '@state/ui/commands/index.ts';
 import { printableInput } from '@libs/composer/promptText.ts';
 import {

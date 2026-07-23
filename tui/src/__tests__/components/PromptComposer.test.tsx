@@ -1,7 +1,7 @@
 import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import { PromptComposer } from '@components/PromptComposer/index.tsx';
-import { resolveComposerCursorPosition } from '@components/PromptComposer/cursorPosition.ts';
+import { resolveComposerCursorPosition } from '@libs/composer/cursorPosition.ts';
 import { enqueuePromptAtom } from '@state/promptQueue/index.ts';
 import { commandMenuDismissedAtom, highlightedCommandAtom } from '@state/ui/commands/index.ts';
 import { armedActionAtom } from '@state/ui/index.ts';
