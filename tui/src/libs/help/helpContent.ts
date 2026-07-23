@@ -33,7 +33,7 @@ const KEYBINDING_SECTIONS: readonly HelpSection[] = [
     title: 'INPUT',
     entries: [
       { keys: 'enter', description: 'Submit the prompt' },
-      { keys: 'shift+enter', description: 'Insert a newline' },
+      { keys: 'shift/alt+enter', description: 'Insert a newline (supported terminals)' },
       { keys: '\\ then enter', description: 'Insert a newline' },
       { keys: '← / →', description: 'Move the cursor' },
       { keys: 'backspace', description: 'Delete the previous character' }

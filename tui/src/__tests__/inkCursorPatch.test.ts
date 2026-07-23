@@ -7,6 +7,7 @@ import {
   buildCursorOnlySequence,
   buildCursorSuffix
 } from '../../node_modules/ink/build/cursor-helpers.js';
+import parseKeypress from '../../node_modules/ink/build/parse-keypress.js';
 
 const showCursor = '\u001B[?25h';
 const hideCursor = '\u001B[?25l';
@@ -20,6 +21,19 @@ describe('patched Ink fullscreen cursor baseline', () => {
     expect(
       buildCursorSuffix(3, { x: 2, y: 2 }, true)
     ).toBe(`${ansiEscapes.cursorUp(1)}${ansiEscapes.cursorTo(2)}${showCursor}`);
+  });
+
+  describe('patched Ink modified Enter parsing', () => {
+    it.each([
+      ['Shift+Enter', '\u001B[27;2;13~', { shift: true, meta: false, ctrl: false }],
+      ['Alt+Enter', '\u001B[27;3;13~', { shift: false, meta: true, ctrl: false }],
+      ['Ctrl+Enter', '\u001B[27;5;13~', { shift: false, meta: false, ctrl: true }]
+    ])('parses xterm %s sequences', (_label, input, modifiers) => {
+      expect(parseKeypress(input)).toMatchObject({
+        name: 'return',
+        ...modifiers
+      });
+    });
   });
 
   it('moves cursor-only updates from the physical bottom without vertical drift', () => {

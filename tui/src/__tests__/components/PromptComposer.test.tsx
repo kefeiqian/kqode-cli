@@ -60,7 +60,9 @@ describe('PromptComposer', () => {
     ['Shift+Enter', '\u001B[13;2u'],
     ['Alt+Enter', '\u001B[13;3u'],
     ['Ctrl+Enter', '\u001B[13;5u'],
-    ['Ctrl+Shift+Enter', '\u001B[13;6u']
+    ['Ctrl+Shift+Enter', '\u001B[13;6u'],
+    ['xterm Shift+Enter', '\u001B[27;2;13~'],
+    ['xterm Alt+Enter', '\u001B[27;3;13~']
   ])('uses %s to insert a newline without submitting', async (_label, input) => {
     const onSubmit = vi.fn();
     const { stdin } = renderWithJotai(<PromptComposer columns={40} onSubmit={onSubmit} />);

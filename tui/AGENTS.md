@@ -36,4 +36,6 @@ The prompt composer reserves one background-only column of internal right paddin
 
 Terminal.app uses continuous `─` composer borders, lets composer text rows blend into the body background, and renders user messages as borderless filled rows because its font rasterizer leaves visible side-bearing gaps between block-element glyphs. Composer decorative lines may extend through the final-cell gutter while content geometry remains guarded. Other terminals retain inward `▄`/`▀` half-block borders and distinct surface backgrounds. Keep this terminal branch isolated in `src/libs/terminal/surfaceBorder.ts`.
 
+Ink keyboard handling is patched for xterm `modifyOtherKeys` Enter sequences and the TUI opts into Kitty keyboard auto-detection. Ghostty and other capable terminals should distinguish Shift/Alt/Ctrl+Enter; Terminal.app cannot distinguish Shift+Enter from plain Enter, so `\` then Enter remains the documented no-configuration newline fallback.
+
 Prompt cursor placement is manually resolved with Ink's cursor API, so it can drift when vertical layout math changes. When changing body height, spacer rows, wrapping rows, validation rows, background rows, cwd/composer/status placement, or `cursorTop` math, explicitly verify the cursor still lands on the active composer text row rather than one row above or on the cwd row.

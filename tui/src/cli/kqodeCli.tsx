@@ -28,7 +28,11 @@ async function launchTui({ entryUrl, loadPackagedAsset }: RunKqodeCliOptions): P
     // avoids the per-keystroke clear+repaint that blinks in WezTerm on Windows.
     // exitOnCtrlC is off so Ctrl+C flows to the global two-step-exit handler
     // (useGlobalKeys) instead of quitting on the first press.
-    { incrementalRendering: true, exitOnCtrlC: false }
+    {
+      incrementalRendering: true,
+      exitOnCtrlC: false,
+      kittyKeyboard: { mode: 'auto', flags: ['disambiguateEscapeCodes'] }
+    }
   );
 
   // Restore the terminal, then print the exit summary card into the recovered
