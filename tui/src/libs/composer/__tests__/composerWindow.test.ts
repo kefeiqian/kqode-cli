@@ -15,14 +15,14 @@ describe('resolveComposerWindow', () => {
 
   it('follows the cursor at offset 0 (bottom window when cursor at end)', () => {
     const window = resolveComposerWindow(atEnd);
-    expect(window.text).toBe('3333\n4444\n5555');
+    expect(window.text).toBe('4444\n5555\n');
     expect(window.cursorVisible).toBe(true);
     expect(window.canScroll).toBe(true);
   });
 
   it('reveals earlier rows with a positive offset, hiding the cursor row', () => {
     const window = resolveComposerWindow({ ...atEnd, offset: 3 });
-    expect(window.text).toBe('0000\n1111\n2222');
+    expect(window.text).toBe('1111\n2222\n3333');
     expect(window.cursorVisible).toBe(false);
   });
 
@@ -32,7 +32,7 @@ describe('resolveComposerWindow', () => {
 
   it('exposes clamp bounds spanning the full range (cursor at end)', () => {
     const window = resolveComposerWindow(atEnd);
-    expect(window.maxOffset).toBe(3); // baseStart = lastStart = 6 - 3
+    expect(window.maxOffset).toBe(4); // baseStart = lastStart = 7 - 3
     expect(window.minOffset).toBe(0); // baseStart - lastStart
   });
 
@@ -102,6 +102,14 @@ describe('resolveVerticalCursorIndex', () => {
 
     expect(resolveVerticalCursorIndex(text, 4, 4, 'up')).toBe(0);
     expect(resolveVerticalCursorIndex(text, 4, 4, 'down')).toBe(8);
+  });
+
+  it('moves back down to the trailing caret row after moving up from it', () => {
+    const text = 'abcdefgh';
+    const previousRow = resolveVerticalCursorIndex(text, 4, text.length, 'up');
+
+    expect(previousRow).toBe(4);
+    expect(resolveVerticalCursorIndex(text, 4, previousRow ?? -1, 'down')).toBe(text.length);
   });
 
   it('preserves the visual column across wide glyphs', () => {
@@ -177,7 +185,7 @@ describe('resolveClickResult', () => {
     // 'abcdefghij' at columns 2 -> rows ab(0-2) cd(2-4) ef(4-6) gh(6-8) ij(8-10).
     // offset 2 shows cd/ef (visibleStart 1). A column-0 click lands on a wrap
     // boundary index (row.start === previousRow.end); the window must not scroll.
-    const scrolled = { text: 'abcdefghij', columns: 2, maxVisibleLines: 2, cursorIndex: 10, offset: 2 };
+    const scrolled = { text: 'abcdefghij', columns: 2, maxVisibleLines: 2, cursorIndex: 9, offset: 2 };
     const before = resolveComposerWindow(scrolled).text;
     expect(before).toBe('cd\nef');
     for (const visibleRow of [0, 1]) {

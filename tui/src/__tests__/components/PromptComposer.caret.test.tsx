@@ -6,7 +6,7 @@ import {
   composerStateAtom
 } from '@state/ui/composer/index.ts';
 import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/dimensions.ts';
-import { bodyEntriesAtom } from '@state/ui/index.ts';
+import { bodyEntriesAtom, composerRowsAtom } from '@state/ui/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
@@ -100,6 +100,38 @@ describe('PromptComposer caret during scrolling', () => {
         x: firstRowPosition.x,
         y: firstRowPosition.y + 1
       });
+    });
+
+    unmount();
+  });
+
+  it('moves the caret to a new row when the final line exactly fills its width', async () => {
+    const store = createStore();
+    store.set(columnsTestOverrideAtom, 60);
+    store.set(rowsTestOverrideAtom, 24);
+    const inputColumns = 57;
+    const text = 'a'.repeat(inputColumns);
+    store.set(composerStateAtom, { text, cursorIndex: 0, validationError: null });
+
+    const { unmount } = renderWithJotai(<HomeScreenView />, store);
+    await vi.waitFor(() => {
+      expect(setCursorPositionSpy.mock.calls.at(-1)?.[0]).toBeDefined();
+    });
+    const firstRowPosition = setCursorPositionSpy.mock.calls.at(-1)?.[0];
+    const initialComposerRows = store.get(composerRowsAtom);
+
+    store.set(composerStateAtom, {
+      text,
+      cursorIndex: text.length,
+      validationError: null
+    });
+
+    await vi.waitFor(() => {
+      expect(setCursorPositionSpy.mock.calls.at(-1)?.[0]).toEqual({
+        x: firstRowPosition.x,
+        y: firstRowPosition.y
+      });
+      expect(store.get(composerRowsAtom)).toBe(initialComposerRows + 1);
     });
 
     unmount();

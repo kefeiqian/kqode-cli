@@ -1,4 +1,4 @@
-import { measureGraphemes } from '@libs/text/displayWidth.ts';
+import { displayWidth, measureGraphemes } from '@libs/text/displayWidth.ts';
 
 /** One wrapped visual row of the prompt, with its source index range. */
 export type WrappedPromptRow = {
@@ -15,6 +15,7 @@ export type WrappedPromptRow = {
 // rows, so sharing the cached array is safe.
 let cachedText: string | undefined;
 let cachedColumns = -1;
+let cachedTrailingCaretRow = false;
 let cachedRows: WrappedPromptRow[] | undefined;
 
 /**
@@ -25,20 +26,34 @@ let cachedRows: WrappedPromptRow[] | undefined;
  * The last `(text, columns)` result is memoized, so the repeated wraps of the
  * current prompt within a keystroke reuse one computation.
  */
-export function wrapPromptText(text: string, columns: number): WrappedPromptRow[] {
+export function wrapPromptText(
+  text: string,
+  columns: number,
+  includeTrailingCaretRow = false
+): WrappedPromptRow[] {
   const safeColumns = Math.max(1, columns);
-  if (cachedRows !== undefined && cachedText === text && cachedColumns === safeColumns) {
+  if (
+    cachedRows !== undefined &&
+    cachedText === text &&
+    cachedColumns === safeColumns &&
+    cachedTrailingCaretRow === includeTrailingCaretRow
+  ) {
     return cachedRows;
   }
 
-  const rows = computeWrappedPromptRows(text, safeColumns);
+  const rows = computeWrappedPromptRows(text, safeColumns, includeTrailingCaretRow);
   cachedText = text;
   cachedColumns = safeColumns;
+  cachedTrailingCaretRow = includeTrailingCaretRow;
   cachedRows = rows;
   return rows;
 }
 
-function computeWrappedPromptRows(text: string, safeColumns: number): WrappedPromptRow[] {
+function computeWrappedPromptRows(
+  text: string,
+  safeColumns: number,
+  includeTrailingCaretRow: boolean
+): WrappedPromptRow[] {
   if (text.length === 0) {
     return [{ text: '', start: 0, end: 0 }];
   }
@@ -55,6 +70,15 @@ function computeWrappedPromptRows(text: string, safeColumns: number): WrappedPro
     appendLineRows(rows, line, lineStart, safeColumns);
 
     if (newlineIndex < 0) {
+      const finalRow = rows.at(-1);
+      if (
+        includeTrailingCaretRow &&
+        finalRow !== undefined &&
+        finalRow.end === text.length &&
+        displayWidth(finalRow.text) === safeColumns
+      ) {
+        rows.push({ text: '', start: text.length, end: text.length });
+      }
       break;
     }
 

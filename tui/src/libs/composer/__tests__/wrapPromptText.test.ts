@@ -6,6 +6,14 @@ describe('wrapPromptText', () => {
     expect(wrapPromptText('abcdefghij', 4).map((row) => row.text)).toEqual(['abcd', 'efgh', 'ij']);
   });
 
+  it('adds a caret row when the final logical line exactly fills its width', () => {
+    expect(wrapPromptText('abcdefgh', 4, true).map((row) => row.text)).toEqual([
+      'abcd',
+      'efgh',
+      ''
+    ]);
+  });
+
   it('keeps authored newlines as separate rows', () => {
     expect(wrapPromptText('a\nbb', 10).map((row) => row.text)).toEqual(['a', 'bb']);
   });

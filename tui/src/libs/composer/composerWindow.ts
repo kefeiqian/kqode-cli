@@ -44,7 +44,7 @@ export type ComposerWindow = {
 export function resolveComposerWindow(params: ComposerWindowParams): ComposerWindow {
   const { text, columns, maxVisibleLines, cursorIndex, offset = 0 } = params;
   const safeMaxVisibleLines = Math.max(1, maxVisibleLines);
-  const rows = wrapPromptText(text, columns);
+  const rows = wrapPromptText(text, columns, cursorIndex >= text.length);
   const safeCursorIndex = clampToGraphemeBoundary(text, clamp(cursorIndex, 0, text.length));
   // Cursor-follow baseline (slide up only when the cursor would fall below the
   // last visible row); the signed offset then shifts the window from there.
@@ -77,7 +77,7 @@ export function resolveComposerWindow(params: ComposerWindowParams): ComposerWin
 export function resolveScrollIntoViewOffset(params: ComposerWindowParams): number {
   const { text, columns, maxVisibleLines, cursorIndex, offset = 0 } = params;
   const safeMaxVisibleLines = Math.max(1, maxVisibleLines);
-  const rows = wrapPromptText(text, columns);
+  const rows = wrapPromptText(text, columns, cursorIndex >= text.length);
   const safeCursorIndex = clampToGraphemeBoundary(text, clamp(cursorIndex, 0, text.length));
   const { visibleStart, baseStart, cursorRowIndex } = resolveWindowBounds(
     rows,
@@ -111,7 +111,7 @@ export function resolveClickResult(
     return null;
   }
 
-  const rows = wrapPromptText(text, columns);
+  const rows = wrapPromptText(text, columns, cursorIndex >= text.length);
   const safeCursorIndex = clampToGraphemeBoundary(text, clamp(cursorIndex, 0, text.length));
   const { visibleStart, lastStart } = resolveWindowBounds(
     rows,
@@ -191,7 +191,7 @@ export function resolveVerticalCursorIndex(
   cursorIndex: number,
   direction: VerticalDirection
 ): number | null {
-  const rows = wrapPromptText(text, columns);
+  const rows = wrapPromptText(text, columns, true);
   const safeCursorIndex = clampToGraphemeBoundary(text, clamp(cursorIndex, 0, text.length));
   const currentRow = resolveCursorRowIndex(rows, safeCursorIndex);
   const targetRow = currentRow + (direction === 'up' ? -1 : 1);
