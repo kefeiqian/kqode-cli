@@ -1,6 +1,10 @@
 import { Box, Text } from 'ink';
 import { LOWER_HALF_BLOCK, UPPER_HALF_BLOCK } from '@libs/tui/backgroundBlock.ts';
-import { PROMPT_PREFIX } from '@constants/ui.ts';
+import {
+  COMPOSER_RIGHT_PADDING_COLUMNS,
+  PROMPT_PREFIX
+} from '@constants/ui.ts';
+import { resolveComposerInputColumns } from '@libs/composer/layout.ts';
 import { formatValidationError } from '@libs/composer/promptTextView.ts';
 import { padEndToWidth } from '@libs/text/displayWidth.ts';
 import { theme } from '@theme/themeConfig.ts';
@@ -31,12 +35,26 @@ export function ComposerFrame({
         />
       ))}
       {validationError === null ? null : (
-        <Text
+        <Box
+          width={columns}
           backgroundColor={backgroundColor(shouldRenderBackground)}
-          color={theme.colors.errorRed}
         >
-          {formatValidationError(validationError, columns, shouldRenderBackground)}
-        </Text>
+          <Text
+            backgroundColor={backgroundColor(shouldRenderBackground)}
+            color={theme.colors.errorRed}
+          >
+            {formatValidationError(
+              validationError,
+              columns - COMPOSER_RIGHT_PADDING_COLUMNS,
+              shouldRenderBackground
+            )}
+          </Text>
+          {shouldRenderBackground ? (
+            <Text backgroundColor={backgroundColor(true)}>
+              {' '.repeat(COMPOSER_RIGHT_PADDING_COLUMNS)}
+            </Text>
+          ) : null}
+        </Box>
       )}
       {shouldRenderBackground ? <ComposerHalfLine glyph={UPPER_HALF_BLOCK} columns={columns} /> : null}
     </>
@@ -55,7 +73,9 @@ function ComposerTextRow({
   shouldRenderBackground: boolean;
 }) {
   const prefix = promptPrefixForRow(rowIndex);
-  const rowColumns = Math.max(0, columns - prefix.length);
+  const rowColumns = shouldRenderBackground
+    ? resolveComposerInputColumns(columns)
+    : Math.max(0, columns - prefix.length);
 
   return (
     // Prevent Yoga's default stretch from painting this row into the reserved
@@ -76,6 +96,11 @@ function ComposerTextRow({
       >
         {shouldRenderBackground ? padEndToWidth(row, rowColumns) : row}
       </Text>
+      {shouldRenderBackground ? (
+        <Text backgroundColor={backgroundColor(true)}>
+          {' '.repeat(COMPOSER_RIGHT_PADDING_COLUMNS)}
+        </Text>
+      ) : null}
     </Box>
   );
 }

@@ -33,6 +33,21 @@ export function padEndToWidth(text: string, width: number): string {
   return padding > 0 ? text + ' '.repeat(padding) : text;
 }
 
+/** Truncates `text` to complete graphemes fitting within `width` columns. */
+export function truncateToWidth(text: string, width: number): string {
+  const safeWidth = Math.max(0, width);
+  let usedWidth = 0;
+  let end = 0;
+  for (const grapheme of measureGraphemes(text)) {
+    if (usedWidth + grapheme.width > safeWidth) {
+      break;
+    }
+    usedWidth += grapheme.width;
+    end = grapheme.end;
+  }
+  return text.slice(0, end);
+}
+
 /** Previous grapheme boundary at or before `index`. */
 export function previousGraphemeStart(text: string, index: number): number {
   const safeIndex = Math.max(0, Math.min(index, text.length));

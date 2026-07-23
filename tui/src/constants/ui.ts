@@ -20,6 +20,8 @@ export const MIN_USABLE_TERMINAL_COLUMNS = MIN_COLUMNS;
 // --- Prompt composer ---
 
 export const PROMPT_PREFIX = '> ';
+/** Background-only space between prompt text and the composer's right edge. */
+export const COMPOSER_RIGHT_PADDING_COLUMNS = 1;
 
 /** Terminal input sequences emitted for modified Enter combinations. */
 export const MODIFIED_ENTER_INPUTS: readonly string[] = [

@@ -1,5 +1,5 @@
 import type { ComposerKeyHandler } from '@hooks/promptComposer/input/types.ts';
-import { PROMPT_PREFIX } from '@constants/ui.ts';
+import { resolveComposerInputColumns } from '@libs/composer/layout.ts';
 import { chromeColumnsAtom } from '@state/ui/index.ts';
 import {
   moveComposerCursorBackwardAtom,
@@ -27,7 +27,7 @@ export const handleCursorMove: ComposerKeyHandler = (context) => {
   }
 
   if (key.upArrow || key.downArrow) {
-    const columns = Math.max(1, store.get(chromeColumnsAtom) - PROMPT_PREFIX.length);
+    const columns = resolveComposerInputColumns(store.get(chromeColumnsAtom));
     store.set(key.upArrow ? moveComposerCursorUpAtom : moveComposerCursorDownAtom, { columns });
     return true;
   }

@@ -81,8 +81,8 @@ describe('PromptComposer caret during scrolling', () => {
     const store = createStore();
     store.set(columnsTestOverrideAtom, 60);
     store.set(rowsTestOverrideAtom, 24);
-    // 60 terminal columns - 1 final-cell gutter - 2 prompt-prefix columns.
-    const inputColumns = 57;
+    // 60 terminal columns - 1 final-cell gutter - 2 prefix - 1 right padding.
+    const inputColumns = 56;
     const text = 'a'.repeat(inputColumns * 2);
     store.set(composerStateAtom, { text, cursorIndex: 0, validationError: null });
 
@@ -109,7 +109,7 @@ describe('PromptComposer caret during scrolling', () => {
     const store = createStore();
     store.set(columnsTestOverrideAtom, 60);
     store.set(rowsTestOverrideAtom, 24);
-    const inputColumns = 57;
+    const inputColumns = 56;
     const text = 'a'.repeat(inputColumns);
     store.set(composerStateAtom, { text, cursorIndex: 0, validationError: null });
 

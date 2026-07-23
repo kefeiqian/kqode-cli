@@ -27,6 +27,15 @@ describe('PromptComposer', () => {
     }
   });
 
+  it('reserves one background column as right padding inside the composer', async () => {
+    const { lastFrame, stdin } = renderWithJotai(<PromptComposer columns={20} />);
+
+    stdin.write('abcdefghijklmnopq');
+    await flushInput();
+
+    expect(lastFrame() ?? '').toContain('> abcdefghijklmnop\n  q');
+  });
+
   it('indents authored continuation lines under the prompt text', async () => {
     const onSubmit = vi.fn();
     const { lastFrame, stdin } = renderWithJotai(

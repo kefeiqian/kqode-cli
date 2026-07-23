@@ -16,6 +16,7 @@ import { handleWheelScroll } from '@hooks/homeScreen/handleWheelScroll.ts';
 import { useComposerCaretRefresh } from '@hooks/homeScreen/useComposerCaretRefresh.ts';
 import { usePullRequestClick } from '@hooks/homeScreen/usePullRequestClick.ts';
 import { resolveClickResult } from '@libs/composer/composerWindow.ts';
+import { resolveComposerInputColumns } from '@libs/composer/layout.ts';
 import { BODY_CWD_GAP_ROWS } from '@libs/tui/layout.ts';
 import {
   bottomSpacerRowsAtom,
@@ -82,7 +83,7 @@ export function HomeScreenView() {
         const composerState = store.get(composerStateAtom);
         const result = resolveClickResult({
           text: composerState.text,
-          columns: Math.max(1, chromeColumns - PROMPT_PREFIX.length),
+          columns: resolveComposerInputColumns(chromeColumns),
           maxVisibleLines: layout.composerVisibleRows,
           cursorIndex: composerState.cursorIndex,
           offset: store.get(composerScrollOffsetRowsAtom),

@@ -1,4 +1,5 @@
 import { COMPOSER_BACKGROUND_PADDING_ROWS } from '@constants/ui.ts';
+import { padEndToWidth, truncateToWidth } from '@libs/text/displayWidth.ts';
 
 export function countVisibleComposerRows(
   visibleRowCount: number,
@@ -13,6 +14,6 @@ export function countVisibleComposerRows(
 }
 
 export function formatValidationError(error: string, columns: number, shouldPad: boolean): string {
-  const errorLine = `ERROR: ${error}`;
-  return shouldPad ? errorLine.padEnd(columns, ' ') : errorLine;
+  const errorLine = truncateToWidth(`ERROR: ${error}`, columns);
+  return shouldPad ? padEndToWidth(errorLine, columns) : errorLine;
 }

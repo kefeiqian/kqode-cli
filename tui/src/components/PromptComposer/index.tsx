@@ -7,6 +7,7 @@ import { ComposerFrame } from '@components/PromptComposer/ComposerFrame.tsx';
 import { PROMPT_PREFIX } from '@constants/ui.ts';
 import { usePromptComposerInput } from '@hooks/promptComposer/usePromptComposerInput.ts';
 import { resolveComposerCursorPosition } from '@libs/composer/cursorPosition.ts';
+import { resolveComposerInputColumns } from '@libs/composer/layout.ts';
 import { countVisibleComposerRows } from '@libs/composer/promptTextView.ts';
 import { DEFAULT_COMPOSER_VISIBLE_LINES } from '@constants/ui.ts';
 import { clearTranscriptAtom, enqueuePromptAtom } from '@state/promptQueue/index.ts';
@@ -75,7 +76,7 @@ export function PromptComposer({
     commandActions
   });
 
-  const inputColumns = Math.max(1, resolvedColumns - PROMPT_PREFIX.length);
+  const inputColumns = resolveComposerInputColumns(resolvedColumns);
   const composerWindow = resolveComposerWindow({
     text: state.text,
     columns: inputColumns,
