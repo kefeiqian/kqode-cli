@@ -58,7 +58,12 @@ function ComposerTextRow({
   const rowColumns = Math.max(0, columns - prefix.length);
 
   return (
-    <Box backgroundColor={backgroundColor(shouldRenderBackground)}>
+    // Prevent Yoga's default stretch from painting this row into the reserved
+    // final-column gutter before the first incremental repaint.
+    <Box
+      width={columns}
+      backgroundColor={backgroundColor(shouldRenderBackground)}
+    >
       <Text
         backgroundColor={backgroundColor(shouldRenderBackground)}
         color={rowIndex === 0 ? theme.colors.accentBlue : theme.colors.foreground}

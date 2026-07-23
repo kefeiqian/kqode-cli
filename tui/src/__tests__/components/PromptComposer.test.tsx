@@ -1,5 +1,6 @@
 import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
+import { Box } from 'ink';
 import { PromptComposer } from '@components/PromptComposer/index.tsx';
 import { resolveComposerCursorPosition } from '@libs/composer/cursorPosition.ts';
 import { enqueuePromptAtom } from '@state/promptQueue/index.ts';
@@ -15,7 +16,11 @@ import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
 describe('PromptComposer', () => {
   it('keeps every composer row out of the terminal final column', () => {
-    const { lastFrame } = renderWithJotai(<PromptComposer columns={20} />);
+    const { lastFrame } = renderWithJotai(
+      <Box width={20}>
+        <PromptComposer columns={20} />
+      </Box>
+    );
 
     for (const line of (lastFrame() ?? '').split('\n')) {
       expect(line.length).toBeLessThanOrEqual(19);
