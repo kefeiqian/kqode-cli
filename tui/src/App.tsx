@@ -4,7 +4,7 @@ import { useLayoutEffect } from 'react';
 import { HelpScreen } from '@components/HelpScreen/index.tsx';
 import { HomeScreen } from '@components/HomeScreen/index.tsx';
 import { TerminalTooSmall } from '@components/TerminalTooSmall.tsx';
-import { useGlobalKeys } from '@/useGlobalKeys.ts';
+import { useGlobalKeys } from '@hooks/useGlobalKeys.ts';
 import { terminalTooSmallAtom, windowColumnsAtom, windowRowsAtom } from '@state/ui/index.ts';
 import { helpVisibleAtom } from '@state/ui/help/index.ts';
 

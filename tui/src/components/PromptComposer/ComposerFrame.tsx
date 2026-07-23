@@ -1,11 +1,22 @@
 import { Box, Text } from 'ink';
-import { LOWER_HALF_BLOCK, UPPER_HALF_BLOCK } from '@libs/tui/backgroundBlock.ts';
-import { PROMPT_PREFIX } from '@constants/ui.ts';
-import { formatValidationError } from '@components/PromptComposer/promptTextView.ts';
+import {
+  resolveComposerBackgroundEnabled,
+  resolveComposerBorderColumns,
+  resolveSurfaceBorderGlyph,
+  type SurfaceBorderEdge
+} from '@libs/terminal/surfaceBorder.ts';
+import {
+  COMPOSER_RIGHT_PADDING_COLUMNS,
+  PROMPT_PREFIX
+} from '@constants/ui.ts';
+import { resolveComposerInputColumns } from '@libs/composer/layout.ts';
+import { formatValidationError } from '@libs/composer/promptTextView.ts';
+import { padEndToWidth } from '@libs/text/displayWidth.ts';
 import { theme } from '@theme/themeConfig.ts';
 
 type ComposerFrameProps = {
   columns: number;
+  terminalColumns: number;
   shouldRenderBackground: boolean;
   validationError: string | null;
   visibleTextRows: string[];
@@ -13,31 +24,59 @@ type ComposerFrameProps = {
 
 export function ComposerFrame({
   columns,
+  terminalColumns,
   shouldRenderBackground,
   validationError,
   visibleTextRows
 }: ComposerFrameProps) {
+  const renderInputBackground =
+    shouldRenderBackground && resolveComposerBackgroundEnabled();
+
   return (
     <>
-      {shouldRenderBackground ? <ComposerHalfLine glyph={LOWER_HALF_BLOCK} columns={columns} /> : null}
+      {shouldRenderBackground ? (
+        <ComposerBorder
+          edge="top"
+          columns={resolveComposerBorderColumns(columns, terminalColumns)}
+        />
+      ) : null}
       {visibleTextRows.map((row, index) => (
         <ComposerTextRow
           columns={columns}
           key={`${index}-${row}`}
           row={row}
           rowIndex={index}
-          shouldRenderBackground={shouldRenderBackground}
+          shouldRenderBackground={renderInputBackground}
         />
       ))}
       {validationError === null ? null : (
-        <Text
-          backgroundColor={backgroundColor(shouldRenderBackground)}
-          color={theme.colors.errorRed}
+        <Box
+          width={columns}
+          backgroundColor={backgroundColor(renderInputBackground)}
         >
-          {formatValidationError(validationError, columns, shouldRenderBackground)}
-        </Text>
+          <Text
+            backgroundColor={backgroundColor(renderInputBackground)}
+            color={theme.colors.errorRed}
+          >
+            {formatValidationError(
+              validationError,
+              columns - COMPOSER_RIGHT_PADDING_COLUMNS,
+              renderInputBackground
+            )}
+          </Text>
+          {renderInputBackground ? (
+            <Text backgroundColor={backgroundColor(true)}>
+              {' '.repeat(COMPOSER_RIGHT_PADDING_COLUMNS)}
+            </Text>
+          ) : null}
+        </Box>
       )}
-      {shouldRenderBackground ? <ComposerHalfLine glyph={UPPER_HALF_BLOCK} columns={columns} /> : null}
+      {shouldRenderBackground ? (
+        <ComposerBorder
+          edge="bottom"
+          columns={resolveComposerBorderColumns(columns, terminalColumns)}
+        />
+      ) : null}
     </>
   );
 }
@@ -54,10 +93,15 @@ function ComposerTextRow({
   shouldRenderBackground: boolean;
 }) {
   const prefix = promptPrefixForRow(rowIndex);
-  const rowColumns = Math.max(0, columns - prefix.length);
+  const rowColumns = resolveComposerInputColumns(columns);
 
   return (
-    <Box backgroundColor={backgroundColor(shouldRenderBackground)}>
+    // Prevent Yoga's default stretch from painting this row into the reserved
+    // final-column gutter before the first incremental repaint.
+    <Box
+      width={columns}
+      backgroundColor={backgroundColor(shouldRenderBackground)}
+    >
       <Text
         backgroundColor={backgroundColor(shouldRenderBackground)}
         color={rowIndex === 0 ? theme.colors.accentBlue : theme.colors.foreground}
@@ -68,13 +112,18 @@ function ComposerTextRow({
         backgroundColor={backgroundColor(shouldRenderBackground)}
         color={theme.colors.foreground}
       >
-        {shouldRenderBackground ? row.padEnd(rowColumns, ' ') : row}
+        {padEndToWidth(row, rowColumns)}
+      </Text>
+      <Text backgroundColor={backgroundColor(shouldRenderBackground)}>
+        {' '.repeat(COMPOSER_RIGHT_PADDING_COLUMNS)}
       </Text>
     </Box>
   );
 }
 
-function ComposerHalfLine({ glyph, columns }: { glyph: string; columns: number }) {
+function ComposerBorder({ edge, columns }: { edge: SurfaceBorderEdge; columns: number }) {
+  const glyph = resolveSurfaceBorderGlyph(edge);
+
   return (
     <Text
       backgroundColor={theme.colors.bodyBackground}

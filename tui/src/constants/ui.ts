@@ -11,23 +11,36 @@ export const DEFAULT_ROWS = 24;
 export const MIN_ROWS = 15;
 export const MIN_COLUMNS = 60;
 export const DEFAULT_COMPOSER_VISIBLE_LINES = 3;
+/** Physical terminal cells reserved from meaningful non-body chrome content. */
+export const TERMINAL_FINAL_COLUMN_GUARD = 1;
+export const FULLSCREEN_GUARD_ROWS = 0;
+export const MIN_USABLE_TERMINAL_ROWS = MIN_ROWS + FULLSCREEN_GUARD_ROWS;
+export const MIN_USABLE_TERMINAL_COLUMNS = MIN_COLUMNS;
 
 // --- Prompt composer ---
 
 export const PROMPT_PREFIX = '> ';
+/** Background-only space between prompt text and the composer's right edge. */
+export const COMPOSER_RIGHT_PADDING_COLUMNS = 1;
 
-// The app fills the terminal exactly (FULLSCREEN_GUARD_ROWS = 0), so Ink treats
-// each frame as fullscreen, omits its trailing newline, and shifts the cursor
-// baseline up one row. This offset adds that row back so the measured composer
-// top maps onto the editable row. (It was 0 while the app rendered just under
-// fullscreen, where Ink appends the trailing newline and the baseline already
-// lands on the output's bottom row.) NOTE: below the MIN_ROWS floor the layout
-// makes content overflow the terminal and this can be off by one — but the
-// too-small gate replaces the home screen before that, so it is a test-only
-// degenerate case.
-export const INK_CURSOR_ROW_ORIGIN_OFFSET = 1;
+/** Terminal input sequences emitted for modified Enter combinations. */
+export const MODIFIED_ENTER_INPUTS: readonly string[] = [
+  '\u001B[13;2u',
+  '\u001B[13;3u',
+  '\u001B[13;5u',
+  '\u001B[13;6u'
+];
+
 export const COMPOSER_BACKGROUND_PADDING_ROWS = 2;
 export const COMPOSER_BACKGROUND_TOP_PADDING_ROWS = 1;
+
+/**
+ * Divisor bounding the composer's visible box to a fraction of the terminal
+ * height (`2` = at most half) so a long prompt cannot bury the transcript. The
+ * text-line cap derived from it subtracts the background padding and the
+ * reserved error row, so the whole composer box stays within `rows / DIVISOR`.
+ */
+export const COMPOSER_MAX_HEIGHT_DIVISOR = 2;
 
 // --- Slash commands ---
 

@@ -1,0 +1,128 @@
+import { displayWidth, measureGraphemes } from '@libs/text/displayWidth.ts';
+
+/** One wrapped visual row of the prompt, with its source index range. */
+export type WrappedPromptRow = {
+  text: string;
+  start: number;
+  end: number;
+};
+
+// Single-slot memo: the prompt is re-wrapped several times per keystroke (the
+// render window, the scroll-into-view effect, and the scroll atoms), always for
+// the current text and width. Caching the last result — compared with `===`
+// (value equality, with V8's same-string-object fast path) rather than a Map
+// hash — collapses those into a single wrap. Callers never mutate the returned
+// rows, so sharing the cached array is safe.
+let cachedText: string | undefined;
+let cachedColumns = -1;
+let cachedTrailingCaretRow = false;
+let cachedRows: WrappedPromptRow[] | undefined;
+
+/**
+ * Splits `text` into visual rows: authored newlines start new rows, and each
+ * logical line is wrapped to `columns` terminal display columns. An empty prompt
+ * yields a single empty row. Wide and multi-code-point graphemes stay intact.
+ *
+ * The last `(text, columns)` result is memoized, so the repeated wraps of the
+ * current prompt within a keystroke reuse one computation.
+ */
+export function wrapPromptText(
+  text: string,
+  columns: number,
+  includeTrailingCaretRow = false
+): WrappedPromptRow[] {
+  const safeColumns = Math.max(1, columns);
+  if (
+    cachedRows !== undefined &&
+    cachedText === text &&
+    cachedColumns === safeColumns &&
+    cachedTrailingCaretRow === includeTrailingCaretRow
+  ) {
+    return cachedRows;
+  }
+
+  const rows = computeWrappedPromptRows(text, safeColumns, includeTrailingCaretRow);
+  cachedText = text;
+  cachedColumns = safeColumns;
+  cachedTrailingCaretRow = includeTrailingCaretRow;
+  cachedRows = rows;
+  return rows;
+}
+
+function computeWrappedPromptRows(
+  text: string,
+  safeColumns: number,
+  includeTrailingCaretRow: boolean
+): WrappedPromptRow[] {
+  if (text.length === 0) {
+    return [{ text: '', start: 0, end: 0 }];
+  }
+
+  const rows: WrappedPromptRow[] = [];
+  let lineStart = 0;
+
+  while (lineStart <= text.length) {
+    const newlineIndex = text.indexOf('\n', lineStart);
+    const lineEnd = newlineIndex < 0 ? text.length : newlineIndex;
+    const rawLine = text.slice(lineStart, lineEnd);
+    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
+
+    appendLineRows(rows, line, lineStart, safeColumns);
+
+    if (newlineIndex < 0) {
+      const finalRow = rows.at(-1);
+      if (
+        includeTrailingCaretRow &&
+        finalRow !== undefined &&
+        finalRow.end === text.length &&
+        displayWidth(finalRow.text) === safeColumns
+      ) {
+        rows.push({ text: '', start: text.length, end: text.length });
+      }
+      break;
+    }
+
+    lineStart = newlineIndex + 1;
+  }
+
+  return rows;
+}
+
+function appendLineRows(
+  rows: WrappedPromptRow[],
+  line: string,
+  lineStart: number,
+  safeColumns: number
+): void {
+  if (line.length === 0) {
+    rows.push({ text: '', start: lineStart, end: lineStart });
+    return;
+  }
+
+  let rowStart = 0;
+  let offset = 0;
+  let rowWidth = 0;
+  for (const { segment, width } of measureGraphemes(line)) {
+    if (rowWidth + width > safeColumns && offset > rowStart) {
+      rows.push(rowSlice(line, lineStart, rowStart, offset));
+      rowStart = offset;
+      rowWidth = 0;
+    }
+    rowWidth += width;
+    offset += segment.length;
+  }
+  rows.push(rowSlice(line, lineStart, rowStart, offset));
+}
+
+function rowSlice(
+  line: string,
+  lineStart: number,
+  start: number,
+  end: number
+): WrappedPromptRow {
+  return {
+    text: line.slice(start, end),
+    start: lineStart + start,
+    end: lineStart + end
+  };
+}

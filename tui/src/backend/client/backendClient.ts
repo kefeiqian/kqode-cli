@@ -4,34 +4,20 @@ import type { BackendClient } from '@contracts/backend/index.ts';
 import { DEFAULT_REQUEST_TIMEOUT_MS, DEFAULT_STARTUP_TIMEOUT_MS } from '@constants/backend.ts';
 import type { LaunchedBackend } from '@backend/process/backendProcess.ts';
 import { createMessageConnectionClient } from '@backend/client/messageConnectionClient.ts';
+import { BackendLifecycleState } from '@backend/client/backendLifecycle.ts';
+import type { BackendLifecycleState as BackendLifecycleStateValue } from '@backend/client/backendLifecycle.ts';
 import { openReadyConnection } from '@backend/client/backendReadiness.ts';
 import {
   isFatalBackendError,
-  toLaunchError,
-  withRequestTimeout
+  toLaunchError
 } from '@backend/client/backendClientErrors.ts';
-import type { MessageSubmitParams, MessageSubmitResult } from '@contracts/backend/index.ts';
+import type { SubmitOutcome, SubmitParams } from '@contracts/backend/index.ts';
 
-/** Lifecycle of the TUI-owned backend connection. */
-export const BackendLifecycleState = {
-  /** No backend has been launched yet. */
-  Idle: 'idle',
-  /** A backend launch/connect is in flight. */
-  Starting: 'starting',
-  /** The backend is connected and accepting requests. */
-  Ready: 'ready',
-  /** The TUI is disposing the backend on purpose. */
-  Closing: 'closing',
-  /** The backend exited, crashed, or a fatal transport error occurred. */
-  Dead: 'dead'
-} as const;
-
-export type BackendLifecycleState =
-  (typeof BackendLifecycleState)[keyof typeof BackendLifecycleState];
+export { BackendLifecycleState };
 
 /** Lifecycle handle over a {@link BackendClient} that owns one child backend at a time. */
 export type BackendClientHandle = BackendClient & {
-  getState(): BackendLifecycleState;
+  getState(): BackendLifecycleStateValue;
   ensureStarted(): Promise<void>;
   dispose(): void;
 };
@@ -60,7 +46,7 @@ type BackendSession = {
  * backend (persisted session restore is added with the session methods), never
  * silently and never auto-replaying interrupted work.
  *
- * `dispose()` is terminal: once disposed, `ensureStarted`/`submitMessage` reject
+ * `dispose()` is terminal: once disposed, `ensureStarted`/`submit` reject
  * with a `launch`-kind {@link BackendClientError} without spawning a replacement,
  * so a torn-down client can never orphan a new backend process.
  */
@@ -69,7 +55,7 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
   const startupTimeoutMs = options.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS;
   const { launch } = options;
 
-  let state: BackendLifecycleState = BackendLifecycleState.Idle;
+  let state: BackendLifecycleStateValue = BackendLifecycleState.Idle;
   let session: BackendSession | null = null;
   let starting: Promise<BackendSession> | null = null;
   let disposed = false;
@@ -83,7 +69,7 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
       'backend launch was aborted before it became ready'
     );
 
-  const teardown = (nextState: BackendLifecycleState): void => {
+  const teardown = (nextState: BackendLifecycleStateValue): void => {
     const current = session;
     session = null;
     state = nextState;
@@ -142,7 +128,7 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     const opened: BackendSession = {
       backend,
       connection,
-      client: createMessageConnectionClient(connection)
+      client: createMessageConnectionClient(connection, { requestTimeoutMs })
     };
     session = opened;
     state = BackendLifecycleState.Ready;
@@ -169,19 +155,33 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     async ensureStarted(): Promise<void> {
       await ensureSession();
     },
-    async submitMessage(params: MessageSubmitParams): Promise<MessageSubmitResult> {
+    async submit(params: SubmitParams): Promise<SubmitOutcome> {
       if (disposed) {
         throw disposedError();
       }
       const active = await ensureSession();
       try {
-        return await withRequestTimeout(active.client.submitMessage(params), requestTimeoutMs);
+        return await active.client.submit(params);
       } catch (error) {
         if (isFatalBackendError(error)) {
           markDead();
         }
         throw error;
       }
+    },
+    async gitStatus() {
+      if (disposed) {
+        throw disposedError();
+      }
+      const active = await ensureSession();
+      return active.client.gitStatus();
+    },
+    async pullRequest() {
+      if (disposed) {
+        throw disposedError();
+      }
+      const active = await ensureSession();
+      return active.client.pullRequest();
     },
     dispose() {
       disposed = true;

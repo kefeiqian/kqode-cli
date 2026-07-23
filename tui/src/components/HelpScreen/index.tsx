@@ -1,8 +1,8 @@
 import { Box, Text, useInput } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useMemo } from 'react';
-import { buildHelpSections, flattenHelpLines } from '@components/HelpScreen/helpContent.ts';
-import type { HelpLine } from '@components/HelpScreen/helpContent.ts';
+import { buildHelpSections, flattenHelpLines } from '@libs/help/helpContent.ts';
+import type { HelpLine } from '@libs/help/helpContent.ts';
 import { clamp } from '@libs/math/clamp.ts';
 import { columnsAtom, rowsAtom } from '@state/ui/index.ts';
 import {

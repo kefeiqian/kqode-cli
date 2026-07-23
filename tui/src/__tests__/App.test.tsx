@@ -1,14 +1,14 @@
 import { createStore } from 'jotai';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { App } from '@/App.tsx';
 import {
   armedActionAtom,
   columnsTestOverrideAtom,
-  FULLSCREEN_GUARD_ROWS,
   rowsTestOverrideAtom
 } from '@state/ui/index.ts';
+import { FULLSCREEN_GUARD_ROWS } from '@constants/ui.ts';
 import { ArmedAction } from '@constants/ui.ts';
 import { productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
 import { helpVisibleAtom } from '@state/ui/help/index.ts';
@@ -29,28 +29,6 @@ function renderApp({ columns, rows }: { columns?: number; rows?: number } = {}) 
     store.set(rowsTestOverrideAtom, rows);
   }
   return { store, ...renderWithJotai(<App />, store) };
-}
-
-function deferredPromise<T>() {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  const promise = new Promise<T>((innerResolve) => {
-    resolve = innerResolve;
-  });
-  return { promise, resolve };
-}
-
-async function waitForFrame(
-  getFrame: () => string | undefined,
-  predicate: (frame: string) => boolean
-): Promise<string> {
-  for (let attempt = 0; attempt < 200; attempt += 1) {
-    const frame = getFrame() ?? '';
-    if (predicate(frame)) {
-      return frame;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 5));
-  }
-  throw new Error(`timed out waiting for frame. Last frame:\n${getFrame() ?? ''}`);
 }
 
 describe('App', () => {

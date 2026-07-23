@@ -2,7 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore } from 'jotai';
 import type { BackendClientHandle } from '@backend/client/backendClient.ts';
-import { startBackendRuntime } from '@backend/runtime/backendRuntime.ts';
+import { startBackendRuntime } from '@/cli/backendRuntime.ts';
 import { resolveRepoRoot, resolveWorkspaceCwd } from '@libs/path/runtimePaths.ts';
 import { PRODUCT_NAME } from '@constants/product.ts';
 import { resolveProductVersion } from '@libs/product/productMetadata.ts';
@@ -15,7 +15,8 @@ import {
   enterAlternateScreen,
   leaveAlternateScreen
 } from '@libs/terminal/alternateScreen.ts';
-import { resolveSessionSeed } from '@components/AppExitSummary/resolveSessionSeed.ts';
+import { DISABLE_SGR_MOUSE_TRACKING } from '@libs/terminal/mouse.ts';
+import { resolveSessionSeed } from '@libs/exitSummary/resolveSessionSeed.ts';
 import { windowColumnsAtom, windowRowsAtom } from '@state/ui/index.ts';
 import {
   productVersionAtom,
@@ -131,6 +132,7 @@ export async function createAppRuntime({
   // redundant restore. Mirror the enter order on teardown: reset the background
   // and window title, then leave the alt buffer.
   const restoreTerminal = () => {
+    process.stdout.write(DISABLE_SGR_MOUSE_TRACKING);
     resetTerminalBackground();
     resetTerminalWindowTitle();
     leaveAlternateScreen();

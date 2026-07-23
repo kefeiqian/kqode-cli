@@ -1,2 +1,9 @@
 [alias]
-xtask = "run -p xtask --"
+# Build and run xtask in a private `target/xtask` dir, isolated from the
+# workspace `target/`. On Windows a running exe is locked, so sharing `target/`
+# would let a concurrent `cargo build` or `cargo xtask` cause "Access is denied
+# (os error 5)" relink failures. The isolation is set via this `--target-dir`
+# flag (not the CARGO_TARGET_DIR env var) so it does NOT leak into the nested
+# cargo builds xtask itself spawns (e.g. packaging), which must still use the
+# workspace `target/`.
+xtask = "run -p xtask --target-dir target/xtask --"

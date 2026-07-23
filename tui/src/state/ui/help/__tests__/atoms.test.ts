@@ -6,7 +6,7 @@ import {
   helpVisibleAtom,
   openHelpAtom,
   scrollHelpByRowsAtom
-} from '@state/ui/help/atoms.ts';
+} from '@state/ui/help/index.ts';
 
 describe('help atoms', () => {
   it('openHelpAtom shows the viewer and resets scroll to the top', () => {

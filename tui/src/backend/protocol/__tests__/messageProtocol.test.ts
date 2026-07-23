@@ -8,12 +8,18 @@ import {
 import { ErrorCodes, type MessageConnection, ResponseError } from 'vscode-jsonrpc';
 import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.ts';
 import { createMessageConnectionClient } from '@backend/client/messageConnectionClient.ts';
-import { ACK_MESSAGE } from '@contracts/backend/index.ts';
-import { messageSubmitRequest } from '@backend/protocol/messageProtocol.ts';
+import { SUBMIT_STATUS_NEEDS_CONFIGURATION } from '@contracts/backend/index.ts';
+import type { MessageSubmitResult } from '@contracts/backend/index.ts';
+import {
+  gitStatusRequest,
+  messageSubmitRequest,
+  pullRequestRequest
+} from '@backend/protocol/messageProtocol.ts';
 
 type PairedConnections = {
   client: MessageConnection;
   server: MessageConnection;
+  closeTransport: () => void;
   dispose: () => void;
 };
 
@@ -36,6 +42,10 @@ function pairedConnections(): PairedConnections {
   const pair: PairedConnections = {
     client,
     server,
+    closeTransport: () => {
+      clientToServer.end();
+      serverToClient.end();
+    },
     dispose: () => {
       client.dispose();
       server.dispose();
@@ -43,13 +53,6 @@ function pairedConnections(): PairedConnections {
   };
   openPairs.push(pair);
   return pair;
-}
-
-function ackingServer(server: MessageConnection): void {
-  server.onRequest(messageSubmitRequest, ({ text }) => ({
-    message: ACK_MESSAGE,
-    receivedText: text
-  }));
 }
 
 afterEach(() => {
@@ -60,26 +63,39 @@ afterEach(() => {
 });
 
 describe('message protocol client', () => {
-  it('sends kqode.message.submit and receives an ACK success response', async () => {
+  it('resolves needs-configuration when the ack reports no key', async () => {
     const { client, server } = pairedConnections();
-    ackingServer(server);
+    server.onRequest(messageSubmitRequest, () => ({
+      status: SUBMIT_STATUS_NEEDS_CONFIGURATION
+    }));
 
-    const result = await createMessageConnectionClient(client).submitMessage({
-      text: 'hello from tui'
-    });
+    const outcome = await createMessageConnectionClient(client).submit({ text: 'no key' });
 
-    expect(result.message).toBe(ACK_MESSAGE);
-    expect(result.receivedText).toBe('hello from tui');
+    expect(outcome).toEqual({ kind: 'needsConfiguration' });
   });
 
-  it('preserves Unicode, surrounding spaces, and newlines in receivedText', async () => {
+  it('sends the prompt text to the backend', async () => {
     const { client, server } = pairedConnections();
-    ackingServer(server);
+    const received: Array<{ text: string }> = [];
+    server.onRequest(messageSubmitRequest, (params) => {
+      received.push(params);
+      return { status: SUBMIT_STATUS_NEEDS_CONFIGURATION };
+    });
 
-    const text = '  café\n☕ 日本語  ';
-    const result = await createMessageConnectionClient(client).submitMessage({ text });
+    await createMessageConnectionClient(client).submit({ text: '  café ☕  ' });
 
-    expect(result.receivedText).toBe(text);
+    expect(received).toHaveLength(1);
+    expect(received[0]?.text).toBe('  café ☕  ');
+  });
+
+  it('rejects an unsupported ack status as a protocol error', async () => {
+    const { client, server } = pairedConnections();
+    server.onRequest(messageSubmitRequest, () => ({ status: 'streaming' }));
+
+    const submit = createMessageConnectionClient(client).submit({ text: 'too early' });
+
+    await expect(submit).rejects.toBeInstanceOf(BackendClientError);
+    await expect(submit).rejects.toMatchObject({ kind: BackendErrorKind.Protocol });
   });
 
   it('surfaces JSON-RPC method errors as typed protocol client errors', async () => {
@@ -88,9 +104,94 @@ describe('message protocol client', () => {
       throw new ResponseError(ErrorCodes.InvalidParams, 'invalid message submit params');
     });
 
-    const submit = createMessageConnectionClient(client).submitMessage({ text: 'boom' });
+    const submit = createMessageConnectionClient(client).submit({ text: 'boom' });
 
     await expect(submit).rejects.toBeInstanceOf(BackendClientError);
     await expect(submit).rejects.toMatchObject({ kind: BackendErrorKind.Protocol });
+  });
+
+  it('rejects with a typed backend error when the connection is disposed mid-submit', async () => {
+    const { client, server } = pairedConnections();
+    // The backend never answers, so the request stays pending until the client
+    // connection is disposed — mirroring how the backend client tears down a dead
+    // connection (markDead → dispose), which rejects any in-flight request.
+    // Classifying that death and marking the client dead is owned by the backend
+    // client layer's fatal-teardown listeners; here we only assert the in-flight
+    // submit surfaces a typed error rather than hanging or leaking a raw rejection.
+    server.onRequest(messageSubmitRequest, () => new Promise<MessageSubmitResult>(() => undefined));
+
+    const submit = createMessageConnectionClient(client).submit({ text: 'crash' });
+    queueMicrotask(() => client.dispose());
+
+    await expect(submit).rejects.toBeInstanceOf(BackendClientError);
+  });
+});
+
+describe('git status request', () => {
+  it('resolves the formatted label the backend returns', async () => {
+    const { client, server } = pairedConnections();
+    server.onRequest(gitStatusRequest, () => ({ label: '⎇ main*' }));
+
+    const status = await createMessageConnectionClient(client).gitStatus();
+
+    expect(status).toEqual({ label: '⎇ main*' });
+  });
+
+  it('resolves null when the workspace is not a git repository', async () => {
+    const { client, server } = pairedConnections();
+    server.onRequest(gitStatusRequest, () => ({ label: null }));
+
+    const status = await createMessageConnectionClient(client).gitStatus();
+
+    expect(status).toBeNull();
+  });
+
+  it('surfaces a JSON-RPC error as a typed protocol client error', async () => {
+    const { client, server } = pairedConnections();
+    server.onRequest(gitStatusRequest, () => {
+      throw new ResponseError(ErrorCodes.InternalError, 'git failed');
+    });
+
+    const status = createMessageConnectionClient(client).gitStatus();
+
+    await expect(status).rejects.toBeInstanceOf(BackendClientError);
+    await expect(status).rejects.toMatchObject({ kind: BackendErrorKind.Protocol });
+    await expect(status).rejects.toThrow('git status');
+  });
+});
+
+describe('pull request status request', () => {
+  it('resolves the formatted PR label and URL the backend returns', async () => {
+    const { client, server } = pairedConnections();
+    server.onRequest(pullRequestRequest, () => ({
+      label: '#3',
+      url: 'https://github.com/o/r/pull/3'
+    }));
+
+    const status = await createMessageConnectionClient(client).pullRequest();
+
+    expect(status).toEqual({ label: '#3', url: 'https://github.com/o/r/pull/3' });
+  });
+
+  it('resolves null when the branch has no pull request', async () => {
+    const { client, server } = pairedConnections();
+    server.onRequest(pullRequestRequest, () => ({ label: null, url: null }));
+
+    const status = await createMessageConnectionClient(client).pullRequest();
+
+    expect(status).toBeNull();
+  });
+
+  it('surfaces a JSON-RPC error as a typed protocol client error', async () => {
+    const { client, server } = pairedConnections();
+    server.onRequest(pullRequestRequest, () => {
+      throw new ResponseError(ErrorCodes.InternalError, 'gh failed');
+    });
+
+    const status = createMessageConnectionClient(client).pullRequest();
+
+    await expect(status).rejects.toBeInstanceOf(BackendClientError);
+    await expect(status).rejects.toMatchObject({ kind: BackendErrorKind.Protocol });
+    await expect(status).rejects.toThrow('pull request');
   });
 });

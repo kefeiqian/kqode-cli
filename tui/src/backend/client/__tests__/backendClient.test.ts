@@ -1,4 +1,6 @@
 import { PassThrough } from 'node:stream';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -10,8 +12,12 @@ import {
 } from 'vscode-jsonrpc/node';
 import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.ts';
 import { type LaunchedBackend } from '@backend/process/backendProcess.ts';
-import { ACK_MESSAGE } from '@contracts/backend/index.ts';
-import { messageSubmitRequest, backendReadyNotification } from '@backend/protocol/messageProtocol.ts';
+import { SUBMIT_STATUS_NEEDS_CONFIGURATION } from '@contracts/backend/index.ts';
+import {
+  gitStatusRequest,
+  messageSubmitRequest,
+  backendReadyNotification
+} from '@backend/protocol/messageProtocol.ts';
 import type { MessageSubmitResult } from '@contracts/backend/index.ts';
 import {
   BackendLifecycleState,
@@ -26,12 +32,17 @@ type FakeBackend = {
   launched: LaunchedBackend;
   disposed: () => boolean;
   emitExit: () => void;
+  closeTransport: () => void;
 };
 
 let openServers: MessageConnection[] = [];
 
+// A fake backend whose submit deterministically acks needsConfiguration, since no
+// provider is wired in this bootstrap slice.
 function ack(server: MessageConnection): void {
-  server.onRequest(messageSubmitRequest, ({ text }) => ({ message: ACK_MESSAGE, receivedText: text }));
+  server.onRequest(messageSubmitRequest, () => ({
+    status: SUBMIT_STATUS_NEEDS_CONFIGURATION
+  }));
 }
 
 function makeFakeBackend(
@@ -73,6 +84,10 @@ function makeFakeBackend(
       for (const listener of exitListeners) {
         listener({ code: 1, signal: null });
       }
+    },
+    closeTransport: () => {
+      backendStdout.end();
+      backendStdin.end();
     }
   };
 }
@@ -95,8 +110,8 @@ describe('createBackendClient (fake backend)', () => {
     expect(client.getState()).toBe(BackendLifecycleState.Ready);
     expect(launch).toHaveBeenCalledTimes(1);
 
-    const result = await client.submitMessage({ text: 'hello' });
-    expect(result).toEqual({ message: ACK_MESSAGE, receivedText: 'hello' });
+    const result = await client.submit({ text: 'hello' });
+    expect(result).toEqual({ kind: 'needsConfiguration' });
     expect(launch).toHaveBeenCalledTimes(1);
     client.dispose();
   });
@@ -106,9 +121,9 @@ describe('createBackendClient (fake backend)', () => {
     const client = createBackendClient({ launch: async () => fake.launched });
 
     expect(client.getState()).toBe(BackendLifecycleState.Idle);
-    const result = await client.submitMessage({ text: 'hello' });
+    const result = await client.submit({ text: 'hello' });
 
-    expect(result).toEqual({ message: ACK_MESSAGE, receivedText: 'hello' });
+    expect(result).toEqual({ kind: 'needsConfiguration' });
     expect(client.getState()).toBe(BackendLifecycleState.Ready);
     client.dispose();
   });
@@ -128,6 +143,19 @@ describe('createBackendClient (fake backend)', () => {
     client.dispose();
   });
 
+  it('rejects with a transport error when the backend dies before readiness', async () => {
+    const fake = makeFakeBackend(ack, { signalReady: false });
+    const client = createBackendClient({ launch: async () => fake.launched });
+
+    const start = client.ensureStarted();
+    fake.closeTransport();
+
+    await expect(start).rejects.toMatchObject({ kind: BackendErrorKind.Transport });
+    expect(client.getState()).toBe(BackendLifecycleState.Dead);
+    expect(fake.disposed()).toBe(true);
+    client.dispose();
+  });
+
   it('keeps the backend alive after a recoverable JSON-RPC method error', async () => {
     const fake = makeFakeBackend((server) =>
       server.onRequest(messageSubmitRequest, () => {
@@ -137,13 +165,13 @@ describe('createBackendClient (fake backend)', () => {
     const launch = vi.fn(async () => fake.launched);
     const client = createBackendClient({ launch });
 
-    await expect(client.submitMessage({ text: 'x' })).rejects.toMatchObject({
+    await expect(client.submit({ text: 'x' })).rejects.toMatchObject({
       kind: BackendErrorKind.Protocol
     });
     expect(client.getState()).toBe(BackendLifecycleState.Ready);
     expect(fake.disposed()).toBe(false);
 
-    await expect(client.submitMessage({ text: 'y' })).rejects.toMatchObject({
+    await expect(client.submit({ text: 'y' })).rejects.toMatchObject({
       kind: BackendErrorKind.Protocol
     });
     expect(launch).toHaveBeenCalledTimes(1);
@@ -159,16 +187,31 @@ describe('createBackendClient (fake backend)', () => {
     const launch = vi.fn(async () => backends.shift()?.launched as LaunchedBackend);
     const client = createBackendClient({ launch, requestTimeoutMs: 100 });
 
-    await expect(client.submitMessage({ text: 'first' })).rejects.toMatchObject({
+    await expect(client.submit({ text: 'first' })).rejects.toMatchObject({
       kind: BackendErrorKind.Timeout
     });
     expect(client.getState()).toBe(BackendLifecycleState.Dead);
     expect(hung.disposed()).toBe(true);
 
-    const result = await client.submitMessage({ text: 'second' });
-    expect(result.receivedText).toBe('second');
+    const result = await client.submit({ text: 'second' });
+    expect(result).toEqual({ kind: 'needsConfiguration' });
     expect(client.getState()).toBe(BackendLifecycleState.Ready);
     expect(launch).toHaveBeenCalledTimes(2);
+    client.dispose();
+  });
+
+  it('does not mark the shared backend dead when best-effort git status times out', async () => {
+    const fake = makeFakeBackend((server) => {
+      ack(server);
+      server.onRequest(gitStatusRequest, () => new Promise(() => undefined));
+    });
+    const client = createBackendClient({ launch: async () => fake.launched, requestTimeoutMs: 50 });
+
+    await expect(client.gitStatus()).rejects.toMatchObject({ kind: BackendErrorKind.Timeout });
+    expect(client.getState()).toBe(BackendLifecycleState.Ready);
+
+    const result = await client.submit({ text: 'still alive' });
+    expect(result).toEqual({ kind: 'needsConfiguration' });
     client.dispose();
   });
 
@@ -176,7 +219,7 @@ describe('createBackendClient (fake backend)', () => {
     const fake = makeFakeBackend(ack);
     const client = createBackendClient({ launch: async () => fake.launched });
 
-    await client.submitMessage({ text: 'alive' });
+    await client.submit({ text: 'alive' });
     expect(client.getState()).toBe(BackendLifecycleState.Ready);
 
     fake.emitExit();
@@ -194,7 +237,7 @@ describe('createBackendClient (fake backend)', () => {
 
     client.dispose();
 
-    await expect(client.submitMessage({ text: 'after dispose' })).rejects.toMatchObject({
+    await expect(client.submit({ text: 'after dispose' })).rejects.toMatchObject({
       kind: BackendErrorKind.Launch
     });
     // The disposed client is terminal: no fresh backend is launched.
@@ -213,7 +256,7 @@ describe('createBackendClient (fake backend)', () => {
     );
     const client = createBackendClient({ launch });
 
-    const submit = client.submitMessage({ text: 'race' });
+    const submit = client.submit({ text: 'race' });
     client.dispose();
     resolveLaunch?.(fake.launched);
 
@@ -225,15 +268,24 @@ describe('createBackendClient (fake backend)', () => {
 
 describe('createSourceBackendClient (integration)', () => {
   it(
-    'starts the Rust backend, submits, and receives the ACK with exact receivedText',
+    'builds and launches the Rust backend, routing to configuration without a key',
     async () => {
-      const client = createSourceBackendClient({ repoRoot, workspaceCwd: repoRoot });
+      // Provider setup lands later, so bootstrap submit deterministically returns
+      // needsConfiguration regardless of the workspace.
+      const workspaceCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'kqode-src-client-'));
+      const client = createSourceBackendClient({ repoRoot, workspaceCwd });
       try {
-        const result = await client.submitMessage({ text: '  café\n☕  ' });
-        expect(result.message).toBe(ACK_MESSAGE);
-        expect(result.receivedText).toBe('  café\n☕  ');
+        const outcome = await client.submit({ text: 'hello' });
+        expect(outcome).toEqual({ kind: 'needsConfiguration' });
       } finally {
         client.dispose();
+        // Best-effort: on Windows the just-killed backend may still hold the cwd
+        // handle briefly; the OS reclaims the temp dir regardless.
+        try {
+          fs.rmSync(workspaceCwd, { recursive: true, force: true });
+        } catch {
+          /* temp cleanup is best-effort */
+        }
       }
     },
     INTEGRATION_TIMEOUT_MS

@@ -1,7 +1,7 @@
 #[path = "common/rpc.rs"]
 mod rpc;
 
-use kqode::protocol::{ACK_MESSAGE, BACKEND_READY_METHOD, RpcMethod};
+use kqode::protocol::{BACKEND_READY_METHOD, RpcMethod, SUBMIT_STATUS_NEEDS_CONFIGURATION};
 use serde_json::json;
 
 use rpc::{backend_output, parse_stdout_frames, request_frame, response_frames};
@@ -29,7 +29,9 @@ fn backend_announces_ready_before_handling_requests() {
 }
 
 #[test]
-fn message_submit_returns_ack_with_received_text() {
+fn message_submit_without_key_returns_needs_configuration() {
+    // With no API key (forced by the harness), submit must return an immediate
+    // ack routing the user to configuration and must not stream any tokens.
     let output = backend_output(&request_frame(
         1,
         RpcMethod::MessageSubmit.as_str(),
@@ -37,21 +39,30 @@ fn message_submit_returns_ack_with_received_text() {
     ));
 
     assert!(output.status.success(), "{output:?}");
+
+    let all_frames = parse_stdout_frames(&output.stdout);
+    assert_eq!(
+        all_frames.len(),
+        2,
+        "expected only the ready notification and one ack response: {all_frames:?}"
+    );
+
     let frames = response_frames(&output.stdout);
     assert_eq!(frames[0]["id"], 1);
-    assert_eq!(frames[0]["result"]["message"], ACK_MESSAGE);
-    assert_eq!(frames[0]["result"]["receivedText"], "hello from tui");
+    assert_eq!(
+        frames[0]["result"]["status"],
+        SUBMIT_STATUS_NEEDS_CONFIGURATION
+    );
 }
 
 #[test]
-fn message_submit_preserves_unicode_newlines_and_empty_text() {
-    let text = "  hello\nfrom tui 🌱  ";
+fn message_submit_answers_each_request_with_needs_configuration() {
     let output = backend_output(
         &[
             request_frame(
                 1,
                 RpcMethod::MessageSubmit.as_str(),
-                json!({ "text": text }),
+                json!({ "text": "first" }),
             ),
             request_frame(2, RpcMethod::MessageSubmit.as_str(), json!({ "text": "" })),
         ]
@@ -61,7 +72,13 @@ fn message_submit_preserves_unicode_newlines_and_empty_text() {
     assert!(output.status.success(), "{output:?}");
     let frames = response_frames(&output.stdout);
     assert_eq!(frames[0]["id"], 1);
+    assert_eq!(
+        frames[0]["result"]["status"],
+        SUBMIT_STATUS_NEEDS_CONFIGURATION
+    );
     assert_eq!(frames[1]["id"], 2);
-    assert_eq!(frames[0]["result"]["receivedText"], text);
-    assert_eq!(frames[1]["result"]["receivedText"], "");
+    assert_eq!(
+        frames[1]["result"]["status"],
+        SUBMIT_STATUS_NEEDS_CONFIGURATION
+    );
 }

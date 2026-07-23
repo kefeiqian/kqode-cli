@@ -1,5 +1,6 @@
 import { createStore } from 'jotai';
 import { describe, expect, it } from 'vitest';
+import { BACKEND_LOADING_HINT } from '@constants/statusHint.ts';
 import {
   commandMenuDesiredRowsAtom,
   commandMenuDismissedAtom,
@@ -12,7 +13,7 @@ import {
 } from '@state/ui/commands/index.ts';
 import { CommandId } from '@libs/commands/registry.ts';
 import { composerStateAtom } from '@state/ui/composer/index.ts';
-import { BACKEND_LOADING_HINT, startupStatusHintAtom } from '@state/ui/statusHint.ts';
+import { startupStatusHintAtom } from '@state/ui/statusHint.ts';
 
 type Store = ReturnType<typeof createStore>;
 

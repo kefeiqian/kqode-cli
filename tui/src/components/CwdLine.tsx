@@ -1,17 +1,18 @@
 import { Box, Text } from 'ink';
 import { useAtomValue } from 'jotai';
-import { formatCwdLine } from '@libs/tui/cwdLine.ts';
-import { gitStatusLabelAtom } from '@state/ui/index.ts';
+import { renderCwdLine } from '@libs/tui/cwdLine.ts';
+import { chromeColumnsAtom, gitStatusAtom } from '@state/ui/index.ts';
 import { workspaceCwdAtom } from '@state/global/index.ts';
 import { theme } from '@theme/themeConfig.ts';
 
 export function CwdLine() {
   const workspaceCwd = useAtomValue(workspaceCwdAtom);
-  const gitStatusLabel = useAtomValue(gitStatusLabelAtom);
+  const gitStatus = useAtomValue(gitStatusAtom);
+  const columns = useAtomValue(chromeColumnsAtom);
 
   return (
-    <Box>
-      <Text color={theme.colors.foreground}>{formatCwdLine(workspaceCwd, gitStatusLabel)}</Text>
+    <Box width={columns}>
+      <Text color={theme.colors.foreground}>{renderCwdLine(workspaceCwd, gitStatus)}</Text>
     </Box>
   );
 }

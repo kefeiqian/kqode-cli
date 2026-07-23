@@ -7,18 +7,23 @@ import { App } from '@/App.tsx';
 import { BodyPane } from '@components/BodyPane.tsx';
 import { formatDisplayCwd } from '@libs/tui/cwdLine.ts';
 import type { BodyEntry } from '@libs/tui/bodyRows.ts';
+import type { GitStatus } from '@contracts/backend/index.ts';
 import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
 import {
   bodyEntriesAtom,
   columnsTestOverrideAtom,
-  gitStatusLabelTestOverrideAtom,
+  gitStatusAtom,
   rowsTestOverrideAtom
 } from '@state/ui/index.ts';
 import { productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
+import { composerStateAtom } from '@state/ui/composer/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 import { theme } from '@theme/themeConfig.ts';
 
+// Build the workspace under the real home dir (not a hard-coded C:\ string) so
+// formatDisplayCwd collapses it to a `~`-relative path on every OS, keeping the
+// cwd-row assertions valid on the Linux CI runner as well as Windows.
 const workspaceCwd = path.join(os.homedir(), 'Projects', 'KQode');
 const displayCwd = `~${path.sep}${path.join('Projects', 'KQode')}`;
 const projectsKQode = path.join('Projects', 'KQode');
@@ -26,7 +31,7 @@ const projectsKQode = path.join('Projects', 'KQode');
 type RenderHomeScreenOptions = {
   productVersion?: string;
   workspaceCwd?: string;
-  gitStatusLabel?: string;
+  gitStatus?: GitStatus;
   columns?: number;
   rows?: number;
   bodyEntries?: readonly BodyEntry[];
@@ -35,7 +40,7 @@ type RenderHomeScreenOptions = {
 function renderHomeScreen({
   productVersion = '0.1.0',
   workspaceCwd: screenWorkspaceCwd = workspaceCwd,
-  gitStatusLabel,
+  gitStatus,
   columns,
   rows,
   bodyEntries
@@ -43,8 +48,8 @@ function renderHomeScreen({
   const store = createStore();
   store.set(productVersionAtom, productVersion);
   store.set(workspaceCwdAtom, screenWorkspaceCwd);
-  if (gitStatusLabel !== undefined) {
-    store.set(gitStatusLabelTestOverrideAtom, gitStatusLabel);
+  if (gitStatus !== undefined) {
+    store.set(gitStatusAtom, gitStatus);
   }
   if (columns !== undefined) {
     store.set(columnsTestOverrideAtom, columns);
@@ -55,7 +60,7 @@ function renderHomeScreen({
   if (bodyEntries !== undefined) {
     store.set(bodyEntriesAtom, bodyEntries);
   }
-  return renderWithJotai(<App />, store);
+  return { store, ...renderWithJotai(<App />, store) };
 }
 
 describe('HomeScreen', () => {
@@ -211,9 +216,12 @@ describe('HomeScreen', () => {
     expect(outputRows.at(2)).toContain('  IJKLMNOPQRSTUVWXYZ');
   });
 
-  it('formats the cwd row with a home-relative path and bracketed git status', () => {
+  it('formats the cwd row with home-relative path and git status', () => {
     const { lastFrame } = renderHomeScreen({
-      gitStatusLabel: '⎇ feat/first-ink-tui-jsonrpc-backend*+%',
+      gitStatus: {
+        label: '⎇ feat/first-ink-tui-jsonrpc-backend*+%',
+        pullRequestLabel: '#3'
+      },
       columns: 100,
       rows: 20
     });
@@ -221,8 +229,28 @@ describe('HomeScreen', () => {
     const output = lastFrame() ?? '';
 
     expect(formatDisplayCwd(workspaceCwd)).toBe(displayCwd);
-    expect(output).toContain(`${displayCwd} [⎇ feat/first-ink-tui-jsonrpc-backend*+%]`);
+    expect(output).toContain(`${displayCwd} [⎇ feat/first-ink-tui-jsonrpc-backend*+%] [#3]`);
     expect(output).not.toContain('cwd ');
+  });
+
+  it('renders the PR label as a dotted-underline OSC 8 hyperlink when a PR url is present', () => {
+    const { lastFrame } = renderHomeScreen({
+      gitStatus: {
+        label: '⎇ main*',
+        pullRequestLabel: '#3',
+        pullRequestUrl: 'https://github.com/o/r/pull/3'
+      },
+      columns: 100,
+      rows: 20
+    });
+
+    const output = lastFrame() ?? '';
+
+    // OSC 8 hyperlink pointing at the PR, wrapping a #3 that carries a primed
+    // dotted underline (4m then 4:3m) with its 24m reset intact.
+    expect(output).toContain(
+      '\u001B]8;;https://github.com/o/r/pull/3\u0007\u001B[4m\u001B[4:3m#3\u001B[24m'
+    );
   });
 
   it('soft-wraps a long cwd without truncating it', () => {
@@ -284,7 +312,7 @@ describe('HomeScreen', () => {
   });
 
   it('keeps cwd, composer, status hints, and model label visible at the minimum 60x15', async () => {
-    const { lastFrame, stdin } = renderHomeScreen({ columns: 60, rows: 15 });
+    const { lastFrame, stdin, store } = renderHomeScreen({ columns: 60, rows: 15 });
 
     const output = lastFrame() ?? '';
 
@@ -302,17 +330,10 @@ describe('HomeScreen', () => {
 
     const wrappedOutput = lastFrame() ?? '';
     const wrappedRows = wrappedOutput.split('\n');
-    // The composer soft-wraps across rows; rejoining the rows and dropping the
-    // one prompt prefix plus the 2-space padding/indent runs (continuations are
-    // indented under `> `) must reproduce the full typed prompt.
-    const composerFlattened = wrappedRows
-      .map((row) => row.replace(/\s+$/, ''))
-      .join('')
-      .replace(/ {2,}/g, '')
-      .replace('> ', '');
-
     expect(wrappedOutput).not.toContain('...');
-    expect(composerFlattened).toContain(typed);
+    expect(store.get(composerStateAtom).text).toBe(typed);
+    expect(wrappedOutput).toContain('a long prompt that wraps across several visible composer');
+    expect(wrappedOutput).toContain('rows');
     expect(wrappedRows).toHaveLength(15);
     expect(wrappedRows.at(-2)).toContain('▀');
     expect(wrappedRows.at(-1)).toContain('/ commands | @ mention | ? help');
@@ -320,7 +341,11 @@ describe('HomeScreen', () => {
 
   it('soft-wraps long prompts instead of truncating them with an ellipsis', async () => {
     const longPrompt = 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const { lastFrame, stdin } = renderHomeScreen({ bodyEntries: [], columns: 60, rows: 15 });
+    const { lastFrame, stdin } = renderHomeScreen({
+      bodyEntries: [],
+      columns: 60,
+      rows: 15
+    });
 
     stdin.write(longPrompt);
     await flushInput();

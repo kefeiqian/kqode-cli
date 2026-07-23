@@ -1,0 +1,200 @@
+diff --git a/build/cursor-helpers.d.ts b/build/cursor-helpers.d.ts
+index c6e94667f9aef310093d40520fd8611448d0f0b6..8b4d831f2acea9560ca66fab144e8ae1563990d6 100644
+--- a/build/cursor-helpers.d.ts
++++ b/build/cursor-helpers.d.ts
+@@ -11,9 +11,10 @@ Compare two cursor positions. Returns true if they differ.
+ export declare const cursorPositionChanged: (a: CursorPosition | undefined, b: CursorPosition | undefined) => boolean;
+ /**
+ Build escape sequence to move cursor from bottom of output to the target position and show it.
+-Assumes cursor is at (col 0, line visibleLineCount) — i.e. just after the last output line.
++The bottom is the row after output when it has a trailing newline, otherwise it
++is the final visible row.
+ */
+-export declare const buildCursorSuffix: (visibleLineCount: number, cursorPosition: CursorPosition | undefined) => string;
++export declare const buildCursorSuffix: (visibleLineCount: number, cursorPosition: CursorPosition | undefined, hasTrailingNewline: boolean) => string;
+ /**
+ Build escape sequence to move cursor from previousCursorPosition back to the bottom of output.
+ This must be done before eraseLines or any operation that assumes cursor is at the bottom.
+@@ -25,6 +26,7 @@ export type CursorOnlyInput = {
+     previousCursorPosition: CursorPosition | undefined;
+     visibleLineCount: number;
+     cursorPosition: CursorPosition | undefined;
++    hasTrailingNewline: boolean;
+ };
+ /**
+ Build the escape sequence for cursor-only updates (output unchanged, cursor moved).
+diff --git a/build/cursor-helpers.js b/build/cursor-helpers.js
+index be493545f0a22d2972a36ad858d2e4bbc4c9326a..632dac9131cc463988e526779c7b604753832e1e 100644
+--- a/build/cursor-helpers.js
++++ b/build/cursor-helpers.js
+@@ -8,13 +8,15 @@ Compare two cursor positions. Returns true if they differ.
+ export const cursorPositionChanged = (a, b) => a?.x !== b?.x || a?.y !== b?.y;
+ /**
+ Build escape sequence to move cursor from bottom of output to the target position and show it.
+-Assumes cursor is at (col 0, line visibleLineCount) — i.e. just after the last output line.
++The bottom is the row after output when it has a trailing newline, otherwise it
++is the final visible row.
+ */
+-export const buildCursorSuffix = (visibleLineCount, cursorPosition) => {
++export const buildCursorSuffix = (visibleLineCount, cursorPosition, hasTrailingNewline) => {
+     if (!cursorPosition) {
+         return '';
+     }
+-    const moveUp = visibleLineCount - cursorPosition.y;
++    const bottomRow = visibleLineCount - (hasTrailingNewline ? 0 : 1);
++    const moveUp = bottomRow - cursorPosition.y;
+     return ((moveUp > 0 ? ansiEscapes.cursorUp(moveUp) : '') +
+         ansiEscapes.cursorTo(cursorPosition.x) +
+         showCursorEscape);
+@@ -39,7 +41,7 @@ Hides cursor if it was previously shown, returns to bottom, then repositions.
+ export const buildCursorOnlySequence = (input) => {
+     const hidePrefix = input.cursorWasShown ? hideCursorEscape : '';
+     const returnToBottom = buildReturnToBottom(input.previousLineCount, input.previousCursorPosition);
+-    const cursorSuffix = buildCursorSuffix(input.visibleLineCount, input.cursorPosition);
++    const cursorSuffix = buildCursorSuffix(input.visibleLineCount, input.cursorPosition, input.hasTrailingNewline);
+     return hidePrefix + returnToBottom + cursorSuffix;
+ };
+ /**
+diff --git a/build/ink.js b/build/ink.js
+index 24d45ece46acbc2765c9da2f2d39c2b620f9a504..0082666b281ec2db77b875d6b8460bcc19a59ce7 100644
+--- a/build/ink.js
++++ b/build/ink.js
+@@ -765,7 +765,7 @@ export default class Ink {
+             if (sync) {
+                 this.options.stdout.write(bsu);
+             }
+-            this.options.stdout.write(ansiEscapes.clearTerminal + this.fullStaticOutput + output);
++            this.options.stdout.write(ansiEscapes.clearTerminal + this.fullStaticOutput + outputToRender);
+             this.lastOutput = output;
+             this.lastOutputToRender = outputToRender;
+             this.lastOutputHeight = outputHeight;
+diff --git a/build/log-update.js b/build/log-update.js
+index cdb5fc41f158304c4c4f230a765065ab1fe0a2f7..ece0ab329f7951f2110ebd4d80edb486cca25264 100644
+--- a/build/log-update.js
++++ b/build/log-update.js
+@@ -32,7 +32,8 @@ const createStandard = (stream, { showCursor = false } = {}) => {
+         }
+         const lines = str.split('\n');
+         const visibleCount = visibleLineCount(lines, str);
+-        const cursorSuffix = buildCursorSuffix(visibleCount, activeCursor);
++        const hasTrailingNewline = str.endsWith('\n');
++        const cursorSuffix = buildCursorSuffix(visibleCount, activeCursor, hasTrailingNewline);
+         if (str === previousOutput && cursorChanged) {
+             stream.write(buildCursorOnlySequence({
+                 cursorWasShown,
+@@ -40,6 +41,7 @@ const createStandard = (stream, { showCursor = false } = {}) => {
+                 previousCursorPosition,
+                 visibleLineCount: visibleCount,
+                 cursorPosition: activeCursor,
++                hasTrailingNewline,
+             }));
+         }
+         else {
+@@ -89,7 +91,7 @@ const createStandard = (stream, { showCursor = false } = {}) => {
+             stream.write(hideCursorEscape);
+         }
+         if (activeCursor) {
+-            stream.write(buildCursorSuffix(visibleLineCount(lines, str), activeCursor));
++            stream.write(buildCursorSuffix(visibleLineCount(lines, str), activeCursor, str.endsWith('\n')));
+         }
+         previousCursorPosition = activeCursor ? { ...activeCursor } : undefined;
+         cursorWasShown = activeCursor !== undefined;
+@@ -131,6 +133,7 @@ const createIncremental = (stream, { showCursor = false } = {}) => {
+         const nextLines = str.split('\n');
+         const visibleCount = visibleLineCount(nextLines, str);
+         const previousVisible = visibleLineCount(previousLines, previousOutput);
++        const hasTrailingNewline = str.endsWith('\n');
+         if (str === previousOutput && cursorChanged) {
+             stream.write(buildCursorOnlySequence({
+                 cursorWasShown,
+@@ -138,6 +141,7 @@ const createIncremental = (stream, { showCursor = false } = {}) => {
+                 previousCursorPosition,
+                 visibleLineCount: visibleCount,
+                 cursorPosition: activeCursor,
++                hasTrailingNewline,
+             }));
+             previousCursorPosition = activeCursor ? { ...activeCursor } : undefined;
+             cursorWasShown = activeCursor !== undefined;
+@@ -145,7 +149,7 @@ const createIncremental = (stream, { showCursor = false } = {}) => {
+         }
+         const returnPrefix = buildReturnToBottomPrefix(cursorWasShown, previousLines.length, previousCursorPosition);
+         if (str === '\n' || previousOutput.length === 0) {
+-            const cursorSuffix = buildCursorSuffix(visibleCount, activeCursor);
++            const cursorSuffix = buildCursorSuffix(visibleCount, activeCursor, hasTrailingNewline);
+             stream.write(returnPrefix +
+                 ansiEscapes.eraseLines(previousLines.length) +
+                 str +
+@@ -156,7 +160,6 @@ const createIncremental = (stream, { showCursor = false } = {}) => {
+             previousLines = nextLines;
+             return true;
+         }
+-        const hasTrailingNewline = str.endsWith('\n');
+         // We aggregate all chunks for incremental rendering into a buffer, and then write them to stdout at the end.
+         const buffer = [];
+         buffer.push(returnPrefix);
+@@ -187,7 +190,7 @@ const createIncremental = (stream, { showCursor = false } = {}) => {
+                 // has no trailing newline (fullscreen mode).
+                 (isLastLine && !hasTrailingNewline ? '' : '\n'));
+         }
+-        const cursorSuffix = buildCursorSuffix(visibleCount, activeCursor);
++        const cursorSuffix = buildCursorSuffix(visibleCount, activeCursor, hasTrailingNewline);
+         buffer.push(cursorSuffix);
+         stream.write(buffer.join(''));
+         cursorWasShown = activeCursor !== undefined;
+@@ -230,7 +233,7 @@ const createIncremental = (stream, { showCursor = false } = {}) => {
+             stream.write(hideCursorEscape);
+         }
+         if (activeCursor) {
+-            stream.write(buildCursorSuffix(visibleLineCount(lines, str), activeCursor));
++            stream.write(buildCursorSuffix(visibleLineCount(lines, str), activeCursor, str.endsWith('\n')));
+         }
+         previousCursorPosition = activeCursor ? { ...activeCursor } : undefined;
+         cursorWasShown = activeCursor !== undefined;
+diff --git a/build/parse-keypress.js b/build/parse-keypress.js
+index e5129a11311e3fefff156aa22404ecfe52e15ba9..7092088e2d3638fe28fa35db70c9f21a07e76440 100644
+--- a/build/parse-keypress.js
++++ b/build/parse-keypress.js
+@@ -127,6 +127,8 @@ const kittyKeyRe = /^\x1b\[(\d+)(?:;(\d+)(?::(\d+))?(?:;([\d:]+))?)?u$/;
+ // These are legacy CSI sequences enhanced with the :eventType field.
+ // Examples: \x1b[1;1:1A (up arrow press), \x1b[3;1:3~ (delete release)
+ const kittySpecialKeyRe = /^\x1b\[(\d+);(\d+):(\d+)([A-Za-z~])$/;
++// xterm modifyOtherKeys: CSI 27 ; modifiers ; codepoint ~
++const modifyOtherKeysRe = /^\x1b\[27;(\d+);(\d+)~$/;
+ // Letter-terminated special key names (CSI 1 ; mods letter)
+ const kittySpecialLetterKeys = {
+     A: 'up',
+@@ -277,6 +279,24 @@ function parseKittyModifiers(modifiers) {
+         numLock: !!(modifiers & kittyModifiers.numLock),
+     };
+ }
++const parseModifyOtherKeys = (s) => {
++    const match = modifyOtherKeysRe.exec(s);
++    if (!match)
++        return null;
++    const modifiers = Math.max(0, parseInt(match[1], 10) - 1);
++    const codepoint = parseInt(match[2], 10);
++    if (codepoint !== 13) {
++        return null;
++    }
++    return {
++        name: 'return',
++        ...parseKittyModifiers(modifiers),
++        sequence: s,
++        raw: s,
++        isPrintable: true,
++        text: '\r',
++    };
++};
+ const parseKittyKeypress = (s) => {
+     const match = kittyKeyRe.exec(s);
+     if (!match)
+@@ -380,6 +400,9 @@ const parseKeypress = (s = '') => {
+     else if (!s) {
+         s = '';
+     }
++    const modifyOtherKeysResult = parseModifyOtherKeys(s);
++    if (modifyOtherKeysResult)
++        return modifyOtherKeysResult;
+     // Try kitty keyboard protocol parsers first
+     const kittyResult = parseKittyKeypress(s);
+     if (kittyResult)

@@ -1,6 +1,10 @@
 import { Box, Text } from 'ink';
 import { useAtomValue } from 'jotai';
-import { columnsAtom, MIN_USABLE_TERMINAL_COLUMNS, MIN_USABLE_TERMINAL_ROWS } from '@state/ui/index.ts';
+import {
+  MIN_USABLE_TERMINAL_COLUMNS,
+  MIN_USABLE_TERMINAL_ROWS
+} from '@constants/ui.ts';
+import { columnsAtom } from '@state/ui/index.ts';
 import { theme } from '@theme/themeConfig.ts';
 
 /**
