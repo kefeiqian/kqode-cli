@@ -19,6 +19,7 @@ export default defineConfig({
       '@components': path.join(srcRoot, 'components'),
       '@constants': path.join(srcRoot, 'constants'),
       '@contracts': path.join(srcRoot, 'contracts'),
+      '@hooks': path.join(srcRoot, 'hooks'),
       '@libs': path.join(srcRoot, 'libs'),
       '@state': path.join(srcRoot, 'state'),
       '@test': path.join(srcRoot, 'test'),

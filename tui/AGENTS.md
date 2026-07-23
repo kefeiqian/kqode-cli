@@ -6,6 +6,22 @@ Split TUI source files into focused modules before they grow beyond 200 lines. P
 
 Prefer Jotai atoms/selectors over drilling HomeScreen config or shared TUI state through multiple component layers. When a leaf component is specific to the stateful TUI shell, read shared screen state from atoms near that leaf instead of threading config props through intermediate wrappers.
 
+Keep dependencies flowing in one direction:
+
+```text
+constants / contracts / theme
+  -> libs / backend
+  -> state / hooks
+  -> components
+  -> App / bootstrap / cli
+```
+
+Modules in the same layer may depend on one another only when the resulting graph stays acyclic. Keep architecture boundaries executable through the Vitest guard in `src/__tests__/architecture.test.ts`; existing exceptions belong in its explicit baselines and each migration should reduce those baselines.
+
+Files under `src/components/` may export React components only. Move hooks to `src/hooks/`, pure functions and shared types to domain-focused `src/libs/` modules, and stateful atoms/selectors to `src/state/`. Do not expose component internals only for tests: verify simple logic through component behavior, or move substantial pure logic to `src/libs/` so production code and tests share the same public function.
+
+Use `src/constants/` only for dependency-free immutable static data such as strings, numbers, readonly arrays/objects, and enum-like values. Constants modules must not import from other project layers, create mutable collections such as `Set` or `Map`, or contain runtime calculation functions.
+
 ## Terminal layout
 
 Keep the cwd row, prompt composer, and command/status row stuck to the bottom of the terminal for every shell window size. Keep exactly one blank separator row between the body area and cwd row, but do not let body, preview, or header content push gaps between the composer and the command/status row.

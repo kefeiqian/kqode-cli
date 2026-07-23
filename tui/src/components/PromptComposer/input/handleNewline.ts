@@ -1,4 +1,4 @@
-import { MODIFIED_ENTER_INPUTS } from '@components/PromptComposer/constants.ts';
+import { MODIFIED_ENTER_INPUTS } from '@constants/ui.ts';
 import type { ComposerKeyContext, ComposerKeyHandler } from '@components/PromptComposer/input/types.ts';
 import { deleteComposerBackwardAtom, insertComposerTextAtom } from '@state/ui/composer/index.ts';
 
@@ -25,7 +25,7 @@ export const handleNewline: ComposerKeyHandler = (context) => {
 };
 
 function classifyNewlineInput({ input, key, state }: ComposerKeyContext): PromptNewlineInput | null {
-  if (MODIFIED_ENTER_INPUTS.has(input)) {
+  if (MODIFIED_ENTER_INPUTS.includes(input)) {
     return 'insert-newline';
   }
 

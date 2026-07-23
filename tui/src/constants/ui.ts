@@ -16,6 +16,14 @@ export const DEFAULT_COMPOSER_VISIBLE_LINES = 3;
 
 export const PROMPT_PREFIX = '> ';
 
+/** Terminal input sequences emitted for modified Enter combinations. */
+export const MODIFIED_ENTER_INPUTS: readonly string[] = [
+  '\u001B[13;2u',
+  '\u001B[13;3u',
+  '\u001B[13;5u',
+  '\u001B[13;6u'
+];
+
 // The app fills the terminal exactly (FULLSCREEN_GUARD_ROWS = 0), so Ink treats
 // each frame as fullscreen, omits its trailing newline, and shifts the cursor
 // baseline up one row. This offset adds that row back so the measured composer
