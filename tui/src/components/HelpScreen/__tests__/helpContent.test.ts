@@ -3,7 +3,7 @@ import {
   buildCommandSection,
   buildHelpSections,
   flattenHelpLines
-} from '@components/HelpScreen/helpContent.ts';
+} from '@libs/help/helpContent.ts';
 import { COMMAND_REGISTRY } from '@libs/commands/registry.ts';
 
 describe('helpContent', () => {

@@ -1,7 +1,7 @@
 import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import { MOUSE_WHEEL_SCROLL_ROWS } from '@constants/ui.ts';
-import { handleWheelScroll } from '@components/HomeScreen/wheelScroll.ts';
+import { handleWheelScroll } from '@hooks/homeScreen/handleWheelScroll.ts';
 import {
   bodyEntriesAtom,
   bodyScrollOffsetRowsAtom,

@@ -22,19 +22,7 @@ const componentExportBaseline = [
   'components/AppExitSummary/resolveSessionSeed.ts:SessionSeed',
   'components/AppExitSummary/resolveSessionSeed.ts:resolveSessionSeed',
   'components/AppExitSummary/types.ts:Colorize',
-  'components/AppExitSummary/types.ts:ExitSummaryData',
-  'components/HelpScreen/helpContent.ts:HelpEntry',
-  'components/HelpScreen/helpContent.ts:HelpLine',
-  'components/HelpScreen/helpContent.ts:HelpSection',
-  'components/HelpScreen/helpContent.ts:buildCommandSection',
-  'components/HelpScreen/helpContent.ts:buildHelpSections',
-  'components/HelpScreen/helpContent.ts:flattenHelpLines',
-  'components/HomeScreen/useComposerCaretRefresh.ts:useComposerCaretRefresh',
-  'components/HomeScreen/usePullRequestClick.ts:usePullRequestClick',
-  'components/HomeScreen/wheelRouting.ts:WheelTarget',
-  'components/HomeScreen/wheelRouting.ts:isPointerOverComposer',
-  'components/HomeScreen/wheelRouting.ts:resolveWheelTarget',
-  'components/HomeScreen/wheelScroll.ts:handleWheelScroll'
+  'components/AppExitSummary/types.ts:ExitSummaryData'
 ];
 
 const layerViolationBaseline = [

@@ -1,6 +1,6 @@
 import type { createStore } from 'jotai';
 import { MOUSE_WHEEL_SCROLL_ROWS } from '@constants/ui.ts';
-import { resolveWheelTarget } from '@components/HomeScreen/wheelRouting.ts';
+import { resolveWheelTarget } from '@libs/tui/wheelRouting.ts';
 import type { MouseWheelEvent } from '@libs/terminal/mouse.ts';
 import {
   composerCanScrollAtom,

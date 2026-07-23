@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isPointerOverComposer, resolveWheelTarget } from '@components/HomeScreen/wheelRouting.ts';
+import { isPointerOverComposer, resolveWheelTarget } from '@libs/tui/wheelRouting.ts';
 
 // rows = 24; composer block top at 0-based row 18; status row = 23.
 const composerTop = 18;

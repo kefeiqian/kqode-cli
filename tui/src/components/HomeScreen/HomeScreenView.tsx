@@ -12,9 +12,9 @@ import {
   ENABLE_SGR_MOUSE_TRACKING,
   parseMouseInputEvents
 } from '@libs/terminal/mouse.ts';
-import { handleWheelScroll } from '@components/HomeScreen/wheelScroll.ts';
-import { useComposerCaretRefresh } from '@components/HomeScreen/useComposerCaretRefresh.ts';
-import { usePullRequestClick } from '@components/HomeScreen/usePullRequestClick.ts';
+import { handleWheelScroll } from '@hooks/homeScreen/handleWheelScroll.ts';
+import { useComposerCaretRefresh } from '@hooks/homeScreen/useComposerCaretRefresh.ts';
+import { usePullRequestClick } from '@hooks/homeScreen/usePullRequestClick.ts';
 import { resolveClickResult } from '@libs/composer/composerWindow.ts';
 import { BODY_CWD_GAP_ROWS } from '@libs/tui/layout.ts';
 import {
