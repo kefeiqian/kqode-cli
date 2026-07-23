@@ -133,26 +133,25 @@ describe('PromptComposer', () => {
   });
 
   it('places the terminal cursor on the active composer row instead of the cwd row', () => {
-    // y = composerTop(7) + background-top-pad(1) + cursor-row + INK_CURSOR_ROW_ORIGIN_OFFSET(1, fullscreen)
-    expect(resolveComposerCursorPosition('', 38, 7)).toEqual({ x: 2, y: 9 });
-    expect(resolveComposerCursorPosition('123', 38, 7)).toEqual({ x: 5, y: 9 });
+    expect(resolveComposerCursorPosition('', 38, 7)).toEqual({ x: 2, y: 8 });
+    expect(resolveComposerCursorPosition('123', 38, 7)).toEqual({ x: 5, y: 8 });
   });
 
   it('places the terminal cursor using display width for wide glyphs', () => {
-    expect(resolveComposerCursorPosition('界a', 38, 7)).toEqual({ x: 5, y: 9 });
+    expect(resolveComposerCursorPosition('界a', 38, 7)).toEqual({ x: 5, y: 8 });
   });
 
   it('places the terminal cursor on the active authored multiline composer row', () => {
-    expect(resolveComposerCursorPosition('first\nsecond', 38, 7)).toEqual({ x: 8, y: 10 });
+    expect(resolveComposerCursorPosition('first\nsecond', 38, 7)).toEqual({ x: 8, y: 9 });
   });
 
   it('places the terminal cursor on the active soft-wrapped composer row', () => {
     const visibleText = 'abcdefgh\nijklmnop';
-    expect(resolveComposerCursorPosition(visibleText, 8, 7)).toEqual({ x: 10, y: 10 });
+    expect(resolveComposerCursorPosition(visibleText, 8, 7)).toEqual({ x: 10, y: 9 });
   });
 
   it('places the terminal cursor at an authored middle position', () => {
-    expect(resolveComposerCursorPosition('abcd', 38, 7, 2)).toEqual({ x: 4, y: 9 });
+    expect(resolveComposerCursorPosition('abcd', 38, 7, 2)).toEqual({ x: 4, y: 8 });
   });
 
   it('submits exact non-empty text with leading and trailing spaces, then clears', async () => {

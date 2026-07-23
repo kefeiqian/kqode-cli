@@ -34,9 +34,10 @@ export const chromeColumnsAtom = atom((get) => resolveChromeColumns(get(columnsA
  * fullscreen and, on terminals that do not coalesce the clear, forces a
  * whole-screen clear (`ESC[2J ESC[3J`) and full repaint on **every** keystroke
  * (WezTerm blinks; Windows Terminal does not). Fullscreen frames also make Ink
- * omit its trailing newline and shift the cursor baseline up one row, which
- * {@link INK_CURSOR_ROW_ORIGIN_OFFSET} adds back. Raise this to `1` to restore
- * the incremental, non-fullscreen path (one blank row, no per-keystroke clear).
+ * omit its trailing newline. KQode patches Ink's cursor renderer to use the
+ * actual final visible row as the fullscreen baseline. Raise this to `1` to
+ * restore the incremental, non-fullscreen path (one blank row, no per-keystroke
+ * clear).
  */
 /**
  * Rows the UI renders into. Production subtracts {@link FULLSCREEN_GUARD_ROWS}

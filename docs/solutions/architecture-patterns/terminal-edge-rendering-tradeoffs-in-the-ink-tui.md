@@ -67,11 +67,12 @@ const isFullscreen = isTty && outputHeight >= viewportRows;
 const outputToRender = isFullscreen ? output : output + '\n';
 ```
 
-The omitted newline shifts Ink's cursor baseline up one row. KQode compensates
-with `INK_CURSOR_ROW_ORIGIN_OFFSET` (`tui/src/constants/ui.ts`), which **must
-move in lockstep** with the guard row: fullscreen (`FULLSCREEN_GUARD_ROWS = 0`)
-→ offset `1`; non-fullscreen (`FULLSCREEN_GUARD_ROWS = 1`) → offset `0`. Change
-one without the other and the prompt cursor drifts one row off the composer.
+The omitted newline means the physical bottom is the final visible row rather
+than a row after the output. Ink 7.1's cursor helper assumed the latter for both
+paths. A `+1` application offset corrected the initial render but poisoned the
+stored previous position: every cursor-only Left/Right update then drifted one
+row upward, and Up moved two rows. KQode now patches Ink's no-newline baseline
+directly (`tui/patches/ink@7.1.0.patch`) and uses unadjusted cursor coordinates.
 
 ### On Windows, fullscreen frames force a full clear + repaint every frame
 
@@ -129,11 +130,11 @@ On Windows you cannot have both on WezTerm:
 | Non-fullscreen (guard row `= 1`) | No blink | No — incremental `ESC[K` clips the last column of rewritten rows on WezTerm |
 
 **Updated decision:** keep the full-height canvas unconditionally
-(`FULLSCREEN_GUARD_ROWS = 0`, `INK_CURSOR_ROW_ORIGIN_OFFSET = 1`, no per-terminal
-branching), but reserve the status bar's final cell with `paddingRight={1}`.
-Its background still paints the full row, so the surface looks edge-to-edge
-while the right-aligned model label does not depend on final-cell glyph support.
-Only the body pane uses the last column for scrollbar chrome.
+(`FULLSCREEN_GUARD_ROWS = 0`, patched Ink cursor baseline, no per-terminal
+branching), but reserve the final cell from non-body chrome through the shared
+`chromeColumnsAtom`. Composer wrapping, cwd layout, status text, clicks, and
+caret scrolling all use that guarded width; only the body pane uses the physical
+last column for scrollbar chrome.
 
 ## Why This Matters
 
@@ -153,9 +154,8 @@ Only the body pane uses the last column for scrollbar chrome.
 
 ## When to Apply
 
-- Before changing `FULLSCREEN_GUARD_ROWS`, always change
-  `INK_CURSOR_ROW_ORIGIN_OFFSET` in lockstep and visually verify the cursor lands
-  on the composer row (no unit test covers this).
+- When upgrading Ink, reapply or retire the checked-in cursor-baseline patch only
+  after `inkCursorPatch.test.ts` and live fullscreen cursor navigation pass.
 - When a full-width bar/bubble does not reach the right edge, prefer a
   `<Box width={columns} backgroundColor>` over a bare `<Text>`.
 - When diagnosing per-keystroke flicker on Windows, check whether frames are
@@ -169,22 +169,20 @@ Guard row and cursor offset move together (`tui/src/state/ui/dimensions.ts`,
 `tui/src/constants/ui.ts`):
 
 ```ts
-// Edge-to-edge (current): fills full height, Ink renders fullscreen frames.
-export const FULLSCREEN_GUARD_ROWS = 0;        // dimensions.ts
-export const INK_CURSOR_ROW_ORIGIN_OFFSET = 1; // constants/ui.ts
+// Edge-to-edge (current): fills full height; the Ink patch handles the
+// no-trailing-newline cursor baseline.
+export const FULLSCREEN_GUARD_ROWS = 0;
 
-// Revert knob: reserve one row to stay non-fullscreen (no Windows repaint blink).
+// Revert knob: reserve one row to stay non-fullscreen.
 // export const FULLSCREEN_GUARD_ROWS = 1;
-// export const INK_CURSOR_ROW_ORIGIN_OFFSET = 0;
 ```
 
-Status bar reaching the final column (`tui/src/components/StatusBar.tsx`):
+Guarded non-body chrome (`tui/src/state/ui/dimensions.ts`):
 
-```tsx
-// The background fills the row; the final cell stays free of meaningful text.
-<Box width={columns} paddingRight={1} backgroundColor={bodyBackground}>
-  {/* ...hints... model label ... */}
-</Box>
+```ts
+export const chromeColumnsAtom = atom((get) =>
+  resolveChromeColumns(get(columnsAtom))
+);
 ```
 
 Observed on WezTerm-on-Windows with `FULLSCREEN_GUARD_ROWS = 1`: no flicker, but
