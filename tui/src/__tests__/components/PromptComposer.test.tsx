@@ -1,6 +1,7 @@
 import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import { Box } from 'ink';
+import { LOWER_HALF_BLOCK, UPPER_HALF_BLOCK } from '@libs/tui/backgroundBlock.ts';
 import { PromptComposer } from '@components/PromptComposer/index.tsx';
 import { resolveComposerCursorPosition } from '@libs/composer/cursorPosition.ts';
 import { enqueuePromptAtom } from '@state/promptQueue/index.ts';
@@ -25,6 +26,14 @@ describe('PromptComposer', () => {
     for (const line of (lastFrame() ?? '').split('\n')) {
       expect(line.length).toBeLessThanOrEqual(19);
     }
+  });
+
+  it('uses inverse half-blocks so the input-colored half is background-filled', () => {
+    const { lastFrame } = renderWithJotai(<PromptComposer columns={20} />);
+    const lines = (lastFrame() ?? '').split('\n');
+
+    expect(lines[0]).toBe(UPPER_HALF_BLOCK.repeat(19));
+    expect(lines.at(-1)).toBe(LOWER_HALF_BLOCK.repeat(19));
   });
 
   it('reserves one background column as right padding inside the composer', async () => {

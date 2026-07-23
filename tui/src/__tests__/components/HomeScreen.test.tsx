@@ -158,9 +158,9 @@ describe('HomeScreen', () => {
 
     expect(cwdRow).toBe(11);
     expect(outputRows.at(cwdRow - 1)).toBe('');
-    expect(outputRows.at(cwdRow + 1)).toContain('▄');
+    expect(outputRows.at(cwdRow + 1)).toContain('▀');
     expect(outputRows.at(cwdRow + 2)).toContain('>');
-    expect(outputRows.at(cwdRow + 3)).toContain('▀');
+    expect(outputRows.at(cwdRow + 3)).toContain('▄');
     expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
   });
 
@@ -291,7 +291,7 @@ describe('HomeScreen', () => {
 
     expect(outputRows.at(cwdRow - 1)).toBe('');
     expect(outputRows.at(cwdRow - 2)).toContain('entry 10');
-    expect(outputRows.at(cwdRow + 1)).toContain('▄');
+    expect(outputRows.at(cwdRow + 1)).toContain('▀');
     expect(outputRows.at(cwdRow + 2)).toContain('>');
   });
 
@@ -335,7 +335,7 @@ describe('HomeScreen', () => {
     expect(wrappedOutput).toContain('a long prompt that wraps across several visible composer');
     expect(wrappedOutput).toContain('rows');
     expect(wrappedRows).toHaveLength(15);
-    expect(wrappedRows.at(-2)).toContain('▀');
+    expect(wrappedRows.at(-2)).toContain('▄');
     expect(wrappedRows.at(-1)).toContain('/ commands | @ mention | ? help');
   });
 
@@ -360,7 +360,7 @@ describe('HomeScreen', () => {
 
     expect(output).not.toContain('...');
     expect(composerFlattened).toContain(longPrompt);
-    expect(outputRows.at(-2)).toContain('▀');
+    expect(outputRows.at(-2)).toContain('▄');
     expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
   });
 
