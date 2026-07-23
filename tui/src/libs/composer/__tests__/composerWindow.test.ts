@@ -97,6 +97,13 @@ describe('resolveVerticalCursorIndex', () => {
     expect(resolveVerticalCursorIndex('abcdefghij', 4, 6, 'up')).toBe(2);
   });
 
+  it('treats a soft-wrap boundary as the start of the following visual row', () => {
+    const text = 'abcdefghijkl';
+
+    expect(resolveVerticalCursorIndex(text, 4, 4, 'up')).toBe(0);
+    expect(resolveVerticalCursorIndex(text, 4, 4, 'down')).toBe(8);
+  });
+
   it('preserves the visual column across wide glyphs', () => {
     expect(resolveVerticalCursorIndex('界a\n123', 40, 2, 'down')).toBe(6);
   });

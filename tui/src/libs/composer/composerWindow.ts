@@ -153,10 +153,28 @@ function resolveWindowBounds(
 }
 
 function resolveCursorRowIndex(rows: WrappedPromptRow[], cursorIndex: number): number {
-  return Math.max(
-    0,
-    rows.findIndex((row) => cursorIndex >= row.start && cursorIndex <= row.end)
-  );
+  return findCursorRowIndex(rows, cursorIndex) ?? 0;
+}
+
+function findCursorRowIndex(
+  rows: readonly WrappedPromptRow[],
+  cursorIndex: number
+): number | null {
+  for (const [index, row] of rows.entries()) {
+    if (cursorIndex < row.start || cursorIndex > row.end) {
+      continue;
+    }
+
+    const next = rows[index + 1];
+    const isSharedSoftWrapBoundary =
+      cursorIndex === row.end &&
+      row.start !== row.end &&
+      next?.start === cursorIndex;
+    if (!isSharedSoftWrapBoundary) {
+      return index;
+    }
+  }
+  return null;
 }
 
 export type VerticalDirection = 'up' | 'down';
@@ -190,15 +208,17 @@ export function resolveVerticalCursorIndex(
 }
 
 function resolveVisibleCursorIndex(rows: WrappedPromptRow[], cursorIndex: number): number {
-  let visibleCursorIndex = 0;
-
-  for (const row of rows) {
-    if (cursorIndex >= row.start && cursorIndex <= row.end) {
-      return visibleCursorIndex + Math.min(row.text.length, cursorIndex - row.start);
-    }
-
-    visibleCursorIndex += row.text.length + 1;
+  const cursorRowIndex = findCursorRowIndex(rows, cursorIndex);
+  if (cursorRowIndex === null) {
+    return Math.max(
+      0,
+      rows.reduce((length, row) => length + row.text.length + 1, 0) - 1
+    );
   }
 
-  return Math.max(0, visibleCursorIndex - 1);
+  const precedingLength = rows
+    .slice(0, cursorRowIndex)
+    .reduce((length, row) => length + row.text.length + 1, 0);
+  const row = rows[cursorRowIndex];
+  return precedingLength + Math.min(row.text.length, cursorIndex - row.start);
 }
