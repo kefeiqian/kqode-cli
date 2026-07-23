@@ -50,12 +50,18 @@ describe('analyzeArchitecture', () => {
       'delete value.key;'
     ].join('\n'));
     write(root, 'src/state/example.ts', [
-      "import { atom } from 'jotai';",
+      "import { atom as jotaiAtom } from 'jotai';",
       'export type State = { value: number };',
-      'export const valueAtom = atom(0);',
+      'export const valueAtom = (jotaiAtom(0) as unknown);',
       'export const DEFAULT_VALUE = 0;',
       'export function calculate() { return 1; }'
     ].join('\n'));
+    write(root, 'src/state/fake.ts', [
+      'const atom = (value: number) => value;',
+      'export const fakeAtom = atom(0);'
+    ].join('\n'));
+    write(root, 'src/state/index.ts', "export * from '@libs/helper.ts';\n");
+    write(root, 'src/libs/helper.ts', 'export const helper = 1;\n');
 
     const report = analyzeArchitecture(path.join(root, 'src'));
 
@@ -75,7 +81,9 @@ describe('analyzeArchitecture', () => {
     ]));
     expect(report.stateExportViolations).toEqual([
       'state/example.ts:DEFAULT_VALUE',
-      'state/example.ts:calculate'
+      'state/example.ts:calculate',
+      'state/fake.ts:fakeAtom',
+      'state/index.ts:*'
     ]);
   });
 });
@@ -91,7 +99,8 @@ function fixtureRoot(): string {
       moduleResolution: 'NodeNext',
       paths: {
         '@/*': ['./src/*'],
-        '@components/*': ['./src/components/*']
+        '@components/*': ['./src/components/*'],
+        '@libs/*': ['./src/libs/*']
       }
     },
     include: ['main.tsx', 'src/**/*.ts', 'src/**/*.tsx']
