@@ -39,6 +39,21 @@ describe('resolveBodyRows hard line breaks', () => {
     );
   });
 
+  it('renders user messages without decorative borders in Terminal.app', () => {
+    const previousTermProgram = process.env.TERM_PROGRAM;
+    process.env.TERM_PROGRAM = 'Apple_Terminal';
+    try {
+      const texts = rowTexts(BodyEntryKind.User, 'hello');
+      expect(texts).toEqual(['  ❯ hello']);
+    } finally {
+      if (previousTermProgram === undefined) {
+        delete process.env.TERM_PROGRAM;
+      } else {
+        process.env.TERM_PROGRAM = previousTermProgram;
+      }
+    }
+  });
+
   it('still wraps a single long line to the available width', () => {
     const texts = rowTexts(BodyEntryKind.Success, 'x'.repeat(WIDE_COLUMNS + 5));
 

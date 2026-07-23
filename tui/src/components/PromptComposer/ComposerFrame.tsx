@@ -1,5 +1,10 @@
 import { Box, Text } from 'ink';
-import { LOWER_HALF_BLOCK, UPPER_HALF_BLOCK } from '@libs/tui/backgroundBlock.ts';
+import {
+  resolveComposerBackgroundEnabled,
+  resolveComposerBorderColumns,
+  resolveSurfaceBorderGlyph,
+  type SurfaceBorderEdge
+} from '@libs/terminal/surfaceBorder.ts';
 import {
   COMPOSER_RIGHT_PADDING_COLUMNS,
   PROMPT_PREFIX
@@ -11,6 +16,7 @@ import { theme } from '@theme/themeConfig.ts';
 
 type ComposerFrameProps = {
   columns: number;
+  terminalColumns: number;
   shouldRenderBackground: boolean;
   validationError: string | null;
   visibleTextRows: string[];
@@ -18,45 +24,59 @@ type ComposerFrameProps = {
 
 export function ComposerFrame({
   columns,
+  terminalColumns,
   shouldRenderBackground,
   validationError,
   visibleTextRows
 }: ComposerFrameProps) {
+  const renderInputBackground =
+    shouldRenderBackground && resolveComposerBackgroundEnabled();
+
   return (
     <>
-      {shouldRenderBackground ? <ComposerHalfLine glyph={LOWER_HALF_BLOCK} columns={columns} /> : null}
+      {shouldRenderBackground ? (
+        <ComposerBorder
+          edge="top"
+          columns={resolveComposerBorderColumns(columns, terminalColumns)}
+        />
+      ) : null}
       {visibleTextRows.map((row, index) => (
         <ComposerTextRow
           columns={columns}
           key={`${index}-${row}`}
           row={row}
           rowIndex={index}
-          shouldRenderBackground={shouldRenderBackground}
+          shouldRenderBackground={renderInputBackground}
         />
       ))}
       {validationError === null ? null : (
         <Box
           width={columns}
-          backgroundColor={backgroundColor(shouldRenderBackground)}
+          backgroundColor={backgroundColor(renderInputBackground)}
         >
           <Text
-            backgroundColor={backgroundColor(shouldRenderBackground)}
+            backgroundColor={backgroundColor(renderInputBackground)}
             color={theme.colors.errorRed}
           >
             {formatValidationError(
               validationError,
               columns - COMPOSER_RIGHT_PADDING_COLUMNS,
-              shouldRenderBackground
+              renderInputBackground
             )}
           </Text>
-          {shouldRenderBackground ? (
+          {renderInputBackground ? (
             <Text backgroundColor={backgroundColor(true)}>
               {' '.repeat(COMPOSER_RIGHT_PADDING_COLUMNS)}
             </Text>
           ) : null}
         </Box>
       )}
-      {shouldRenderBackground ? <ComposerHalfLine glyph={UPPER_HALF_BLOCK} columns={columns} /> : null}
+      {shouldRenderBackground ? (
+        <ComposerBorder
+          edge="bottom"
+          columns={resolveComposerBorderColumns(columns, terminalColumns)}
+        />
+      ) : null}
     </>
   );
 }
@@ -73,9 +93,7 @@ function ComposerTextRow({
   shouldRenderBackground: boolean;
 }) {
   const prefix = promptPrefixForRow(rowIndex);
-  const rowColumns = shouldRenderBackground
-    ? resolveComposerInputColumns(columns)
-    : Math.max(0, columns - prefix.length);
+  const rowColumns = resolveComposerInputColumns(columns);
 
   return (
     // Prevent Yoga's default stretch from painting this row into the reserved
@@ -94,18 +112,18 @@ function ComposerTextRow({
         backgroundColor={backgroundColor(shouldRenderBackground)}
         color={theme.colors.foreground}
       >
-        {shouldRenderBackground ? padEndToWidth(row, rowColumns) : row}
+        {padEndToWidth(row, rowColumns)}
       </Text>
-      {shouldRenderBackground ? (
-        <Text backgroundColor={backgroundColor(true)}>
-          {' '.repeat(COMPOSER_RIGHT_PADDING_COLUMNS)}
-        </Text>
-      ) : null}
+      <Text backgroundColor={backgroundColor(shouldRenderBackground)}>
+        {' '.repeat(COMPOSER_RIGHT_PADDING_COLUMNS)}
+      </Text>
     </Box>
   );
 }
 
-function ComposerHalfLine({ glyph, columns }: { glyph: string; columns: number }) {
+function ComposerBorder({ edge, columns }: { edge: SurfaceBorderEdge; columns: number }) {
+  const glyph = resolveSurfaceBorderGlyph(edge);
+
   return (
     <Text
       backgroundColor={theme.colors.bodyBackground}

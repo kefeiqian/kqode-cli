@@ -1,9 +1,6 @@
-import {
-  LOWER_HALF_BLOCK,
-  UPPER_HALF_BLOCK
-} from '@libs/tui/backgroundBlock.ts';
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
 import { wrapBodyText } from '@libs/tui/wrapBodyText.ts';
+import { resolveMessageBorderGlyph } from '@libs/terminal/surfaceBorder.ts';
 import { theme } from '@theme/themeConfig.ts';
 
 export type BodyEntry = {
@@ -134,17 +131,21 @@ function toPromptRows(text: string, columns: number): BodyRow[] {
   }));
 
   return [
-    halfLineRow(columns, LOWER_HALF_BLOCK),
+    surfaceBorderRow(columns, 'top'),
     ...textRows,
-    halfLineRow(columns, UPPER_HALF_BLOCK)
-  ];
+    surfaceBorderRow(columns, 'bottom')
+  ].filter((row): row is BodyRow => row !== null);
 }
 
 function promptPrefix(): string {
   return `${' '.repeat(USER_MESSAGE_HORIZONTAL_PADDING)}${USER_MESSAGE_PREFIX}`;
 }
 
-function halfLineRow(columns: number, glyph: string): BodyRow {
+function surfaceBorderRow(columns: number, edge: 'top' | 'bottom'): BodyRow | null {
+  const glyph = resolveMessageBorderGlyph(edge);
+  if (glyph === null) {
+    return null;
+  }
   return {
     backgroundColor: theme.colors.bodyBackground,
     color: theme.colors.messageBackground,
