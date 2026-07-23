@@ -49,6 +49,13 @@ describe('analyzeArchitecture', () => {
       'declare const value: { key?: string };',
       'delete value.key;'
     ].join('\n'));
+    write(root, 'src/state/example.ts', [
+      "import { atom } from 'jotai';",
+      'export type State = { value: number };',
+      'export const valueAtom = atom(0);',
+      'export const DEFAULT_VALUE = 0;',
+      'export function calculate() { return 1; }'
+    ].join('\n'));
 
     const report = analyzeArchitecture(path.join(root, 'src'));
 
@@ -66,6 +73,10 @@ describe('analyzeArchitecture', () => {
       'constants/input.ts:PARENTHESIZED:mutable',
       'constants/input.ts:SHALLOW:mutable'
     ]));
+    expect(report.stateExportViolations).toEqual([
+      'state/example.ts:DEFAULT_VALUE',
+      'state/example.ts:calculate'
+    ]);
   });
 });
 

@@ -11,6 +11,15 @@ const layerViolationBaseline: string[] = [];
 
 const unknownLayerBaseline: string[] = [];
 
+const stateExportBaseline = [
+  'state/global/model.ts:DEFAULT_MODEL_LABEL',
+  'state/ui/composer/atoms.ts:initialComposerState',
+  'state/ui/dimensions.ts:FULLSCREEN_GUARD_ROWS',
+  'state/ui/dimensions.ts:MIN_USABLE_TERMINAL_COLUMNS',
+  'state/ui/dimensions.ts:MIN_USABLE_TERMINAL_ROWS',
+  'state/ui/statusHint.ts:BACKEND_LOADING_HINT'
+];
+
 describe('TUI architecture boundaries', () => {
   const report = analyzeArchitecture(srcRoot);
 
@@ -35,5 +44,9 @@ describe('TUI architecture boundaries', () => {
 
   it('keeps constants dependency-free and statically initialized', () => {
     expect(report.constantViolations).toEqual([]);
+  });
+
+  it('exports only atoms and types from state modules', () => {
+    expect(report.stateExportViolations).toEqual(stateExportBaseline);
   });
 });

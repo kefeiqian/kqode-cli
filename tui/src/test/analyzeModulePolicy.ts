@@ -1,5 +1,6 @@
 import { componentExportViolations } from '@test/analyzeComponentExports.ts';
 import { constantViolations } from '@test/analyzeConstants.ts';
+import { stateExportViolations } from '@test/analyzeStateExports.ts';
 
 export function analyzeModulePolicy(
   files: string[],
@@ -18,6 +19,13 @@ export function analyzeModulePolicy(
         const relative = relativeFile(file);
         return relative.startsWith('constants/') && !relative.includes('/__tests__/');
       })
-      .flatMap((file) => constantViolations(file, relativeFile))
+      .flatMap((file) => constantViolations(file, relativeFile)),
+    stateExportViolations: files
+      .filter((file) => {
+        const relative = relativeFile(file);
+        return relative.startsWith('state/') && !relative.includes('/__tests__/');
+      })
+      .flatMap((file) => stateExportViolations(file, relativeFile))
+      .sort()
   };
 }

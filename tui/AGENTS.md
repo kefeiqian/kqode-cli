@@ -22,6 +22,8 @@ Files under `src/components/` may export React components only. Move hooks to `s
 
 Use `src/constants/` only for dependency-free immutable static data such as strings, numbers, readonly arrays/objects, and enum-like values. Constants modules must not import from other project layers, create mutable collections such as `Set` or `Map`, or contain runtime calculation functions.
 
+Organize `src/state/` by domain directories and split files within a domain by responsibility, not one atom per file. Keep cohesive base atoms, derived selectors, and write actions together until a file approaches roughly 200 lines or mixes distinct responsibilities; then split into focused files such as `state.ts`, `editing.ts`, `cursor.ts`, and `scroll.ts`. State modules may export atoms/selectors and state-specific types only. Move reusable deterministic calculations to `src/libs/` and exported static data to `src/constants/`; helpers that directly use Jotai `get`/`set` or reference atoms remain in the state domain.
+
 ## Terminal layout
 
 Keep the cwd row, prompt composer, and command/status row stuck to the bottom of the terminal for every shell window size. Keep exactly one blank separator row between the body area and cwd row, but do not let body, preview, or header content push gaps between the composer and the command/status row.
