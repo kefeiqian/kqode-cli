@@ -5,11 +5,9 @@
  * The alternate buffer has no scrollback region, so while the TUI owns the
  * screen the terminal's native scrollbar has no prior history to scroll into —
  * the user stays pinned to the live UI instead of drifting into pre-launch
- * output. This is independent of Ink's "fullscreen" detection: with
- * `FULLSCREEN_GUARD_ROWS` now `0` the UI fills the alt buffer fullscreen, so
- * `incrementalRendering` only avoids a per-keystroke repaint on terminals that
- * skip the whole-screen clear on fullscreen frames (Windows Terminal is fine;
- * WezTerm repaints and blinks).
+ * output. This is independent of Ink's "fullscreen" detection: KQode keeps the
+ * alternate buffer in WezTerm but reserves one row there so Ink can update
+ * incrementally without a visible whole-screen clear on every keystroke.
  */
 export const ENTER_ALTERNATE_SCREEN_SEQUENCE = '\u001B[?1049h';
 

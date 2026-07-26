@@ -7,6 +7,7 @@ import {
   MIN_USABLE_TERMINAL_COLUMNS,
   MIN_USABLE_TERMINAL_ROWS
 } from '@constants/ui.ts';
+import { resolveFullscreenGuardRows } from '@libs/terminal/fullscreenGuard.ts';
 import { resolveChromeColumns } from '@libs/tui/layout.ts';
 
 // Test-only seams that pin a deterministic viewport ahead of the live terminal
@@ -27,22 +28,19 @@ export const columnsAtom = atom((get) => {
 export const chromeColumnsAtom = atom((get) => resolveChromeColumns(get(columnsAtom)));
 
 /**
- * Rows reserved below the UI. Now `0`: the UI fills the full terminal height so
- * no blank row sits at the bottom (tighter, edge-to-edge layout).
- *
- * The trade-off: filling the terminal *exactly* makes Ink treat every frame as
- * fullscreen and, on terminals that do not coalesce the clear, forces a
- * whole-screen clear (`ESC[2J ESC[3J`) and full repaint on **every** keystroke
- * (WezTerm blinks; Windows Terminal does not). Fullscreen frames also make Ink
- * omit its trailing newline. KQode patches Ink's cursor renderer to use the
- * actual final visible row as the fullscreen baseline. Raise this to `1` to
- * restore the incremental, non-fullscreen path (one blank row, no per-keystroke
- * clear).
+ * WezTerm visibly repaints Ink's Windows fullscreen clear on every keystroke,
+ * so it reserves one row. Other terminals retain the edge-to-edge canvas.
  */
+const fullscreenGuardRowsAtom = atom(() => resolveFullscreenGuardRows());
+
+/** Minimum physical terminal height for the current terminal's row budget. */
+export const minimumUsableRowsAtom = atom(
+  (get) => MIN_USABLE_TERMINAL_ROWS + get(fullscreenGuardRowsAtom)
+);
+
 /**
- * Rows the UI renders into. Production subtracts {@link FULLSCREEN_GUARD_ROWS}
- * from the live terminal height (now `0`, so the UI fills the full height); test
- * overrides pin the canvas directly and bypass the reservation.
+ * Rows the UI renders into. Production applies the terminal-specific fullscreen
+ * guard; test overrides pin the canvas directly and bypass the reservation.
  */
 export const rowsAtom = atom((get) => {
   const override = __TEST__ ? get(rowsTestOverrideAtom) : undefined;
@@ -51,7 +49,10 @@ export const rowsAtom = atom((get) => {
   }
 
   const windowRows = get(windowRowsAtom) ?? DEFAULT_ROWS;
-  return Math.max(MIN_ROWS, windowRows - FULLSCREEN_GUARD_ROWS);
+  return Math.max(
+    MIN_ROWS,
+    windowRows - FULLSCREEN_GUARD_ROWS - get(fullscreenGuardRowsAtom)
+  );
 });
 
 /**
@@ -67,7 +68,8 @@ export const terminalTooSmallAtom = atom((get) => {
   const windowRows = rowOverride ?? get(windowRowsAtom);
   const windowColumns = columnOverride ?? get(windowColumnsAtom);
 
-  const rowsTooSmall = windowRows !== undefined && windowRows < MIN_USABLE_TERMINAL_ROWS;
+  const rowsTooSmall =
+    windowRows !== undefined && windowRows < get(minimumUsableRowsAtom);
   const columnsTooSmall = windowColumns !== undefined && windowColumns < MIN_USABLE_TERMINAL_COLUMNS;
 
   return rowsTooSmall || columnsTooSmall;

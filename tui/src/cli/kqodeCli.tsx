@@ -24,8 +24,8 @@ async function launchTui({ entryUrl, loadPackagedAsset }: RunKqodeCliOptions): P
       <App />
     </Provider>,
     // Rewrite only changed lines instead of repainting the whole screen each
-    // frame. Paired with FULLSCREEN_GUARD_ROWS keeping us under fullscreen, this
-    // avoids the per-keystroke clear+repaint that blinks in WezTerm on Windows.
+    // frame. WezTerm reserves one viewport row so Ink remains on this
+    // incremental path instead of clearing and repainting on every keystroke.
     // exitOnCtrlC is off so Ctrl+C flows to the global two-step-exit handler
     // (useGlobalKeys) instead of quitting on the first press.
     {

@@ -1,12 +1,47 @@
 import { createStore } from 'jotai';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   columnsTestOverrideAtom,
+  rowsAtom,
   rowsTestOverrideAtom,
-  terminalTooSmallAtom
+  terminalTooSmallAtom,
+  windowColumnsAtom,
+  windowRowsAtom
 } from '@state/ui/dimensions.ts';
 
 describe('terminalTooSmallAtom', () => {
+  beforeEach(() => {
+    vi.stubEnv('TERM_PROGRAM', 'Windows_Terminal');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('reserves one row in WezTerm to stay below Ink fullscreen rendering', () => {
+    vi.stubEnv('TERM_PROGRAM', 'WezTerm');
+    const store = createStore();
+    store.set(windowRowsAtom, 24);
+
+    expect(store.get(rowsAtom)).toBe(23);
+  });
+
+  it('keeps the full terminal height outside WezTerm', () => {
+    const store = createStore();
+    store.set(windowRowsAtom, 24);
+
+    expect(store.get(rowsAtom)).toBe(24);
+  });
+
+  it('includes the WezTerm guard row in the minimum usable height', () => {
+    vi.stubEnv('TERM_PROGRAM', 'WezTerm');
+    const store = createStore();
+    store.set(windowColumnsAtom, 80);
+    store.set(windowRowsAtom, 15);
+
+    expect(store.get(terminalTooSmallAtom)).toBe(true);
+  });
+
   it('is false while the window size is unmeasured', () => {
     const store = createStore();
     expect(store.get(terminalTooSmallAtom)).toBe(false);

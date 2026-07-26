@@ -1,10 +1,7 @@
 import { Box, Text } from 'ink';
 import { useAtomValue } from 'jotai';
-import {
-  MIN_USABLE_TERMINAL_COLUMNS,
-  MIN_USABLE_TERMINAL_ROWS
-} from '@constants/ui.ts';
-import { columnsAtom } from '@state/ui/index.ts';
+import { MIN_USABLE_TERMINAL_COLUMNS } from '@constants/ui.ts';
+import { columnsAtom, minimumUsableRowsAtom } from '@state/ui/index.ts';
 import { theme } from '@theme/themeConfig.ts';
 
 /**
@@ -15,13 +12,14 @@ import { theme } from '@theme/themeConfig.ts';
  */
 export function TerminalTooSmall() {
   const columns = useAtomValue(columnsAtom);
+  const minimumUsableRows = useAtomValue(minimumUsableRowsAtom);
 
   return (
     <Box flexDirection="column" width={columns}>
       <Text color={theme.colors.warning}>Terminal too small</Text>
       <Text color={theme.colors.muted}>Please enlarge or maximize the window</Text>
       <Text color={theme.colors.muted}>
-        {`(needs at least ${MIN_USABLE_TERMINAL_COLUMNS} cols \u00D7 ${MIN_USABLE_TERMINAL_ROWS} rows)`}
+        {`(needs at least ${MIN_USABLE_TERMINAL_COLUMNS} cols \u00D7 ${minimumUsableRows} rows)`}
       </Text>
     </Box>
   );

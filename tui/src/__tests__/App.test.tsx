@@ -1,15 +1,15 @@
 import { createStore } from 'jotai';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '@/App.tsx';
 import {
   armedActionAtom,
   columnsTestOverrideAtom,
   rowsTestOverrideAtom
 } from '@state/ui/index.ts';
-import { FULLSCREEN_GUARD_ROWS } from '@constants/ui.ts';
 import { ArmedAction } from '@constants/ui.ts';
+import { WEZTERM_FULLSCREEN_GUARD_ROWS } from '@constants/terminal.ts';
 import { productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
 import { helpVisibleAtom } from '@state/ui/help/index.ts';
 import { flushInput } from '@test/flushInput.ts';
@@ -32,6 +32,14 @@ function renderApp({ columns, rows }: { columns?: number; rows?: number } = {}) 
 }
 
 describe('App', () => {
+  beforeEach(() => {
+    vi.stubEnv('TERM_PROGRAM', 'Windows_Terminal');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('smoke renders product metadata and workspace cwd', () => {
     const { lastFrame } = renderApp({ columns: 100, rows: 20 });
 
@@ -53,9 +61,36 @@ describe('App', () => {
     await flushInput();
 
     const outputRows = (lastFrame() ?? '').split('\n');
-    // The UI fills the full terminal height (FULLSCREEN_GUARD_ROWS = 0).
-    expect(outputRows).toHaveLength(18 - FULLSCREEN_GUARD_ROWS);
+    expect(outputRows).toHaveLength(18);
     expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
+  });
+
+  it('keeps WezTerm frames below Ink fullscreen rendering', async () => {
+    vi.stubEnv('TERM_PROGRAM', 'WezTerm');
+    const { lastFrame, stdout } = renderApp();
+
+    await flushInput();
+    Object.defineProperty(stdout, 'columns', { configurable: true, value: 80 });
+    Object.defineProperty(stdout, 'rows', { configurable: true, value: 18 });
+    stdout.emit('resize');
+    await flushInput();
+
+    const outputRows = (lastFrame() ?? '').split('\n');
+    expect(outputRows).toHaveLength(18 - WEZTERM_FULLSCREEN_GUARD_ROWS);
+    expect(outputRows.at(-1)).toContain('/ commands | @ mention | ? help');
+  });
+
+  it('reports the guarded minimum height in WezTerm', async () => {
+    vi.stubEnv('TERM_PROGRAM', 'WezTerm');
+    const { lastFrame, stdout } = renderApp();
+
+    await flushInput();
+    Object.defineProperty(stdout, 'columns', { configurable: true, value: 80 });
+    Object.defineProperty(stdout, 'rows', { configurable: true, value: 15 });
+    stdout.emit('resize');
+    await flushInput();
+
+    expect(lastFrame() ?? '').toContain('60 cols \u00D7 16 rows');
   });
 
   it('shows the enlarge notice when the terminal shrinks below the usable height', async () => {
