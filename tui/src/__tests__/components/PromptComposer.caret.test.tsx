@@ -60,7 +60,12 @@ describe('PromptComposer caret positioning', () => {
     store.set(rowsTestOverrideAtom, 24);
     store.set(startupStatusHintAtom, BACKEND_LOADING_HINT);
 
-    const { unmount } = renderWithJotai(<HomeScreenView />, store);
+    const { stdin, unmount } = renderWithJotai(<HomeScreenView />, store);
+
+    stdin.write('blocked');
+    await flushInput();
+
+    expect(store.get(composerStateAtom).text).toBe('');
 
     await vi.waitFor(() => {
       expect(setCursorPositionSpy.mock.calls.at(-1)?.[0]).toEqual({
