@@ -73,6 +73,11 @@ export const PRESS_AGAIN_TO_EXIT_HINT = 'ctrl+c again to exit';
 
 /** Default left-aligned status-bar hints shown when no transient hint is active. */
 export const DEFAULT_STATUS_HINTS = '/ commands | @ mention | ? help';
+export const TRANSIENT_STATUS_HINT_MS = 1_500;
+export const RIGHT_CLICK_PASTE_DEDUP_MS = 250;
+export const PASTE_FAILED_HINT = 'paste failed';
+export const SELECTION_COPIED_HINT = 'copied selection';
+export const SELECTION_COPY_FAILED_HINT = 'copy failed';
 
 // --- Status-bar loading spinner ---
 

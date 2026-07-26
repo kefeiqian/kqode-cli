@@ -1,5 +1,5 @@
 import { BodyEntryKind } from '@constants/bodyEntry.ts';
-import { wrapBodyText } from '@libs/tui/wrapBodyText.ts';
+import { wrapBodyLines } from '@libs/tui/wrapBodyLines.ts';
 import { resolveMessageBorderGlyph } from '@libs/terminal/surfaceBorder.ts';
 import { theme } from '@theme/themeConfig.ts';
 
@@ -12,6 +12,8 @@ export type BodyEntry = {
 export type BodyRow = {
   backgroundColor?: string;
   color?: string;
+  continuesPrevious?: string;
+  decorative?: boolean;
   fillColumns?: boolean;
   marker?: string;
   markerColor?: string;
@@ -98,21 +100,23 @@ function computeBodyRows(entry: BodyEntry, columns: number): BodyRow[] {
     return toAssistantRows(entry.text, columns);
   }
 
-  return wrapBodyText(labelForEntry(entry), columns).map((text) => ({
+  return wrapBodyLines(labelForEntry(entry), columns).map((line) => ({
     color: colorForEntry(entry.kind),
-    text
+    continuesPrevious: line.continuesPrevious,
+    text: line.text
   }));
 }
 
 function toAssistantRows(text: string, columns: number): BodyRow[] {
   const continuationPrefix = ' '.repeat(ASSISTANT_MESSAGE_PREFIX.length);
-  const wrappedText = wrapBodyText(text, Math.max(1, columns - ASSISTANT_MESSAGE_PREFIX.length));
+  const wrappedText = wrapBodyLines(text, Math.max(1, columns - ASSISTANT_MESSAGE_PREFIX.length));
 
   return wrappedText.map((line, index) => ({
     color: theme.colors.foreground,
+    continuesPrevious: line.continuesPrevious,
     marker: index === 0 ? ASSISTANT_MESSAGE_PREFIX : continuationPrefix,
     markerColor: index === 0 ? theme.colors.accentBlue : theme.colors.foreground,
-    text: line
+    text: line.text
   }));
 }
 
@@ -122,12 +126,15 @@ function toPromptRows(text: string, columns: number): BodyRow[] {
   // continuation rows replace the visible prefix with spaces to align wrapped text.
   const textColumns = Math.max(1, columns - promptIndent - USER_MESSAGE_HORIZONTAL_PADDING);
   const continuationPrefix = ' '.repeat(promptIndent);
-  const wrappedText = wrapBodyText(text, textColumns);
+  const wrappedText = wrapBodyLines(text, textColumns);
   const textRows = wrappedText.map((line, index) => ({
     backgroundColor: theme.colors.messageBackground,
     color: theme.colors.foreground,
+    continuesPrevious: line.continuesPrevious,
     fillColumns: true,
-    text: `${index === 0 ? promptPrefix() : continuationPrefix}${line}`
+    marker: index === 0 ? promptPrefix() : continuationPrefix,
+    markerColor: theme.colors.foreground,
+    text: line.text
   }));
 
   return [
@@ -149,6 +156,7 @@ function surfaceBorderRow(columns: number, edge: 'top' | 'bottom'): BodyRow | nu
   return {
     backgroundColor: theme.colors.bodyBackground,
     color: theme.colors.messageBackground,
+    decorative: true,
     text: glyph.repeat(columns)
   };
 }

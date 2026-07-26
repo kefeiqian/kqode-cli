@@ -14,6 +14,7 @@ import { chromeColumnsAtom, columnsAtom, rowsAtom } from '@state/ui/dimensions.t
 import { gitStatusAtom } from '@state/ui/gitStatus/index.ts';
 
 export const composerRowsAtom = atom(DEFAULT_COMPOSER_ROWS);
+export const bodyTopAtom = atom(HEADER_ROWS);
 
 /** Rows occupied by cwd, collapsing while the command palette replaces it. */
 export const cwdRowsAtom = atom((get) =>

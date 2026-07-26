@@ -36,7 +36,15 @@ const KEYBINDING_SECTIONS: readonly HelpSection[] = [
       { keys: 'shift/alt+enter', description: 'Insert a newline (supported terminals)' },
       { keys: '\\ then enter', description: 'Insert a newline' },
       { keys: '← / →', description: 'Move the cursor' },
-      { keys: 'backspace', description: 'Delete the previous character' }
+      { keys: 'backspace', description: 'Delete the previous character' },
+      { keys: 'right-click', description: 'Paste when no transcript selection is active' }
+    ]
+  },
+  {
+    title: 'SELECTION',
+    entries: [
+      { keys: 'drag', description: 'Highlight transcript text' },
+      { keys: 'right-click', description: 'Copy the highlight, then clear it' }
     ]
   },
   {

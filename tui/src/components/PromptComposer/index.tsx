@@ -6,6 +6,7 @@ import { ComposerCaret } from '@components/PromptComposer/ComposerCaret.tsx';
 import { ComposerFrame } from '@components/PromptComposer/ComposerFrame.tsx';
 import { PROMPT_PREFIX } from '@constants/ui.ts';
 import { usePromptComposerInput } from '@hooks/promptComposer/usePromptComposerInput.ts';
+import { usePasteInput } from '@hooks/promptComposer/usePasteInput.ts';
 import { resolveComposerCursorPosition } from '@libs/composer/cursorPosition.ts';
 import { resolveComposerInputColumns } from '@libs/composer/layout.ts';
 import { countVisibleComposerRows } from '@libs/composer/promptTextView.ts';
@@ -76,6 +77,7 @@ export function PromptComposer({
     state,
     commandActions
   });
+  usePasteInput(maxBytes);
 
   const inputColumns = resolveComposerInputColumns(resolvedColumns);
   const composerWindow = resolveComposerWindow({
@@ -108,10 +110,10 @@ export function PromptComposer({
     scrollCursorIntoView();
   }, [state.cursorIndex, state.text, scrollCursorIntoView]);
 
+  // Input locking disables key handling only; keep the terminal caret anchored
+  // in the composer while startup or another status hint is active.
   const caretPosition =
-    resolvedIsActive &&
-    composerMetrics.hasMeasured &&
-    composerWindow.cursorVisible
+    composerMetrics.hasMeasured && composerWindow.cursorVisible
       ? resolveComposerCursorPosition(
           visibleText,
           inputColumns,

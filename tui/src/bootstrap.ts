@@ -4,6 +4,7 @@ import { createStore } from 'jotai';
 import type { BackendClientHandle } from '@backend/client/backendClient.ts';
 import { startBackendRuntime } from '@/cli/backendRuntime.ts';
 import { resolveRepoRoot, resolveWorkspaceCwd } from '@libs/path/runtimePaths.ts';
+import { systemClipboard } from '@libs/clipboard/systemClipboard.ts';
 import { PRODUCT_NAME } from '@constants/product.ts';
 import { resolveProductVersion } from '@libs/product/productMetadata.ts';
 import { setTerminalWindowTitle, resetTerminalWindowTitle } from '@libs/terminal/windowTitle.ts';
@@ -20,6 +21,7 @@ import { resolveSessionSeed } from '@libs/exitSummary/resolveSessionSeed.ts';
 import { windowColumnsAtom, windowRowsAtom } from '@state/ui/index.ts';
 import {
   productVersionAtom,
+  clipboardClientAtom,
   repoRootAtom,
   sessionGitBaselineAtom,
   sessionStartedAtAtom,
@@ -67,6 +69,7 @@ export async function createAppRuntime({
   loadPackagedAsset
 }: CreateAppRuntimeOptions): Promise<AppRuntime> {
   const store = createStore();
+  store.set(clipboardClientAtom, systemClipboard);
   const workspaceCwd = resolveWorkspaceCwd();
   store.set(workspaceCwdAtom, workspaceCwd);
 

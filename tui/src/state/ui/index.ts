@@ -6,4 +6,6 @@ export * from '@state/ui/gitStatus/index.ts';
 export * from '@state/ui/inputLock.ts';
 export * from '@state/ui/keyArm.ts';
 export * from '@state/ui/layout.ts';
+export * from '@state/ui/pasteSuppression.ts';
+export * from '@state/ui/selection.ts';
 export * from '@state/ui/statusHint.ts';

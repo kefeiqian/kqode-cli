@@ -1,5 +1,7 @@
-export const ENABLE_SGR_MOUSE_TRACKING = '\u001B[?1000h\u001B[?1006h';
-export const DISABLE_SGR_MOUSE_TRACKING = '\u001B[?1006l\u001B[?1000l';
+// Button-event tracking reports press, release, and drag motion while a button
+// is held. Extended coordinates keep positions unambiguous on larger terminals.
+export const ENABLE_SGR_MOUSE_TRACKING = '\u001B[?1002h\u001B[?1006h';
+export const DISABLE_SGR_MOUSE_TRACKING = '\u001B[?1006l\u001B[?1002l';
 
 type MouseWheelDirection = 'up' | 'down';
 
@@ -15,9 +17,15 @@ export type MouseClickEvent = {
   row: number;
   column: number;
 };
+
+export type MouseButtonEvent = MouseClickEvent & {
+  kind: 'press' | 'drag' | 'release';
+};
+
 export type MouseInputEvent =
   | ({ kind: 'wheel' } & MouseWheelEvent)
-  | ({ kind: 'click' } & MouseClickEvent);
+  | MouseButtonEvent
+  | ({ kind: 'rightClick' } & MouseClickEvent);
 
 // SGR mouse reports are `ESC[<button;col;row(M|m)`; col/row are 1-based.
 const SGR_MOUSE_INPUT_PATTERN_ALL =
@@ -25,6 +33,9 @@ const SGR_MOUSE_INPUT_PATTERN_ALL =
 const WHEEL_BUTTON_OFFSET = 64;
 const WHEEL_BUTTON_COUNT = 4;
 const LEFT_BUTTON_CODE = 0;
+const RIGHT_BUTTON_CODE = 2;
+const MOUSE_MOTION_BIT = 32;
+const MOUSE_BUTTON_MASK = 0b11;
 
 export function isMouseInput(input: string): boolean {
   return parseMouseInputEvents(input) !== null;
@@ -59,8 +70,8 @@ function wheelEventFromGroups(groups: SgrMouseGroups): MouseWheelEvent | null {
 }
 
 /**
- * Parses a chunk made entirely of SGR mouse reports. Release and unsupported
- * reports are recognized but omitted from the actionable event list.
+ * Parses a chunk made entirely of SGR mouse reports. Unsupported reports are
+ * recognized but omitted from the actionable event list.
  */
 export function parseMouseInputEvents(input: string): MouseInputEvent[] | null {
   if (input.length === 0) {
@@ -77,12 +88,36 @@ export function parseMouseInputEvents(input: string): MouseInputEvent[] | null {
     const wheel = wheelEventFromGroups(groups);
     if (wheel !== null) {
       events.push({ kind: 'wheel', ...wheel });
+      consumed += match[0].length;
+      continue;
+    }
+
+    const buttonCode = Number.parseInt(groups.buttonCode, 10);
+    if ((buttonCode & WHEEL_BUTTON_OFFSET) !== 0) {
+      consumed += match[0].length;
+      continue;
+    }
+
+    const button = buttonCode & MOUSE_BUTTON_MASK;
+    if (button === LEFT_BUTTON_CODE) {
+      const kind: MouseButtonEvent['kind'] =
+        groups.eventType === 'm'
+          ? 'release'
+          : (buttonCode & MOUSE_MOTION_BIT) !== 0
+            ? 'drag'
+            : 'press';
+      events.push({
+        kind,
+        row: Number.parseInt(groups.row, 10),
+        column: Number.parseInt(groups.column, 10)
+      });
     } else if (
       groups.eventType === 'M' &&
-      Number.parseInt(groups.buttonCode, 10) === LEFT_BUTTON_CODE
+      button === RIGHT_BUTTON_CODE &&
+      (buttonCode & MOUSE_MOTION_BIT) === 0
     ) {
       events.push({
-        kind: 'click',
+        kind: 'rightClick',
         row: Number.parseInt(groups.row, 10),
         column: Number.parseInt(groups.column, 10)
       });

@@ -10,6 +10,7 @@ export const theme = {
     errorRed: '#FF5555',
     border: '#44475A',
     messageBackground: '#44475A',
-    inputBackground: '#44475A'
+    inputBackground: '#44475A',
+    selectionBackground: '#33467C'
   }
 } as const;

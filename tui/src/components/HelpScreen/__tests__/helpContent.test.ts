@@ -22,7 +22,14 @@ describe('helpContent', () => {
     const titles = buildHelpSections().map((section) => section.title);
 
     expect(titles[0]).toBe('COMMANDS');
-    expect(titles).toEqual(['COMMANDS', 'GLOBAL', 'INPUT', 'COMMAND MENU', 'SCROLL']);
+    expect(titles).toEqual([
+      'COMMANDS',
+      'GLOBAL',
+      'INPUT',
+      'SELECTION',
+      'COMMAND MENU',
+      'SCROLL'
+    ]);
   });
 
   it('flattens sections into title, entry, and blank-separator lines', () => {

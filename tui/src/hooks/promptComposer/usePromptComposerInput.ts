@@ -13,7 +13,7 @@ import type {
 } from '@hooks/promptComposer/input/types.ts';
 import { isMouseInput } from '@libs/terminal/mouse.ts';
 import type { CommandActions } from '@libs/commands/executeCommand.ts';
-import { armedActionAtom } from '@state/ui/index.ts';
+import { armedActionAtom, cancelPendingRightClickPasteAtom } from '@state/ui/index.ts';
 
 type PromptComposerInputOptions = {
   isActive: boolean;
@@ -60,6 +60,8 @@ export function usePromptComposerInput({
       if (isMouseInput(input)) {
         return;
       }
+
+      store.set(cancelPendingRightClickPasteAtom);
 
       // Ctrl+C is owned by the global two-step-exit hook; never handle it here.
       if (key.ctrl === true && input === 'c') {

@@ -1,7 +1,13 @@
 import { Box, Text } from 'ink';
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useState } from 'react';
-import { armedActionAtom, chromeColumnsAtom, statusHintAtom } from '@state/ui/index.ts';
+import {
+  armedActionAtom,
+  chromeColumnsAtom,
+  setTransientStatusHintAtom,
+  statusHintAtom,
+  transientStatusHintAtom
+} from '@state/ui/index.ts';
 import { modelLabelAtom } from '@state/global/index.ts';
 import {
   ArmedAction,
@@ -9,7 +15,8 @@ import {
   LOADING_FRAME_COUNT,
   LOADING_FRAME_INTERVAL_MS,
   PRESS_AGAIN_TO_CLEAR_HINT,
-  PRESS_AGAIN_TO_EXIT_HINT
+  PRESS_AGAIN_TO_EXIT_HINT,
+  TRANSIENT_STATUS_HINT_MS
 } from '@constants/ui.ts';
 import { theme } from '@theme/themeConfig.ts';
 
@@ -17,8 +24,10 @@ export function StatusBar() {
   const columns = useAtomValue(chromeColumnsAtom);
   const modelLabel = useAtomValue(modelLabelAtom);
   const statusHint = useAtomValue(statusHintAtom);
+  const transientStatusHint = useAtomValue(transientStatusHintAtom);
   const armedAction = useAtomValue(armedActionAtom);
   const loadingFrame = useLoadingFrame(statusHint?.kind === 'loading');
+  useTransientStatusHintClear(transientStatusHint);
   const baseHints = statusHint === undefined ? DEFAULT_STATUS_HINTS : statusHint.text;
   const armedHint =
     armedAction === ArmedAction.ClearInput
@@ -40,6 +49,24 @@ export function StatusBar() {
       </Box>
     </Box>
   );
+}
+
+function useTransientStatusHintClear(transientStatusHint: unknown) {
+  const setTransientStatusHint = useSetAtom(setTransientStatusHintAtom);
+
+  useEffect(() => {
+    if (transientStatusHint === undefined) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setTransientStatusHint(undefined);
+    }, TRANSIENT_STATUS_HINT_MS);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [setTransientStatusHint, transientStatusHint]);
 }
 
 function useLoadingFrame(isLoading: boolean): number {
