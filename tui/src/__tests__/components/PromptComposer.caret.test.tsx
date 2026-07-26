@@ -6,7 +6,17 @@ import {
   composerStateAtom
 } from '@state/ui/composer/index.ts';
 import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/dimensions.ts';
-import { bodyEntriesAtom, composerRowsAtom } from '@state/ui/index.ts';
+import {
+  bodyEntriesAtom,
+  composerRowsAtom,
+  composerTopAtom
+} from '@state/ui/index.ts';
+import { startupStatusHintAtom } from '@state/ui/statusHint.ts';
+import { BACKEND_LOADING_HINT } from '@constants/statusHint.ts';
+import {
+  COMPOSER_BACKGROUND_TOP_PADDING_ROWS,
+  PROMPT_PREFIX
+} from '@constants/ui.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
@@ -38,10 +48,28 @@ vi.mock('@components/PromptComposer/ComposerFrame.tsx', async () => {
   };
 });
 
-describe('PromptComposer caret during scrolling', () => {
+describe('PromptComposer caret positioning', () => {
   beforeEach(() => {
     composerFrameSpy.mockClear();
     setCursorPositionSpy.mockClear();
+  });
+
+  it('keeps the caret on the composer text row while startup locks input', async () => {
+    const store = createStore();
+    store.set(columnsTestOverrideAtom, 60);
+    store.set(rowsTestOverrideAtom, 24);
+    store.set(startupStatusHintAtom, BACKEND_LOADING_HINT);
+
+    const { unmount } = renderWithJotai(<HomeScreenView />, store);
+
+    await vi.waitFor(() => {
+      expect(setCursorPositionSpy.mock.calls.at(-1)?.[0]).toEqual({
+        x: PROMPT_PREFIX.length,
+        y: store.get(composerTopAtom) + COMPOSER_BACKGROUND_TOP_PADDING_ROWS
+      });
+    });
+
+    unmount();
   });
 
   it('re-asserts the caret after a scroll repaint without re-rendering the frame', async () => {
