@@ -325,12 +325,6 @@ fn session_resume_errors_when_attach_ack_is_missing() {
     let (backend, _client) = Connection::memory();
     let dir = tempfile::tempdir().unwrap();
     let workspace = dir.path().join("workspace");
-    std::fs::create_dir_all(&workspace).unwrap();
-    let canonical_workspace = std::fs::canonicalize(&workspace)
-        .unwrap()
-        .display()
-        .to_string();
-    let _cwd = switch_to(&workspace);
     let session_log_path = dir.path().join("sessions").join("sess-1.jsonl");
     std::fs::create_dir_all(session_log_path.parent().unwrap()).unwrap();
     let log = [
@@ -338,7 +332,7 @@ fn session_resume_errors_when_attach_ack_is_missing() {
             session_id: "sess-1".to_owned(),
             created_at_ms: 10,
             workspace_cwd: workspace.display().to_string(),
-            canonical_workspace_cwd: canonical_workspace.clone(),
+            canonical_workspace_cwd: String::new(),
         },
         SessionLogEvent::TurnEnqueued {
             turn_id: "turn-1".to_owned(),
@@ -360,7 +354,7 @@ fn session_resume_errors_when_attach_ack_is_missing() {
             created_at: 10,
             modified_at: 11,
             workspace_cwd: workspace.display().to_string(),
-            canonical_workspace_cwd: canonical_workspace,
+            canonical_workspace_cwd: String::new(),
             session_log_path: session_log_path.display().to_string(),
             first_prompt_summary: Some("hello".to_owned()),
         })
