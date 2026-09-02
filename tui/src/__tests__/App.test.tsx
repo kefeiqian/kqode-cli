@@ -23,6 +23,7 @@ import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
 
 const workspaceCwd = path.join(os.homedir(), 'Projects', 'dummy-react-app');
+const displayCwd = `~${path.sep}${path.join('Projects', 'dummy-react-app')}`;
 
 function renderApp({ columns, rows }: { columns?: number; rows?: number } = {}) {
   const store = createStore();
@@ -64,7 +65,7 @@ describe('App', () => {
 
     expect(output).toContain('KQode');
     expect(output).toContain('v0.1.0');
-    expect(output).toContain(`~${path.sep}${path.join('Projects', 'dummy-react-app')}`);
+    expect(output).toContain(displayCwd);
     expect(output).not.toContain('Preview mode: local Rust backend only');
   });
 

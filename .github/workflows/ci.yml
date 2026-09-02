@@ -1,9 +1,11 @@
 # Continuous integration for pushes to `main` and every pull request.
 #
 # Runs the same checks documented in AGENTS.md and used locally, split into two
-# parallel jobs so a failure points at either the Rust core or the nested TUI:
+# jobs gated by changed paths so docs/skills-only PRs do not spend time on
+# unrelated build matrices:
 #   - rust: cargo fmt --check, clippy (warnings denied), build, and test.
 #   - tui:  cargo xtask tui-typecheck and tui-test (Bun + vscode-jsonrpc).
+#   - packaging: Node's built-in test runner for npm/Homebrew packaging helpers.
 #
 # Authenticity controls mirror the other workflows: read-only permissions and
 # third-party actions pinned by version. This workflow only reads the repo and
@@ -26,8 +28,75 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect changed areas
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      packaging: ${{ steps.paths.outputs.packaging }}
+      rust: ${{ steps.paths.outputs.rust }}
+      tui: ${{ steps.paths.outputs.tui }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Classify changed paths
+        id: paths
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base_ref="origin/${{ github.base_ref }}"
+            git fetch --no-tags origin "${{ github.base_ref }}"
+            base="$(git merge-base "$base_ref" HEAD)"
+            head="HEAD"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+            if [[ "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+              base="$(git rev-list --max-parents=0 "$head" | tail -1)"
+            fi
+          fi
+
+          git diff --name-only "$base" "$head" > changed-files.txt
+          packaging=false
+          rust=false
+          tui=false
+
+          while IFS= read -r changed_path; do
+            case "$changed_path" in
+              .cargo/*|.github/workflows/ci.yml|Cargo.lock|Cargo.toml|build.rs|main.rs|migrations/*|scripts/*|src/*|tests/*|xtask/*)
+                rust=true
+                ;;
+            esac
+
+            case "$changed_path" in
+              .cargo/*|.github/workflows/ci.yml|Cargo.lock|Cargo.toml|scripts/*|tui/*|xtask/*)
+                tui=true
+                ;;
+            esac
+
+            case "$changed_path" in
+              .github/workflows/ci.yml|.github/workflows/homebrew-publish.yml|.github/workflows/npm-publish.yml|packaging/*)
+                packaging=true
+                ;;
+            esac
+          done < changed-files.txt
+
+          echo "Changed files:"
+          cat changed-files.txt
+          echo "packaging=$packaging" >> "$GITHUB_OUTPUT"
+          echo "rust=$rust" >> "$GITHUB_OUTPUT"
+          echo "tui=$tui" >> "$GITHUB_OUTPUT"
+          echo "Packaging checks: $packaging"
+          echo "Rust checks: $rust"
+          echo "TUI checks: $tui"
+
   rust:
     name: Rust (fmt, clippy, build, test)
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -47,6 +116,8 @@ jobs:
 
   tui:
     name: TUI (typecheck, test)
+    needs: changes
+    if: needs.changes.outputs.tui == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -63,3 +134,24 @@ jobs:
         run: cargo xtask tui-typecheck
       - name: Test
         run: cargo xtask tui-test
+
+  packaging:
+    name: Packaging (node tests)
+    needs: changes
+    if: needs.changes.outputs.packaging == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: npm packaging tests
+        run: node --test
+        working-directory: packaging/npm/kqode
+      - name: npm helper tests
+        run: node --test
+        working-directory: packaging/npm/scripts
+      - name: Homebrew packaging tests
+        run: node --test
+        working-directory: packaging/homebrew
