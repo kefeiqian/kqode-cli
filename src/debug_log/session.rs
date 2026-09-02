@@ -80,7 +80,7 @@ pub(super) fn prune_old_sessions(logs_root: &Path) {
         return;
     }
     // Newest first, then drop everything past the retention window.
-    dirs.sort_by(|a, b| b.0.cmp(&a.0));
+    dirs.sort_by_key(|entry| std::cmp::Reverse(entry.0));
     for (_, path) in dirs.into_iter().skip(SESSION_RETENTION) {
         let _ = fs::remove_dir_all(path);
     }
