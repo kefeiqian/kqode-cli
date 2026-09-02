@@ -21,7 +21,7 @@ export type ComposerKeyContext = {
   key: Key;
   state: ComposerInputState;
   maxBytes: number;
-  onSubmit: (prompt: string) => void;
+  onSubmit: (prompt: string, submissionSequence?: number) => void;
   commandActions: CommandActions;
   store: Store;
 };

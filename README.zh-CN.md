@@ -2,15 +2,21 @@
 
 [English](README.md) | **简体中文**
 
-[![CI](https://github.com/kefeiqian/kqode-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/kefeiqian/kqode-cli/actions/workflows/ci.yml)
-[![Release](https://github.com/kefeiqian/kqode-cli/actions/workflows/release.yml/badge.svg)](https://github.com/kefeiqian/kqode-cli/actions/workflows/release.yml)
-[![GitHub Pages](https://github.com/kefeiqian/kqode-cli/actions/workflows/github-pages.yml/badge.svg)](https://github.com/kefeiqian/kqode-cli/actions/workflows/github-pages.yml)
-[![npm](https://img.shields.io/npm/v/@kqode/kqode-cli?logo=npm)](https://www.npmjs.com/package/@kqode/kqode-cli)
-[![GitHub release](https://img.shields.io/github/v/release/kefeiqian/kqode-cli?logo=github)](https://github.com/kefeiqian/kqode-cli/releases/latest)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#许可证)
-[![Made with Rust](https://img.shields.io/badge/Rust-2024_edition-orange.svg?logo=rust)](https://www.rust-lang.org/)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.zh-CN.md)
-[![GitHub stars](https://img.shields.io/github/stars/kefeiqian/kqode-cli?logo=github)](https://github.com/kefeiqian/kqode-cli/stargazers)
+<p align="center">
+  <a href="https://github.com/kefeiqian/kqode-cli/actions/workflows/ci.yml"><img src="https://github.com/kefeiqian/kqode-cli/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/kefeiqian/kqode-cli/actions/workflows/release.yml"><img src="https://github.com/kefeiqian/kqode-cli/actions/workflows/release.yml/badge.svg" alt="Release"></a>
+  <a href="https://github.com/kefeiqian/kqode-cli/actions/workflows/github-pages.yml"><img src="https://github.com/kefeiqian/kqode-cli/actions/workflows/github-pages.yml/badge.svg" alt="GitHub Pages"></a>
+</p>
+<p align="center">
+  <a href="https://www.npmjs.com/package/@kqode/kqode-cli"><img src="https://img.shields.io/npm/v/@kqode/kqode-cli?logo=npm" alt="npm"></a>
+  <a href="https://github.com/kefeiqian/kqode-cli/releases/latest"><img src="https://img.shields.io/github/v/release/kefeiqian/kqode-cli?logo=github" alt="GitHub release"></a>
+  <a href="#许可证"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg" alt="License"></a>
+</p>
+<p align="center">
+  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-2024_edition-orange.svg?logo=rust" alt="Made with Rust"></a>
+  <a href="CONTRIBUTING.zh-CN.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome"></a>
+  <a href="https://github.com/kefeiqian/kqode-cli/stargazers"><img src="https://img.shields.io/github/stars/kefeiqian/kqode-cli?logo=github" alt="GitHub stars"></a>
+</p>
 
 KQode 是一个以 Rust 为核心（Rust-first）的编码智能体（coding agent）框架，并将
 TypeScript Ink 作为其正式的终端界面（TUI）。项目目前处于地基阶段：已提交的实现
@@ -92,13 +98,17 @@ cargo xtask tui-install    # 安装内嵌 TUI 的依赖
 cargo xtask tui-typecheck  # 对 TUI 做类型检查（tsc --noEmit）
 cargo xtask tui-test       # 运行 TUI 测试（vitest）
 cargo xtask tui-dev        # 在一次性 fixture 工作区中运行 TUI
+cargo xtask tui-dev-here   # 从源码运行 TUI，并使用当前终端目录作为 cwd
 ```
 
 `cargo xtask tui-dev` 会针对一份复制出来的 fixture 工作区运行 Ink TUI，因此显示的
-工作目录是一个真实的项目，而不是 KQode 仓库本身。目前 TUI 与一个本地 Rust
-JSON-RPC 后端通信，该后端只会对每个提交的 prompt 做确认（`ACK: message
-received`）；它尚未调用模型、运行工具或执行智能体循环，斜杠命令、提及（mention）
-与模型相关的交互目前都只是无实际作用的占位符。
+工作目录是一个真实的项目，而不是 KQode 仓库本身。如果要在已有项目中 dogfood，
+可以从该项目目录运行 `/path/to/KQode/scripts/xtask.sh tui-dev-here`，让源码模式
+使用当前终端目录，与打包后的 `kqode` 可执行文件保持一致。目前 TUI 与一个本地 Rust
+JSON-RPC 后端通信；该后端会对每个提交的 prompt 做确认，并将可恢复的本地会话
+历史持久化到 `~/.kqode/`。`/help`、`/clear`、`/login`、`/model` 与 `/resume`
+现已连接到真实的 TUI 界面或后端流程；它仍然尚未调用模型、运行工具或执行智能体
+循环，而提及（mention）支持目前仍是占位符。
 
 使用以下命令显式准备或重置该 fixture 工作区：
 
@@ -120,7 +130,7 @@ cargo xtask tui-prod   # 构建并运行独立可执行文件
 ```
 
 仅在这种源码模式构建时才需要 Cargo。打包后的可执行文件会将其内嵌的后端物化
-（materialize）到 `~/.kqcode/` 下的每用户缓存中，并运行与源码模式相同的本地 ACK
+（materialize）到 `~/.kqode/` 下的每用户缓存中，并运行与源码模式相同的本地 ACK
 流程。
 
 ### 分发

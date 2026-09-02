@@ -1,7 +1,10 @@
 #[path = "common/rpc.rs"]
 mod rpc;
 
-use kqode::protocol::{ACK_MESSAGE, BACKEND_READY_METHOD, RpcMethod};
+use kqode::protocol::{
+    BACKEND_READY_METHOD, RpcMethod, SETTLED_KIND_NEEDS_CONFIGURATION, TURN_ENQUEUED_METHOD,
+    TURN_SETTLED_METHOD,
+};
 use serde_json::json;
 
 use rpc::{backend_output, parse_stdout_frames, request_frame, response_frames};
@@ -26,42 +29,81 @@ fn backend_announces_ready_before_handling_requests() {
         "ready is a notification, not a response: {}",
         frames[0]
     );
+    assert!(
+        frames[0]["params"]["sessionId"]
+            .as_str()
+            .is_some_and(|id| !id.is_empty()),
+        "ready notification must carry a non-empty sessionId: {}",
+        frames[0]
+    );
 }
 
 #[test]
-fn message_submit_returns_ack_with_received_text() {
+fn message_submit_without_key_settles_needs_configuration() {
+    // With no API key (forced by the harness), submit must still be accepted.
+    // The coordinator then settles the turn to configuration-required.
     let output = backend_output(&request_frame(
         1,
         RpcMethod::MessageSubmit.as_str(),
-        json!({ "text": "hello from tui" }),
+        json!({ "text": "hello from tui", "turnId": "turn-1" }),
     ));
 
     assert!(output.status.success(), "{output:?}");
+
+    let all_frames = parse_stdout_frames(&output.stdout);
+    assert!(
+        all_frames
+            .iter()
+            .any(|frame| frame["method"] == TURN_ENQUEUED_METHOD),
+        "expected an enqueue notification: {all_frames:?}"
+    );
+    assert!(
+        all_frames
+            .iter()
+            .any(|frame| frame["method"] == TURN_SETTLED_METHOD),
+        "expected a settled notification: {all_frames:?}"
+    );
+    assert!(
+        all_frames
+            .iter()
+            .any(|frame| frame["method"] == TURN_SETTLED_METHOD
+                && frame["params"]["result"]["kind"] == SETTLED_KIND_NEEDS_CONFIGURATION),
+        "expected a needs-configuration settlement: {all_frames:?}"
+    );
+
     let frames = response_frames(&output.stdout);
-    assert_eq!(frames[0]["id"], 1);
-    assert_eq!(frames[0]["result"]["message"], ACK_MESSAGE);
-    assert_eq!(frames[0]["result"]["receivedText"], "hello from tui");
+    let response = frames.iter().find(|frame| frame["id"] == 1).unwrap();
+    assert_eq!(response["result"]["turnId"], "turn-1");
+    assert!(
+        response["result"].get("status").is_none(),
+        "submit ack no longer carries status: {response:?}"
+    );
 }
 
 #[test]
-fn message_submit_preserves_unicode_newlines_and_empty_text() {
-    let text = "  hello\nfrom tui 🌱  ";
+fn message_submit_echoes_the_client_turn_id_for_each_submit() {
     let output = backend_output(
         &[
             request_frame(
                 1,
                 RpcMethod::MessageSubmit.as_str(),
-                json!({ "text": text }),
+                json!({ "text": "first", "turnId": "turn-a" }),
             ),
-            request_frame(2, RpcMethod::MessageSubmit.as_str(), json!({ "text": "" })),
+            request_frame(
+                2,
+                RpcMethod::MessageSubmit.as_str(),
+                json!({ "text": "", "turnId": "turn-b" }),
+            ),
         ]
         .concat(),
     );
 
     assert!(output.status.success(), "{output:?}");
     let frames = response_frames(&output.stdout);
-    assert_eq!(frames[0]["id"], 1);
-    assert_eq!(frames[1]["id"], 2);
-    assert_eq!(frames[0]["result"]["receivedText"], text);
-    assert_eq!(frames[1]["result"]["receivedText"], "");
+    let first = frames.iter().find(|frame| frame["id"] == 1).unwrap();
+    let second = frames.iter().find(|frame| frame["id"] == 2).unwrap();
+    assert_eq!(first["result"]["turnId"], "turn-a");
+    assert!(first["result"].get("status").is_none());
+    assert_eq!(second["result"]["turnId"], "turn-b");
+    assert!(second["result"].get("status").is_none());
 }

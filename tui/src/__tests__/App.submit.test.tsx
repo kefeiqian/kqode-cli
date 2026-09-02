@@ -1,168 +1,333 @@
+import os from 'node:os';
+import path from 'node:path';
 import { createStore } from 'jotai';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '@/App.tsx';
-import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.ts';
-import type { BackendClient } from '@contracts/backend/index.ts';
-import { ACK_MESSAGE } from '@contracts/backend/index.ts';
-import type { MessageSubmitParams, MessageSubmitResult } from '@contracts/backend/index.ts';
-import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/index.ts';
-import { backendClientAtom, productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
-import { promptQueueAtom } from '@state/promptQueue/index.ts';
+import type { BackendClient, StreamSubmitParams, TranscriptEvent, TurnResult } from '@contracts/backend/index.ts';
+import { SETTLED_KIND_CANCELLED, SETTLED_KIND_COMPLETED, SETTLED_KIND_NEEDS_CONFIGURATION } from '@contracts/backend/index.ts';
+import { BodyEntryKind } from '@constants/bodyEntry.ts';
+import { ArmedAction } from '@constants/ui.ts';
+import { composerStateAtom } from '@state/ui/composer/index.ts';
+import { PROVIDER_NOT_CONFIGURED_MESSAGE } from '@libs/promptQueue/promptQueue.ts';
+import { activeSurfaceAtom, armedActionAtom, bodyEntriesAtom, bodySelectionAtom, columnsTestOverrideAtom, rowsTestOverrideAtom, Surface } from '@state/ui/index.ts';
+import { backendClientAtom, clipboardClientAtom, productVersionAtom, workspaceCwdAtom } from '@state/global/index.ts';
+import {
+  activeTurnIdAtom,
+  clientOnlyRowsAtom,
+  promptQueueAtom,
+  restoreComposerDraftAtom,
+  transcriptEventAtom
+} from '@state/promptQueue/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
+import { memoryBackendStub } from '@test/backendMemoryStub.ts';
+import { themeBackendStub } from '@test/backendThemeStub.ts';
 
-const workspaceCwd = 'C:\\Users\\kefeiqian\\Projects\\dummy-react-app';
+const workspaceCwd = path.join(os.homedir(), 'Projects', 'dummy-react-app');
 
-function renderApp(backendClient: BackendClient, columns = 80, rows = 40) {
+function renderApp(backendClient: Partial<BackendClient>, columns = 80, rows = 40) {
   const store = createStore();
   store.set(productVersionAtom, '0.1.0');
   store.set(workspaceCwdAtom, workspaceCwd);
   store.set(columnsTestOverrideAtom, columns);
   store.set(rowsTestOverrideAtom, rows);
-  store.set(backendClientAtom, backendClient);
+  const client: BackendClient = {
+    ...memoryBackendStub(),
+    ...themeBackendStub(),
+    submit: async () => undefined,
+    onTranscriptEvent: () => () => {},
+    clearConversation: async () => undefined,
+    cancelTurn: async () => undefined,
+    stopTurn: async () => undefined,
+    gitStatus: async () => null,
+    listProviders: async () => ({ providers: [] }),
+    getActiveSelection: async () => ({ providerId: null, modelId: null }),
+    setActiveSelection: async () => undefined,
+    clearProviderKey: async () => undefined,
+    setProviderKey: async () => ({ outcome: 'unreachable', selectedModel: null }),
+    listModels: async () => ({ status: 'failed', models: [] }),
+    listSessions: async () => ({ sessions: [] }),
+    resumeSession: async () => ({
+      sessionId: 'sess-1',
+      workspaceCwd,
+      canonicalWorkspaceCwd: workspaceCwd,
+      turns: []
+    }),
+    ...backendClient
+  };
+  store.set(backendClientAtom, client);
+  client.onTranscriptEvent((event) => store.set(transcriptEventAtom, event));
   return { store, ...renderWithJotai(<App />, store) };
 }
 
-function echoBackend() {
-  return vi.fn(
-    async ({ text }: MessageSubmitParams): Promise<MessageSubmitResult> => ({
-      message: ACK_MESSAGE,
-      receivedText: text
-    })
-  );
+function eventBackend(reply: (text: string) => string = (text) => `reply: ${text}`) {
+  let handler: ((event: TranscriptEvent) => void) | undefined;
+  const submit = vi.fn(async ({ turnId, text }: StreamSubmitParams) => {
+    handler?.({ type: 'activated', turnId });
+    handler?.({ type: 'tokenDelta', turnId, delta: reply(text) });
+    handler?.({
+      type: 'settled',
+      turnId,
+      result: {
+        kind: SETTLED_KIND_COMPLETED,
+        text: reply(text),
+        finishReason: 'stop',
+        errorKind: null,
+        message: null
+      }
+    });
+  });
+  return { submit, onTranscriptEvent: (next: (event: TranscriptEvent) => void) => {
+    handler = next;
+    return () => {
+      handler = undefined;
+    };
+  } };
 }
 
-async function waitForFrame(
-  getFrame: () => string | undefined,
-  predicate: (frame: string) => boolean
-): Promise<string> {
+function settledBackend(result: TurnResult) {
+  let handler: ((event: TranscriptEvent) => void) | undefined;
+  const submit = vi.fn(async ({ turnId }: StreamSubmitParams) => {
+    handler?.({ type: 'settled', turnId, result });
+  });
+  return {
+    submit,
+    onTranscriptEvent: (next: (event: TranscriptEvent) => void) => {
+      handler = next;
+      return () => {
+        handler = undefined;
+      };
+    }
+  };
+}
+
+async function waitForFrame(getFrame: () => string | undefined, predicate: (frame: string) => boolean) {
   for (let attempt = 0; attempt < 200; attempt += 1) {
     const frame = getFrame() ?? '';
-    if (predicate(frame)) {
-      return frame;
-    }
+    if (predicate(frame)) return frame;
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
   throw new Error(`timed out waiting for frame. Last frame:\n${getFrame() ?? ''}`);
 }
 
-async function submit(stdin: { write: (data: string) => void }, text: string): Promise<void> {
+async function typePrompt(stdin: { write: (data: string) => void }, text: string): Promise<void> {
   stdin.write(text);
   await flushInput();
   stdin.write('\r');
   await flushInput();
 }
 
-describe('App submit and ACK output', () => {
-  it('appends the prompt and the Rust backend ACK when Enter is pressed', async () => {
-    const submitMessage = echoBackend();
-    const { lastFrame, stdin } = renderApp({ submitMessage });
+describe('App submit and event-fed output', () => {
+  it('appends the prompt and mirrors assistant events', async () => {
+    const backend = eventBackend();
+    const { lastFrame, stdin } = renderApp(backend);
 
-    await submit(stdin, 'hello from tui');
+    await typePrompt(stdin, 'hello from tui');
 
-    const frame = await waitForFrame(lastFrame, (output) =>
-      output.includes('Rust backend ACK - received: hello from tui')
-    );
+    const frame = await waitForFrame(lastFrame, (output) => output.includes('reply: hello from tui'));
     expect(frame).toContain('❯ hello from tui');
-    expect(submitMessage).toHaveBeenCalledWith({ text: 'hello from tui' });
-  });
-
-  it('preserves Unicode and surrounding spaces in the backend result', async () => {
-    const submitMessage = echoBackend();
-    const { lastFrame, stdin } = renderApp({ submitMessage }, 120);
-
-    await submit(stdin, ' café ☕ ');
-
-    await waitForFrame(lastFrame, (output) => output.includes('café ☕'));
-    expect(submitMessage).toHaveBeenCalledWith({ text: ' café ☕ ' });
-  });
-
-  it('queues consecutive submits, marking only the later prompts pending', async () => {
-    const pending: Array<{ text: string; resolve: (result: MessageSubmitResult) => void }> = [];
-    const submitMessage = vi.fn(
-      (params: MessageSubmitParams): Promise<MessageSubmitResult> =>
-        new Promise((resolve) => {
-          pending.push({ text: params.text, resolve });
-        })
-    );
-    const { lastFrame, stdin } = renderApp({ submitMessage });
-
-    await submit(stdin, 'first');
-    await submit(stdin, 'second');
-    await submit(stdin, 'third');
-
-    const queuedFrame = await waitForFrame(
-      lastFrame,
-      (output) => output.includes('second (pending)') && output.includes('third (pending)')
-    );
-    expect(submitMessage).toHaveBeenCalledTimes(1);
-    expect(submitMessage).toHaveBeenCalledWith({ text: 'first' });
-    expect(queuedFrame).toContain('❯ first');
-    expect(queuedFrame).not.toContain('first (pending)');
-
-    pending[0]?.resolve({ message: ACK_MESSAGE, receivedText: 'first' });
-
-    const drainedFrame = await waitForFrame(
-      lastFrame,
-      (output) =>
-        output.includes('Rust backend ACK - received: first') && !output.includes('second (pending)')
-    );
-    expect(submitMessage).toHaveBeenCalledTimes(2);
-    expect(submitMessage).toHaveBeenNthCalledWith(2, { text: 'second' });
-    expect(drainedFrame).toContain('third (pending)');
-  });
-
-  it('shows a red backend failure for the matching prompt', async () => {
-    const submitMessage = vi.fn(async (): Promise<MessageSubmitResult> => {
-      throw new BackendClientError(BackendErrorKind.Transport, 'connection died');
-    });
-    const { lastFrame, stdin } = renderApp({ submitMessage });
-
-    await submit(stdin, 'will fail');
-
-    const frame = await waitForFrame(lastFrame, (output) =>
-      output.includes('ERROR: Rust backend failed')
-    );
-    expect(frame).toContain('❯ will fail');
-    expect(frame).toContain('connection died');
+    expect(backend.submit).toHaveBeenCalledWith({ turnId: expect.any(String), text: 'hello from tui' });
   });
 
   it('escapes terminal-control characters in backend output before rendering', async () => {
-    const submitMessage = vi.fn(
-      async (): Promise<MessageSubmitResult> => ({
-        message: ACK_MESSAGE,
-        receivedText: 'evil\u001b[2Jcleared'
-      })
-    );
-    const { lastFrame, stdin } = renderApp({ submitMessage }, 120, 20);
+    const backend = eventBackend(() => 'evil\u001b[2Jcleared');
+    const { lastFrame, stdin } = renderApp(backend, 120, 20);
 
-    await submit(stdin, 'trigger');
+    await typePrompt(stdin, 'trigger');
 
     const frame = await waitForFrame(lastFrame, (output) => output.includes('evil\\x1b[2Jcleared'));
     expect(frame).not.toContain('evil\u001b[2J');
   });
 
   it('does not call the backend for whitespace-only submits', async () => {
-    const submitMessage = echoBackend();
-    const { stdin } = renderApp({ submitMessage });
+    const backend = eventBackend();
+    const { stdin } = renderApp(backend);
 
-    await submit(stdin, '   ');
-    await flushInput();
+    await typePrompt(stdin, '   ');
 
-    expect(submitMessage).not.toHaveBeenCalled();
+    expect(backend.submit).not.toHaveBeenCalled();
   });
 
-  it('posts an unknown slash command and its error into the body without a backend call', async () => {
-    const submitMessage = echoBackend();
-    const { lastFrame, stdin, store } = renderApp({ submitMessage });
+  it('posts an unknown slash command without a backend call', async () => {
+    const backend = eventBackend();
+    const { lastFrame, stdin, store } = renderApp(backend);
 
-    await submit(stdin, '/nope');
+    await typePrompt(stdin, '/nope');
 
-    const frame = await waitForFrame(lastFrame, (output) =>
-      output.includes('Unknown command: /nope')
+    const frame = await waitForFrame(lastFrame, (output) => output.includes('Unknown command: /nope'));
+    expect(backend.submit).not.toHaveBeenCalled();
+    expect(store.get(promptQueueAtom)).toEqual([]);
+    expect(store.get(clientOnlyRowsAtom)).toHaveLength(1);
+  });
+
+  it('renders auth errors and reroutes to Connect with the prompt restored', async () => {
+    const { stdin, store } = renderApp(
+      settledBackend({ kind: 'error', text: null, finishReason: null, errorKind: 'auth', message: 'bad key' })
     );
-    expect(frame).toContain('❯ /nope');
-    expect(submitMessage).not.toHaveBeenCalled();
-    expect(store.get(promptQueueAtom).some((item) => item.state === 'active')).toBe(false);
+
+    await typePrompt(stdin, 'needs a good key');
+
+    await waitForFrame(
+      () => `${store.get(activeSurfaceAtom)}:${store.get(restoreComposerDraftAtom)}`,
+      (state) => state === `${Surface.Connect}:needs a good key`
+    );
+    expect(store.get(promptQueueAtom).at(-1)?.result?.text).toContain('bad key');
+  });
+
+  it('keeps missing provider configuration on the home screen without restoring the prompt', async () => {
+    const { stdin, store } = renderApp(
+      settledBackend({
+        kind: SETTLED_KIND_NEEDS_CONFIGURATION,
+        text: null,
+        finishReason: null,
+        errorKind: 'needsConfiguration',
+        message: PROVIDER_NOT_CONFIGURED_MESSAGE
+      })
+    );
+
+    await typePrompt(stdin, 'hello without config');
+
+    await waitForFrame(
+      () => store.get(promptQueueAtom).at(-1)?.result?.text,
+      (text) => text === PROVIDER_NOT_CONFIGURED_MESSAGE
+    );
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Home);
+    expect(store.get(restoreComposerDraftAtom)).toBe('');
+    expect(store.get(promptQueueAtom).at(-1)?.result).toEqual({
+      kind: BodyEntryKind.System,
+      text: PROVIDER_NOT_CONFIGURED_MESSAGE
+    });
+  });
+});
+
+function streamingBackend() {
+  let handler: ((event: TranscriptEvent) => void) | undefined;
+  const stopTurn = vi.fn(async () => undefined);
+  const cancelTurn = vi.fn(async () => undefined);
+  const submit = vi.fn(async ({ turnId }: StreamSubmitParams) => {
+    handler?.({ type: 'activated', turnId });
+    handler?.({ type: 'tokenDelta', turnId, delta: 'streaming…' });
+    // Intentionally no settled event: the turn stays active (streaming), so
+    // `activeTurnIdAtom` is non-null and Ctrl+C takes the busy-stop path.
+  });
+  return {
+    parts: {
+      submit,
+      stopTurn,
+      cancelTurn,
+      onTranscriptEvent: (next: (event: TranscriptEvent) => void) => {
+        handler = next;
+        return () => {
+          handler = undefined;
+        };
+      }
+    } satisfies Partial<BackendClient>,
+    stopTurn,
+    cancelTurn,
+    submit,
+    fire: (event: TranscriptEvent) => handler?.(event)
+  };
+}
+
+describe('App Ctrl+C stop while streaming', () => {
+  it('stops the running turn without arming exit and preserves the composer draft', async () => {
+    const backend = streamingBackend();
+    const { store, stdin, lastFrame } = renderApp(backend.parts);
+
+    await typePrompt(stdin, 'run something long');
+    await waitForFrame(lastFrame, (frame) => frame.includes('streaming…'));
+    expect(store.get(activeTurnIdAtom)).not.toBeNull();
+
+    stdin.write('draft while streaming');
+    await flushInput();
+    expect(store.get(composerStateAtom).text).toBe('draft while streaming');
+
+    stdin.write('\u0003');
+    await flushInput();
+
+    expect(backend.stopTurn).toHaveBeenCalledTimes(1);
+    expect(backend.cancelTurn).not.toHaveBeenCalled();
+    expect(store.get(armedActionAtom)).toBeNull();
+    expect(store.get(composerStateAtom).text).toBe('draft while streaming');
+  });
+
+  it('arms exit only after the stop settles the session idle', async () => {
+    const backend = streamingBackend();
+    const { store, stdin, lastFrame } = renderApp(backend.parts);
+
+    await typePrompt(stdin, 'go');
+    await waitForFrame(lastFrame, (frame) => frame.includes('streaming…'));
+    const activeTurnId = store.get(activeTurnIdAtom);
+    expect(activeTurnId).not.toBeNull();
+
+    stdin.write('\u0003');
+    await flushInput();
+    expect(backend.stopTurn).toHaveBeenCalledTimes(1);
+    expect(store.get(armedActionAtom)).toBeNull();
+
+    backend.fire({
+      type: 'settled',
+      turnId: activeTurnId as string,
+      result: { kind: SETTLED_KIND_CANCELLED, text: null, finishReason: null, errorKind: null, message: null }
+    });
+    await flushInput();
+    expect(store.get(activeTurnIdAtom)).toBeNull();
+
+    stdin.write('\u0003');
+    await flushInput();
+    expect(store.get(armedActionAtom)).toBe(ArmedAction.Exit);
+  });
+
+  it('absorbs a reflexive Ctrl+C burst without arming exit', async () => {
+    const backend = streamingBackend();
+    const { store, stdin, lastFrame } = renderApp(backend.parts);
+
+    await typePrompt(stdin, 'go');
+    await waitForFrame(lastFrame, (frame) => frame.includes('streaming…'));
+
+    stdin.write('\u0003');
+    stdin.write('\u0003');
+    stdin.write('\u0003');
+    await flushInput();
+
+    expect(backend.stopTurn).toHaveBeenCalled();
+    expect(store.get(armedActionAtom)).toBeNull();
+  });
+
+  it('lets ESC cancel the running turn (not stop) while streaming', async () => {
+    const backend = streamingBackend();
+    const { stdin, lastFrame } = renderApp(backend.parts);
+
+    await typePrompt(stdin, 'go');
+    await waitForFrame(lastFrame, (frame) => frame.includes('streaming…'));
+
+    stdin.write('\u001B'); // Esc
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    expect(backend.cancelTurn).toHaveBeenCalledTimes(1);
+    expect(backend.stopTurn).not.toHaveBeenCalled();
+  });
+
+  it('copies an active transcript selection on Ctrl+C without stopping the turn', async () => {
+    const backend = streamingBackend();
+    const { store, stdin, lastFrame } = renderApp(backend.parts);
+
+    await typePrompt(stdin, 'select this prompt');
+    await waitForFrame(lastFrame, (frame) => frame.includes('streaming…'));
+
+    const writeText = vi.fn().mockResolvedValue(true);
+    store.set(clipboardClientAtom, { readText: vi.fn(), writeText });
+    store.set(bodyEntriesAtom, [{ kind: BodyEntryKind.Success, text: 'copy this line' }]);
+    store.set(bodySelectionAtom, {
+      anchor: { rowIndex: 0, column: 0 },
+      focus: { rowIndex: 0, column: 4 }
+    });
+
+    stdin.write('\u0003');
+    await flushInput();
+
+    expect(writeText).toHaveBeenCalledWith('copy');
+    expect(backend.stopTurn).not.toHaveBeenCalled();
+    expect(store.get(bodySelectionAtom)).toBeNull();
   });
 });

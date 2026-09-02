@@ -1,24 +1,22 @@
-# Submits each new KQode release to the Windows Package Manager community
-# repository (microsoft/winget-pkgs) so `winget install kqode` stays current.
-# Uses vedantmgoyal9/winget-releaser, which reads the release's Windows `.zip`
-# asset, generates the updated manifests, and opens a PR to winget-pkgs from a
-# fork.
+# Submits a KQode release to the Windows Package Manager community repository
+# (microsoft/winget-pkgs) via vedantmgoyal9/winget-releaser, which reads the
+# release's Windows `.zip` asset, regenerates the manifests, and opens a PR to
+# winget-pkgs from your fork.
 #
-# IMPORTANT: winget-releaser UPDATES an EXISTING package — it copies the previous
-# version's manifests (identifier KQode.KQode, Moniker `kqode`, the portable
-# nested-installer metadata) and bumps the version/URL/hash. The very first
-# version must therefore be submitted ONCE by hand; see the one-time bootstrap in
-# docs/release/kqode_distribution_registration.md. Runs before that bootstrap
-# fail with a clear "package does not exist" error.
+# MANUAL BY DESIGN (workflow_dispatch only). winget cannot be fully automated for
+# a third-party repo: opening the cross-fork PR to microsoft/winget-pkgs requires
+# a CLASSIC PAT with `public_repo` (fine-grained tokens and GitHub App tokens
+# cannot create that PR — an App would have to be installed on winget-pkgs, which
+# only Microsoft can do), and Microsoft's "Open Source" enterprise rejects classic
+# PATs whose lifetime exceeds 8 days. So a long-lived WINGET_TOKEN secret is not
+# viable — it would expire within a week.
 #
-# How it runs (mirrors homebrew-publish.yml / npm-publish.yml):
-#   - workflow_run: fires when the "Release" workflow finishes; on a successful
-#     tag-push release it publishes the just-released version. Note that
-#     `release: published` is intentionally NOT a trigger — a GITHUB_TOKEN-created
-#     release does not fire it, and komac is not idempotent per version (a second
-#     run would open a duplicate PR), so hand-published releases use the manual
-#     dispatch below instead.
-#   - workflow_dispatch: manual (re-)publish for a given tag.
+# The token is read from the WINGET_TOKEN *secret*, NOT a workflow input: a
+# workflow_dispatch input value is recorded in the run's UI/API and would leak the
+# token. Refresh the secret with a fresh (<= 7 day) classic PAT right before each
+# run, then dispatch:
+#   gh secret set WINGET_TOKEN --repo kefeiqian/kqode-cli   # paste a fresh <=7-day classic PAT
+#   gh workflow run "Publish winget" --repo kefeiqian/kqode-cli -f tag=vX.Y.Z
 #
 # winget-releaser UPDATES an existing package, so the first KefeiQian.KQode version
 # must be submitted once by hand (bootstrap). Running komac / wingetcreate locally
@@ -33,62 +31,37 @@ on:
         description: "Release tag to publish, e.g. v0.1.0"
         required: true
         type: string
-  workflow_run:
-    workflows: ["Release"]
-    types: [completed]
 
 permissions:
   contents: read
 
 concurrency:
-  group: winget-publish-${{ inputs.tag || github.event.workflow_run.head_sha }}
+  group: winget-publish-${{ inputs.tag }}
   cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    # For workflow_run, only publish after a SUCCESSFUL tag-push release.
-    if: >-
-      github.event_name != 'workflow_run' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push')
     permissions:
-      contents: read # checkout + release API read (github.token, inside the action)
+      contents: read # release API read (github.token, inside the action)
     steps:
-      - uses: actions/checkout@v4
-        with:
-          # Check out the code for version resolution: the released commit for
-          # workflow_run (its head_sha, whose package.json version is read below),
-          # else the workflow's own ref for dispatch (which resolves the version
-          # from the input tag instead). The input tag is not used as the checkout
-          # ref, so a tag predating this workflow can still be dispatched.
-          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
       - name: Ensure winget token is configured
         env:
           WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
         run: |
           if [ -z "$WINGET_TOKEN" ]; then
-            echo "::error::WINGET_TOKEN secret is not set. See docs/release/kqode_distribution_registration.md (winget)."
+            echo "::error::WINGET_TOKEN secret is not set. Set a fresh <=7-day classic PAT (public_repo) right before dispatching. See docs/release/kqode_distribution_registration.md (winget)."
             exit 1
           fi
 
       - name: Resolve version
         id: rel
         env:
-          EVENT: ${{ github.event_name }}
           INPUT_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          if [ "$EVENT" = "workflow_run" ]; then
-            version="$(node -p "require('./packaging/npm/kqode/package.json').version")"
-          else
-            [ -n "$INPUT_TAG" ] || { echo "::error::no release tag provided"; exit 1; }
-            version="${INPUT_TAG#v}"
-          fi
+          [ -n "$INPUT_TAG" ] || { echo "::error::no release tag provided"; exit 1; }
+          version="${INPUT_TAG#v}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
           echo "Resolved winget version: $version (tag v$version)"

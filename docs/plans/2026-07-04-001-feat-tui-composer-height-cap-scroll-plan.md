@@ -1,7 +1,7 @@
 ---
 title: "feat: Composer height cap, hover-routed scroll, and multi-line navigation"
 type: feat
-status: active
+status: completed
 date: 2026-07-04
 origin: docs/brainstorms/2026-07-04-tui-composer-height-cap-and-scroll-requirements.md
 ---

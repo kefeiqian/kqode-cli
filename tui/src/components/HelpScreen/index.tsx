@@ -4,29 +4,31 @@ import { useMemo } from 'react';
 import { buildHelpSections, flattenHelpLines } from '@components/HelpScreen/helpContent.ts';
 import type { HelpLine } from '@components/HelpScreen/helpContent.ts';
 import { clamp } from '@libs/math/clamp.ts';
-import { columnsAtom, rowsAtom } from '@state/ui/index.ts';
+import { columnsAtom, rowsAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
 import {
   closeHelpAtom,
   helpScrollOffsetAtom,
   scrollHelpByRowsAtom
 } from '@state/ui/help/index.ts';
-import { theme } from '@theme/themeConfig.ts';
+import { activeThemeAtom } from '@state/global/index.ts';
 
 /** Bottom hint shown in the pager, mirroring `less`/`more` affordances. */
-const HELP_FOOTER_HINT = '↑/↓ scroll · esc close';
+const HELP_FOOTER_HINT = '↑/↓ scroll · q/esc close';
 
 /**
  * Fullscreen `/help` viewer. Rendered in place of the home screen (see `App`),
  * it pages through the command + keybinding reference: `↑/↓` and `page up/down`
- * scroll, `esc` returns to the transcript. The content area fills every row
+ * scroll, `q`/`esc` returns to the transcript. The content area fills every row
  * above a fixed footer, so the layout stays pinned like the rest of the TUI.
  */
 export function HelpScreen() {
   const columns = useAtomValue(columnsAtom);
+  const safeChromeColumns = useAtomValue(safeChromeColumnsAtom);
   const rows = useAtomValue(rowsAtom);
   const scrollOffset = useAtomValue(helpScrollOffsetAtom);
   const closeHelp = useSetAtom(closeHelpAtom);
   const scrollBy = useSetAtom(scrollHelpByRowsAtom);
+  const theme = useAtomValue(activeThemeAtom);
 
   const lines = useMemo(() => flattenHelpLines(buildHelpSections()), []);
   const visibleRows = Math.max(1, rows - 1);
@@ -34,8 +36,8 @@ export function HelpScreen() {
   const offset = clamp(scrollOffset, 0, maxOffset);
   const pageRows = Math.max(1, visibleRows - 1);
 
-  useInput((_input, key) => {
-    if (key.escape) {
+  useInput((input, key) => {
+    if (key.escape || input === 'q') {
       closeHelp();
       return;
     }
@@ -70,12 +72,14 @@ export function HelpScreen() {
           <HelpRow key={index} line={visible[index]} />
         ))}
       </Box>
-      <HelpFooter columns={columns} offset={offset} maxOffset={maxOffset} />
+      <HelpFooter columns={safeChromeColumns} offset={offset} maxOffset={maxOffset} />
     </Box>
   );
 }
 
 function HelpRow({ line }: { line: HelpLine | undefined }) {
+  const theme = useAtomValue(activeThemeAtom);
+
   if (line === undefined || line.kind === 'blank') {
     return <Text> </Text>;
   }
@@ -97,6 +101,7 @@ function HelpFooter({
   offset: number;
   maxOffset: number;
 }) {
+  const theme = useAtomValue(activeThemeAtom);
   const position = scrollPositionLabel(offset, maxOffset);
 
   return (

@@ -6,8 +6,10 @@ This catalog lists the open-source and public-reference coding-agent implementat
 
 | Project | Repository | Primary lessons for KQode |
 |---|---|---|
+| GitHub Copilot CLI | `https://github.com/github/copilot-cli` | Terminal Copilot workflow, GitHub-native auth and model access, approvals, and headless/CI usage patterns. |
 | Codex CLI | `https://github.com/openai/codex` | Terminal-first coding agent, approvals, sandbox policy, project instructions, session resume, subagents, MCP, local code review, web search, headless mode. |
 | Kimi Code CLI | `https://github.com/moonshotai/kimi-code` | Fast TUI, video input, conversational MCP config, plugin trust model, hooks, ACP, sessions, exports, provider management. |
+| KimiX | `https://github.com/Sikao-Engine/KimiX` | Lightweight coding-agent CLI shape, minimal-footprint tooling, and provider-agnostic agent loop patterns. |
 | Gemini CLI | `https://github.com/google-gemini/gemini-cli` | GEMINI.md context, checkpointing, rewind, headless JSON/stream-json, policy engine, trusted folders, token caching, GitHub Action automation, evals. |
 | Aider | `https://github.com/Aider-AI/aider` | Git-native edit loop, repo map, model-specific edit formats, auto lint/test loop, watch comments, voice, image/web context, polyglot benchmark. |
 | OpenCode | `https://github.com/anomalyco/opencode` | Terminal product shape, build/plan primary agents, subagent hierarchy, LSP diagnostics, custom agents/commands, session sharing, themes, keybindings. |
@@ -33,8 +35,8 @@ This catalog lists the open-source and public-reference coding-agent implementat
 
 | Product | Reference value |
 |---|---|
-| Claude Code | Product benchmark for terminal coding-agent UX, permissions, tool use, memory, skills, and workflow depth. Do not use leaked/proprietary source as implementation material. |
-| GitHub Copilot CLI / Copilot Coding Agent | Reference for GitHub-native coding workflows and possible model access paths. |
+| Claude Code | Product benchmark for terminal coding-agent UX, permissions, tool use, memory, skills, and workflow depth. Do not use leaked/proprietary source as implementation material. The `kqode-research` skill studies it only from a git-ignored local mirror at `docs/claude-code`. |
+| GitHub Copilot Coding Agent | Reference for GitHub-native async/cloud coding workflows and model access paths. (The Copilot CLI itself is now an open-source primary reference above.) |
 | Cursor | Reference for editor-native agent UX and codebase interaction. |
 | Windsurf | Reference for IDE-agent workflow and user-facing product polish. |
 
@@ -82,4 +84,4 @@ Everything else is later proof-of-depth.
 
 ## Research workflow
 
-Use `.agents/skills/kqode-research/SKILL.md` for repeatable source-grounded research over these repositories. Research reports live under `docs/research` and should record analyzed commit SHAs, cite source evidence, separate observed reference behavior from KQode lessons, and preserve the no-source-copying boundary.
+Use `.agents/skills/kqode-research/SKILL.md` for repeatable source-grounded research over these repositories. The skill's default research scope is KQode's referenced coding-agent list from `blog/docs/01-KQode介绍.md` (Copilot CLI, Codex, Gemini CLI, OpenCode, Kimi Code, KimiX) plus Claude Code, which is read from a git-ignored local mirror at `docs/claude-code` and cited with internal repo-relative links. Research reports live under `docs/research` and should record analyzed commit SHAs (or mirror provenance), cite source evidence, separate observed reference behavior from KQode lessons, and preserve the no-source-copying boundary.

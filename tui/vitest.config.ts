@@ -26,6 +26,12 @@ export default defineConfig({
     }
   },
   test: {
-    environment: 'node'
+    environment: 'node',
+    // Disable backend debug logging for the integration tests that spawn the
+    // real Rust backend, so they never write under the real `~/.kqode/logs`
+    // (the dev build defaults it on). buildHardenedEnv allowlists KQODE_DEBUG.
+    env: {
+      KQODE_DEBUG: '0'
+    }
   }
 });

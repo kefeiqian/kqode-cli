@@ -1,0 +1,139 @@
+import { createStore } from 'jotai';
+import { describe, expect, it, vi } from 'vitest';
+import type { BackendClient, ProviderStatusInfo } from '@contracts/backend/index.ts';
+import { PROVIDER_STATUS_CONNECTED, PROVIDER_STATUS_NOT_CONFIGURED } from '@contracts/backend/index.ts';
+import { backendClientAtom } from '@state/global/index.ts';
+import { memoryBackendStub } from '@test/backendMemoryStub.ts';
+import { themeBackendStub } from '@test/backendThemeStub.ts';
+import {
+  activeSurfaceAtom,
+  closeActiveSurfaceAtom,
+  openMemorySurfaceAtom,
+  openConnectSurfaceAtom,
+  openModelSurfaceAtom,
+  Surface
+} from '@state/ui/surface/index.ts';
+import { helpVisibleAtom, openHelpAtom } from '@state/ui/help/index.ts';
+import { MemoryMode, memoryModeAtom } from '@state/ui/memory/index.ts';
+
+const provider = (status: ProviderStatusInfo['status']): ProviderStatusInfo => ({
+  providerId: `provider-${status}`,
+  label: `Provider ${status}`,
+  baseUrl: null,
+  defaultModel: status === PROVIDER_STATUS_CONNECTED ? 'default-model' : null,
+  status,
+  credentialSource: status === PROVIDER_STATUS_CONNECTED ? 'keychain' : null
+});
+
+const clientWithProviders = (providers: ProviderStatusInfo[]): BackendClient => ({
+  ...memoryBackendStub(),
+  ...themeBackendStub(),
+  submit: vi.fn(),
+  onTranscriptEvent: () => () => undefined,
+  clearConversation: async () => undefined,
+  cancelTurn: async () => undefined,
+  stopTurn: async () => undefined,
+  gitStatus: async () => null,
+  listProviders: async () => ({ providers }),
+  getActiveSelection: async () => ({ providerId: null, modelId: null }),
+  setActiveSelection: async () => {},
+  clearProviderKey: async () => {},
+  setProviderKey: async () => ({ outcome: 'unreachable', selectedModel: null }),
+  listModels: async () => ({ status: 'failed', models: [] }),
+  listSessions: async () => ({ sessions: [] }),
+  resumeSession: async () => ({
+    sessionId: 'sess-1',
+    workspaceCwd: 'C:\\workspace',
+    canonicalWorkspaceCwd: 'C:\\workspace',
+    turns: []
+  })
+});
+
+function deferredProviders() {
+  let resolve!: (providers: ProviderStatusInfo[]) => void;
+  const promise = new Promise<ProviderStatusInfo[]>((innerResolve) => {
+    resolve = innerResolve;
+  });
+  return { promise, resolve };
+}
+
+describe('surface atoms', () => {
+  it('starts on home and opens exactly one named surface at a time', () => {
+    const store = createStore();
+
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Home);
+
+    store.set(openConnectSurfaceAtom);
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Connect);
+    expect(store.get(helpVisibleAtom)).toBe(false);
+
+    store.set(openHelpAtom);
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Help);
+    expect(store.get(helpVisibleAtom)).toBe(true);
+  });
+
+  it('closes the active surface back to home for Esc handlers', () => {
+    const store = createStore();
+    store.set(openConnectSurfaceAtom);
+
+    store.set(closeActiveSurfaceAtom);
+
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Home);
+  });
+
+  it('folds the help visible selector into the active surface', () => {
+    const store = createStore();
+
+    store.set(helpVisibleAtom, true);
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Help);
+
+    store.set(helpVisibleAtom, false);
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Home);
+  });
+
+  it('opens model when a provider is connected', async () => {
+    const store = createStore();
+    store.set(backendClientAtom, clientWithProviders([provider(PROVIDER_STATUS_CONNECTED)]));
+
+    await store.set(openModelSurfaceAtom);
+
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Model);
+  });
+
+  it('opens model when no provider is connected', async () => {
+    const store = createStore();
+    store.set(backendClientAtom, clientWithProviders([provider(PROVIDER_STATUS_NOT_CONFIGURED)]));
+
+    await store.set(openModelSurfaceAtom);
+
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Model);
+  });
+
+  it('opens memory with an explicit initial mode and resets to active by default', () => {
+    const store = createStore();
+
+    store.set(openMemorySurfaceAtom, MemoryMode.Inbox);
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Memory);
+    expect(store.get(memoryModeAtom)).toBe(MemoryMode.Inbox);
+
+    store.set(closeActiveSurfaceAtom);
+    store.set(openMemorySurfaceAtom);
+    expect(store.get(memoryModeAtom)).toBe(MemoryMode.Active);
+  });
+
+  it('does not let a stale model status read overwrite newer navigation', async () => {
+    const store = createStore();
+    const pending = deferredProviders();
+    store.set(backendClientAtom, {
+      ...clientWithProviders([]),
+      listProviders: async () => ({ providers: await pending.promise })
+    });
+
+    const openModel = store.set(openModelSurfaceAtom);
+    store.set(openConnectSurfaceAtom);
+    pending.resolve([provider(PROVIDER_STATUS_CONNECTED)]);
+    await openModel;
+
+    expect(store.get(activeSurfaceAtom)).toBe(Surface.Connect);
+  });
+});

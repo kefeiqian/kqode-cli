@@ -148,10 +148,10 @@ KQode currently has a starter Rust binary and a checked-in starter TypeScript TU
 
 ### Local Data Handling
 
-- [x] Store KQode local data (such as the packaged backend cache) under the current user's profile directory at `~/.kqcode/`, not inside the workspace repository.
-- [x] Create `~/.kqcode/` with per-user permissions where the platform supports it (for example `0700` for directories and `0600` for files on Unix-like systems).
+- [x] Store KQode local data (such as the packaged backend cache) under the current user's profile directory at `~/.kqode/`, not inside the workspace repository.
+- [x] Create `~/.kqode/` with per-user permissions where the platform supports it (for example `0700` for directories and `0600` for files on Unix-like systems).
 - [x] Do not persist environment variables, provider keys, tokens, or raw process environments to local KQode data.
-- [x] Provide a documented local path for clearing KQode local data; this slice may document manual deletion of `~/.kqcode/` before a first-class delete command exists.
+- [x] Provide a documented local path for clearing KQode local data; this slice may document manual deletion of `~/.kqode/` before a first-class delete command exists.
 
 ---
 
@@ -369,7 +369,7 @@ Source mode and packaged mode share the same JSON-RPC contract. Source mode laun
 ## Implementation Units
 Each implementation unit is intended to be landed as one atomic commit-sized change. If implementation reveals a unit is too large to review as one commit, split the unit without renumbering existing U-IDs.
 
-After each commit-sized unit lands, run code review on the completed unit, then pause for user review and wait for explicit consent before starting the next unit.
+After each commit-sized unit lands, run code review on the completed unit, then continue with the next unit without pausing for user review or consent.
 
 > Reconciliation note (2026-07-01): Units were re-aligned with delivered work. The standalone executable moved from U11 to **U9**; new as-built units **U10** (TUI state/backend architecture hardening) and **U11** (terminal control and rendering robustness) capture added features; the deferred SQLite session store and `/resume` picker were moved into the LLM provider/streaming-chat plan (`2026-06-30-001-feat-llm-provider-streaming-chat-plan.md`) as units **U9** and **U10**. This was a deliberate, user-directed reconciliation rather than a routine split. The exit-summary card, Gemini-style theming, and LLM provider streaming chat are tracked in their own plans and are intentionally out of scope here.
 >
@@ -770,7 +770,7 @@ After each commit-sized unit lands, run code review on the completed unit, then 
 - [x] Bundle and compile the packaged Ink entry `tui/packaged/entry.packaged.tsx` with `Bun.build({ compile })` in `tui/scripts/buildPackaged.ts`, injecting `KQODE_DISTRIBUTION`, `KQODE_VERSION`, and `KQODE_BACKEND_SHA256` as build-time defines and stubbing the optional `react-devtools-core` import.
 - [x] Produce the native executable at `tui/dist/kqode[.exe]` with no sibling `node_modules` tree required at runtime.
 - [x] Compile the Rust backend in release mode and stage it as an embeddable asset (`tui/packaged/assets/kqode-backend`, surfaced through `tui/packaged/embeddedBackendAsset.ts`), recording its SHA-256 for runtime verification.
-- [x] At runtime, materialize the embedded backend into a content-addressed per-user cache at `~/.kqcode/backends/<version>/<sha256>/kqode-backend[.exe]` before launching it (`tui/src/backend/packaged/`).
+- [x] At runtime, materialize the embedded backend into a content-addressed per-user cache at `~/.kqode/backends/<version>/<sha256>/kqode-backend[.exe]` before launching it (`tui/src/backend/packaged/`).
 - [x] Harden backend materialization: user-only permissions where supported, create-new/atomic replacement semantics, never follow symlinks, avoid shared world-writable temp paths, verify the materialized backend SHA-256 against the embedded digest before every packaged-mode spawn, and re-materialize with a race fallback on mismatch; if verification still fails, show a red backend materialization error and do not spawn.
 - [x] Packaged executable mode must use only the packaged backend asset; source mode must always use Cargo, even if generated artifacts exist.
 - [x] Keep generated artifacts under `tui/dist/` ignored unless the repository later decides to commit release artifacts.
@@ -792,7 +792,7 @@ After each commit-sized unit lands, run code review on the completed unit, then 
 
 **Verification:**
 - [x] A developer can build `tui/dist/kqode[.exe]`, run it directly from the terminal, submit text, and see the Rust JSON-RPC ACK without running a separate backend command.
-- [x] Delivered by the implementation commits above: `cargo xtask package` builds the release backend and Bun-compiles `tui/dist/kqode[.exe]`, which materializes and hash-verifies the embedded backend from `~/.kqcode/backends/<version>/<sha256>/` before reaching the local ACK path.
+- [x] Delivered by the implementation commits above: `cargo xtask package` builds the release backend and Bun-compiles `tui/dist/kqode[.exe]`, which materializes and hash-verifies the embedded backend from `~/.kqode/backends/<version>/<sha256>/` before reaching the local ACK path.
 
 ---
 

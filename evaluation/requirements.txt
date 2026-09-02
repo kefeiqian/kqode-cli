@@ -1,0 +1,10 @@
+# EvalPlus dependency for the KQode eval baseline.
+#
+# The AUTHORITATIVE, reproducible pin is the grader container image digest
+# recorded per run in RunConfig (see evaluation/compose.yaml), NOT this file:
+# grading and prompt-dumping both run inside `ganler/evalplus@sha256:...`, which
+# has evalplus + the HumanEval+/MBPP+ datasets baked in.
+#
+# This file only matters if you install evalplus locally (not required for the
+# container-driven flow). The pinned image currently ships evalplus 0.4.0.dev2.
+evalplus @ git+https://github.com/evalplus/evalplus@v0.3.1

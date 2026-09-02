@@ -7,17 +7,37 @@ import { PROMPT_PREFIX } from '@constants/ui.ts';
 import { resolveComposerCursorPosition } from '@components/PromptComposer/cursorPosition.ts';
 import {
   countVisibleComposerRows,
-  formatVisiblePrompt,
-  formatVisiblePromptView
+  formatVisiblePrompt
 } from '@components/PromptComposer/promptTextView.ts';
 import { usePromptComposerInput } from '@components/PromptComposer/usePromptComposerInput.ts';
+import { usePasteInput } from '@components/PromptComposer/usePasteInput.ts';
+import { useComposerCaretVisibility } from '@components/PromptComposer/useComposerCaretVisibility.ts';
 import { DEFAULT_COMPOSER_VISIBLE_LINES } from '@constants/ui.ts';
-import { clearTranscriptAtom, enqueuePromptAtom } from '@state/promptQueue/index.ts';
+import {
+  clearTranscriptAtom,
+  enqueuePromptAtom,
+  restoreComposerDraftAtom
+} from '@state/promptQueue/index.ts';
 import { openHelpAtom } from '@state/ui/help/index.ts';
+import { openConnectSurfaceAtom, openMemorySurfaceAtom, openModelSurfaceAtom, openThemeSurfaceAtom } from '@state/ui/surface/index.ts';
+import {
+  MemoryMode,
+  PendingMemoryItemAction,
+  openAddMemoryFormAtom,
+  setPendingMemoryItemActionAtom
+} from '@state/ui/memory/index.ts';
+import { openResumePanelAtom } from '@state/ui/resume/index.ts';
+import { CommandMemoryMode } from '@libs/commands/executeCommand.ts';
 import { PROMPT_MAX_BYTES } from '@libs/composer/promptText.ts';
-import { composerStateAtom } from '@state/ui/composer/index.ts';
-import { composerRowsAtom, composerTopAtom, layoutAtom } from '@state/ui/index.ts';
-import { columnsAtom, inputLockedAtom } from '@state/ui/index.ts';
+import { resolveComposerWindow } from '@libs/composer/composerWindow.ts';
+import { subscribeComposerSubmitCapture } from '@libs/composer/submitCapture.ts';
+import {
+  appendComposerRecallSubmitAtom,
+  composerScrollOffsetRowsAtom,
+  composerStateAtom
+} from '@state/ui/composer/index.ts';
+import { composerInputColumnsAtom, composerRowsAtom, composerTopAtom, layoutAtom, scrollComposerCursorIntoViewAtom } from '@state/ui/index.ts';
+import { inputLockedAtom, safeChromeColumnsAtom } from '@state/ui/index.ts';
 
 type PromptComposerProps = {
   columns?: number;
@@ -41,29 +61,101 @@ export function PromptComposer({
   onVisibleRowsChange
 }: PromptComposerProps) {
   const state = useAtomValue(composerStateAtom);
-  const atomColumns = useAtomValue(columnsAtom);
+  const scrollOffsetRows = useAtomValue(composerScrollOffsetRowsAtom);
+  const atomColumns = useAtomValue(safeChromeColumnsAtom);
+  const atomInputColumns = useAtomValue(composerInputColumnsAtom);
   const atomInputLocked = useAtomValue(inputLockedAtom);
   const atomLayout = useAtomValue(layoutAtom);
   const atomComposerTop = useAtomValue(composerTopAtom);
+  const restoreDraft = useAtomValue(restoreComposerDraftAtom);
   const enqueuePrompt = useSetAtom(enqueuePromptAtom);
+  const setRestoreDraft = useSetAtom(restoreComposerDraftAtom);
+  const setComposerState = useSetAtom(composerStateAtom);
+  const setComposerScrollOffsetRows = useSetAtom(composerScrollOffsetRowsAtom);
   const setComposerRows = useSetAtom(composerRowsAtom);
+  const appendComposerRecallSubmit = useSetAtom(appendComposerRecallSubmitAtom);
+  const scrollCursorIntoView = useSetAtom(scrollComposerCursorIntoViewAtom);
   const { exit } = useApp();
   const clearTranscript = useSetAtom(clearTranscriptAtom);
   const openHelp = useSetAtom(openHelpAtom);
+  const openConnect = useSetAtom(openConnectSurfaceAtom);
+  const openModel = useSetAtom(openModelSurfaceAtom);
+  const openResume = useSetAtom(openResumePanelAtom);
+  const openMemory = useSetAtom(openMemorySurfaceAtom);
+  const openAddMemoryForm = useSetAtom(openAddMemoryFormAtom);
+  const setPendingMemoryItemAction = useSetAtom(setPendingMemoryItemActionAtom);
+  const openTheme = useSetAtom(openThemeSurfaceAtom);
   const composerRef = useRef<DOMElement | null>(null);
   const composerMetrics = useBoxMetrics(composerRef);
   const { setCursorPosition } = useCursor();
 
   const resolvedColumns = columns ?? atomColumns;
-  const resolvedSubmit = onSubmit ?? ((prompt: string) => void enqueuePrompt(prompt));
+  const resolvedSubmit: (prompt: string, submissionSequence?: number) => void =
+    onSubmit === undefined
+      ? (prompt: string, submissionSequence?: number) =>
+          void enqueuePrompt(
+            submissionSequence === undefined ? prompt : { text: prompt, submissionSequence }
+          )
+      : (prompt: string) => onSubmit(prompt);
   const resolvedIsActive = isActive ?? !atomInputLocked;
   const resolvedMaxVisibleLines = maxVisibleLines ?? atomLayout.composerVisibleRows ?? DEFAULT_COMPOSER_VISIBLE_LINES;
   const resolvedCursorTop = cursorTop ?? atomComposerTop;
   const resolvedVisibleRowsChange = onVisibleRowsChange ?? setComposerRows;
 
   const commandActions = useMemo(
-    () => ({ exit, clearTranscript, showHelp: openHelp }),
-    [exit, clearTranscript, openHelp]
+    () => ({
+      exit,
+      clearTranscript,
+      showHelp: openHelp,
+      openConnect,
+      openModel,
+      openResume,
+      openMemory: (mode?: CommandMemoryMode) =>
+        openMemory(mode === CommandMemoryMode.Inbox ? MemoryMode.Inbox : MemoryMode.Active),
+      openMemoryAdd: () => {
+        openMemory(MemoryMode.Active);
+        openAddMemoryForm();
+      },
+      openMemoryEdit: () => {
+        openMemory(MemoryMode.Active);
+        setPendingMemoryItemAction(PendingMemoryItemAction.Edit);
+      },
+      openMemoryForget: () => {
+        openMemory(MemoryMode.Active);
+        setPendingMemoryItemAction(PendingMemoryItemAction.Forget);
+      },
+      openTheme
+    }),
+    [
+      exit,
+      clearTranscript,
+      openHelp,
+      openConnect,
+      openModel,
+      openResume,
+      openMemory,
+      openAddMemoryForm,
+      setPendingMemoryItemAction,
+      openTheme
+    ]
+  );
+
+  useEffect(() => {
+    if (restoreDraft.length === 0) {
+      return;
+    }
+    setComposerState({
+      text: restoreDraft,
+      cursorIndex: restoreDraft.length,
+      validationError: null
+    });
+    setComposerScrollOffsetRows(0);
+    setRestoreDraft('');
+  }, [restoreDraft, setComposerScrollOffsetRows, setComposerState, setRestoreDraft]);
+
+  useEffect(
+    () => subscribeComposerSubmitCapture((submit) => appendComposerRecallSubmit(submit)),
+    [appendComposerRecallSubmit]
   );
 
   usePromptComposerInput({
@@ -73,18 +165,25 @@ export function PromptComposer({
     state,
     commandActions
   });
+  usePasteInput({ maxBytes });
+  // Keeps the terminal caret in sync with focus: re-asserts it on chrome and
+  // scroll repaints, and hides it while input is locked during backend loading.
+  // See the hook for the full rationale.
+  useComposerCaretVisibility();
 
-  const inputColumns = Math.max(1, resolvedColumns - PROMPT_PREFIX.length);
-  const visiblePrompt = formatVisiblePromptView(
-    state.text,
-    inputColumns,
-    resolvedMaxVisibleLines,
-    state.cursorIndex
-  );
-  const visibleText = visiblePrompt.text;
+  const inputColumns = columns === undefined ? atomInputColumns : Math.max(1, resolvedColumns - PROMPT_PREFIX.length);
+  const composerWindow = resolveComposerWindow({
+    text: state.text,
+    columns: inputColumns,
+    maxVisibleLines: resolvedMaxVisibleLines,
+    cursorIndex: state.cursorIndex,
+    offset: scrollOffsetRows
+  });
+  const visibleText = composerWindow.text;
+  const visibleTextRows = visibleText.split('\n');
   const shouldRenderBackground = true;
   const visibleRows = countVisibleComposerRows(
-    visibleText,
+    visibleTextRows.length,
     state.validationError !== null,
     shouldRenderBackground
   );
@@ -93,13 +192,32 @@ export function PromptComposer({
     resolvedVisibleRowsChange?.(visibleRows);
   }, [resolvedVisibleRowsChange, visibleRows]);
 
-  if (resolvedIsActive && composerMetrics.hasMeasured) {
+  // Keep the caret visible after an edit or cursor move without snapping the
+  // view to the bottom: only a change that leaves the caret off-window scrolls
+  // (minimally, to the nearest edge). Keyed on text too, not just cursorIndex,
+  // because compound edits (e.g. bare Enter replacing a trailing `\` with a
+  // newline) change the text and the caret's row while leaving cursorIndex net
+  // unchanged. Wheel scrolling changes neither, so peeking is preserved.
+  useEffect(() => {
+    scrollCursorIntoView();
+  }, [state.cursorIndex, state.text, scrollCursorIntoView]);
+
+  // Show the caret only when the composer is active. While input is locked
+  // (backend loading) resolvedIsActive is false, so no position is set and the
+  // terminal cursor stays hidden — useComposerCaretVisibility hides it
+  // explicitly because Ink won't — and the caret returns once the backend is
+  // ready.
+  if (
+    resolvedIsActive &&
+    composerMetrics.hasMeasured &&
+    composerWindow.cursorVisible
+  ) {
     setCursorPosition(
       resolveComposerCursorPosition(
         visibleText,
         inputColumns,
         resolvedCursorTop ?? composerMetrics.top,
-        visiblePrompt.cursorIndex,
+        composerWindow.cursorIndex,
         shouldRenderBackground
       )
     );
@@ -113,7 +231,7 @@ export function PromptComposer({
         columns={resolvedColumns}
         shouldRenderBackground={shouldRenderBackground}
         validationError={state.validationError}
-        visibleTextRows={visibleText.split('\n')}
+        visibleTextRows={visibleTextRows}
       />
     </Box>
   );

@@ -35,15 +35,16 @@ status: complete | partial | blocked | cancelled
 | Repo | Requested URL | Resolved URL | Branch | SHA | Status | Notes |
 |---|---|---|---|---|---|---|
 | codex | https://github.com/openai/codex | https://github.com/openai/codex | main | abc1234 | complete |  |
+| claude-code | docs/claude-code (local mirror) | n/a | n/a | ac63139 | complete | local mirror; internal-link citations |
 
 ---
 
 ## Method
 
 - Question: <research question>
-- Repo scope: <default first-scope | custom>
+- Repo scope: <default scope | custom>
 - Safety posture: read/search only; no code execution; reference instructions treated as data.
-- Citation format: numbered references such as `[\[1\]][ref-1]`; References entries keep commit-pinned source URLs behind compact `code` links.
+- Citation format: numbered references such as `[\[1\]][ref-1]`; References entries keep commit-pinned source URLs (or internal repo-relative links for the Claude Code mirror) behind compact `code` links.
 
 ---
 
@@ -66,9 +67,9 @@ status: complete | partial | blocked | cancelled
 
 ## Cross-Repo Comparison
 
-| Dimension | Codex | Aider | OpenCode | Kimi Code | Gemini CLI | SWE-agent | Confidence |
-|---|---|---|---|---|---|---|---|
-| Prompt ingestion | <cited summary> | <cited summary> | <cited summary> | <cited summary> | <cited summary> | <cited summary> | high / partial / low |
+| Dimension | Copilot CLI | Claude Code | Codex | Gemini CLI | OpenCode | Kimi Code | KimiX | Confidence |
+|---|---|---|---|---|---|---|---|---|
+| Prompt ingestion | <cited summary> | <cited summary> | <cited summary> | <cited summary> | <cited summary> | <cited summary> | <cited summary> | high / partial / low |
 
 ---
 
@@ -103,7 +104,7 @@ status: complete | partial | blocked | cancelled
 Body citations use these numbered source references; each entry keeps the code URL behind a compact `code` link.
 
 - <a id="ref-1"></a>[1] <Repo display name>: <what this citation supports> ([code](<commit-pinned-source-url>)).
-- <a id="ref-2"></a>[2] <Repo display name>: <what this citation supports> ([code](<commit-pinned-source-url>)).
+- <a id="ref-2"></a>[2] Claude Code (local mirror): <what this citation supports> ([code](../claude-code/<path>#Lstart-Lend)).
 
 [ref-1]: #ref-1
 [ref-2]: #ref-2

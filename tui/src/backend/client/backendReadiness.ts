@@ -6,12 +6,14 @@ import {
   StreamMessageWriter
 } from 'vscode-jsonrpc/node';
 import { BackendClientError, BackendErrorKind } from '@contracts/backend/index.ts';
+import { STORE_FAILURE_EXIT_CODE, STORE_FATAL_SENTINEL } from '@constants/backend.ts';
 import { backendReadyNotification } from '@backend/protocol/messageProtocol.ts';
-import type { LaunchedBackend } from '@backend/process/backendProcess.ts';
+import type { BackendExit, LaunchedBackend } from '@backend/process/backendProcess.ts';
 
 /**
- * Resolves once `connection` receives the backend readiness notification, or
- * rejects when `startupTimeoutMs` elapses or the transport dies first.
+ * Resolves with the backend-minted session id once `connection` receives the
+ * readiness notification, or rejects when `startupTimeoutMs` elapses or the
+ * transport dies first.
  *
  * Readiness now means "the backend signaled JSON-RPC readiness," not "the OS
  * spawned the process," so this guards the real failure mode of a backend that
@@ -28,9 +30,10 @@ import type { LaunchedBackend } from '@backend/process/backendProcess.ts';
  */
 export function waitForBackendReady(
   connection: MessageConnection,
+  backend: LaunchedBackend,
   startupTimeoutMs: number
-): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
+): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
     const registrations: Disposable[] = [];
     let settled = false;
 
@@ -57,15 +60,49 @@ export function waitForBackendReady(
       );
     }, startupTimeoutMs);
 
-    const rejectDied = (reason: string): void =>
-      settle(() => reject(new BackendClientError(BackendErrorKind.Transport, reason)));
+    const rejectDied = (reason: string, exit?: BackendExit): void => {
+      settle(() =>
+        reject(
+          new BackendClientError(
+            BackendErrorKind.Launch,
+            startupFailureMessage(backend, reason, exit)
+          )
+        )
+      );
+    };
 
     registrations.push(
-      connection.onNotification(backendReadyNotification, () => settle(resolve)),
-      connection.onClose(() => rejectDied('backend connection closed before it reported readiness')),
-      connection.onError(() => rejectDied('backend connection errored before it reported readiness'))
+      connection.onNotification(backendReadyNotification, ({ sessionId }) =>
+        settle(() => resolve(sessionId))
+      ),
+      connection.onClose(() =>
+        rejectDied('backend connection closed before it reported readiness')
+      ),
+      connection.onError(() =>
+        rejectDied('backend connection errored before it reported readiness')
+      )
     );
+    backend.onExit((exit) => rejectDied('backend exited before it reported readiness', exit));
   });
+}
+
+function startupFailureMessage(
+  backend: LaunchedBackend,
+  fallback: string,
+  exit: BackendExit | undefined
+): string {
+  const stderr = backend.stderrText().trim();
+  if (
+    stderr.startsWith(STORE_FATAL_SENTINEL) &&
+    (exit === undefined || exit.code === STORE_FAILURE_EXIT_CODE)
+  ) {
+    return stderr;
+  }
+  if (exit !== undefined) {
+    const ended = exit.signal === null ? `code ${exit.code ?? 'null'}` : `signal ${exit.signal}`;
+    return `${fallback} (${ended})`;
+  }
+  return fallback;
 }
 
 /** Inputs for {@link openReadyConnection}: a launched process and its teardown hook. */
@@ -73,7 +110,13 @@ export type OpenReadyConnectionOptions = {
   backend: LaunchedBackend;
   startupTimeoutMs: number;
   /** Invoked when the connection closes/errors or the process exits (fatal teardown). */
-  onFatal: () => void;
+  onFatal: (exit?: BackendExit) => void;
+};
+
+/** A ready JSON-RPC connection paired with the session id the backend announced. */
+export type ReadyConnection = {
+  connection: MessageConnection;
+  sessionId: string;
 };
 
 /**
@@ -95,23 +138,24 @@ export async function openReadyConnection({
   backend,
   startupTimeoutMs,
   onFatal
-}: OpenReadyConnectionOptions): Promise<MessageConnection> {
+}: OpenReadyConnectionOptions): Promise<ReadyConnection> {
   const connection = createMessageConnection(
     new StreamMessageReader(backend.stdout),
     new StreamMessageWriter(backend.stdin)
   );
-  connection.onClose(onFatal);
-  connection.onError(onFatal);
+  connection.onClose(() => onFatal());
+  connection.onError(() => onFatal());
   backend.onExit(onFatal);
 
-  const ready = waitForBackendReady(connection, startupTimeoutMs);
+  const ready = waitForBackendReady(connection, backend, startupTimeoutMs);
   connection.listen();
+  let sessionId: string;
   try {
-    await ready;
+    sessionId = await ready;
   } catch (error) {
     connection.dispose();
     backend.dispose();
     throw error;
   }
-  return connection;
+  return { connection, sessionId };
 }

@@ -40,11 +40,12 @@ For the nested TUI package, prefer Cargo-facing xtask commands instead of runnin
 cargo xtask tui-install
 cargo xtask tui-typecheck
 cargo xtask tui-test
-cargo xtask tui-dev    # run the TUI from TypeScript source against a workspace fixture
-cargo xtask tui-prod   # package the standalone kqode binary and run it from the workspace
+cargo xtask tui-dev       # run the TUI from TypeScript source against a workspace fixture
+cargo xtask tui-dev-here  # run the TUI from TypeScript source against the terminal cwd
+cargo xtask tui-prod      # package the standalone kqode binary and run it from the workspace
 ```
 
-`tui-dev` and `tui-prod` both run against a workspace fixture; seed one first with `cargo xtask fixture-prepare-react-simple` (or `fixture-prepare-react-complex`) to skip the interactive fixture prompt.
+`tui-dev` and `tui-prod` both run against a workspace fixture; seed one first with `cargo xtask fixture-prepare-react-simple` (or `fixture-prepare-react-complex`) to skip the interactive fixture prompt. Use `tui-dev-here` through `scripts/xtask.sh`/`scripts/xtask.ps1` from another project directory when source-mode TUI should see that directory as its cwd.
 
 For the Docusaurus blog/docs site under `blog/`, prefer Cargo-facing xtask commands instead of running package-manager commands directly:
 
@@ -57,7 +58,14 @@ cargo xtask blog-serve-en
 cargo xtask blog-preview
 ```
 
-Running two or more `cargo xtask` commands at once fails on Windows: `cargo xtask` expands to `cargo run -p xtask`, which relinks the shared `target\debug\xtask.exe` on each call, and a long-running command keeps that executable locked so the next call cannot replace it (os error 32, or os error 5 on the remove step). To run long-lived or multiple commands in parallel, use the launcher, which builds once then runs a per-invocation copy under `target/debug/xtask-run/`:
+`cargo xtask` is parallel-safe on Windows: the alias builds and runs xtask in a private `target\xtask` directory (separate from the workspace `target\`), so ordinary fast commands never relink a binary another `cargo xtask` or a `cargo build --workspace` is holding. Run fast commands normally, including concurrently:
+
+```powershell
+cargo xtask tui-typecheck
+cargo xtask blog-build
+```
+
+The long-running servers (`blog-serve`, `blog-serve-en`, `blog-preview`, `tui-dev`, `tui-dev-here`, `tui-prod`) hold the binary for their whole session, so run those through the launcher — it builds once, then runs a per-invocation copy under `target\xtask\debug\xtask-run\`, leaving the canonical binary free to relink:
 
 ```powershell
 ./scripts/xtask.ps1 blog-serve   # Windows (PowerShell)
@@ -67,7 +75,7 @@ Running two or more `cargo xtask` commands at once fails on Windows: `cargo xtas
 ./scripts/xtask.sh blog-serve    # macOS/Linux
 ```
 
-Keep xtask command modules as thin wrappers around reusable implementation modules. When adding or renaming an xtask command, add a matching checked-in IDE run profile under `.run/` using the `xtask: <command>` naming pattern.
+Keep xtask command modules as thin wrappers around reusable implementation modules. When adding or renaming an xtask command, add a matching checked-in IDE run profile under `.run/` using the `xtask: <command>` naming pattern, with its Cargo command routed through the `xtask` alias (`xtask <command>`) so IDE runs inherit the private-dir isolation.
 
 ## Architecture
 
@@ -119,6 +127,17 @@ For functions that can fail in non-obvious ways, include a `# Errors` section. U
 - Start evaluation with deterministic harness tests before provider or benchmark tests. The first golden tasks should dogfood KQode on this repository.
 - `docs/solutions/` holds documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (`module`, `tags`, `problem_type`); relevant when implementing or debugging in documented areas.
 
+## Provider configuration and storage
+
+Provider credentials and the active `(provider, model)` selection are **user-global**. Workspace `.env` files are loaded only for development toggles such as `KQODE_DEBUG`; they do not configure provider credentials, model ids, or base URLs.
+
+- **SQLite index** at `~/.kqode/kqode.db` holds non-secret provider settings + the active selection (plus a provisional sessions/turns spine). It is a rebuildable index over the JSONL transcript truth, opened/migrated at backend init via compile-time-embedded, forward-only `refinery` migrations (`refinery_schema_history`). The store is now fail-closed: any DB open/migrate/sanity failure prevents `kqode.backend.ready`, exits with the store-fatal code, and prints a `KQODE_STORE_FATAL:` remedy. The DB is **never auto-deleted**. The store holds **no key material** — only a non-secret `key_present` bit.
+- **Pre-`refinery` reset:** databases created by the former `user_version` runner (or dirty app tables without `refinery_schema_history`) are not auto-baselined. Delete `~/.kqode/kqode.db` plus `~/.kqode/kqode.db-wal` and `~/.kqode/kqode.db-shm`, then restart; the index rebuilds from JSONL. A `refinery` DB still reports `PRAGMA user_version = 0`, so running a pre-`refinery` binary against it looks like a fresh DB to that older binary.
+- **OS keychain** holds API keys under the service constant `com.nincere.kqode.providers`, keyed by provider id (`kimi`/`custom`). Keys are validated before storage and never logged, serialized, or written to the DB/JSONL. When the keychain is unavailable, `/login` refuses to store and asks the user to retry after the OS keychain is available.
+- **Preset vs Custom:** the preset Kimi base URL is a compiled constant and Kimi is configured via `/login` (keychain) **only**. The **Custom** provider is also `/login`-only: its API key lives in the OS keychain and its validated HTTPS base URL is persisted in the SQLite provider settings row.
+- **Commands:** `/login` connects or clears a provider (masked key entry; the key never enters a Jotai atom, only component-local state → the set-key request); `/model` picks the active model across connected providers.
+- `rusqlite` (bundled), `keyring`, `secrecy`, and `tempfile` (dev) are in the dependency graph for store/keychain work; `bundled` `rusqlite` compiles SQLite via `cc` (a C toolchain requirement in the otherwise pure-Rust/rustls graph).
+
 ## Commit workflow
 
-Implement plan work one commit-sized unit at a time. After each commit, run code review on the completed unit, then pause for user review and wait for explicit consent before starting the next commit.
+Implement plan work one commit-sized unit at a time. After each commit, run code review on the completed unit, then continue with the next commit without pausing for user review or consent.

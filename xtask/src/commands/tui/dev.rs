@@ -1,24 +1,43 @@
 use std::{
     io::{self, Write},
-    path::Path,
+    path::{Path, PathBuf},
     process::Command,
 };
 
 use crate::{
-    commands::{CommandSpec, fixture},
+    commands::{
+        CommandSpec, fixture,
+        tui::args::{forwarded_tui_args, source_tui_args},
+    },
     support::{bun, paths},
 };
 
 pub fn run(repo_root: &Path) -> Result<(), String> {
-    ensure_workspace(repo_root)?;
+    let workspace = ensure_workspace(repo_root)?;
+    run_with_workspace(repo_root, &workspace, forwarded_tui_args())
+}
+
+/// Runs the source TUI with `workspace` as the application working directory.
+///
+/// This keeps the source-mode launch path aligned with the packaged executable:
+/// the TypeScript entrypoint is resolved from the KQode repository, while
+/// `process.cwd()` inside the TUI points at the project the user wants to work
+/// in.
+///
+/// # Errors
+///
+/// Returns an error when dependencies cannot be installed, `tsx` cannot be
+/// started, or the TUI exits unsuccessfully.
+pub(crate) fn run_with_workspace(
+    repo_root: &Path,
+    workspace: &Path,
+    forwarded_args: impl IntoIterator<Item = std::ffi::OsString>,
+) -> Result<(), String> {
     bun::ensure_tui_dependencies(repo_root)?;
 
-    let workspace = paths::workspace(repo_root);
     let status = Command::new(paths::tui_bin(repo_root, "tsx"))
-        .arg("--tsconfig")
-        .arg(paths::tui_tsconfig(repo_root))
-        .arg(paths::tui_entrypoint(repo_root))
-        .current_dir(&workspace)
+        .args(source_tui_args(repo_root, forwarded_args))
+        .current_dir(workspace)
         .status()
         .map_err(|error| format!("run TUI dev command: {error}"))?;
 
@@ -39,14 +58,16 @@ pub fn run(repo_root: &Path) -> Result<(), String> {
 ///
 /// Returns an error when the existing workspace is incomplete, the fixture
 /// selection cannot be read, or the selected fixture command fails.
-pub(crate) fn ensure_workspace(repo_root: &Path) -> Result<(), String> {
+pub(crate) fn ensure_workspace(repo_root: &Path) -> Result<PathBuf, String> {
     let workspace = paths::workspace(repo_root);
 
     if workspace.is_dir() {
-        ensure_workspace_ready(&workspace)
+        ensure_workspace_ready(&workspace)?;
     } else {
-        prepare_selected_fixture(repo_root)
+        prepare_selected_fixture(repo_root)?;
     }
+
+    Ok(workspace)
 }
 
 fn ensure_workspace_ready(workspace: &Path) -> Result<(), String> {

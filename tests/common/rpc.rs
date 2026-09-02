@@ -1,14 +1,33 @@
 use std::{
     io::Write,
+    path::Path,
     process::{Command, Output, Stdio},
 };
 
 use kqode::protocol::{BACKEND_MODE_ARG, BACKEND_READY_METHOD};
 use serde_json::{Value, json};
 
+#[allow(dead_code)]
 pub fn backend_output(input: &[u8]) -> Output {
+    let home = tempfile::tempdir().expect("backend test home");
+    backend_output_in(home.path(), Path::new("."), input)
+}
+
+pub fn backend_output_in(home: &Path, cwd: &Path, input: &[u8]) -> Output {
     let mut child = Command::new(env!("CARGO_BIN_EXE_kqode"))
         .arg(BACKEND_MODE_ARG)
+        .current_dir(cwd)
+        .env("HOME", home)
+        .env("USERPROFILE", home)
+        // Use the in-memory mock keyring so the spawned backend never reads the
+        // developer's real OS keychain (which is process-global and not scoped
+        // by HOME/USERPROFILE). This keeps provider credentials unavailable, so
+        // integration tests are deterministic and never issue a live provider
+        // call, regardless of what the developer has connected via `/login`.
+        .env(kqode::secrets::KEYCHAIN_BACKEND_ENV, "mock")
+        // Disable debug logging so the test-spawned backend never writes under
+        // the real `~/.kqode/logs` (the dev build defaults it on).
+        .env("KQODE_DEBUG", "0")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -71,6 +90,7 @@ pub fn parse_stdout_frames(stdout: &[u8]) -> Vec<Value> {
 /// Every backend run now emits a one-shot [`BACKEND_READY_METHOD`] notification
 /// before it handles requests, so response-oriented tests skip that first frame
 /// while still asserting it was announced correctly.
+#[allow(dead_code)]
 pub fn response_frames(stdout: &[u8]) -> Vec<Value> {
     let mut frames = parse_stdout_frames(stdout);
     assert!(

@@ -1,13 +1,20 @@
 import type { ComposerKeyHandler } from '@components/PromptComposer/input/types.ts';
-import { appendUnknownCommandAtom } from '@state/promptQueue/index.ts';
-import { executeCommand } from '@libs/commands/executeCommand.ts';
+import { appendUnknownCommandNoticeAtom } from '@state/promptQueue/index.ts';
+import { executeMenuSelection } from '@libs/commands/executeCommand.ts';
+import { entryFullName } from '@libs/commands/subcommands.ts';
+import { validateComposerSubmit } from '@libs/composer/promptText.ts';
+import { captureComposerSubmit, SubmitCaptureKind } from '@libs/composer/submitCapture.ts';
 import {
   commandMenuDismissedAtom,
   commandMenuOpenAtom,
-  highlightedCommandAtom,
+  highlightedEntryAtom,
   moveCommandHighlightAtom
 } from '@state/ui/commands/index.ts';
-import { clearComposerAtom, insertComposerTextAtom } from '@state/ui/composer/index.ts';
+import {
+  clearComposerAtom,
+  insertComposerTextAtom,
+  setComposerValidationErrorAtom
+} from '@state/ui/composer/index.ts';
 
 /**
  * Keyboard behavior for the slash-command menu, colocated with its rendering.
@@ -25,7 +32,7 @@ export const handleMenuKey: ComposerKeyHandler = (context) => {
     return false;
   }
 
-  const highlightedCommand = store.get(highlightedCommandAtom);
+  const highlightedEntry = store.get(highlightedEntryAtom);
 
   if (key.upArrow) {
     store.set(moveCommandHighlightAtom, -1);
@@ -38,9 +45,13 @@ export const handleMenuKey: ComposerKeyHandler = (context) => {
   }
 
   if (key.tab) {
-    if (highlightedCommand !== undefined) {
+    if (highlightedEntry !== undefined) {
+      const fullName = entryFullName(highlightedEntry);
+      if (state.text.trim() === fullName) {
+        return true;
+      }
       store.set(clearComposerAtom);
-      store.set(insertComposerTextAtom, { maxBytes, text: highlightedCommand.name });
+      store.set(insertComposerTextAtom, { maxBytes, text: fullName });
     }
     return true;
   }
@@ -51,10 +62,26 @@ export const handleMenuKey: ComposerKeyHandler = (context) => {
   }
 
   if (key.return) {
-    if (highlightedCommand !== undefined) {
-      executeCommand(highlightedCommand.id, commandActions);
+    const validation = validateComposerSubmit(state.text, maxBytes);
+    if (!validation.ok) {
+      if (validation.reason === 'over-limit') {
+        store.set(setComposerValidationErrorAtom, validation.message);
+      }
+      return true;
+    }
+
+    if (highlightedEntry !== undefined) {
+      captureComposerSubmit({ kind: SubmitCaptureKind.MenuCommand, text: entryFullName(highlightedEntry) });
+      executeMenuSelection(highlightedEntry, commandActions);
     } else {
-      store.set(appendUnknownCommandAtom, state.text);
+      const captured = captureComposerSubmit({
+        kind: SubmitCaptureKind.UnknownCommand,
+        text: validation.text
+      });
+      store.set(appendUnknownCommandNoticeAtom, {
+        text: validation.text,
+        submissionSequence: captured.sequence
+      });
     }
     store.set(clearComposerAtom);
     return true;

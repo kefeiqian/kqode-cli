@@ -1,128 +1,255 @@
 import { atom } from 'jotai';
 import type { Getter, Setter } from 'jotai';
-import { BodyEntryKind } from '@constants/bodyEntry.ts';
-import { sanitizeDisplayText } from '@libs/text/sanitizeDisplayText.ts';
-import { unknownCommandMessage } from '@libs/commands/unknownCommand.ts';
-import { backendClientAtom } from '@state/global/index.ts';
-import { bodyScrollOffsetRowsAtom, submittedPromptEntriesAtom } from '@state/ui/index.ts';
+import { STREAM_RENDER_FLUSH_MS } from '@constants/backend.ts';
+import { PRODUCT_NAME } from '@constants/product.ts';
+import { setTerminalWindowTitle } from '@libs/terminal/windowTitle.ts';
 import {
-  BACKEND_UNAVAILABLE_MESSAGE,
-  backendErrorMessage,
-  queueToBodyEntries
-} from '@libs/promptQueue/promptQueue.ts';
-import type { BackendResult, QueueItem } from '@libs/promptQueue/promptQueue.ts';
-
-let nextQueueItemId = 0;
-
-/** Ordered record of submitted prompts and their backend outcomes. */
-export const promptQueueAtom = atom<QueueItem[]>([]);
-
-const drainingAtom = atom(false);
-
-/**
- * Appends a submitted prompt and drains the backend queue one request at a time.
- *
- * The prompt is shown immediately: the first item is active with no marker and
- * later items render `(pending)` until they become active. Raw text is sent to
- * the backend while only sanitized text reaches the body, and validation/queue
- * state stays in memory for this slice.
- */
-export const enqueuePromptAtom = atom(null, async (get, set, rawText: string) => {
-  const hasActive = get(promptQueueAtom).some((item) => item.state === 'active');
-  const item: QueueItem = {
-    id: nextQueueItemId++,
-    text: rawText,
-    state: hasActive ? 'queued' : 'active'
-  };
-
-  set(promptQueueAtom, (queue) => [...queue, item]);
-  set(bodyScrollOffsetRowsAtom, 0);
-  syncBodyEntries(get, set);
-  await drainQueue(get, set);
-});
-
-/** Clears all transcript entries (prompts and results) and resets scroll. */
-export const clearTranscriptAtom = atom(null, (get, set) => {
-  set(promptQueueAtom, []);
-  set(bodyScrollOffsetRowsAtom, 0);
-  syncBodyEntries(get, set);
-});
-
-/**
- * Records an unknown `/command` submission in the transcript instead of the
- * composer: the raw text renders as a prompt entry and a red error entry names
- * the unmatched command. The item is pre-settled so the backend queue never
- * sends it, mirroring how a real prompt and its result appear in the body.
- */
-export const appendUnknownCommandAtom = atom(null, (get, set, rawText: string) => {
-  const item: QueueItem = {
-    id: nextQueueItemId++,
-    text: rawText,
-    state: 'settled',
-    result: { kind: BodyEntryKind.Error, text: sanitizeDisplayText(unknownCommandMessage(rawText)) }
-  };
-
-  set(promptQueueAtom, (queue) => [...queue, item]);
-  set(bodyScrollOffsetRowsAtom, 0);
-  syncBodyEntries(get, set);
-});
-
-async function drainQueue(get: Getter, set: Setter): Promise<void> {
-  if (get(drainingAtom)) {
+  BackendClientError,
+  BackendErrorKind,
+  SETTLED_KIND_COMPLETED
+} from '@contracts/backend/index.ts';
+import type { TranscriptEvent } from '@contracts/backend/index.ts';
+import type { SessionResumeResult } from '@contracts/backend/index.ts';
+import { backendClientAtom, currentSessionIdAtom, productVersionAtom } from '@state/global/index.ts';
+import { bodyScrollOffsetRowsAtom, maxBodyScrollOffsetRowsAtom } from '@state/ui/index.ts';
+import { openConnectSurfaceAtom } from '@state/ui/surface/index.ts';
+import { refreshGitStatusAtom } from '@state/ui/index.ts';
+import { createDeltaCoalescer } from '@libs/promptQueue/streamCoalescer.ts';
+import { resolveFollowScrollOffset } from '@libs/tui/followScroll.ts';
+import { BACKEND_UNAVAILABLE_MESSAGE, backendErrorMessage } from '@libs/promptQueue/promptQueue.ts';
+import type { QueueItem } from '@libs/promptQueue/promptQueue.ts';
+import { hydrateResumeTranscript } from '@state/promptQueue/hydrateResumeTranscript.ts';
+import { reduceTranscriptEvent } from '@libs/promptQueue/transcriptReducer.ts';
+import { appendClientOnlyError, sequencedText } from '@state/promptQueue/clientOnlyRows.ts';
+import {
+  conversationGenerationAtom,
+  clientOnlyRowsAtom,
+  nextClientOnlyRowIdAtom,
+  nextQueueItemIdAtom,
+  nextSubmissionSequenceAtom,
+  promptQueueAtom,
+  activeTurnIdAtom,
+  settledTurnIdsAtom,
+  streamingTextByIdAtom,
+  transcriptReducerStateAtom,
+  turnGenerationByIdAtom,
+  turnInFlightAtom
+} from '@state/promptQueue/store.ts';
+export {
+  activeTurnIdAtom,
+  clientOnlyRowsAtom,
+  conversationGenerationAtom,
+  nextClientOnlyRowIdAtom,
+  nextQueueItemIdAtom,
+  nextSubmissionSequenceAtom,
+  promptQueueAtom,
+  settledTurnIdsAtom,
+  streamingTextByIdAtom,
+  turnGenerationByIdAtom,
+  turnInFlightAtom
+};
+const localTurnIdPrefix = 'local-turn';
+let fallbackTurnCounter = 0;
+const deltaCoalescers = new Map<string, ReturnType<typeof createDeltaCoalescer>>();
+export const restoreComposerDraftAtom = atom('');
+/** Factory for caller-side backend turn ids, injected by the composition root. */
+export const newTurnIdAtom = atom({ newTurnId: () => `${localTurnIdPrefix}-${fallbackTurnCounter++}` });
+/** Appends a prompt optimistically and submits its caller-minted turn id. */
+export const enqueuePromptAtom = atom(
+  null,
+  async (get, set, input: string | { text: string; submissionSequence: number }) => {
+    const { text: rawText, submissionSequence } = sequencedText(get, set, input);
+    const backendClient = get(backendClientAtom);
+    const turnId = get(newTurnIdAtom).newTurnId();
+    const item: QueueItem = {
+      id: get(nextQueueItemIdAtom),
+      turnId,
+      submissionSequence,
+      text: rawText,
+      state: 'active'
+    };
+    set(nextQueueItemIdAtom, item.id + 1);
+    set(promptQueueAtom, (queue) => [...queue, item]);
+    set(bodyScrollOffsetRowsAtom, 0);
+    if (backendClient === undefined) {
+      appendClientOnlyError(get, set, submissionSequence, BACKEND_UNAVAILABLE_MESSAGE);
+      settleLocalSubmitFailure(set, turnId);
+      return;
+    }
+    try {
+      await backendClient.submit({ turnId, text: rawText });
+    } catch (error) {
+      if (isDiscardedSubmit(error)) {
+        discardLocalSubmit(set, turnId);
+        return;
+      }
+      appendClientOnlyError(get, set, submissionSequence, backendErrorMessage(error));
+      settleLocalSubmitFailure(set, turnId);
+    }
+  }
+);
+/** Applies one backend transcript event to the local read-model. */
+export const transcriptEventAtom = atom(null, (get, set, event: TranscriptEvent) => {
+  if (event.type === 'tokenDelta') {
+    coalesceDelta(set, event);
     return;
   }
-
-  set(drainingAtom, true);
-  try {
-    let active = findActive(get);
-    while (active !== undefined) {
-      const result = await runBackendRequest(get, active.text);
-      settleActive(get, set, active.id, result);
-      active = findActive(get);
-    }
-  } finally {
-    set(drainingAtom, false);
+  if (event.type === 'sessionSummaryUpdated') {
+    // Handled at the runtime layer (live terminal title); no transcript effect.
+    return;
+  }
+  flushCoalescer(event.turnId);
+  applyTranscriptEvent(get, set, event);
+  if (event.type === 'settled') {
+    cancelCoalescer(event.turnId);
+  }
+});
+const coalescedTranscriptEventAtom = atom(null, (get, set, event: TranscriptEvent) => {
+  applyTranscriptEvent(get, set, event);
+});
+/** Clears all transcript entries locally and asks the backend to clear too. */
+export const clearTranscriptAtom = atom(null, (get, set) => {
+  clearAllCoalescers();
+  bumpGeneration(set);
+  ignoreTurnIds(set, visibleTurnIds(get(promptQueueAtom)));
+  set(promptQueueAtom, []);
+  set(clientOnlyRowsAtom, []);
+  set(streamingTextByIdAtom, new Map());
+  set(turnGenerationByIdAtom, new Map());
+  set(bodyScrollOffsetRowsAtom, 0);
+  set(currentSessionIdAtom, undefined);
+  // Reset the terminal title from the prior session's summary back to the
+  // product title (`KQode v<version>`), matching the startup title so a cleared
+  // session never leaves a stale summary in the tab. Fresh sessions keep this
+  // title until the backend-generated summary lands.
+  setTerminalWindowTitle(PRODUCT_NAME, get(productVersionAtom));
+  void get(backendClientAtom)?.clearConversation().catch(() => undefined);
+});
+/** Bumps generation on backend respawn and drops backend-owned mirror rows. */
+export const resetTranscriptMirrorAtom = atom(null, (get, set) => {
+  clearAllCoalescers();
+  bumpGeneration(set);
+  const generations = get(turnGenerationByIdAtom);
+  ignoreTurnIds(
+    set,
+    visibleTurnIds(get(promptQueueAtom)).filter((turnId) => generations.has(turnId))
+  );
+  set(promptQueueAtom, (queue) =>
+    queue.filter((item) => item.turnId === undefined || !generations.has(item.turnId))
+  );
+  set(streamingTextByIdAtom, new Map());
+  set(turnGenerationByIdAtom, new Map());
+  set(currentSessionIdAtom, undefined);
+});
+/** Rehydrates the backend-owned transcript mirror from a resumed session payload. */
+export const hydrateResumedTranscriptAtom = atom(
+  null,
+  (get, set, resumed: SessionResumeResult) => {
+    clearAllCoalescers();
+    const nextGeneration = get(conversationGenerationAtom) + 1;
+    const hydrated = hydrateResumeTranscript(resumed.turns, nextGeneration);
+    set(conversationGenerationAtom, nextGeneration);
+    set(promptQueueAtom, hydrated.queue);
+    set(clientOnlyRowsAtom, []);
+    set(streamingTextByIdAtom, hydrated.streamingTextById);
+    set(turnGenerationByIdAtom, hydrated.generationByTurnId);
+    set(settledTurnIdsAtom, hydrated.settledTurnIds);
+    set(nextQueueItemIdAtom, hydrated.nextQueueItemId);
+    set(bodyScrollOffsetRowsAtom, 0);
+    set(currentSessionIdAtom, resumed.sessionId);
+  }
+);
+function applyTranscriptEvent(get: Getter, set: Setter, event: TranscriptEvent): void {
+  const previousOffset = get(bodyScrollOffsetRowsAtom);
+  const previousMaxOffset = get(maxBodyScrollOffsetRowsAtom);
+  const result = reduceTranscriptEvent(
+    get(transcriptReducerStateAtom),
+    event,
+    get(conversationGenerationAtom)
+  );
+  set(promptQueueAtom, result.state.queue);
+  set(streamingTextByIdAtom, result.state.streamingTextById);
+  set(turnGenerationByIdAtom, result.state.generationByTurnId);
+  set(settledTurnIdsAtom, result.state.settledTurnIds);
+  set(nextQueueItemIdAtom, result.state.nextQueueItemId);
+  // Follow the newest output only while pinned to the bottom. Once the reader
+  // has scrolled up, keep their place as the transcript grows instead of
+  // snapping back to the end on every streaming flush.
+  set(
+    bodyScrollOffsetRowsAtom,
+    resolveFollowScrollOffset({
+      previousOffset,
+      previousMaxOffset,
+      nextMaxOffset: get(maxBodyScrollOffsetRowsAtom)
+    })
+  );
+  if (event.type === 'settled' && event.result.kind === SETTLED_KIND_COMPLETED) {
+    void set(refreshGitStatusAtom);
+  }
+  if (result.effect !== undefined) {
+    rerouteSubmit(get, set, result.effect);
   }
 }
-
-async function runBackendRequest(get: Getter, text: string): Promise<BackendResult> {
-  const backendClient = get(backendClientAtom);
-  if (backendClient === undefined) {
-    return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(BACKEND_UNAVAILABLE_MESSAGE) };
+function coalesceDelta(
+  set: Setter,
+  event: Extract<TranscriptEvent, { type: 'tokenDelta' }>
+): void {
+  const coalescer =
+    deltaCoalescers.get(event.turnId) ??
+    createDeltaCoalescer((delta) => {
+      set(coalescedTranscriptEventAtom, { ...event, delta });
+    }, STREAM_RENDER_FLUSH_MS);
+  deltaCoalescers.set(event.turnId, coalescer);
+  coalescer.push(event.delta);
+}
+function rerouteSubmit(
+  get: Getter,
+  set: Setter,
+  effect: { type: 'auth'; turnText: string }
+): void {
+  if (get(restoreComposerDraftAtom) === '') {
+    set(restoreComposerDraftAtom, effect.turnText);
+    set(openConnectSurfaceAtom);
   }
-
-  try {
-    const ack = await backendClient.submitMessage({ text });
-    return {
-      kind: BodyEntryKind.Success,
-      text: sanitizeDisplayText(`Rust backend ACK - received: ${ack.receivedText}`)
-    };
-  } catch (error) {
-    return { kind: BodyEntryKind.Error, text: sanitizeDisplayText(backendErrorMessage(error)) };
+}
+function bumpGeneration(set: Setter): void {
+  set(conversationGenerationAtom, (generation) => generation + 1);
+}
+function flushCoalescer(turnId: string): void {
+  deltaCoalescers.get(turnId)?.flush();
+}
+function cancelCoalescer(turnId: string): void {
+  deltaCoalescers.get(turnId)?.cancel();
+  deltaCoalescers.delete(turnId);
+}
+function clearAllCoalescers(): void {
+  for (const coalescer of deltaCoalescers.values()) {
+    coalescer.cancel();
   }
+  deltaCoalescers.clear();
+}
+function visibleTurnIds(queue: readonly QueueItem[]): string[] {
+  return queue.flatMap((item) => (item.turnId === undefined ? [] : [item.turnId]));
+}
+function ignoreTurnIds(set: Setter, turnIds: readonly string[]): void {
+  if (turnIds.length === 0) {
+    return;
+  }
+  set(settledTurnIdsAtom, (previous) => new Set([...previous, ...turnIds]));
 }
 
-function settleActive(get: Getter, set: Setter, id: number, result: BackendResult): void {
-  set(promptQueueAtom, (queue) => {
-    let promoted = false;
-    return queue.map((item) => {
-      if (item.id === id) {
-        return { ...item, state: 'settled' as const, result };
-      }
-      if (!promoted && item.state === 'queued') {
-        promoted = true;
-        return { ...item, state: 'active' as const };
-      }
-      return item;
-    });
-  });
-  syncBodyEntries(get, set);
+function settleLocalSubmitFailure(set: Setter, turnId: string): void {
+  set(promptQueueAtom, (queue) =>
+    queue.map((item) => (item.turnId === turnId ? { ...item, state: 'settled' } : item))
+  );
+  set(settledTurnIdsAtom, (turnIds) => new Set([...turnIds, turnId]));
 }
 
-function findActive(get: Getter): QueueItem | undefined {
-  return get(promptQueueAtom).find((item) => item.state === 'active');
+function discardLocalSubmit(set: Setter, turnId: string): void {
+  set(promptQueueAtom, (queue) => queue.filter((item) => item.turnId !== turnId));
+  set(settledTurnIdsAtom, (turnIds) => new Set([...turnIds, turnId]));
 }
 
-function syncBodyEntries(get: Getter, set: Setter): void {
-  set(submittedPromptEntriesAtom, queueToBodyEntries(get(promptQueueAtom)));
+function isDiscardedSubmit(error: unknown): boolean {
+  return error instanceof BackendClientError && error.kind === BackendErrorKind.Discarded;
 }

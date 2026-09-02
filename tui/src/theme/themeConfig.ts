@@ -1,15 +1,15 @@
-// Palette derived from the Dracula theme (https://draculatheme.com, MIT License).
-export const theme = {
-  colors: {
-    bodyBackground: '#282A36',
-    foreground: '#F8F8F2',
-    muted: '#6272A4',
-    accentBlue: '#8BE9FD',
-    accentGreen: '#50FA7B',
-    warning: '#F1FA8C',
-    errorRed: '#FF5555',
-    border: '#44475A',
-    messageBackground: '#44475A',
-    inputBackground: '#44475A'
-  }
-} as const;
+import { DEFAULT_THEME } from '@theme/themeCatalog.ts';
+
+export {
+  DEFAULT_THEME,
+  DEFAULT_THEME_ID,
+  THEME_CATALOG,
+  findTheme,
+  isBuiltInThemeId,
+  resolveTheme
+} from '@theme/themeCatalog.ts';
+export { ThemeId } from '@theme/themeTypes.ts';
+export type { ThemeColors, ThemeDefinition, ThemeSource } from '@theme/themeTypes.ts';
+
+/** Current default theme used by static consumers until active theme state lands. */
+export const theme = DEFAULT_THEME;

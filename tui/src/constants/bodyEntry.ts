@@ -13,8 +13,12 @@ export const BodyEntryKind = {
   Pending: 'pending',
   /** A successful command or backend result. */
   Success: 'success',
+  /** Non-error guidance emitted by the client or backend. */
+  System: 'system',
   /** A failed command or backend result. */
-  Error: 'error'
+  Error: 'error',
+  /** A muted non-error terminal result, such as a cancelled backend turn. */
+  Muted: 'muted'
 } as const;
 
 export type BodyEntryKind = (typeof BodyEntryKind)[keyof typeof BodyEntryKind];

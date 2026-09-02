@@ -1,12 +1,21 @@
-import { useWindowSize } from 'ink';
+import { useInput, useWindowSize } from 'ink';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useLayoutEffect } from 'react';
 import { HelpScreen } from '@components/HelpScreen/index.tsx';
 import { HomeScreen } from '@components/HomeScreen/index.tsx';
 import { TerminalTooSmall } from '@components/TerminalTooSmall.tsx';
 import { useGlobalKeys } from '@/useGlobalKeys.ts';
-import { terminalTooSmallAtom, windowColumnsAtom, windowRowsAtom } from '@state/ui/index.ts';
-import { helpVisibleAtom } from '@state/ui/help/index.ts';
+import {
+  activeSurfaceAtom,
+  armedActionAtom,
+  closeActiveSurfaceAtom,
+  Surface,
+  terminalTooSmallAtom,
+  windowColumnsAtom,
+  windowRowsAtom
+} from '@state/ui/index.ts';
+import { memorySurfaceConsumesEscAtom } from '@state/ui/memory/index.ts';
+import { modelSurfaceConsumesEscAtom } from '@state/ui/model/index.ts';
 
 export function App() {
   useGlobalKeys();
@@ -14,7 +23,24 @@ export function App() {
   const setWindowColumns = useSetAtom(windowColumnsAtom);
   const setWindowRows = useSetAtom(windowRowsAtom);
   const tooSmall = useAtomValue(terminalTooSmallAtom);
-  const helpVisible = useAtomValue(helpVisibleAtom);
+  const activeSurface = useAtomValue(activeSurfaceAtom);
+  const closeActiveSurface = useSetAtom(closeActiveSurfaceAtom);
+  const setArmedAction = useSetAtom(armedActionAtom);
+  const memoryConsumesEsc = useAtomValue(memorySurfaceConsumesEscAtom);
+  const modelConsumesEsc = useAtomValue(modelSurfaceConsumesEscAtom);
+
+  useInput((_input, key) => {
+    if (
+      key.escape &&
+      activeSurface !== Surface.Home &&
+      activeSurface !== Surface.Connect &&
+      !(activeSurface === Surface.Model && modelConsumesEsc) &&
+      !(activeSurface === Surface.Memory && memoryConsumesEsc)
+    ) {
+      setArmedAction(null);
+      closeActiveSurface();
+    }
+  });
 
   useLayoutEffect(() => {
     setWindowColumns(windowSize.columns);
@@ -25,5 +51,14 @@ export function App() {
     return <TerminalTooSmall />;
   }
 
-  return helpVisible ? <HelpScreen /> : <HomeScreen />;
+  switch (activeSurface) {
+    case Surface.Help:
+      return <HelpScreen />;
+    case Surface.Home:
+    case Surface.Theme:
+    case Surface.Model:
+    case Surface.Memory:
+    case Surface.Connect:
+      return <HomeScreen />;
+  }
 }

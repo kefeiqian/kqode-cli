@@ -5,10 +5,11 @@ import { describe, expect, it } from 'vitest';
 
 const srcRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-// Display components and shared UI state must reach the backend only through the
-// injected BackendClient interface, never through process/launch mechanics.
+// Display components and shared UI state must reach backend/clipboard process
+// mechanics only through injected seams, never by importing process launch code.
 const FORBIDDEN_REFERENCES = [
   'node:child_process',
+  'systemClipboard',
   'backendProcess',
   'backendBuild',
   'createBackendClient',

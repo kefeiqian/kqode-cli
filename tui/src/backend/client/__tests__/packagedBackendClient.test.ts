@@ -32,7 +32,9 @@ describe('createPackagedBackendClient', () => {
       cacheBaseDir: tempCacheBase()
     });
 
-    await expect(client.submitMessage({ text: 'hello' })).rejects.toMatchObject({
+    await expect(
+      client.submit({ turnId: 'turn-1', text: 'hello' })
+    ).rejects.toMatchObject({
       kind: BackendErrorKind.Launch
     });
     expect(client.getState()).toBe(BackendLifecycleState.Dead);

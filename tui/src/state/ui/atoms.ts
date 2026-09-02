@@ -1,23 +1,43 @@
 import { atom } from 'jotai';
 import { countBodyRows, DEFAULT_BODY_ENTRIES } from '@libs/tui/bodyRows.ts';
-import type { BodyEntry } from '@libs/tui/bodyRows.ts';
+import { composeTranscriptRows } from '@libs/promptQueue/rowComposition.ts';
+import { clientOnlyRowsAtom, promptQueueAtom, streamingTextByIdAtom } from '@state/promptQueue/store.ts';
 import { countCwdRows } from '@libs/tui/cwdLine.ts';
 import {
   BODY_CWD_GAP_ROWS,
   DEFAULT_COMPOSER_ROWS,
+  HIDDEN_HEADER_ROWS,
   HEADER_ROWS,
   resolveHomeScreenLayout
 } from '@libs/tui/layout.ts';
 import { clamp } from '@libs/math/clamp.ts';
 import { workspaceCwdAtom } from '@state/global/index.ts';
 import { bodyEntriesAtom } from '@state/ui/body.ts';
-import { columnsAtom, rowsAtom } from '@state/ui/dimensions.ts';
+import {
+  composerInputColumnsAtom,
+  rowsAtom,
+  safeChromeColumnsAtom
+} from '@state/ui/dimensions.ts';
 import { gitStatusLabelAtom } from '@state/ui/gitStatus.ts';
 import { commandMenuDesiredRowsAtom, commandMenuOpenAtom } from '@state/ui/commands/index.ts';
+import { activeDockedPanelAtom, dockedPanelRowsAtom } from '@state/ui/dock/atoms.ts';
+import { PROMPT_PREFIX } from '@constants/ui.ts';
+import {
+  resolveComposerWindow,
+  resolveScrollIntoViewOffset
+} from '@libs/composer/composerWindow.ts';
+import { composerScrollOffsetRowsAtom, composerStateAtom } from '@state/ui/composer/index.ts';
 
 export const bodyScrollOffsetRowsAtom = atom(0);
 export const composerRowsAtom = atom(DEFAULT_COMPOSER_ROWS);
-export const submittedPromptEntriesAtom = atom<BodyEntry[]>([]);
+/** Transcript body rows derived from the prompt queue and live streaming text. */
+export const submittedPromptEntriesAtom = atom((get) =>
+  composeTranscriptRows(
+    get(promptQueueAtom),
+    get(clientOnlyRowsAtom),
+    get(streamingTextByIdAtom)
+  )
+);
 
 /**
  * Rows the cwd line occupies in the layout. It collapses to `0` while the command
@@ -26,10 +46,10 @@ export const submittedPromptEntriesAtom = atom<BodyEntry[]>([]);
  * the composer and status row pinned.
  */
 export const cwdRowsAtom = atom((get) => {
-  if (get(commandMenuOpenAtom)) {
+  if (get(commandMenuOpenAtom) || get(activeDockedPanelAtom) !== null) {
     return 0;
   }
-  return countCwdRows(get(workspaceCwdAtom), get(gitStatusLabelAtom), get(columnsAtom));
+  return countCwdRows(get(workspaceCwdAtom), get(gitStatusLabelAtom), get(safeChromeColumnsAtom));
 });
 
 export const displayedBodyEntriesAtom = atom((get) => {
@@ -41,12 +61,20 @@ export const displayedBodyEntriesAtom = atom((get) => {
     : [...baseBodyEntries, ...submittedPromptEntries];
 });
 
+export const homeHeaderRowsAtom = atom((get) =>
+  get(displayedBodyEntriesAtom).length === 0 ? HEADER_ROWS : HIDDEN_HEADER_ROWS
+);
+
 /**
  * Rows the open command menu actually occupies: the desired height (U2) clamped
  * to the rows free above a one-row-minimum body, so the menu is truncated or
  * suppressed rather than pushing the total past the canvas at small sizes.
  */
 export const commandMenuRowsAtom = atom((get) => {
+  if (get(activeDockedPanelAtom) !== null) {
+    return 0;
+  }
+
   const desired = get(commandMenuDesiredRowsAtom);
   if (desired === 0) {
     return 0;
@@ -55,33 +83,46 @@ export const commandMenuRowsAtom = atom((get) => {
   const rows = get(rowsAtom);
   const composerRows = get(composerRowsAtom);
   const cwdRows = get(cwdRowsAtom);
+  const homeHeaderRows = get(homeHeaderRowsAtom);
   const freeMenuRows = Math.max(
     0,
-    rows - HEADER_ROWS - BODY_CWD_GAP_ROWS - cwdRows - 1 - composerRows - 1
+    rows - homeHeaderRows - BODY_CWD_GAP_ROWS - cwdRows - 1 - composerRows - 1
   );
   return Math.min(desired, freeMenuRows);
 });
 
+/** Compatibility alias: the resume panel's reserved rows are the shared docked-panel rows. */
+export const resumePanelRowsAtom = atom((get) => get(dockedPanelRowsAtom));
+
 export const layoutAtom = atom((get) => {
-  const columns = get(columnsAtom);
+  const safeColumns = get(safeChromeColumnsAtom);
   const rows = get(rowsAtom);
   const composerRows = get(composerRowsAtom);
   const displayedBodyEntries = get(displayedBodyEntriesAtom);
-  const bodyEntryRows = countBodyRows(displayedBodyEntries, columns, rows);
+  const homeHeaderRows = get(homeHeaderRowsAtom);
+  // Body wraps within the shared safe content width (the physical final column
+  // is a reserved gutter), so count rows at that width to match the render.
+  const bodyEntryRows = countBodyRows(displayedBodyEntries, safeColumns, rows);
 
-  return resolveHomeScreenLayout(
+  return resolveHomeScreenLayout({
     rows,
-    bodyEntryRows,
+    bodyEntryCount: bodyEntryRows,
     composerRows,
-    get(cwdRowsAtom),
-    get(commandMenuRowsAtom)
-  );
+    cwdRows: get(cwdRowsAtom),
+    commandMenuRows: get(commandMenuRowsAtom),
+    resumePanelRows: get(dockedPanelRowsAtom),
+    headerRows: homeHeaderRows
+  });
 });
 
 export const maxBodyScrollOffsetRowsAtom = atom((get) => {
-  const columns = get(columnsAtom);
+  const safeColumns = get(safeChromeColumnsAtom);
   const layout = get(layoutAtom);
-  const bodyRowsForScroll = countBodyRows(get(displayedBodyEntriesAtom), columns, layout.bodyRows);
+  const bodyRowsForScroll = countBodyRows(
+    get(displayedBodyEntriesAtom),
+    safeColumns,
+    layout.bodyRows
+  );
 
   return Math.max(0, bodyRowsForScroll - layout.bodyRows);
 });
@@ -89,13 +130,19 @@ export const maxBodyScrollOffsetRowsAtom = atom((get) => {
 export const bottomSpacerRowsAtom = atom((get) => {
   const rows = get(rowsAtom);
   const layout = get(layoutAtom);
+  const dockedPanelRows = get(dockedPanelRowsAtom);
+  const homeHeaderRows = get(homeHeaderRowsAtom);
+  if (dockedPanelRows > 0) {
+    return Math.max(0, rows - homeHeaderRows - layout.bodyRows - dockedPanelRows);
+  }
+
   const composerRows = get(composerRowsAtom);
   // Keep cwd/composer/status pinned to the bottom by giving every spare row to
   // the body-to-cwd spacer instead of allowing the body to push the prompt down.
   return Math.max(
     0,
     rows -
-      HEADER_ROWS -
+      homeHeaderRows -
       layout.bodyRows -
       BODY_CWD_GAP_ROWS -
       layout.cwdRows -
@@ -117,5 +164,56 @@ export const scrollBodyByRowsAtom = atom(null, (get, set, deltaRows: number) => 
   const maxBodyScrollOffsetRows = get(maxBodyScrollOffsetRowsAtom);
   set(bodyScrollOffsetRowsAtom, (current) =>
     clamp(current + deltaRows, 0, maxBodyScrollOffsetRows)
+  );
+});
+
+/**
+ * The composer's current visible window, derived from the live composer text,
+ * the shared input width (`columns − PROMPT_PREFIX.length`, matching the render),
+ * the layout's visible-line cap, and the scroll offset. Its `canScroll` and
+ * `minOffset`/`maxOffset` drive the wheel router and the scroll clamp.
+ */
+const composerWindowAtom = atom((get) => {
+  const inputColumns = get(composerInputColumnsAtom);
+  const { text, cursorIndex } = get(composerStateAtom);
+  return resolveComposerWindow({
+    text,
+    columns: inputColumns,
+    maxVisibleLines: get(layoutAtom).composerVisibleRows,
+    cursorIndex,
+    offset: get(composerScrollOffsetRowsAtom)
+  });
+});
+
+/** Whether the composer overflows its cap — drives wheel fall-through to the body. */
+export const composerCanScrollAtom = atom((get) => get(composerWindowAtom).canScroll);
+
+export const scrollComposerByRowsAtom = atom(null, (get, set, deltaRows: number) => {
+  const { minOffset, maxOffset } = get(composerWindowAtom);
+  set(composerScrollOffsetRowsAtom, (current) =>
+    clamp(current + deltaRows, minOffset, maxOffset)
+  );
+});
+
+/**
+ * Adjusts the composer scroll offset so the caret stays visible after a text
+ * edit or cursor move, without snapping the view to the bottom: a no-op while
+ * the caret is already within the scrolled window, otherwise a minimal scroll to
+ * the nearest edge. The composer dispatches this whenever the cursor index
+ * changes (never on wheel scroll, which does not move the cursor), so typing
+ * after a click keeps the current view.
+ */
+export const scrollComposerCursorIntoViewAtom = atom(null, (get, set) => {
+  const inputColumns = get(composerInputColumnsAtom);
+  const { text, cursorIndex } = get(composerStateAtom);
+  set(
+    composerScrollOffsetRowsAtom,
+    resolveScrollIntoViewOffset({
+      text,
+      columns: inputColumns,
+      maxVisibleLines: get(layoutAtom).composerVisibleRows,
+      cursorIndex,
+      offset: get(composerScrollOffsetRowsAtom)
+    })
   );
 });

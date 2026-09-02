@@ -4,6 +4,7 @@ import {
   PROMPT_PREFIX
 } from '@constants/ui.ts';
 import { clamp } from '@libs/math/clamp.ts';
+import { displayWidth } from '@libs/text/displayWidth.ts';
 
 export function resolveComposerCursorPosition(
   visibleText: string,
@@ -33,7 +34,7 @@ function cursorPositionForVisibleText(
   const lines = textBeforeCursor.split('\n');
   const lastLine = lines.at(-1) ?? '';
   return {
-    x: Math.min(lastLine.length, columns),
+    x: Math.min(displayWidth(lastLine), columns),
     y: lines.length - 1
   };
 }

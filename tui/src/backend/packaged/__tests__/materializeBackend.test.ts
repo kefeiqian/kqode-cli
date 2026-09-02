@@ -39,6 +39,15 @@ function asset(bytes: Buffer, sha = sha256(bytes)): EmbeddedBackendAsset & { cal
   };
 }
 
+// Emulate writeBinary's user-only permissions so inspectExisting classifies the
+// staged file as reusable on Unix, where loose group/other perms are treated as
+// stale. Without this the concurrent-race fallback tests fail on non-Windows CI.
+function writeCacheBinary(binaryPath: string, runtimeDir: string, bytes: Buffer): void {
+  fs.mkdirSync(runtimeDir, { recursive: true });
+  fs.writeFileSync(binaryPath, bytes);
+  fs.chmodSync(binaryPath, 0o700);
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   while (tempDirs.length > 0) {
@@ -216,11 +225,7 @@ describe('materializePackagedBackend', () => {
     // Simulate the winner writing the valid binary, then our own write failing
     // (e.g. the winner already spawned and locked it on Windows).
     const losingWrite = (binaryPath: string, runtimeDir: string): void => {
-      fs.mkdirSync(runtimeDir, { recursive: true });
-      fs.writeFileSync(binaryPath, bytes);
-      if (!isWindows) {
-        fs.chmodSync(binaryPath, 0o700);
-      }
+      writeCacheBinary(binaryPath, runtimeDir, bytes);
       throw new Error('EBUSY: binary is locked by the winning instance');
     };
 
@@ -258,11 +263,7 @@ describe('materializePackagedBackend', () => {
     // The injected write leaves a genuinely valid binary (as a concurrent winner
     // would)...
     const write = (binaryPath: string, runtimeDir: string): void => {
-      fs.mkdirSync(runtimeDir, { recursive: true });
-      fs.writeFileSync(binaryPath, bytes);
-      if (!isWindows) {
-        fs.chmodSync(binaryPath, 0o700);
-      }
+      writeCacheBinary(binaryPath, runtimeDir, bytes);
     };
     // ...but the immediate post-write read-back observes the atomic-replace gap
     // once (ENOENT), which must fall back to reusing the valid cache.

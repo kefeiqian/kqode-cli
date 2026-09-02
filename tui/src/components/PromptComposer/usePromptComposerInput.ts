@@ -1,8 +1,12 @@
 import { useInput } from 'ink';
 import { useStore } from 'jotai';
 import { handleCursorMove } from '@components/PromptComposer/input/handleCursorMove.ts';
+import { handleCopyLastResponse } from '@components/PromptComposer/input/handleCopyLastResponse.ts';
+import { handleEscCancelTurn } from '@components/PromptComposer/input/handleEscCancelTurn.ts';
 import { handleEscArmedClear } from '@components/PromptComposer/input/handleEscArmedClear.ts';
+import { handleHistoryRecall } from '@components/PromptComposer/input/handleHistoryRecall.ts';
 import { handleNewline } from '@components/PromptComposer/input/handleNewline.ts';
+import { handlePaste } from '@components/PromptComposer/input/handlePaste.ts';
 import { handleSubmit } from '@components/PromptComposer/input/handleSubmit.ts';
 import { handleTextEdit } from '@components/PromptComposer/input/handleTextEdit.ts';
 import type {
@@ -11,6 +15,7 @@ import type {
   ComposerKeyHandler
 } from '@components/PromptComposer/input/types.ts';
 import { handleMenuKey } from '@components/SlashCommandMenu/handleMenuKey.ts';
+import { isModifierOnlyKeyEvent } from '@libs/keyboard/clipboardShortcuts.ts';
 import { isMouseInput } from '@libs/terminal/mouse.ts';
 import type { CommandActions } from '@libs/commands/executeCommand.ts';
 import { armedActionAtom } from '@state/ui/index.ts';
@@ -18,7 +23,7 @@ import { armedActionAtom } from '@state/ui/index.ts';
 type PromptComposerInputOptions = {
   isActive: boolean;
   maxBytes: number;
-  onSubmit: (prompt: string) => void;
+  onSubmit: (prompt: string, submissionSequence?: number) => void;
   state: ComposerInputState;
   commandActions: CommandActions;
 };
@@ -27,14 +32,19 @@ type PromptComposerInputOptions = {
  * Priority-ordered branches of the composer's single `useInput`. The dispatcher
  * runs them in order and stops at the first that reports it handled the key, so
  * the order is behavior: newline (incl. modified Enter) precedes the open menu,
- * which precedes Esc-clear, cursor moves, bare-Enter submit, and text editing.
+ * which precedes active-turn Esc-cancel, Esc-clear, cursor moves, bare-Enter
+ * submit, and text editing.
  * Adding a key is a new handler plus one entry here — not more lines in the hook.
  */
 const COMPOSER_KEY_HANDLERS: readonly ComposerKeyHandler[] = [
   handleNewline,
   handleMenuKey,
+  handleEscCancelTurn,
   handleEscArmedClear,
+  handleHistoryRecall,
   handleCursorMove,
+  handlePaste,
+  handleCopyLastResponse,
   handleSubmit,
   handleTextEdit
 ];
@@ -58,6 +68,10 @@ export function usePromptComposerInput({
   useInput(
     (input, key) => {
       if (isMouseInput(input)) {
+        return;
+      }
+
+      if (isModifierOnlyKeyEvent(input, key)) {
         return;
       }
 

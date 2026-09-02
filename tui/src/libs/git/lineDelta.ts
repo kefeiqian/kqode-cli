@@ -26,7 +26,12 @@ export function readWorkingTreeLineDelta(cwd: string): GitLineDelta | undefined 
     const shortstat = execFileSync('git', ['-C', cwd, 'diff', '--shortstat', 'HEAD'], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
-      timeout: GIT_LINE_DELTA_TIMEOUT_MS
+      timeout: GIT_LINE_DELTA_TIMEOUT_MS,
+      // Match the windowsHide convention used for every other child spawn
+      // (backend + build): the child gets its own hidden console instead of
+      // sharing the TUI's ConPTY, so a spawned console tool can never disturb the
+      // session's OSC 2 window title. No-op off Windows.
+      windowsHide: true
     });
 
     return parseShortstat(shortstat);

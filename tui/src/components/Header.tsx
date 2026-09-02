@@ -1,11 +1,11 @@
 import { Box, Text } from 'ink';
 import { useAtomValue } from 'jotai';
 import { PRODUCT_NAME } from '@constants/product.ts';
-import { productVersionAtom } from '@state/global/index.ts';
-import { theme } from '@theme/themeConfig.ts';
+import { activeThemeAtom, productVersionAtom } from '@state/global/index.ts';
 
 export function Header() {
   const productVersion = useAtomValue(productVersionAtom);
+  const theme = useAtomValue(activeThemeAtom);
   const versionLabel = ` v${productVersion}`;
 
   return (

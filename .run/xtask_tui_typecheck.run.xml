@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="xtask: tui-typecheck" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
-    <option name="command" value="run -p xtask -- tui-typecheck" />
+    <option name="command" value="xtask tui-typecheck" />
     <option name="workingDirectory" value="$PROJECT_DIR$" />
     <method v="2" />
   </configuration>

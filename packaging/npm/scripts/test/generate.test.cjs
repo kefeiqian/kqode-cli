@@ -76,9 +76,13 @@ test('buildPackage assembles a posix platform package from a verified tar.gz', (
     assert.ok(!('bin' in manifest));
 
     assert.equal(fs.readFileSync(path.join(dir, 'kqode'), 'utf8'), 'ELF-ish payload');
-    for (const file of ['LICENSE-APACHE', 'LICENSE-MIT', 'README.md']) {
+    for (const file of ['LICENSE-APACHE', 'LICENSE-MIT', 'THIRD_PARTY_NOTICES.md', 'README.md']) {
       assert.ok(fs.existsSync(path.join(dir, file)), `${file} should be present`);
     }
+    assert.match(
+      fs.readFileSync(path.join(dir, 'README.md'), 'utf8'),
+      /@kqode\/kqode-cli-linux-x64/
+    );
   });
 });
 

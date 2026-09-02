@@ -1,4 +1,8 @@
 import { COMMAND_REGISTRY } from '@libs/commands/registry.ts';
+import {
+  commandSubcommands,
+  subcommandFullName
+} from '@libs/commands/subcommands.ts';
 
 /** A single row inside a help section: a key/command label and what it does. */
 export type HelpEntry = { keys: string; description: string };
@@ -25,7 +29,7 @@ const KEYBINDING_SECTIONS: readonly HelpSection[] = [
     title: 'GLOBAL',
     entries: [
       { keys: '/', description: 'Open the command menu' },
-      { keys: 'ctrl+c ×2', description: 'Exit KQode' },
+      { keys: 'ctrl+c ×2', description: 'Exit KQode when no selection is active' },
       { keys: 'esc', description: 'Clear the prompt · close the command menu' }
     ]
   },
@@ -36,7 +40,24 @@ const KEYBINDING_SECTIONS: readonly HelpSection[] = [
       { keys: 'shift+enter', description: 'Insert a newline' },
       { keys: '\\ then enter', description: 'Insert a newline' },
       { keys: '← / →', description: 'Move the cursor' },
-      { keys: 'backspace', description: 'Delete the previous character' }
+      { keys: 'backspace', description: 'Delete the previous visible character' },
+      { keys: 'ctrl+v / cmd+v', description: 'Paste from the system clipboard' }
+    ]
+  },
+  {
+    title: 'CLIPBOARD',
+    entries: [{ keys: 'ctrl+o', description: 'Copy the last assistant response' }]
+  },
+  {
+    title: 'SELECTION',
+    entries: [
+      { keys: 'drag', description: 'Select transcript text' },
+      { keys: 'double-click', description: 'Select the word' },
+      { keys: 'triple-click', description: 'Select the line' },
+      { keys: 'ctrl+c / cmd+c', description: 'Copy the selection, then dismiss it' },
+      { keys: 'right-click', description: 'Copy selection, or paste when none is active' },
+      { keys: 'other keys', description: 'Dismiss the highlight; scroll keys keep it' },
+      { keys: 'shift+drag', description: 'Select with the terminal for native copy' }
     ]
   },
   {
@@ -62,10 +83,16 @@ const KEYBINDING_SECTIONS: readonly HelpSection[] = [
 export function buildCommandSection(): HelpSection {
   return {
     title: 'COMMANDS',
-    entries: COMMAND_REGISTRY.map((command) => ({
-      keys: command.name,
-      description: command.description
-    }))
+    entries: COMMAND_REGISTRY.flatMap((command) => [
+      {
+        keys: command.name,
+        description: command.description
+      },
+      ...commandSubcommands(command).map((subcommand) => ({
+        keys: subcommandFullName(command, subcommand),
+        description: subcommand.description
+      }))
+    ])
   };
 }
 

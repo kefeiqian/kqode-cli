@@ -1,7 +1,7 @@
 import { Box, Text } from 'ink';
 import { useAtomValue } from 'jotai';
 import { columnsAtom, MIN_USABLE_TERMINAL_COLUMNS, MIN_USABLE_TERMINAL_ROWS } from '@state/ui/index.ts';
-import { theme } from '@theme/themeConfig.ts';
+import { activeThemeAtom } from '@state/global/index.ts';
 
 /**
  * Shown instead of the home screen when the terminal is too small to render it
@@ -11,6 +11,7 @@ import { theme } from '@theme/themeConfig.ts';
  */
 export function TerminalTooSmall() {
   const columns = useAtomValue(columnsAtom);
+  const theme = useAtomValue(activeThemeAtom);
 
   return (
     <Box flexDirection="column" width={columns}>

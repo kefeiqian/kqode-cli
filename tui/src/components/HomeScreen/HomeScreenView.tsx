@@ -1,69 +1,30 @@
-import { Box, useInput, useStdout } from 'ink';
-import { useAtomValue, useSetAtom } from 'jotai';
-import { useEffect } from 'react';
+import { Box } from 'ink';
+import { useAtomValue } from 'jotai';
 import { BodyPane } from '@components/BodyPane.tsx';
 import { CwdLine } from '@components/CwdLine.tsx';
 import { Header } from '@components/Header.tsx';
 import { PromptComposer } from '@components/PromptComposer/index.tsx';
+import { ResumePanel } from '@components/ResumePanel/index.tsx';
+import { ThemeSurface } from '@components/ThemeSurface/index.tsx';
+import { ModelSurface } from '@components/ModelSurface/index.tsx';
+import { MemorySurface } from '@components/MemorySurface/index.tsx';
+import { ConnectSurface } from '@components/ConnectSurface/index.tsx';
+import { UserQuestionSurface } from '@components/UserQuestionSurface/index.tsx';
 import { SlashCommandMenu } from '@components/SlashCommandMenu/index.tsx';
 import { StatusBar } from '@components/StatusBar.tsx';
-import {
-  DISABLE_SGR_MOUSE_TRACKING,
-  ENABLE_SGR_MOUSE_TRACKING,
-  parseMouseWheelInput
-} from '@libs/terminal/mouse.ts';
+import { useHomeScreenInput } from '@components/HomeScreen/useHomeScreenInput.ts';
 import { BODY_CWD_GAP_ROWS } from '@libs/tui/layout.ts';
-import {
-  bottomSpacerRowsAtom,
-  layoutAtom,
-  scrollBodyByRowsAtom
-} from '@state/ui/index.ts';
+import { bottomSpacerRowsAtom, homeHeaderRowsAtom, layoutAtom } from '@state/ui/index.ts';
 import { columnsAtom, rowsAtom } from '@state/ui/index.ts';
 import { commandMenuOpenAtom } from '@state/ui/commands/index.ts';
-import { theme } from '@theme/themeConfig.ts';
-import { MOUSE_WHEEL_SCROLL_ROWS } from '@constants/ui.ts';
+import { activeDockedPanelAtom, DockedPanel } from '@state/ui/dock/atoms.ts';
+import { activeThemeAtom } from '@state/global/index.ts';
 
 export function HomeScreenView() {
-  const { stdout } = useStdout();
   const columns = useAtomValue(columnsAtom);
   const rows = useAtomValue(rowsAtom);
-  const layout = useAtomValue(layoutAtom);
-  const scrollBodyByRows = useSetAtom(scrollBodyByRowsAtom);
-
-  useEffect(() => {
-    if (!stdout.isTTY) {
-      return;
-    }
-
-    stdout.write(ENABLE_SGR_MOUSE_TRACKING);
-    return () => {
-      stdout.write(DISABLE_SGR_MOUSE_TRACKING);
-    };
-  }, [stdout]);
-
-  useInput((input, key) => {
-    const wheelDirection = parseMouseWheelInput(input);
-    if (wheelDirection !== null) {
-      scrollBodyByRows(
-        wheelDirection === 'up' ? MOUSE_WHEEL_SCROLL_ROWS : -MOUSE_WHEEL_SCROLL_ROWS
-      );
-      return;
-    }
-
-    if (key.pageUp) {
-      scrollBodyByRows(Math.max(1, layout.bodyRows - 2));
-      return;
-    }
-
-    if (key.pageDown) {
-      scrollBodyByRows(-Math.max(1, layout.bodyRows - 2));
-      return;
-    }
-
-    if (key.end) {
-      scrollBodyByRows(Number.NEGATIVE_INFINITY);
-    }
-  });
+  const theme = useAtomValue(activeThemeAtom);
+  useHomeScreenInput();
 
   return (
     <Box
@@ -76,17 +37,23 @@ export function HomeScreenView() {
       <HomeBody />
       <HomeBottomStack />
       <HomeComposer />
-      <StatusBar />
+      <HomeStatusBar />
     </Box>
   );
 }
 
 function HomeHeader() {
+  const headerRows = useAtomValue(homeHeaderRowsAtom);
+  if (headerRows === 0) {
+    return null;
+  }
+
   return <Header />;
 }
 
 function HomeBody() {
   const layout = useAtomValue(layoutAtom);
+  const theme = useAtomValue(activeThemeAtom);
 
   return (
     <Box
@@ -102,6 +69,15 @@ function HomeBody() {
 function HomeBottomStack() {
   const bottomSpacerRows = useAtomValue(bottomSpacerRowsAtom);
   const menuOpen = useAtomValue(commandMenuOpenAtom);
+  const dockedPanel = useAtomValue(activeDockedPanelAtom);
+
+  if (dockedPanel !== null) {
+    return (
+      <Box marginTop={bottomSpacerRows} flexDirection="column">
+        <DockedSurface panel={dockedPanel} />
+      </Box>
+    );
+  }
 
   // The cwd line and the command palette share the row directly above the
   // composer: the palette replaces the cwd while it is open. The spacer + gap
@@ -115,6 +91,40 @@ function HomeBottomStack() {
   );
 }
 
+/** Renders the one open docked popup below the accent divider it owns. */
+function DockedSurface({ panel }: { panel: DockedPanel }) {
+  switch (panel) {
+    case DockedPanel.Resume:
+      return <ResumePanel />;
+    case DockedPanel.Theme:
+      return <ThemeSurface />;
+    case DockedPanel.Model:
+      return <ModelSurface />;
+    case DockedPanel.Memory:
+      return <MemorySurface />;
+    case DockedPanel.Connect:
+      return <ConnectSurface />;
+    case DockedPanel.UserQuestion:
+      return <UserQuestionSurface />;
+    default:
+      return null;
+  }
+}
+
 function HomeComposer() {
+  const docked = useAtomValue(activeDockedPanelAtom) !== null;
+  if (docked) {
+    return null;
+  }
+
   return <PromptComposer />;
+}
+
+function HomeStatusBar() {
+  const docked = useAtomValue(activeDockedPanelAtom) !== null;
+  if (docked) {
+    return null;
+  }
+
+  return <StatusBar />;
 }

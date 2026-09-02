@@ -1,25 +1,50 @@
 import { Box, Text } from 'ink';
-import { useAtomValue } from 'jotai';
-import { useEffect, useState } from 'react';
-import { armedActionAtom, columnsAtom, statusHintAtom } from '@state/ui/index.ts';
-import { modelLabelAtom } from '@state/global/index.ts';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { useEffect } from 'react';
+import { activeModelLabelAtom, activeThemeAtom, refreshActiveModelAtom } from '@state/global/index.ts';
+import { turnInFlightAtom } from '@state/promptQueue/index.ts';
+import {
+  activeSurfaceAtom,
+  armedActionAtom,
+  AUTO_COMPACTING_HINT,
+  compactionInProgressAtom,
+  loadingFrameAtom,
+  safeChromeColumnsAtom,
+  setTransientStatusHintAtom,
+  startupStatusHintAtom,
+  Surface,
+  transientStatusHintAtom,
+  WORKING_STATUS_HINT
+} from '@state/ui/index.ts';
 import {
   ArmedAction,
   DEFAULT_STATUS_HINTS,
   LOADING_FRAME_COUNT,
   LOADING_FRAME_INTERVAL_MS,
   PRESS_AGAIN_TO_CLEAR_HINT,
-  PRESS_AGAIN_TO_EXIT_HINT
+  PRESS_AGAIN_TO_EXIT_HINT,
+  TRANSIENT_STATUS_HINT_MS
 } from '@constants/ui.ts';
-import { theme } from '@theme/themeConfig.ts';
 
 export function StatusBar() {
-  const columns = useAtomValue(columnsAtom);
-  const modelLabel = useAtomValue(modelLabelAtom);
-  const statusHint = useAtomValue(statusHintAtom);
+  const columns = useAtomValue(safeChromeColumnsAtom);
+  const modelLabel = useAtomValue(activeModelLabelAtom);
+  const startupStatusHint = useAtomValue(startupStatusHintAtom);
+  const transientStatusHint = useAtomValue(transientStatusHintAtom);
   const armedAction = useAtomValue(armedActionAtom);
-  const loadingFrame = useLoadingFrame(statusHint?.kind === 'loading');
-  const baseHints = statusHint === undefined ? DEFAULT_STATUS_HINTS : statusHint.text;
+  const turnInFlight = useAtomValue(turnInFlightAtom);
+  const compactionInProgress = useAtomValue(compactionInProgressAtom);
+  const theme = useAtomValue(activeThemeAtom);
+  useActiveModelRefresh();
+  useTransientStatusHintClear(transientStatusHint);
+  // Backend startup takes precedence over the working spinner; a loading-kind
+  // hint drives the animated dots.
+  const persistentStatusHint =
+    startupStatusHint ??
+    (compactionInProgress ? AUTO_COMPACTING_HINT : undefined) ??
+    (turnInFlight ? WORKING_STATUS_HINT : undefined);
+  const loadingFrame = useLoadingFrame(persistentStatusHint?.kind === 'loading');
+  const baseHints = persistentStatusHint?.text ?? transientStatusHint?.text ?? DEFAULT_STATUS_HINTS;
   const armedHint =
     armedAction === ArmedAction.ClearInput
       ? PRESS_AGAIN_TO_CLEAR_HINT
@@ -28,24 +53,59 @@ export function StatusBar() {
         : undefined;
   const leftHints =
     armedHint ??
-    (statusHint?.kind === 'loading' ? `${baseHints}${'.'.repeat(loadingFrame)}` : baseHints);
+    (persistentStatusHint?.kind === 'loading' ? `${baseHints}${'.'.repeat(loadingFrame)}` : baseHints);
+  const renderedModelLabel = truncateStatusModelLabel(modelLabel, columns, leftHints.length);
 
   return (
-    // Fill the terminal's final column for a tight right edge. Ink erases to
-    // end-of-line after each row, and some terminals (WezTerm) drop a glyph in
-    // the last column — Windows Terminal renders it fine, so the model label is
-    // allowed to reach the edge. Restore paddingRight={1} if a terminal clips it.
+    // Stay inside the shared safe chrome width so the status label does not
+    // depend on terminals rendering a glyph in the physical final column.
     <Box width={columns}>
-      <Text color={theme.colors.muted}>{leftHints}</Text>
+      <Text color={theme.colors.muted} wrap="truncate">
+        {leftHints}
+      </Text>
       <Box flexGrow={1} justifyContent="flex-end">
-        <Text color={theme.colors.accentGreen}>{modelLabel}</Text>
+        <Text color={theme.colors.accentGreen} wrap="truncate">
+          {renderedModelLabel}
+        </Text>
       </Box>
     </Box>
   );
 }
 
+function useTransientStatusHintClear(transientStatusHint: unknown) {
+  const setTransientStatusHint = useSetAtom(setTransientStatusHintAtom);
+
+  useEffect(() => {
+    if (transientStatusHint === undefined) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setTransientStatusHint(undefined);
+    }, TRANSIENT_STATUS_HINT_MS);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [setTransientStatusHint, transientStatusHint]);
+}
+
+function useActiveModelRefresh() {
+  const activeSurface = useAtomValue(activeSurfaceAtom);
+  const refreshActiveModel = useSetAtom(refreshActiveModelAtom);
+
+  useEffect(() => {
+    if (activeSurface === Surface.Home) {
+      void refreshActiveModel();
+    }
+  }, [activeSurface, refreshActiveModel]);
+}
+
 function useLoadingFrame(isLoading: boolean): number {
-  const [frame, setFrame] = useState(0);
+  // Backed by the shared `loadingFrameAtom` (not local state) so the prompt
+  // composer can subscribe and re-assert the terminal caret on each tick — see
+  // the atom's doc comment. The StatusBar is the single interval driver.
+  const [frame, setFrame] = useAtom(loadingFrameAtom);
 
   useEffect(() => {
     if (!isLoading) {
@@ -60,7 +120,12 @@ function useLoadingFrame(isLoading: boolean): number {
     return () => {
       clearInterval(timer);
     };
-  }, [isLoading]);
+  }, [isLoading, setFrame]);
 
   return frame;
+}
+
+function truncateStatusModelLabel(label: string, columns: number, leftColumns: number): string {
+  const availableColumns = Math.max(0, columns - leftColumns);
+  return label.slice(0, availableColumns);
 }

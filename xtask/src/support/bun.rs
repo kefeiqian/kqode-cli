@@ -26,24 +26,18 @@ pub fn run_in(package_root: &Path, args: &[&str]) -> Result<(), String> {
     }
 }
 
-/// Installs the nested TUI dependencies when `tui-dev` is run from a fresh checkout.
+/// Installs or updates the nested TUI dependencies before running a TUI command.
 ///
-/// The check is intentionally based on the local `tsx` executable because
-/// `tui-dev` invokes that binary directly from the selected workspace cwd.
+/// This deliberately runs `bun install` even when `node_modules` already exists
+/// so new package manifest entries are picked up before the command starts.
 ///
 /// # Errors
 ///
 /// Returns an error when Bun cannot be started or `bun install` exits
 /// unsuccessfully.
 pub fn ensure_tui_dependencies(repo_root: &Path) -> Result<(), String> {
-    let tsx = paths::tui_bin(repo_root, "tsx");
-
-    if tsx.is_file() {
-        Ok(())
-    } else {
-        println!("TUI dependencies are missing; running bun install.");
-        run(repo_root, &["install"])
-    }
+    println!("Ensuring TUI dependencies with bun install.");
+    run(repo_root, &["install"])
 }
 
 pub fn command() -> &'static str {

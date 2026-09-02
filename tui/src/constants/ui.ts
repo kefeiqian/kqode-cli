@@ -15,28 +15,82 @@ export const DEFAULT_COMPOSER_VISIBLE_LINES = 3;
 // --- Prompt composer ---
 
 export const PROMPT_PREFIX = '> ';
+export const SAFE_CHROME_COLUMN_GUARD = 1;
+export const FULLSCREEN_GUARD_ROWS = 0;
 
-// The app fills the terminal exactly (FULLSCREEN_GUARD_ROWS = 0), so Ink treats
-// each frame as fullscreen, omits its trailing newline, and shifts the cursor
-// baseline up one row. This offset adds that row back so the measured composer
-// top maps onto the editable row. (It was 0 while the app rendered just under
-// fullscreen, where Ink appends the trailing newline and the baseline already
-// lands on the output's bottom row.) NOTE: below the MIN_ROWS floor the layout
-// makes content overflow the terminal and this can be off by one — but the
-// too-small gate replaces the home screen before that, so it is a test-only
-// degenerate case.
-export const INK_CURSOR_ROW_ORIGIN_OFFSET = 1;
+// The app now renders edge-to-edge to the physical last row. Filling the full
+// viewport moves Ink to its fullscreen cursor baseline, so the paired
+// INK_CURSOR_ROW_ORIGIN_OFFSET recomputes to 1 below.
+export const INK_CURSOR_ROW_ORIGIN_OFFSET = inkCursorRowOriginOffset(FULLSCREEN_GUARD_ROWS);
 export const COMPOSER_BACKGROUND_PADDING_ROWS = 2;
 export const COMPOSER_BACKGROUND_TOP_PADDING_ROWS = 1;
+
+function inkCursorRowOriginOffset(guardRows: number): number {
+  return guardRows === 0 ? 1 : 0;
+}
+
+/**
+ * Divisor bounding the composer's visible box to a fraction of the terminal
+ * height (`2` = at most half) so a long prompt cannot bury the transcript. The
+ * text-line cap derived from it subtracts the background padding and the
+ * reserved error row, so the whole composer box stays within `rows / DIVISOR`.
+ */
+export const COMPOSER_MAX_HEIGHT_DIVISOR = 2;
+
+// --- Selection rows ---
+
+/**
+ * Gutter glyphs prefixed to every selectable command-surface row by the shared
+ * `SelectableRow`. The chevron marks the highlighted row; the plain gutter keeps
+ * non-highlighted rows column-aligned with it. Both are `SELECTION_GUTTER_WIDTH`
+ * display columns wide, so columnar callers format their content at
+ * `safeChromeColumns - SELECTION_GUTTER_WIDTH` and let the row prepend the gutter.
+ */
+export const SELECTION_CHEVRON = '\u276F '; // "❯ "
+export const SELECTION_GUTTER = '  ';
+export const SELECTION_GUTTER_WIDTH = 2;
 
 // --- Slash commands ---
 
 /**
- * Maximum command rows shown in the autocomplete menu before it stops growing.
- * Inert with the three built-in commands today; exercised once the deferred
- * markdown/config command source adds more.
+ * Fixed number of rows the slash-command panel occupies while open. The panel
+ * always renders this many rows: matching commands fill from the top and any
+ * remaining rows are left blank, so the panel keeps a stable height instead of
+ * shrinking as the query narrows the matches. Also serves as the scroll-window
+ * size once the command set grows beyond this many entries.
  */
-export const MAX_COMMAND_MENU_ROWS = 8;
+export const COMMAND_MENU_PANEL_ROWS = 7;
+
+// --- Command surface popups ---
+
+/**
+ * Divisor bounding every docked command popup (theme/model/login/memory and the
+ * resume panel) to at most half the terminal height (`2` = half), mirroring the
+ * composer's `COMPOSER_MAX_HEIGHT_DIVISOR`. The whole popup box — accent
+ * separator, content, and footer — stays within `⌊rows / DIVISOR⌋`; `/help` is
+ * the sole exception and renders full-screen.
+ */
+export const POPUP_MAX_HEIGHT_DIVISOR = 2;
+
+// --- Resume panel ---
+
+/** Maximum number of session rows shown in the docked resume panel. */
+export const RESUME_PANEL_SESSION_ROWS = 10;
+
+/** Non-session rows in the docked resume panel: divider, label, list header, gap, footer. */
+export const RESUME_PANEL_CHROME_ROWS = 5;
+
+/** Fixed desired height of the docked resume panel while open. */
+export const RESUME_PANEL_ROWS = RESUME_PANEL_SESSION_ROWS + RESUME_PANEL_CHROME_ROWS;
+
+/**
+ * The single constant total height every docked command popup (`/theme`,
+ * `/model`, `/memory`, `/connect`, resume) renders at, capped to `⌊rows/2⌋` by
+ * `resolveDockedPanelRows`. Reuses the resume panel's height so switching between
+ * surfaces never changes the popup height (short surfaces pad blank; long ones
+ * scroll internally). At a given terminal size every docked popup is identical.
+ */
+export const DOCKED_PANEL_ROWS = RESUME_PANEL_ROWS;
 
 // --- Two-step key confirmations ---
 
@@ -59,7 +113,40 @@ export const PRESS_AGAIN_TO_CLEAR_HINT = 'esc again to clear input';
 export const PRESS_AGAIN_TO_EXIT_HINT = 'ctrl+c again to exit';
 
 /** Default left-aligned status-bar hints shown when no transient hint is active. */
-export const DEFAULT_STATUS_HINTS = '/ commands | @ mention | ? help';
+export const DEFAULT_STATUS_HINTS = '/ commands | @ mention';
+
+/** Milliseconds before a transient status-bar hint clears itself. */
+export const TRANSIENT_STATUS_HINT_MS = 1_500;
+
+/** Generic clipboard success hint used by copy/paste follow-up units. */
+export const CLIPBOARD_ACTION_SUCCEEDED_HINT = 'clipboard updated';
+
+/** Generic clipboard failure hint used by copy/paste follow-up units. */
+export const CLIPBOARD_ACTION_FAILED_HINT = 'clipboard unavailable';
+
+/** Composer key that triggers a system-clipboard paste read. */
+export const PASTE_INPUT_KEY = 'v';
+
+/** Transient hint shown when clipboard paste cannot read text. */
+export const PASTE_FAILED_HINT = 'paste failed';
+
+/** Composer key that copies the last assistant response. */
+export const COPY_LAST_RESPONSE_KEY = 'o';
+
+/** Transient hint shown after the last assistant response is copied. */
+export const COPY_LAST_RESPONSE_SUCCEEDED_HINT = 'copied';
+
+/** Transient hint shown when copying the last assistant response fails. */
+export const COPY_LAST_RESPONSE_FAILED_HINT = 'copy failed';
+
+/** Transient hint shown when no assistant response can be copied. */
+export const COPY_LAST_RESPONSE_NOTHING_HINT = 'nothing to copy';
+
+/** Transient hint shown after the current transcript selection is copied. */
+export const SELECTION_COPIED_HINT = 'copied selection';
+
+/** Transient hint shown when copying the transcript selection fails. */
+export const SELECTION_COPY_FAILED_HINT = 'copy failed';
 
 // --- Status-bar loading spinner ---
 

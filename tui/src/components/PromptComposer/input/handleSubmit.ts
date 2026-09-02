@@ -1,7 +1,9 @@
 import type { ComposerKeyContext, ComposerKeyHandler } from '@components/PromptComposer/input/types.ts';
-import { appendUnknownCommandAtom } from '@state/promptQueue/index.ts';
-import { executeCommand } from '@libs/commands/executeCommand.ts';
+import { appendUnknownCommandNoticeAtom } from '@state/promptQueue/index.ts';
+import { executeMenuSelection } from '@libs/commands/executeCommand.ts';
 import { exactCommandMatch } from '@libs/commands/matchCommand.ts';
+import { entryFullName } from '@libs/commands/subcommands.ts';
+import { captureComposerSubmit, SubmitCaptureKind } from '@libs/composer/submitCapture.ts';
 import { validateComposerSubmit } from '@libs/composer/promptText.ts';
 import {
   clearComposerAtom,
@@ -36,16 +38,25 @@ function submitPrompt({ state, maxBytes, onSubmit, commandActions, store }: Comp
   }
 
   if (validation.text.startsWith('/')) {
-    const command = exactCommandMatch(validation.text);
-    if (command !== undefined) {
-      executeCommand(command.id, commandActions);
+    const entry = exactCommandMatch(validation.text);
+    if (entry !== undefined) {
+      captureComposerSubmit({ kind: SubmitCaptureKind.ValidCommand, text: entryFullName(entry) });
+      executeMenuSelection(entry, commandActions);
     } else {
-      store.set(appendUnknownCommandAtom, validation.text);
+      const captured = captureComposerSubmit({
+        kind: SubmitCaptureKind.UnknownCommand,
+        text: validation.text
+      });
+      store.set(appendUnknownCommandNoticeAtom, {
+        text: validation.text,
+        submissionSequence: captured.sequence
+      });
     }
     store.set(clearComposerAtom);
     return;
   }
 
-  onSubmit(validation.text);
+  const captured = captureComposerSubmit({ kind: SubmitCaptureKind.Prompt, text: validation.text });
+  onSubmit(validation.text, captured.sequence);
   store.set(clearComposerAtom);
 }

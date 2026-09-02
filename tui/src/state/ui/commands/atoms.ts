@@ -1,16 +1,17 @@
 import { atom } from 'jotai';
-import { MAX_COMMAND_MENU_ROWS } from '@constants/ui.ts';
+import { COMMAND_MENU_PANEL_ROWS } from '@constants/ui.ts';
 import { clamp } from '@libs/math/clamp.ts';
 import { filterCommands } from '@libs/commands/filterCommands.ts';
 import { composerStateAtom } from '@state/ui/composer/index.ts';
 import { inputLockedAtom } from '@state/ui/inputLock.ts';
 import type { CommandDefinition } from '@libs/commands/registry.ts';
+import type { MenuEntry } from '@libs/commands/subcommands.ts';
 
 /** True while the composer text begins a slash command (`/...`). */
 const isCommandQueryAtom = atom((get) => get(composerStateAtom).text.startsWith('/'));
 
 /** Commands matching the current composer text; empty when it is not a command query. */
-export const commandMenuMatchesAtom = atom<CommandDefinition[]>((get) =>
+export const commandMenuMatchesAtom = atom<MenuEntry[]>((get) =>
   get(isCommandQueryAtom) ? filterCommands(get(composerStateAtom).text) : []
 );
 
@@ -30,8 +31,8 @@ export const commandMenuOpenAtom = atom(
 /** Raw highlight index; derived reads clamp it against the current matches. */
 export const commandMenuHighlightIndexAtom = atom(0);
 
-/** The highlighted command, or undefined when there are no matches. */
-export const highlightedCommandAtom = atom<CommandDefinition | undefined>((get) => {
+/** The highlighted menu entry, or undefined when there are no matches. */
+export const highlightedEntryAtom = atom<MenuEntry | undefined>((get) => {
   const matches = get(commandMenuMatchesAtom);
   if (matches.length === 0) {
     return undefined;
@@ -40,18 +41,28 @@ export const highlightedCommandAtom = atom<CommandDefinition | undefined>((get) 
   return matches[index];
 });
 
+/** Compatibility selector for callers that still need a parent command. */
+export const highlightedCommandAtom = atom<CommandDefinition | undefined>((get) => {
+  const entry = get(highlightedEntryAtom);
+  if (entry === undefined) {
+    return undefined;
+  }
+
+  return entry.kind === 'command' ? entry.command : entry.parent;
+});
+
 /**
- * Rows the menu wants to render: the capped match count, one row for the
- * "No matching commands" state, or zero when closed. U4 clamps this to the space
- * actually free above the composer.
+ * Rows the menu wants to render while open: the accent top rule (U5) plus the
+ * fixed command-list panel height (`COMMAND_MENU_PANEL_ROWS`), so the rule never
+ * eats a command row; zero when closed. Clamped downstream to the space actually
+ * free above the composer.
  */
 export const commandMenuDesiredRowsAtom = atom((get) => {
   if (!get(commandMenuOpenAtom)) {
     return 0;
   }
 
-  const matches = get(commandMenuMatchesAtom);
-  return matches.length === 0 ? 1 : Math.min(matches.length, MAX_COMMAND_MENU_ROWS);
+  return COMMAND_MENU_PANEL_ROWS + 1;
 });
 
 /** Moves the highlight by `delta`, clamped to the current match range. */

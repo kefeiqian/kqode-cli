@@ -2,15 +2,21 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-[![CI](https://github.com/kefeiqian/kqode-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/kefeiqian/kqode-cli/actions/workflows/ci.yml)
-[![Release](https://github.com/kefeiqian/kqode-cli/actions/workflows/release.yml/badge.svg)](https://github.com/kefeiqian/kqode-cli/actions/workflows/release.yml)
-[![GitHub Pages](https://github.com/kefeiqian/kqode-cli/actions/workflows/github-pages.yml/badge.svg)](https://github.com/kefeiqian/kqode-cli/actions/workflows/github-pages.yml)
-[![npm](https://img.shields.io/npm/v/@kqode/kqode-cli?logo=npm)](https://www.npmjs.com/package/@kqode/kqode-cli)
-[![GitHub release](https://img.shields.io/github/v/release/kefeiqian/kqode-cli?logo=github)](https://github.com/kefeiqian/kqode-cli/releases/latest)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
-[![Made with Rust](https://img.shields.io/badge/Rust-2024_edition-orange.svg?logo=rust)](https://www.rust-lang.org/)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-[![GitHub stars](https://img.shields.io/github/stars/kefeiqian/kqode-cli?logo=github)](https://github.com/kefeiqian/kqode-cli/stargazers)
+<p align="center">
+  <a href="https://github.com/kefeiqian/kqode-cli/actions/workflows/ci.yml"><img src="https://github.com/kefeiqian/kqode-cli/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/kefeiqian/kqode-cli/actions/workflows/release.yml"><img src="https://github.com/kefeiqian/kqode-cli/actions/workflows/release.yml/badge.svg" alt="Release"></a>
+  <a href="https://github.com/kefeiqian/kqode-cli/actions/workflows/github-pages.yml"><img src="https://github.com/kefeiqian/kqode-cli/actions/workflows/github-pages.yml/badge.svg" alt="GitHub Pages"></a>
+</p>
+<p align="center">
+  <a href="https://www.npmjs.com/package/@kqode/kqode-cli"><img src="https://img.shields.io/npm/v/@kqode/kqode-cli?logo=npm" alt="npm"></a>
+  <a href="https://github.com/kefeiqian/kqode-cli/releases/latest"><img src="https://img.shields.io/github/v/release/kefeiqian/kqode-cli?logo=github" alt="GitHub release"></a>
+  <a href="#license"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg" alt="License"></a>
+</p>
+<p align="center">
+  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-2024_edition-orange.svg?logo=rust" alt="Made with Rust"></a>
+  <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome"></a>
+  <a href="https://github.com/kefeiqian/kqode-cli/stargazers"><img src="https://img.shields.io/github/stars/kefeiqian/kqode-cli?logo=github" alt="GitHub stars"></a>
+</p>
 
 KQode is a Rust-first coding-agent harness with TypeScript Ink as its committed TUI.
 The project is currently in the foundation stage: the checked-in implementation is
@@ -99,14 +105,20 @@ cargo xtask tui-install    # install nested TUI dependencies
 cargo xtask tui-typecheck  # type-check the TUI (tsc --noEmit)
 cargo xtask tui-test       # run TUI tests (vitest)
 cargo xtask tui-dev        # run the TUI from a throwaway fixture workspace
+cargo xtask tui-dev-here   # run the TUI from source against the current cwd
 ```
 
 `cargo xtask tui-dev` runs the Ink TUI against a copied fixture workspace, so the
 displayed working directory is a realistic project rather than the KQode repo.
+When dogfooding against an existing checkout, run
+`/path/to/KQode/scripts/xtask.sh tui-dev-here` from that checkout so source mode
+uses the terminal's current directory, matching the packaged `kqode` executable.
 Today the TUI talks to a local Rust JSON-RPC backend that acknowledges each
-submitted prompt (`ACK: message received`); it does not yet call a model, run
-tools, or execute an agent loop, and the slash-command, mention, and model
-affordances are inert placeholders for now.
+submitted prompt and now persists local resumable session history and durable
+local memory under `~/.kqode/`; `/help`, `/clear`, `/login`, `/model`,
+`/resume`, `/memory`, and `/theme` are wired to real TUI surfaces or backend
+flows. It still does not yet call a model, run tools, or execute an agent loop,
+and mention support remains a placeholder.
 
 Prepare or reset that fixture workspace explicitly with:
 
@@ -129,7 +141,7 @@ cargo xtask tui-prod   # build and run the standalone executable
 ```
 
 Cargo is required only for this source-mode build. The packaged executable
-materializes its embedded backend into a per-user cache under `~/.kqcode/` and
+materializes its embedded backend into a per-user cache under `~/.kqode/` and
 runs the same local ACK path as source mode.
 
 ### Distribution

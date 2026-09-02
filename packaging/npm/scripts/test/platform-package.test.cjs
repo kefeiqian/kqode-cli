@@ -2,10 +2,16 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { platformPackageManifest, platformPackageReadme, LICENSE_FILES } = require('../platform-package.cjs');
+const {
+  platformPackageManifest,
+  platformPackageReadme,
+  LICENSE_FILES,
+  NOTICE_FILES,
+  PACKAGE_SUPPORT_FILES
+} = require('../platform-package.cjs');
 const { releaseTargetName, archiveExt } = require('../release-target.cjs');
 
-test('platformPackageManifest sets os/cpu and ships only the binary + license + readme', () => {
+test('platformPackageManifest sets os/cpu and ships only the binary + support files', () => {
   const manifest = platformPackageManifest({
     name: '@kqode/kqode-cli-linux-x64',
     version: '1.2.3',
@@ -17,7 +23,7 @@ test('platformPackageManifest sets os/cpu and ships only the binary + license + 
   assert.equal(manifest.version, '1.2.3');
   assert.deepEqual(manifest.os, ['linux']);
   assert.deepEqual(manifest.cpu, ['x64']);
-  assert.deepEqual(manifest.files, ['kqode', 'LICENSE-APACHE', 'LICENSE-MIT', 'README.md']);
+  assert.deepEqual(manifest.files, ['kqode', ...PACKAGE_SUPPORT_FILES]);
   assert.equal(manifest.preferUnplugged, true);
   assert.equal(manifest.license, 'MIT OR Apache-2.0');
 });
@@ -56,4 +62,8 @@ test('archiveExt is zip on Windows and tar.gz elsewhere', () => {
 
 test('LICENSE_FILES are the two dual-license files', () => {
   assert.deepEqual(LICENSE_FILES, ['LICENSE-APACHE', 'LICENSE-MIT']);
+});
+
+test('NOTICE_FILES contains third-party notices', () => {
+  assert.deepEqual(NOTICE_FILES, ['THIRD_PARTY_NOTICES.md']);
 });

@@ -18,7 +18,7 @@ Fixture data shows all selected repos produced enough cited evidence to compare 
 | Repo | Requested URL | Resolved URL | Branch | SHA | Status | Notes |
 |---|---|---|---|---|---|---|
 | codex | https://github.com/openai/codex | https://github.com/openai/codex | main | 1111111 | complete | fixture |
-| aider | https://github.com/Aider-AI/aider | https://github.com/Aider-AI/aider | main | 2222222 | complete | fixture |
+| claude-code | docs/claude-code (local mirror) | n/a | n/a | ac63139 | complete | fixture; local mirror |
 
 ---
 
@@ -33,21 +33,21 @@ Fixture data shows all selected repos produced enough cited evidence to compare 
 - The fixture prompt enters a command handler before context assembly. [\[1\]][ref-1]
 - The fixture tool loop records tool results before continuing. [\[2\]][ref-2]
 
-### Aider
+### Claude Code
 
 **Status:** complete
 
 **Observed behavior**
 
-- The fixture prompt is routed through a coder object that owns the edit loop. [\[3\]][ref-3]
+- The fixture prompt is routed through a query loop that owns the tool cycle. [\[3\]][ref-3]
 
 ---
 
 ## Cross-Repo Comparison
 
-| Dimension | Codex | Aider | Confidence |
+| Dimension | Codex | Claude Code | Confidence |
 |---|---|---|---|
-| Prompt ingestion | CLI command handler. [\[1\]][ref-1] | Coder object. [\[3\]][ref-3] | high |
+| Prompt ingestion | CLI command handler. [\[1\]][ref-1] | Query loop. [\[3\]][ref-3] | high |
 
 ---
 
@@ -83,7 +83,7 @@ Body citations use these numbered source references; each entry keeps the code U
 
 - <a id="ref-1"></a>[1] Codex CLI: prompt ingestion fixture ([code](https://github.com/openai/codex/blob/1111111/crates/cli/src/main.rs#L10-L22)).
 - <a id="ref-2"></a>[2] Codex CLI: tool result fixture ([code](https://github.com/openai/codex/blob/1111111/crates/core/src/agent.rs#L50-L74)).
-- <a id="ref-3"></a>[3] Aider: edit-loop fixture ([code](https://github.com/Aider-AI/aider/blob/2222222/aider/coders/base_coder.py#L30-L55)).
+- <a id="ref-3"></a>[3] Claude Code (local mirror): query-loop fixture ([code](../claude-code/query.ts#L30-L55)).
 
 [ref-1]: #ref-1
 [ref-2]: #ref-2

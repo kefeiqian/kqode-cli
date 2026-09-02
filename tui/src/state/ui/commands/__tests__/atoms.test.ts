@@ -7,10 +7,13 @@ import {
   commandMenuMatchesAtom,
   commandMenuOpenAtom,
   highlightedCommandAtom,
+  highlightedEntryAtom,
   moveCommandHighlightAtom,
   resetCommandHighlightAtom
 } from '@state/ui/commands/index.ts';
+import { COMMAND_MENU_PANEL_ROWS } from '@constants/ui.ts';
 import { CommandId } from '@libs/commands/registry.ts';
+import { entryFullName } from '@libs/commands/subcommands.ts';
 import { composerStateAtom } from '@state/ui/composer/index.ts';
 import { BACKEND_LOADING_HINT, startupStatusHintAtom } from '@state/ui/statusHint.ts';
 
@@ -26,33 +29,57 @@ describe('command menu atoms', () => {
     setText(store, '/');
 
     expect(store.get(commandMenuOpenAtom)).toBe(true);
-    expect(store.get(commandMenuMatchesAtom).map((command) => command.id)).toEqual([
+    expect(store.get(commandMenuMatchesAtom).map((entry) => entry.kind === 'command' ? entry.command.id : entry.subcommand.id)).toEqual([
       CommandId.Clear,
+      CommandId.Connect,
       CommandId.Exit,
-      CommandId.Help
+      CommandId.Help,
+      CommandId.Memory,
+      CommandId.Model,
+      CommandId.Resume,
+      CommandId.Theme
     ]);
     expect(store.get(highlightedCommandAtom)?.id).toBe(CommandId.Clear);
-    expect(store.get(commandMenuDesiredRowsAtom)).toBe(3);
+    expect(store.get(commandMenuDesiredRowsAtom)).toBe(COMMAND_MENU_PANEL_ROWS + 1);
   });
 
   it('narrows matches as the query grows', () => {
     const store = createStore();
     setText(store, '/cl');
 
-    expect(store.get(commandMenuMatchesAtom).map((command) => command.id)).toEqual([
+    expect(store.get(commandMenuMatchesAtom).map((entry) => entry.kind === 'command' ? entry.command.id : entry.subcommand.id)).toEqual([
       CommandId.Clear
     ]);
     expect(store.get(highlightedCommandAtom)?.id).toBe(CommandId.Clear);
   });
 
-  it('stays open with no matches and shows a single row', () => {
+  it('expands memory subcommands and highlights narrowed subcommands', () => {
+    const store = createStore();
+    setText(store, '/memory');
+
+    expect(store.get(commandMenuMatchesAtom).map(entryFullName)).toEqual([
+      '/memory',
+      '/memory add',
+      '/memory show',
+      '/memory inbox',
+      '/memory edit',
+      '/memory forget'
+    ]);
+    expect(entryFullName(store.get(highlightedEntryAtom)!)).toBe('/memory');
+
+    setText(store, '/memory e');
+    expect(store.get(commandMenuMatchesAtom).map(entryFullName)).toEqual(['/memory edit']);
+    expect(entryFullName(store.get(highlightedEntryAtom)!)).toBe('/memory edit');
+  });
+
+  it('stays open with no matches and keeps the fixed panel height', () => {
     const store = createStore();
     setText(store, '/zzz');
 
     expect(store.get(commandMenuOpenAtom)).toBe(true);
     expect(store.get(commandMenuMatchesAtom)).toEqual([]);
     expect(store.get(highlightedCommandAtom)).toBeUndefined();
-    expect(store.get(commandMenuDesiredRowsAtom)).toBe(1);
+    expect(store.get(commandMenuDesiredRowsAtom)).toBe(COMMAND_MENU_PANEL_ROWS + 1);
   });
 
   it('is closed for non-slash text', () => {
@@ -83,7 +110,7 @@ describe('command menu atoms', () => {
     expect(store.get(commandMenuHighlightIndexAtom)).toBe(1);
 
     store.set(moveCommandHighlightAtom, 5);
-    expect(store.get(commandMenuHighlightIndexAtom)).toBe(2);
+    expect(store.get(commandMenuHighlightIndexAtom)).toBe(6);
 
     store.set(moveCommandHighlightAtom, -10);
     expect(store.get(commandMenuHighlightIndexAtom)).toBe(0);

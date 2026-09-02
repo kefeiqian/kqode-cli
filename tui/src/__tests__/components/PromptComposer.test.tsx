@@ -5,15 +5,23 @@ import {
   PromptComposer,
   resolveComposerCursorPosition
 } from '@components/PromptComposer/index.tsx';
-import { enqueuePromptAtom } from '@state/promptQueue/index.ts';
+import { enqueuePromptAtom, restoreComposerDraftAtom } from '@state/promptQueue/index.ts';
 import { commandMenuDismissedAtom, highlightedCommandAtom } from '@state/ui/commands/index.ts';
 import { armedActionAtom } from '@state/ui/index.ts';
 import { ArmedAction } from '@constants/ui.ts';
 import { helpVisibleAtom } from '@state/ui/help/index.ts';
-import { composerStateAtom } from '@state/ui/composer/index.ts';
-import { submittedPromptEntriesAtom } from '@state/ui/index.ts';
+import { composerScrollOffsetRowsAtom, composerStateAtom } from '@state/ui/composer/index.ts';
+import { columnsTestOverrideAtom, rowsTestOverrideAtom } from '@state/ui/dimensions.ts';
+import { scrollComposerByRowsAtom, submittedPromptEntriesAtom } from '@state/ui/index.ts';
 import { flushInput } from '@test/flushInput.ts';
 import { renderWithJotai } from '@test/renderWithJotai.tsx';
+
+const SGR_PATTERN = /\u001B\[[0-9;]*m/g;
+
+/** Drops SGR color/background escapes so a rendered line can be measured. */
+function stripSgr(text: string): string {
+  return text.replace(SGR_PATTERN, '');
+}
 
 describe('PromptComposer', () => {
   it('preserves long prompt content while rendering a wrapped visible view', () => {
@@ -44,8 +52,21 @@ describe('PromptComposer', () => {
     expect(lastFrame() ?? '').toContain('> 1\n  2\n  3');
   });
 
+  it('wraps wide CJK input by display width across composer rows', async () => {
+    // Input width is 4 columns (6 − prefix). '去儿童' is 6 display columns, so it
+    // must wrap after '去儿'; the old char-count logic kept all 3 glyphs on one
+    // row (3 ≤ 4) and let the over-wide row overflow.
+    const { lastFrame, stdin } = renderWithJotai(<PromptComposer columns={6} />);
+
+    stdin.write('去儿童');
+    await flushInput();
+
+    expect(stripSgr(lastFrame() ?? '')).toContain('> 去儿\n  童');
+  });
+
   it.each([
     ['Shift+Enter', '\u001B[13;2u'],
+    ['Shift+Enter xterm modifyOtherKeys', '\u001B[27;2;13~'],
     ['Alt+Enter', '\u001B[13;3u'],
     ['Ctrl+Enter', '\u001B[13;5u'],
     ['Ctrl+Shift+Enter', '\u001B[13;6u']
@@ -67,6 +88,33 @@ describe('PromptComposer', () => {
     expect(onSubmit).toHaveBeenCalledWith('first\nsecond');
   });
 
+  it('scrolls the caret back into view after a backslash-Enter edit that keeps the cursor index', async () => {
+    const store = createStore();
+    store.set(columnsTestOverrideAtom, 60);
+    store.set(rowsTestOverrideAtom, 24);
+    // A long prompt (overflows the composer cap) ending in a backslash, caret at end.
+    const text = `${Array.from({ length: 20 }, (_, index) => `line ${index}`).join('\n')}\\`;
+    store.set(composerStateAtom, { text, cursorIndex: text.length, validationError: null });
+
+    const { stdin } = renderWithJotai(<PromptComposer />, store);
+    await flushInput();
+
+    // Peek toward the top so the caret (at the end) is scrolled off-window.
+    store.set(scrollComposerByRowsAtom, 999);
+    await flushInput();
+    expect(store.get(composerScrollOffsetRowsAtom)).toBeGreaterThan(0);
+
+    // Bare Enter on the trailing `\` deletes it and inserts a newline in one
+    // keypress: the text changes but the net cursor index does not. The caret
+    // must still snap back into view (regression guard for the effect keying on
+    // text as well as cursor index).
+    stdin.write('\r');
+    await flushInput();
+
+    expect(store.get(composerStateAtom).text).toBe(`${text.slice(0, -1)}\n`);
+    expect(store.get(composerScrollOffsetRowsAtom)).toBe(0);
+  });
+
   it('uses backslash followed by Enter as a newline fallback without submitting', async () => {
     const onSubmit = vi.fn();
     const { lastFrame, stdin } = renderWithJotai(
@@ -86,6 +134,24 @@ describe('PromptComposer', () => {
     await flushInput();
 
     expect(onSubmit).toHaveBeenCalledWith('first\nsecond');
+  });
+
+  it('inserts bracketed multi-line paste without submitting and preserves over-limit validation', async () => {
+    const onSubmit = vi.fn();
+    const { lastFrame, stdin } = renderWithJotai(
+      <PromptComposer columns={40} maxBytes={6} onSubmit={onSubmit} />
+    );
+
+    stdin.write('\u001B[200~one\r\ntwo\u001B[201~');
+    await flushInput();
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(lastFrame() ?? '').toContain('> one\n  two');
+    expect(lastFrame() ?? '').toContain('ERROR: Prompt is 7 bytes; maximum is 6 bytes.');
+    stdin.write('\r');
+    await flushInput();
+
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('submits a trailing backslash instead of inserting a newline when the cursor is at the start', async () => {
@@ -123,7 +189,7 @@ describe('PromptComposer', () => {
     expect(resolveComposerCursorPosition('abcd', 38, 7, 2)).toEqual({ x: 4, y: 9 });
   });
 
-  it('submits exact non-empty text with leading and trailing spaces, then clears', async () => {
+  it('trims leading and trailing whitespace from submitted text, then clears', async () => {
     const onSubmit = vi.fn();
     const { lastFrame, stdin } = renderWithJotai(
       <PromptComposer columns={40} onSubmit={onSubmit} />
@@ -134,8 +200,23 @@ describe('PromptComposer', () => {
     stdin.write('\r');
     await flushInput();
 
-    expect(onSubmit).toHaveBeenCalledWith('  hello  ');
+    expect(onSubmit).toHaveBeenCalledWith('hello');
     expect(lastFrame() ?? '').not.toContain('Ask KQode...');
+  });
+
+  it('restores a pending draft at the end of the composer and clears the restore seam', async () => {
+    const store = createStore();
+    store.set(restoreComposerDraftAtom, 'retry this prompt');
+
+    renderWithJotai(<PromptComposer columns={40} />, store);
+    await flushInput();
+
+    expect(store.get(composerStateAtom)).toMatchObject({
+      text: 'retry this prompt',
+      cursorIndex: 'retry this prompt'.length,
+      validationError: null
+    });
+    expect(store.get(restoreComposerDraftAtom)).toBe('');
   });
 
   it('blocks empty or whitespace-only submits', async () => {
@@ -184,6 +265,24 @@ describe('PromptComposer', () => {
     await flushInput();
 
     expect(lastFrame() ?? '').toContain('> abXcY');
+  });
+
+  it('uses arrows and backspace without splitting grapheme clusters', async () => {
+    const onSubmit = vi.fn();
+    const { lastFrame, stdin } = renderWithJotai(
+      <PromptComposer columns={40} onSubmit={onSubmit} />
+    );
+
+    stdin.write('👍🏽e\u0301x');
+    await flushInput();
+    stdin.write('\u001B[D');
+    await flushInput();
+    stdin.write('\u001B[D');
+    await flushInput();
+    stdin.write('\b');
+    await flushInput();
+
+    expect(lastFrame() ?? '').toContain('> e\u0301x');
   });
 
   it('ignores mouse tracking sequences instead of inserting them into the prompt', async () => {
@@ -259,7 +358,7 @@ describe('PromptComposer', () => {
 
     stdin.write('\u001B[B');
     await flushInput();
-    expect(store.get(highlightedCommandAtom)?.name).toBe('/exit');
+    expect(store.get(highlightedCommandAtom)?.name).toBe('/connect');
 
     stdin.write('\u001B[A');
     await flushInput();
@@ -292,7 +391,7 @@ describe('PromptComposer', () => {
     expect(store.get(submittedPromptEntriesAtom)).toEqual([]);
   });
 
-  it('posts an unknown command and its error into the transcript without sending it', async () => {
+  it('posts an unknown command notice without sending it', async () => {
     const store = createStore();
     const onSubmit = vi.fn();
     const { stdin } = renderWithJotai(
@@ -307,7 +406,6 @@ describe('PromptComposer', () => {
 
     const entries = store.get(submittedPromptEntriesAtom);
     expect(entries.map((entry) => ({ kind: entry.kind, text: entry.text }))).toEqual([
-      { kind: 'user', text: '/zzz' },
       { kind: 'error', text: 'Unknown command: /zzz' }
     ]);
     expect(store.get(composerStateAtom).text).toBe('');
@@ -378,5 +476,60 @@ describe('PromptComposer', () => {
     expect(store.get(armedActionAtom)).toBeNull();
     expect(store.get(composerStateAtom).text).toBe('hellox');
     expect(lastFrame() ?? '').toContain('hellox');
+  });
+
+  it('renders the cursor-follow bottom window of an overflowing prompt at offset 0', () => {
+    const store = createStore();
+    store.set(composerStateAtom, {
+      text: '1111\n2222\n3333\n4444\n5555',
+      cursorIndex: 24,
+      validationError: null
+    });
+
+    const { lastFrame } = renderWithJotai(
+      <PromptComposer columns={40} maxVisibleLines={3} />,
+      store
+    );
+    const frame = lastFrame() ?? '';
+
+    expect(frame).toContain('5555');
+    expect(frame).not.toContain('1111');
+  });
+
+  it('scrolls the composer view to earlier rows when a scroll offset is set', () => {
+    const store = createStore();
+    store.set(composerStateAtom, {
+      text: '1111\n2222\n3333\n4444\n5555',
+      cursorIndex: 24,
+      validationError: null
+    });
+    store.set(composerScrollOffsetRowsAtom, 2);
+
+    const { lastFrame } = renderWithJotai(
+      <PromptComposer columns={40} maxVisibleLines={3} />,
+      store
+    );
+    const frame = lastFrame() ?? '';
+
+    expect(frame).toContain('1111');
+    expect(frame).not.toContain('5555');
+  });
+
+  it('moves the cursor between visual lines with the Up and Down arrows', async () => {
+    const store = createStore();
+    const { stdin } = renderWithJotai(<PromptComposer />, store);
+    store.set(composerStateAtom, {
+      text: 'aaa\nbbb\nccc',
+      cursorIndex: 11,
+      validationError: null
+    });
+
+    stdin.write('\u001B[A'); // Up
+    await flushInput();
+    expect(store.get(composerStateAtom).cursorIndex).toBe(7);
+
+    stdin.write('\u001B[B'); // Down
+    await flushInput();
+    expect(store.get(composerStateAtom).cursorIndex).toBe(11);
   });
 });

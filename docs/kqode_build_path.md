@@ -51,6 +51,15 @@ Ink is the committed TUI framework. The Rust core must still run headless withou
 
 **Done when:** `kqode run "explain this repo"` can inspect files, search, ask a question if needed, and finish with a completion summary.
 
+**Immediate next slice:** build the smallest deterministic headless tool loop
+before the full edit/sandbox stack. A fake provider should be able to request
+`read_file` and `complete_task`, the registry should validate typed inputs and
+return the standard tool-result shape, and the loop should stop only through
+`complete_task`, `ask_user`, budget exhaustion, cancellation, or a typed
+unrecoverable error. Defer file writes, patch application, shell execution, and
+approval UX to M2/M3 so the first slice proves the model-tool-model loop without
+side-effect risk.
+
 ### M2. VFS, patch, and git loop
 
 **Goal:** Make safe code edits the center of the product.

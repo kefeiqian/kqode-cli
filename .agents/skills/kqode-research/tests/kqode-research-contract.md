@@ -12,10 +12,12 @@ These scenarios define deterministic behavior for the `kqode-research` skill. Th
 
 ## Repo catalog
 
-- Given default scope, repos resolve in this order: Codex CLI, Aider, OpenCode, Kimi Code, Gemini CLI, SWE-agent.
+- Given default scope, repos resolve in this order: GitHub Copilot CLI, Claude Code, Codex CLI, Gemini CLI, OpenCode, Kimi Code, KimiX.
 - Given a secondary open-source repo requested by catalog ID, the resolver accepts it.
-- Given a public product without an open-source repo, the resolver rejects it as a source-repo target.
-- Given an arbitrary URL in v1, the resolver rejects it as unsupported.
+- Given GitHub Copilot CLI, the resolver accepts its public repo as a source target.
+- Given Claude Code, the resolver accepts it as a local-mirror source target at `docs/claude-code`.
+- Given a product with no researchable source, such as the Copilot Coding Agent cloud service, Cursor, or Windsurf, the resolver rejects it as a source-repo target.
+- Given an arbitrary URL or arbitrary local path in v1, the resolver rejects it as unsupported.
 
 ## Safety
 
@@ -24,10 +26,13 @@ These scenarios define deterministic behavior for the `kqode-research` skill. Th
 - Given a redirect away from the catalog URL, the repo status becomes `policy_blocked`.
 - Given an output slug with `..`, a slash, or shell metacharacters, validation fails.
 - Given a symlink points outside a cloned repo root, reads through that symlink are rejected.
+- Given the Claude Code local mirror at `docs/claude-code` is absent or empty, its status becomes `mirror_missing`.
+- Given a symlink inside the Claude Code mirror points outside `docs/claude-code`, reads through that symlink are rejected.
 
 ## Citations and reports
 
 - Given an observed behavior claim, the report includes a numbered reference and a commit-pinned source link in References.
+- Given an observed behavior claim about Claude Code, the reference uses an internal repo-relative link into `docs/claude-code` and records the mirror provenance SHA in Run Metadata.
 - Given a material observed-behavior paragraph has no numbered reference, report validation fails.
 - Given a source link is generated, it uses the same SHA and line range recorded for that numbered reference.
 - Given one repo fails to fetch, the report includes that repo with an incomplete status and reason.

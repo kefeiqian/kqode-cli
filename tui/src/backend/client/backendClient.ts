@@ -4,151 +4,195 @@ import type { BackendClient } from '@contracts/backend/index.ts';
 import { DEFAULT_REQUEST_TIMEOUT_MS, DEFAULT_STARTUP_TIMEOUT_MS } from '@constants/backend.ts';
 import type { LaunchedBackend } from '@backend/process/backendProcess.ts';
 import { createMessageConnectionClient } from '@backend/client/messageConnectionClient.ts';
+import type { MessageConnectionBackendClient } from '@backend/client/messageConnectionClient.ts';
 import { openReadyConnection } from '@backend/client/backendReadiness.ts';
 import {
   isFatalBackendError,
-  toLaunchError,
-  withRequestTimeout
+  toLaunchError
 } from '@backend/client/backendClientErrors.ts';
-import type { MessageSubmitParams, MessageSubmitResult } from '@contracts/backend/index.ts';
-
-/** Lifecycle of the TUI-owned backend connection. */
-export const BackendLifecycleState = {
-  /** No backend has been launched yet. */
-  Idle: 'idle',
-  /** A backend launch/connect is in flight. */
-  Starting: 'starting',
-  /** The backend is connected and accepting requests. */
-  Ready: 'ready',
-  /** The TUI is disposing the backend on purpose. */
-  Closing: 'closing',
-  /** The backend exited, crashed, or a fatal transport error occurred. */
-  Dead: 'dead'
-} as const;
-
-export type BackendLifecycleState =
-  (typeof BackendLifecycleState)[keyof typeof BackendLifecycleState];
-
-/** Lifecycle handle over a {@link BackendClient} that owns one child backend at a time. */
-export type BackendClientHandle = BackendClient & {
-  getState(): BackendLifecycleState;
-  ensureStarted(): Promise<void>;
-  dispose(): void;
-};
-
-/** Composition inputs for the generic backend client: an injected process launcher. */
-export type BackendClientOptions = {
-  /** Produces a freshly launched backend process; source/packaged factories inject this. */
-  launch: () => Promise<LaunchedBackend>;
-  requestTimeoutMs?: number;
-  /** Ceiling for the launched backend to signal JSON-RPC readiness before it is torn down. */
-  startupTimeoutMs?: number;
-};
-
+import {
+  BackendLifecycleState,
+  type BackendClientHandle,
+  type BackendClientOptions
+} from '@backend/client/backendClientTypes.ts';
+import type {
+  ActiveSelectionResult,
+  ModelListResult,
+  ProviderListResult,
+  SessionListResult,
+  SessionResumeParams,
+  SessionResumeResult,
+  SetKeyParams,
+  SetKeyResult,
+  StreamSubmitParams,
+  TranscriptEvent,
+  MemoryAddParams,
+  MemoryEditParams,
+  MemoryForgetParams,
+  MemoryForgetResult,
+  MemoryInboxApplyParams,
+  MemoryInboxApplyResult,
+  MemoryInboxListParams,
+  MemoryInboxListResult,
+  MemoryInboxUndoParams,
+  MemoryInboxUndoResult,
+  MemoryListParams,
+  MemoryListResult,
+  MemoryMutationResult,
+  MemoryShowParams,
+  MemoryShowResult,
+  ThemeGetResult,
+  ThemeSetResult
+} from '@contracts/backend/index.ts';
+export { BackendLifecycleState };
+export type { BackendClientHandle, BackendClientOptions };
 type BackendSession = {
   backend: LaunchedBackend;
   connection: MessageConnection;
-  client: BackendClient;
+  client: MessageConnectionBackendClient;
+  generation: number;
 };
-
-/**
- * Creates a JSON-RPC client over a launched child backend.
- *
- * One backend serves the whole TUI session. Recoverable method errors keep the
- * process alive; fatal transport/timeout/exit failures dispose the connection
- * and mark the client `dead`. The next submit after `dead` respawns a fresh
- * backend (persisted session restore is added with the session methods), never
- * silently and never auto-replaying interrupted work.
- *
- * `dispose()` is terminal: once disposed, `ensureStarted`/`submitMessage` reject
- * with a `launch`-kind {@link BackendClientError} without spawning a replacement,
- * so a torn-down client can never orphan a new backend process.
- */
+type BackendTransition = {
+  workspaceCwd: string | undefined;
+  promise: Promise<BackendSession>;
+  kind: 'start' | 'relaunch';
+};
+/** Creates a lifecycle-managed JSON-RPC client over a launched child backend. */
 export function createBackendClient(options: BackendClientOptions): BackendClientHandle {
   const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+  const validationRequestTimeoutMs = options.validationRequestTimeoutMs;
   const startupTimeoutMs = options.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS;
   const { launch } = options;
-
+  let workspaceCwd = options.initialWorkspaceCwd;
   let state: BackendLifecycleState = BackendLifecycleState.Idle;
   let session: BackendSession | null = null;
-  let starting: Promise<BackendSession> | null = null;
+  let starting: BackendTransition | null = null;
+  let generationCounter = 0;
+  let activeGeneration = 0;
   let disposed = false;
-
+  const readyListeners: Array<(sessionId: string) => void> = [];
+  const transcriptListeners = new Set<(event: TranscriptEvent) => void>();
+  let detachTranscriptEvents: (() => void) | undefined;
   const disposedError = (): BackendClientError =>
     new BackendClientError(BackendErrorKind.Launch, 'backend client disposed');
-
   const abortedError = (): BackendClientError =>
     new BackendClientError(
       BackendErrorKind.Launch,
       'backend launch was aborted before it became ready'
     );
-
+  const discardedSubmitError = (): BackendClientError =>
+    new BackendClientError(
+      BackendErrorKind.Discarded,
+      'prompt discarded because the session switched before it could be submitted'
+    );
+  const nextGeneration = (): number => {
+    generationCounter += 1;
+    activeGeneration = generationCounter;
+    return generationCounter;
+  };
+  const disposeSession = (target: BackendSession): void => {
+    target.client.failInFlight('backend connection closed before the turn completed');
+    target.connection.dispose();
+    target.backend.dispose();
+  };
   const teardown = (nextState: BackendLifecycleState): void => {
     const current = session;
     session = null;
     state = nextState;
     if (current !== null) {
-      current.connection.dispose();
-      current.backend.dispose();
+      disposeSession(current);
+      detachTranscriptEvents?.();
+      detachTranscriptEvents = undefined;
     }
   };
-
-  const markDead = (): void => {
+  const markDead = (generation: number): void => {
+    if (generation !== activeGeneration) {
+      return;
+    }
     if (state === BackendLifecycleState.Closing || state === BackendLifecycleState.Dead) {
       return;
     }
     teardown(BackendLifecycleState.Dead);
   };
-
-  const start = async (): Promise<BackendSession> => {
-    state = BackendLifecycleState.Starting;
+  const launchSession = async (
+    nextWorkspaceCwd: string | undefined,
+    generation: number
+  ): Promise<{ opened: BackendSession; sessionId: string }> => {
     let backend: LaunchedBackend;
     try {
-      backend = await launch();
+      backend = await launch(nextWorkspaceCwd);
     } catch (error) {
-      state = BackendLifecycleState.Dead;
       throw toLaunchError(error);
     }
-
-    // The client may have been disposed (or marked dead) while the launch was in
-    // flight. Only `dispose()` can change state during this window because no
-    // connection/exit listeners are wired yet; reclaim the process instead of
-    // resurrecting a backend nobody will dispose.
-    if (state !== BackendLifecycleState.Starting) {
-      backend.dispose();
-      throw abortedError();
+    const { connection, sessionId } = await openReadyConnection({
+      backend,
+      startupTimeoutMs,
+      onFatal: () => markDead(generation)
+    });
+    const innerClient = createMessageConnectionClient(connection, {
+      requestTimeoutMs,
+      validationRequestTimeoutMs
+    });
+    return {
+      opened: {
+        backend,
+        connection,
+        client: innerClient,
+        generation
+      },
+      sessionId
+    };
+  };
+  const attachTranscriptListener = (innerClient: MessageConnectionBackendClient): void => {
+    detachTranscriptEvents = innerClient.onTranscriptEvent((event) => {
+      for (const listener of transcriptListeners) {
+        listener(event);
+      }
+    });
+  };
+  const announceReady = (sessionId: string): void => {
+    for (const listener of readyListeners) {
+      listener(sessionId);
     }
-
-    // Gate "ready" on the backend actually speaking JSON-RPC (readiness
-    // notification) rather than trusting the OS spawn event.
-    let connection: MessageConnection;
+  };
+  const adoptStartedSession = (opened: BackendSession, sessionId: string): BackendSession => {
+    attachTranscriptListener(opened.client);
+    session = opened;
+    state = BackendLifecycleState.Ready;
+    announceReady(sessionId);
+    return opened;
+  };
+  const start = async (targetWorkspaceCwd: string | undefined): Promise<BackendSession> => {
+    const generation = nextGeneration();
+    state = BackendLifecycleState.Starting;
     try {
-      connection = await openReadyConnection({ backend, startupTimeoutMs, onFatal: markDead });
+      const { opened, sessionId } = await launchSession(targetWorkspaceCwd, generation);
+      if (generation !== activeGeneration || state !== BackendLifecycleState.Starting) {
+        disposeSession(opened);
+        throw abortedError();
+      }
+      workspaceCwd = targetWorkspaceCwd;
+      return adoptStartedSession(opened, sessionId);
     } catch (error) {
-      if (state === BackendLifecycleState.Starting) {
+      if (generation === activeGeneration && state === BackendLifecycleState.Starting) {
         state = BackendLifecycleState.Dead;
       }
       throw error;
     }
-
-    // Disposal can land while we await readiness; reclaim the freshly launched
-    // backend instead of publishing a session over a client that is tearing down.
-    if (state !== BackendLifecycleState.Starting) {
-      connection.dispose();
-      backend.dispose();
-      throw abortedError();
-    }
-
-    const opened: BackendSession = {
-      backend,
-      connection,
-      client: createMessageConnectionClient(connection)
-    };
-    session = opened;
-    state = BackendLifecycleState.Ready;
-    return opened;
   };
-
+  const beginStart = (
+    targetWorkspaceCwd: string | undefined,
+    kind: BackendTransition['kind'] = 'start'
+  ): Promise<BackendSession> => {
+    let promise!: Promise<BackendSession>;
+    promise = start(targetWorkspaceCwd).finally(() => {
+      if (starting?.promise === promise) {
+        starting = null;
+      }
+    });
+    starting = { workspaceCwd: targetWorkspaceCwd, promise, kind };
+    return promise;
+  };
   const ensureSession = (): Promise<BackendSession> => {
     if (disposed) {
       return Promise.reject(disposedError());
@@ -156,32 +200,146 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
     if (session !== null && state === BackendLifecycleState.Ready) {
       return Promise.resolve(session);
     }
-    if (starting === null) {
-      starting = start().finally(() => {
-        starting = null;
-      });
+    if (starting !== null && starting.workspaceCwd === workspaceCwd) {
+      return starting.promise;
     }
-    return starting;
+    return beginStart(workspaceCwd);
   };
-
+  const submit = async (params: StreamSubmitParams): Promise<void> => {
+    const transition = starting?.kind === 'relaunch' ? starting : null;
+    if (transition !== null) {
+      await transition.promise;
+      throw discardedSubmitError();
+    }
+    await withClient((client) => client.submit(params));
+  };
+  const withClient = async <T>(operation: (client: BackendClient) => Promise<T>): Promise<T> => {
+    if (disposed) {
+      throw disposedError();
+    }
+    const active = await ensureSession();
+    try {
+      return await operation(active.client);
+    } catch (error) {
+      if (isFatalBackendError(error)) {
+        markDead(activeGeneration);
+      }
+      throw error;
+    }
+  };
   return {
     getState: () => state,
-    async ensureStarted(): Promise<void> {
-      await ensureSession();
+    onReady: (listener: (sessionId: string) => void): void => void readyListeners.push(listener),
+    onTranscriptEvent(listener: (event: TranscriptEvent) => void): () => void {
+      transcriptListeners.add(listener);
+      return () => {
+        transcriptListeners.delete(listener);
+      };
     },
-    async submitMessage(params: MessageSubmitParams): Promise<MessageSubmitResult> {
+    ensureStarted: async (): Promise<void> => void (await ensureSession()),
+    async relaunch(nextWorkspaceCwd: string): Promise<void> {
       if (disposed) {
         throw disposedError();
       }
-      const active = await ensureSession();
-      try {
-        return await withRequestTimeout(active.client.submitMessage(params), requestTimeoutMs);
-      } catch (error) {
-        if (isFatalBackendError(error)) {
-          markDead();
-        }
-        throw error;
+      if (state !== BackendLifecycleState.Ready || session === null) {
+        workspaceCwd = nextWorkspaceCwd;
+        await beginStart(nextWorkspaceCwd, 'relaunch');
+        return;
       }
+      const previousSession = session;
+      const previousWorkspaceCwd = workspaceCwd;
+      const previousGeneration = previousSession.generation;
+      const generation = nextGeneration();
+      state = BackendLifecycleState.Starting;
+      workspaceCwd = nextWorkspaceCwd;
+      let promise!: Promise<BackendSession>;
+      promise = (async () => {
+        try {
+          const { opened, sessionId } = await launchSession(nextWorkspaceCwd, generation);
+          if (generation !== activeGeneration || state !== BackendLifecycleState.Starting) {
+            disposeSession(opened);
+            throw abortedError();
+          }
+          disposeSession(previousSession);
+          detachTranscriptEvents?.();
+          detachTranscriptEvents = undefined;
+          return adoptStartedSession(opened, sessionId);
+        } catch (error) {
+          if (generation === activeGeneration) {
+            session = previousSession;
+            workspaceCwd = previousWorkspaceCwd;
+            activeGeneration = previousGeneration;
+            state = BackendLifecycleState.Ready;
+          }
+          throw error;
+        } finally {
+          if (starting?.promise === promise) {
+            starting = null;
+          }
+        }
+      })();
+      starting = { workspaceCwd: nextWorkspaceCwd, promise, kind: 'relaunch' };
+      await promise;
+    },
+    submit,
+    clearConversation: async (): Promise<void> =>
+      void (await withClient((client) => client.clearConversation())),
+    cancelTurn: async (turnId: string): Promise<void> =>
+      void (await withClient((client) => client.cancelTurn(turnId))),
+    stopTurn: async (): Promise<void> =>
+      void (await withClient((client) => client.stopTurn())),
+    gitStatus: (): Promise<string | null> => withClient((client) => client.gitStatus()),
+    listProviders: (): Promise<ProviderListResult> => withClient((client) => client.listProviders()),
+    getActiveSelection: (): Promise<ActiveSelectionResult> =>
+      withClient((client) => client.getActiveSelection()),
+    setActiveSelection: async (providerId: string, modelId: string): Promise<void> =>
+      void (await withClient((client) => client.setActiveSelection(providerId, modelId))),
+    clearProviderKey: async (providerId: string): Promise<void> =>
+      void (await withClient((client) => client.clearProviderKey(providerId))),
+    async setProviderKey(params: SetKeyParams): Promise<SetKeyResult> {
+      return withClient((client) => client.setProviderKey(params));
+    },
+    async listModels(providerId: string): Promise<ModelListResult> {
+      return withClient((client) => client.listModels(providerId));
+    },
+    async getTheme(): Promise<ThemeGetResult> {
+      return withClient((client) => client.getTheme());
+    },
+    async setTheme(themeId: string): Promise<ThemeSetResult> {
+      return withClient((client) => client.setTheme(themeId));
+    },
+    async listSessions(): Promise<SessionListResult> {
+      return withClient((client) => client.listSessions());
+    },
+    async resumeSession(params: SessionResumeParams): Promise<SessionResumeResult> {
+      return withClient((client) => client.resumeSession(params));
+    },
+    async listMemory(params: MemoryListParams): Promise<MemoryListResult> {
+      return withClient((client) => client.listMemory(params));
+    },
+    async showMemory(params: MemoryShowParams): Promise<MemoryShowResult> {
+      return withClient((client) => client.showMemory(params));
+    },
+    async addMemory(params: MemoryAddParams): Promise<MemoryMutationResult> {
+      return withClient((client) => client.addMemory(params));
+    },
+    async editMemory(params: MemoryEditParams): Promise<MemoryMutationResult> {
+      return withClient((client) => client.editMemory(params));
+    },
+    async forgetMemory(params: MemoryForgetParams): Promise<MemoryForgetResult> {
+      return withClient((client) => client.forgetMemory(params));
+    },
+    async reloadMemory(): Promise<MemoryListResult> {
+      return withClient((client) => client.reloadMemory());
+    },
+    async listMemoryInbox(params: MemoryInboxListParams): Promise<MemoryInboxListResult> {
+      return withClient((client) => client.listMemoryInbox(params));
+    },
+    async applyMemoryInbox(params: MemoryInboxApplyParams): Promise<MemoryInboxApplyResult> {
+      return withClient((client) => client.applyMemoryInbox(params));
+    },
+    async undoMemoryInbox(params: MemoryInboxUndoParams): Promise<MemoryInboxUndoResult> {
+      return withClient((client) => client.undoMemoryInbox(params));
     },
     dispose() {
       disposed = true;

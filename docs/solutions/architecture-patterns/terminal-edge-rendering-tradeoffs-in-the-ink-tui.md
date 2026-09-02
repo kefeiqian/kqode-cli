@@ -11,6 +11,7 @@ symptoms:
   - "WezTerm blinks/flashes on every keystroke while Windows Terminal does not"
   - "Right-aligned status text clipped on WezTerm (GPT-5.5 rendered as GPT-5.)"
   - "An empty dark block appears at the right of the composer bar after typing"
+  - "A one-column block sits past the composer's right edge at launch and clears on the first keystroke (background Box stretched into the reserved column)"
   - "Prompt cursor lands one row above the composer after changing layout math"
 applies_when:
   - "Building a fullscreen Ink (v7) TUI that enters the alternate screen manually"
@@ -45,10 +46,19 @@ clipped to `GPT-5.`, and an empty block at the right of the composer after
 typing). Investigating them against Ink 7.1's source revealed a **fundamental
 rendering trade-off on Windows** that these reservations existed to sidestep.
 
-This session built the terminal-conditional handling, then — per an explicit
+This session first built terminal-conditional handling, then — per an explicit
 product decision to **prioritize Windows Terminal** — removed all of it in favor
-of unconditional edge-to-edge rendering. This doc captures the mechanism so the
-decision (and its knobs) are understood, not rediscovered.
+of unconditional edge-to-edge rendering. That decision was superseded on
+2026-07-07 by the TUI ink-safe rendering plan: KQode temporarily prioritized
+artifact-free Ink rendering, reserved a physical guard row, and used a shared
+safe content width for all rendered glyph content — bottom chrome plus
+body/transcript (extended to the body on 2026-07-07 after a store-fatal error
+message reproduced the last-column glyph drop in the body). On 2026-07-08 that
+decision was intentionally reversed: WezTerm-on-Windows was dropped from the
+support matrix, so KQode returned to edge-to-edge height (`FULLSCREEN_GUARD_ROWS = 0`,
+`INK_CURSOR_ROW_ORIGIN_OFFSET = 1`) while keeping the shared safe content width.
+This doc captures the mechanism so the decision history and knobs are
+understood, not rediscovered.
 
 Lineage (session history): the alternate screen was introduced 2026-07-02, and
 the "starts at 1/4 screen then jumps to fullscreen" first-frame bug was fixed
@@ -112,14 +122,23 @@ are untouched and keep their last column.
 ### Full-width backgrounds: Box-with-width paints the edge; bare Text may not
 
 A `<Box width={columns} backgroundColor>` paints its background as a solid
-rectangle that reaches the last column even on WezTerm (see `BodyPane` bubbles,
-`tui/src/components/BodyPane.tsx`). A bare full-width `<Text>` can lose its last
+rectangle that reaches the last column even on WezTerm (the root background box
+in `tui/src/components/HomeScreen/HomeScreenView.tsx` keeps raw columns and fills
+the reserved final column behind the safe-width body rows). That width must be
+**explicit**: a background `<Box>` with no `width` inherits Ink's default
+`alignItems: stretch` and grows to the raw parent width, painting its background
+into the reserved final column. A safe-width composer text row with no explicit
+`width` therefore stretched one column past the safe-width half-lines and showed
+a stray `inputBackground` block past the composer's right edge on the initial
+paint until the first keystroke's incremental `ESC[K` erased it — fixed by
+pinning `width={columns}` on the row (`tui/src/components/PromptComposer/ComposerFrame.tsx`).
+A bare full-width `<Text>` can lose its last
 glyph on WezTerm (this is why right-aligned `GPT-5.5` clipped to `GPT-5.` in the
 status bar). Mirroring the Box-with-explicit-width pattern fixes static
 full-width rows — but it does **not** defeat the incremental `ESC[K` clip on a
 row that is rewritten every keystroke (the composer).
 
-### The core trade-off (Windows) and the decision
+### The core trade-off (Windows) and the current decision
 
 On Windows you cannot have both on WezTerm:
 
@@ -128,11 +147,14 @@ On Windows you cannot have both on WezTerm:
 | Fullscreen (`FULLSCREEN_GUARD_ROWS = 0`) | WezTerm blinks per keystroke; WT fine | Yes (full repaint, no `ESC[K`) |
 | Non-fullscreen (guard row `= 1`) | No blink | No — incremental `ESC[K` clips the last column of rewritten rows on WezTerm |
 
-**Decision: prioritize Windows Terminal.** Render edge-to-edge unconditionally
-(`FULLSCREEN_GUARD_ROWS = 0`, `INK_CURSOR_ROW_ORIGIN_OFFSET = 1`, no per-terminal
-branching) and accept WezTerm's blink/clip as a known limitation. Windows
-Terminal, macOS, and Linux get a clean full-height, edge-to-edge UI. The revert
-knobs are documented inline for anyone who later wants to re-optimize WezTerm.
+**Current decision: prioritize edge-to-edge height.** Render through the
+terminal's physical last row (`FULLSCREEN_GUARD_ROWS = 0`,
+`INK_CURSOR_ROW_ORIGIN_OFFSET = 1`) and reserve a safe content column for all
+rendered glyph content. Composer, cwd,
+status, slash-menu, fullscreen footer, and body/transcript text all use the safe
+width; only background boxes keep raw columns and fill the reserved final column
+as a gutter. This assumes WezTerm-on-Windows is out of scope; Windows Terminal
+remains the Windows priority terminal.
 
 ## Why This Matters
 
@@ -142,8 +164,9 @@ knobs are documented inline for anyone who later wants to re-optimize WezTerm.
 - The guard-row ↔ cursor-offset lockstep is a silent foot-gun: touching one
   without the other drifts the prompt cursor a row off the composer, and there
   are no cursor unit tests that catch a live-terminal drift.
-- It frames the terminal-support decision honestly: "edge-to-edge everywhere,
-  WezTerm blinks" is a deliberate trade-off, not an oversight.
+- It frames the terminal-support decision honestly: edge-to-edge rendering was
+  a deliberate historical trade-off, and the current policy chooses
+  artifact-free stability over perfect physical-edge fill.
 - KQode is a **hybrid** (manual alt-screen + Ink incremental line-rewrite). This
   is why it needs edge reservations at all: reference coding agents avoid the
   problem by being either fully inline in the normal buffer (OpenAI Codex on
@@ -160,7 +183,8 @@ knobs are documented inline for anyone who later wants to re-optimize WezTerm.
 - When diagnosing per-keystroke flicker on Windows, check whether frames are
   fullscreen (`outputHeight >= viewportRows`) before suspecting KQode code.
 - When choosing which terminals to optimize for, remember the fullscreen ↔
-  no-flicker vs incremental ↔ edge-to-edge trade-off is WezTerm-on-Windows only.
+  no-flicker vs incremental ↔ edge-to-edge trade-off is WezTerm-on-Windows only;
+  the current safe-canvas policy avoids depending on that edge case.
 
 ## Examples
 
@@ -168,27 +192,28 @@ Guard row and cursor offset move together (`tui/src/state/ui/dimensions.ts`,
 `tui/src/constants/ui.ts`):
 
 ```ts
-// Edge-to-edge (current): fills full height, Ink renders fullscreen frames.
+// Edge-to-edge (current): fill the terminal's full height.
 export const FULLSCREEN_GUARD_ROWS = 0;        // dimensions.ts
 export const INK_CURSOR_ROW_ORIGIN_OFFSET = 1; // constants/ui.ts
 
-// Revert knob: reserve one row to stay non-fullscreen (no Windows repaint blink).
+// Historical stability-first knob: reserve one row to stay non-fullscreen.
 // export const FULLSCREEN_GUARD_ROWS = 1;
 // export const INK_CURSOR_ROW_ORIGIN_OFFSET = 0;
 ```
 
-Status bar reaching the final column (`tui/src/components/StatusBar.tsx`):
+Status bar using the safe chrome width (`tui/src/components/StatusBar.tsx`):
 
 ```tsx
-// paddingRight={1} reserved the last column to avoid WezTerm clipping the model
-// label; removed to reach the edge on Windows Terminal (WezTerm may clip).
-<Box width={columns}>{/* ...hints... model label ... */}</Box>
+// StatusBar reads safeChromeColumnsAtom so the model label does not depend on
+// the physical final column rendering correctly.
+<Box width={safeChromeColumns}>{/* ...hints... model label ... */}</Box>
 ```
 
 Observed on WezTerm-on-Windows with `FULLSCREEN_GUARD_ROWS = 1`: no flicker, but
-the composer bar shows a ~1-column dark block at the right after the first
-keystroke (the incremental `ESC[K` clip). With `= 0`: composer reaches the edge,
-but every keystroke repaints the whole screen and WezTerm blinks.
+the composer bar can show a ~1-column dark block at the right after the first
+keystroke if editable rows still paint through the physical final column. The
+current fix pairs the guard row with `safeChromeColumnsAtom` for bottom chrome
+and body/transcript so incremental rendering no longer depends on that final cell.
 
 ## Related
 
