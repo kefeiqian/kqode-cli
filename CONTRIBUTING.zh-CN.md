@@ -2,9 +2,10 @@
 
 [English](CONTRIBUTING.md) | **简体中文**
 
-感谢你对 KQode 的关注！KQode 是一个以 Rust 为核心（Rust-first）的编码智能体
-（coding agent）框架，并配有 TypeScript Ink 终端界面（TUI）。项目仍处于地基阶段，
-因此我们欢迎各种形式的贡献、问题反馈与设计建议。
+感谢你对 KQode 的关注！KQode 是一个以 Rust 为核心（Rust-first）的 Coding Agent
+应用，并以 React 和 Tauri 桌面应用作为主要交互界面。Rust 运行时也支持命令行和
+headless 执行；KQode 不提供 TUI。项目仍处于地基阶段，因此我们欢迎各种形式的
+贡献、问题反馈与设计建议。
 
 本指南介绍如何构建项目、我们遵循的约定，以及如何让改动进入评审。
 [`AGENTS.md`](AGENTS.md) 是仓库约定的权威来源——在进行任何非琐碎改动之前，请先
@@ -18,17 +19,19 @@
 
 ## 仓库结构
 
-参见 README 中的[仓库结构](README.zh-CN.md#仓库结构)，其中概览了 `src/`、
-`xtask/`、`tui/`、`blog/` 与 `docs/`。
+参见 README 中的[仓库结构](README.zh-CN.md#仓库结构)，其中概览了 `crates/`、
+`xtask/`、`blog/` 与 `docs/`。
 
 ## 前置条件
 
-- 通过 [rustup](https://rustup.rs/) 安装的稳定版 **Rust** 工具链（它驱动构建、
-  测试以及所有 `cargo xtask` 自动化命令）。
+- 通过 [rustup](https://rustup.rs/) 安装 **Rust 1.94.0 或更高版本**。仓库中提交的
+  `rust-toolchain.toml` 会为构建、测试以及所有 `cargo xtask` 自动化命令选择受支持
+  的基线版本。
+- 用于桌面前端和文档站点的 **Bun 1.3.12**。
 - **Git**。
 
-你**无需**手动安装 Node、npm 或 Bun。对 TUI 和文档站点的开发，都通过面向 Cargo 的
-`cargo xtask` 命令驱动，这些命令会替你封装底层的包管理器。
+日常桌面应用和文档站点工作通过面向 Cargo 的 `cargo xtask` 命令驱动。针对前端的
+聚焦检查使用 `crates/kqode-desktop/frontend/` 下已有的 Bun 脚本。
 
 ## 快速开始
 
@@ -36,7 +39,7 @@
 git clone https://github.com/kefeiqian/kqode-cli.git
 cd kqode-cli
 cargo build
-cargo run
+cargo xtask desktop-dev
 ```
 
 使用以下命令列出可用的自动化命令：
@@ -53,23 +56,27 @@ cargo xtask help
 
 ```bash
 cargo build
-cargo run
+cargo xtask desktop-dev
 cargo test --workspace
 cargo test -p <crate-name> <test_name>   # 只运行单个测试
-cargo fmt --check
+cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo xtask workspace-boundaries
 ```
 
-### TUI
+### 桌面应用
 
-请优先使用面向 Cargo 的 xtask 命令，而不要直接调用包管理器。
+通过面向 Cargo 的命令启动 Tauri 应用：
 
 ```bash
-cargo xtask tui-install    # 安装内嵌 TUI 的依赖
-cargo xtask tui-typecheck  # 对 TUI 做类型检查（tsc --noEmit）
-cargo xtask tui-test       # 运行 TUI 测试（vitest）
-cargo xtask tui-dev        # 在一次性 fixture 工作区中运行 TUI
-cargo xtask tui-dev-here   # 从源码运行 TUI，并使用当前终端目录作为 cwd
+cargo xtask desktop-dev
+```
+
+在 `crates/kqode-desktop/frontend/` 下运行聚焦前端检查：
+
+```bash
+bun run typecheck
+bun run build
 ```
 
 ### 文档站点
@@ -88,10 +95,9 @@ cargo xtask blog-preview
 在 Windows 上，`cargo xtask` 已可并行运行：别名会把 xtask 构建并运行在私有的
 `target\xtask` 目录中（与工作区的 `target\` 分开），因此快速命令不会去重新链接
 其他进程正在占用的可执行文件。快速命令可以照常运行，也可以并行运行。长时间运行的
-服务器命令（`blog-serve`、`blog-serve-en`、`blog-preview`、`tui-dev`、
-`tui-dev-here`、`tui-prod`）会在整个会话期间占用该可执行文件，因此请通过启动器
-运行它们——启动器只构建一次，然后运行每次调用独立的副本，从而让规范可执行文件
-保持可被重新链接：
+服务器命令（`blog-serve`、`blog-serve-en` 和 `blog-preview`）会在整个会话期间
+占用该可执行文件，因此请通过启动器运行它们——启动器只构建一次，然后运行每次调用
+独立的副本，从而让规范可执行文件保持可被重新链接：
 
 ```powershell
 ./scripts/xtask.ps1 blog-serve   # Windows（PowerShell）
@@ -106,13 +112,15 @@ cargo xtask blog-preview
 请确保相关检查在本地通过：
 
 ```bash
-cargo fmt --check
+cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace
+cargo xtask workspace-boundaries
 ```
 
-如果你改动了 TUI，还请运行 `cargo xtask tui-typecheck` 和
-`cargo xtask tui-test`。如果你改动了博客，请运行 `cargo xtask blog-build`。
+如果你改动了桌面前端，还请在 `crates/kqode-desktop/frontend/` 下运行
+`bun run typecheck` 和 `bun run build`。如果你改动了博客，请运行
+`cargo xtask blog-build`。
 
 ## 代码约定
 
@@ -139,7 +147,7 @@ cargo test --workspace
 本仓库中的示例：
 
 ```text
-feat(tui): add --version and --help to the kqode CLI via citty
+feat(desktop): add conversation history navigation
 docs(readme): add development blog section and fix repo URLs
 fix(blog): correct GitHub Pages baseUrl and repo name to kqode-cli
 ```

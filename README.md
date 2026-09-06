@@ -2,25 +2,21 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-<p align="center">
-  <a href="https://github.com/kefeiqian/kqode-cli/actions/workflows/ci.yml"><img src="https://github.com/kefeiqian/kqode-cli/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/kefeiqian/kqode-cli/actions/workflows/release.yml"><img src="https://github.com/kefeiqian/kqode-cli/actions/workflows/release.yml/badge.svg" alt="Release"></a>
-  <a href="https://github.com/kefeiqian/kqode-cli/actions/workflows/github-pages.yml"><img src="https://github.com/kefeiqian/kqode-cli/actions/workflows/github-pages.yml/badge.svg" alt="GitHub Pages"></a>
-</p>
-<p align="center">
-  <a href="https://www.npmjs.com/package/@kqode/kqode-cli"><img src="https://img.shields.io/npm/v/@kqode/kqode-cli?logo=npm" alt="npm"></a>
-  <a href="https://github.com/kefeiqian/kqode-cli/releases/latest"><img src="https://img.shields.io/github/v/release/kefeiqian/kqode-cli?logo=github" alt="GitHub release"></a>
-  <a href="#license"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg" alt="License"></a>
-</p>
-<p align="center">
-  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-2024_edition-orange.svg?logo=rust" alt="Made with Rust"></a>
-  <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome"></a>
-  <a href="https://github.com/kefeiqian/kqode-cli/stargazers"><img src="https://img.shields.io/github/stars/kefeiqian/kqode-cli?logo=github" alt="GitHub stars"></a>
-</p>
+[![CI](https://github.com/kefeiqian/kqode-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/kefeiqian/kqode-cli/actions/workflows/ci.yml)
+[![Release](https://github.com/kefeiqian/kqode-cli/actions/workflows/release.yml/badge.svg)](https://github.com/kefeiqian/kqode-cli/actions/workflows/release.yml)
+[![GitHub Pages](https://github.com/kefeiqian/kqode-cli/actions/workflows/github-pages.yml/badge.svg)](https://github.com/kefeiqian/kqode-cli/actions/workflows/github-pages.yml)
+[![GitHub release](https://img.shields.io/github/v/release/kefeiqian/kqode-cli?logo=github)](https://github.com/kefeiqian/kqode-cli/releases/latest)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![Made with Rust](https://img.shields.io/badge/Rust-2024_edition-orange.svg?logo=rust)](https://www.rust-lang.org/)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![GitHub stars](https://img.shields.io/github/stars/kefeiqian/kqode-cli?logo=github)](https://github.com/kefeiqian/kqode-cli/stargazers)
 
-KQode is a Rust-first coding-agent harness with TypeScript Ink as its committed TUI.
-The project is currently in the foundation stage: the checked-in implementation is
-small, while the product direction lives in the planning and architecture docs.
+KQode is a Rust-first coding agent application with a Tauri and React desktop
+interface. The same Rust runtime is designed to support command-line and headless
+execution, but KQode does not provide a terminal UI (TUI).
+
+The project is currently in the foundation stage: the checked-in implementation
+is small, while the product direction is evolving alongside the application.
 
 ## Development blog
 
@@ -38,24 +34,21 @@ implementation unit by unit (`U1` scaffolding, `U2` interactive home screen, …
 mirroring the `U#` commit tags. Each entry captures the reasoning, decisions, and
 trade-offs behind that step rather than only the final code.
 
-## Links
-
-- Architecture spec: [`docs/kqode_architecture_spec.md`](docs/kqode_architecture_spec.md)
-- Build path: [`docs/kqode_build_path.md`](docs/kqode_build_path.md)
-- Detailed requirements: [`docs/kqode_detailed_requirements_index.md`](docs/kqode_detailed_requirements_index.md)
+Earlier terminal-UI experiments and their design documents are retained under
+[`docs/archive-tui/`](docs/archive-tui/) as historical material. They do not
+describe the current product surface.
 
 ## Direction
 
-KQode is designed around a headless Rust core that owns agent execution,
-provider normalization, tools, virtual file operations, sandbox policy, session
-logs, replay, and evaluation. The terminal experience is built permanently with
-Ink, while related protocol clients and future IDE or web companions live in
-TypeScript.
+KQode is designed around a Rust core that owns agent execution, provider
+normalization, tools, virtual file operations, sandbox policy, session logs,
+replay, and evaluation. The committed product surface is a React application
+hosted by Tauri.
 
 ```text
-TypeScript Ink TUI
-  -> JSON-RPC or JSONL protocol
-Rust kqode daemon / CLI
+React desktop UI
+  -> Tauri IPC
+Rust core in the same process
   -> agent loop
   -> provider adapter
   -> tool registry
@@ -64,29 +57,36 @@ Rust kqode daemon / CLI
   -> eval runner
 ```
 
-The first public proof is a local terminal agent that can modify this repository
-safely, show a diff, run checks, record trace evidence, and resume or replay the
-session.
+The first public proof is a local coding agent app that can modify this repository
+safely, show a diff, run checks, record trace evidence, and resume or replay a
+session. The desktop app is the primary interactive experience; CLI and headless
+modes reuse the same Rust core for automation.
 
 ## Repository map
 
-- `src/` - starter Rust crate.
+- `crates/kqode-core/` - provider-neutral runtime contracts and shared core logic.
+- `crates/kqode-provider/` - concrete model provider adapters built on
+  `kqode-core`.
+- `crates/kqode-desktop/` - Tauri desktop application with its React/Vite frontend
+  under `frontend/`.
+- `crates/kqode-cli/` - headless `kqode` command-line package.
 - `xtask/` - Cargo-facing developer automation commands.
-- `tui/` - nested TypeScript Ink TUI package.
 - `blog/` - Docusaurus documentation site published to GitHub Pages.
 - `docs/` - requirements, architecture, implementation, evaluation, and build
   path documents.
 
 ## Development
 
-Run commands from the repository root.
+Install Rust 1.94.0, Bun 1.3.12, and Git, then run commands from the repository
+root.
 
 ```bash
 cargo build
-cargo run
+cargo xtask desktop-dev
 cargo test --workspace
-cargo fmt --check
+cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo xtask workspace-boundaries
 ```
 
 List automation commands:
@@ -95,76 +95,30 @@ List automation commands:
 cargo xtask help
 ```
 
-### TUI
+### Desktop
 
-Use the Cargo-facing xtask commands instead of calling the package manager
-directly.
-
-```bash
-cargo xtask tui-install    # install nested TUI dependencies
-cargo xtask tui-typecheck  # type-check the TUI (tsc --noEmit)
-cargo xtask tui-test       # run TUI tests (vitest)
-cargo xtask tui-dev        # run the TUI from a throwaway fixture workspace
-cargo xtask tui-dev-here   # run the TUI from source against the current cwd
-```
-
-`cargo xtask tui-dev` runs the Ink TUI against a copied fixture workspace, so the
-displayed working directory is a realistic project rather than the KQode repo.
-When dogfooding against an existing checkout, run
-`/path/to/KQode/scripts/xtask.sh tui-dev-here` from that checkout so source mode
-uses the terminal's current directory, matching the packaged `kqode` executable.
-Today the TUI talks to a local Rust JSON-RPC backend that acknowledges each
-submitted prompt and now persists local resumable session history and durable
-local memory under `~/.kqode/`; `/help`, `/clear`, `/login`, `/model`,
-`/resume`, `/memory`, and `/theme` are wired to real TUI surfaces or backend
-flows. It still does not yet call a model, run tools, or execute an agent loop,
-and mention support remains a placeholder.
-
-Prepare or reset that fixture workspace explicitly with:
+Run the Tauri desktop application in development mode:
 
 ```bash
-cargo xtask fixture-prepare-react-simple   # committed simple React fixture
-cargo xtask fixture-prepare-react-complex  # cached official Vite React template
+cargo xtask desktop-dev
 ```
 
-`tui-dev` prepares a workspace on demand, so these are only needed to reset it or
-switch to a specific fixture.
-
-### Standalone executable
-
-`kqode` ships as a single native executable that bundles the Ink frontend with a
-prebuilt Rust backend, so packaged users need neither Cargo, Rust, Node, nor npm.
-
-```bash
-cargo xtask package    # build the standalone executable at tui/dist/kqode[.exe]
-cargo xtask tui-prod   # build and run the standalone executable
-```
-
-Cargo is required only for this source-mode build. The packaged executable
-materializes its embedded backend into a per-user cache under `~/.kqode/` and
-runs the same local ACK path as source mode.
+The command installs the desktop frontend dependencies with Bun when they are
+missing, then starts the Vite frontend and Tauri application.
 
 ### Distribution
 
-Every install channel delivers the same standalone executable from GitHub Release
-assets — no channel builds from source:
-
-- Direct download of `kqode-<os>-<arch>.tar.gz` / `.zip` plus checksums.
-- npm: `npm install -g @kqode/kqode-cli` downloads and verifies the matching
-  release archive on install.
-- Homebrew: `brew install kefeiqian/kqode/kqode` (or `brew tap kefeiqian/kqode`
-  then `brew install kqode`).
-- winget: `winget install kqode`.
+Version tags publish native Tauri installers for macOS, Linux, and Windows to
+GitHub Releases.
 
 Maintainer commands:
 
 ```bash
-cargo xtask package-release    # archive + checksums for the host target
 cargo xtask set-version X.Y.Z  # bump every manifest in lockstep before tagging
 ```
 
 The [distribution registration guide](docs/release/kqode_distribution_registration.md)
-walks through GitHub Release, npm, Homebrew, and winget publishing.
+documents the desktop release workflow.
 
 ### Documentation site
 

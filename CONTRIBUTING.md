@@ -2,9 +2,10 @@
 
 **English** | [简体中文](CONTRIBUTING.zh-CN.md)
 
-Thanks for your interest in KQode! KQode is a Rust-first coding-agent harness
-with a TypeScript Ink TUI. It is still in the foundation stage, so contributions,
-issues, and design feedback are all welcome.
+Thanks for your interest in KQode! KQode is a Rust-first coding agent
+application with a React and Tauri desktop UI. Its Rust runtime also supports
+command-line and headless execution; there is no TUI. It is still in the
+foundation stage, so contributions, issues, and design feedback are all welcome.
 
 This guide covers how to build the project, the conventions we follow, and how to
 get a change reviewed. [`AGENTS.md`](AGENTS.md) is the canonical source of
@@ -19,17 +20,19 @@ repository conventions — please read it before making non-trivial changes.
 ## Project layout
 
 See the [repository map](README.md#repository-map) in the README for a tour of
-`src/`, `xtask/`, `tui/`, `blog/`, and `docs/`.
+`crates/`, `xtask/`, `blog/`, and `docs/`.
 
 ## Prerequisites
 
-- A stable **Rust** toolchain via [rustup](https://rustup.rs/) (this drives the
-  build, tests, and all `cargo xtask` automation).
+- **Rust 1.94.0 or later** via [rustup](https://rustup.rs/). The checked-in
+  `rust-toolchain.toml` selects the supported baseline for builds, tests, and
+  all `cargo xtask` automation.
+- **Bun 1.3.12** for the desktop frontend and documentation site.
 - **Git**.
 
-You do **not** need to install Node, npm, or Bun manually. Work on the TUI and
-documentation site is driven through Cargo-facing `cargo xtask` commands, which
-wrap the underlying package manager for you.
+The Cargo-facing `cargo xtask` commands manage normal desktop and documentation
+workflows. Focused frontend checks use the existing Bun scripts under
+`crates/kqode-desktop/frontend/`.
 
 ## Getting started
 
@@ -37,7 +40,7 @@ wrap the underlying package manager for you.
 git clone https://github.com/kefeiqian/kqode-cli.git
 cd kqode-cli
 cargo build
-cargo run
+cargo xtask desktop-dev
 ```
 
 List the available automation commands with:
@@ -54,23 +57,27 @@ Run these from the repository root.
 
 ```bash
 cargo build
-cargo run
+cargo xtask desktop-dev
 cargo test --workspace
 cargo test -p <crate-name> <test_name>   # target a single test
-cargo fmt --check
+cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo xtask workspace-boundaries
 ```
 
-### TUI
+### Desktop application
 
-Prefer the Cargo-facing xtask commands over calling the package manager directly.
+Start the Tauri application through the Cargo-facing command:
 
 ```bash
-cargo xtask tui-install    # install nested TUI dependencies
-cargo xtask tui-typecheck  # type-check the TUI (tsc --noEmit)
-cargo xtask tui-test       # run TUI tests (vitest)
-cargo xtask tui-dev        # run the TUI from a throwaway fixture workspace
-cargo xtask tui-dev-here   # run the TUI from source against the current cwd
+cargo xtask desktop-dev
+```
+
+Run focused frontend checks from `crates/kqode-desktop/frontend/`:
+
+```bash
+bun run typecheck
+bun run build
 ```
 
 ### Documentation site
@@ -90,10 +97,9 @@ cargo xtask blog-preview
 private `target\xtask` directory, separate from the workspace `target\`, so a
 fast command never relinks a binary another process is holding. Run fast
 commands normally, including in parallel. The long-running servers
-(`blog-serve`, `blog-serve-en`, `blog-preview`, `tui-dev`, `tui-dev-here`,
-`tui-prod`) hold the binary for their whole session, so run those through the
-launcher, which builds once and then runs a per-invocation copy that leaves the
-canonical binary free:
+(`blog-serve`, `blog-serve-en`, and `blog-preview`) hold the binary for their
+whole session, so run those through the launcher, which builds once and then
+runs a per-invocation copy that leaves the canonical binary free:
 
 ```powershell
 ./scripts/xtask.ps1 blog-serve   # Windows (PowerShell)
@@ -108,13 +114,15 @@ canonical binary free:
 Make sure the relevant checks pass locally:
 
 ```bash
-cargo fmt --check
+cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace
+cargo xtask workspace-boundaries
 ```
 
-If you touched the TUI, also run `cargo xtask tui-typecheck` and
-`cargo xtask tui-test`. If you touched the blog, run `cargo xtask blog-build`.
+If you touched the desktop frontend, also run `bun run typecheck` and
+`bun run build` from `crates/kqode-desktop/frontend/`. If you touched the blog, run
+`cargo xtask blog-build`.
 
 ## Coding conventions
 
@@ -145,7 +153,7 @@ or review context.
 Examples from this repository:
 
 ```text
-feat(tui): add --version and --help to the kqode CLI via citty
+feat(desktop): add conversation history navigation
 docs(readme): add development blog section and fix repo URLs
 fix(blog): correct GitHub Pages baseUrl and repo name to kqode-cli
 ```
