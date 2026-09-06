@@ -3,6 +3,12 @@ sidebar_position: 2
 title: 2. 创建前端 TUI 项目
 ---
 
+:::warning 历史实现
+本文记录 KQode 早期的 Ink TUI 实验。当前产品是 React + Tauri 桌面 Coding Agent
+应用，支持 CLI/headless 运行，但不提供 TUI。文中的代码、命令和目录仅用于回顾当时
+的实现。
+:::
+
 在后端 Rust 项目建好之后，我们接下来创建前端的项目。目前大部分的 Coding Agent 的形式都是命令行 CLI，市面上最著名的命令行 TUI (Terminal UI) 方案就是 Ink。
 
 ## Ink 介绍

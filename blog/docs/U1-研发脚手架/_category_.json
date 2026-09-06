@@ -4,6 +4,6 @@
   "link": {
     "type": "generated-index",
     "slug": "/category/u1-development-scaffolding",
-    "description": "KQode U1 阶段的 Rust 项目、Ink TUI、xtask 自动化和阶段总结。"
+    "description": "KQode U1 阶段的 Rust 项目、已归档 Ink TUI 实验、xtask 自动化和阶段总结；TUI 不代表当前产品能力。"
   }
 }

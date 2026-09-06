@@ -7,13 +7,18 @@ title: KQode Introduction
 
 # KQode
 
-KQode is a Rust-based Coding Agent project for learning and researching Agent Runtime and Harness concepts.
+KQode is a Rust-based coding agent application for learning and researching
+Agent Runtime and Harness Engineering. Its primary interactive surface is a
+Tauri and React desktop app. It also supports CLI and headless execution, but it
+does not provide a TUI.
 
 ## Author's Note
 
 Recently, articles, news, and videos everywhere have been talking about Agent Harnesses. To learn and study the latest Agent Runtime and Harness Engineering techniques, there is no better way than building a Coding Agent similar to Copilot CLI or Claude Code. It also gives me a good opportunity to use Rust, a language I am less familiar with, and get two benefits from one effort.
 
-Our goal is to build a production-grade Coding Agent that can be used for daily work, benchmarked against Codex, Claude Code, and Copilot CLI.
+Our goal is to build a production-grade coding agent application for daily work,
+benchmarked against the agent capabilities of Codex, Claude Code, and Copilot
+CLI without copying their terminal-first product shape.
 
 Many technical tutorials are written after the product has already been completed. The author then reorganizes the whole process from the beginning and introduces the overall architecture and implementation details. That approach is very professional. The only downside is that for newcomers to this field, many things are not obvious. They may not have heard of many tools, concepts, or even abbreviations, and without enough background knowledge, the material can be hard to follow. As I write, I will try to make this series approachable for readers at different levels who are new to this field. My experience is limited, so omissions and mistakes are inevitable. I would be grateful for criticism and corrections from experts and peers.
 

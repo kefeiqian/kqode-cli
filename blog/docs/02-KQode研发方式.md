@@ -14,17 +14,18 @@ Coding Agent 不是普通 CLI 工具。它既要和模型交互，也要执行�
 KQode 的研发会遵循几个原则：
 
 - Rust 核心先行：Agent Loop、工具注册、文件系统修改、命令执行、策略审批和会话记录都放在 Rust 侧。
-- TUI 保持可替换：Ink 前端只负责终端交互，不拥有核心状态机。
+- 桌面应用是主要产品界面：React 前端通过 Tauri 调用 Rust 核心，但不拥有核心状态机。
+- CLI/headless 复用同一运行时：命令行适合自动化和非交互运行，不额外建设 TUI。
 - 每次只做一个可验证的小单元：例如先跑通本地命令，再接入工具结果展示，而不是一次性做完整工具系统。
 - 参考现有 Agent，但不复制实现：参考 Copilot CLI、Claude Code、Codex CLI、Gemini CLI、OpenCode 等项目的产品行为和架构取舍，但代码实现保持独立。
-- 先保证本地可用，再扩展高级能力：先做一个能在本机终端里工作的 Agent，再考虑 MCP、Subagent、IDE 集成、浏览器自动化或云端运行。
+- 先保证本地应用可用，再扩展高级能力：先完成桌面 Coding Agent 和可复用 Rust 运行时，再考虑 MCP、Subagent、IDE 集成、浏览器自动化或云端运行。
 
 ## 研发循环
 
 后续每一篇文章基本都会按同一个循环推进：
 
 1. 先明确这一小步要解决的真实问题。
-2. 再确定 Rust 核心和 TypeScript TUI 的边界。
+2. 再确定 Rust 核心、React 桌面应用和 CLI/headless 入口的边界。
 3. 实现最小可运行版本。
 4. 运行对应的构建、测试或手工验证。
 5. 记录这一轮得到的架构结论和下一步。
@@ -37,7 +38,7 @@ KQode 的研发会重度使用 [compound-engineering-plugin](https://github.com/
 
 在真正写代码之前，我们会先用 `ce-brainstorm` 把模糊想法整理成需求，再用 `ce-plan` 把需求整理成可以执行、可以评审、可以验证的计划。
 
-每个计划项都会被逐条 review，确认范围、边界、风险和验收方式都没有问题之后，才开始进入实现阶段。比如第一个 Ink TUI 首页功能对应的计划文档是 `docs/plans/2026-06-25-003-feat-first-ink-tui-homepage-plan.md`，里面把需求、范围边界、技术约束、上下文研究、测试策略和任务拆分都整理成了可勾选的条目。
+每个计划项都会被逐条 review，确认范围、边界、风险和验收方式都没有问题之后，才开始进入实现阶段。早期项目曾以 Ink TUI 首页作为第一个 UI 计划，该实验及其计划现已归档到 `docs/archive-tui/`；它记录了当时的需求、技术约束、测试策略和任务拆分，但不代表当前产品界面。
 
 这种做法很适合 KQode 这类项目：一方面我们确实在用 Coding Agent 加速开发；另一方面，我们不希望 Agent 直接从一句模糊指令直接跳到代码实现。先 brainstorm、再 plan、逐条 review，能让人类把控产品方向和架构边界，也能让 Agent 在明确上下文里完成更稳定的实现。
 
@@ -45,7 +46,7 @@ KQode 的研发会重度使用 [compound-engineering-plugin](https://github.com/
 
 ## 使用的 Coding Agent 和模型
 
-在日常研发中，我们主要使用 [GitHub Copilot CLI](https://github.com/features/copilot/cli/) 作为 Coding Agent 的交互入口。它运行在终端里，适合直接围绕当前仓库做代码搜索、编辑、构建、测试和提交准备，也和 KQode 未来想实现的本地终端 Agent 体验比较接近。
+在日常研发中，我们主要使用 [GitHub Copilot CLI](https://github.com/features/copilot/cli/) 作为 Coding Agent 的开发工具。它运行在终端里，适合直接围绕当前仓库做代码搜索、编辑、构建、测试和提交准备。KQode 会参考它的智能体能力与工程工作流，但产品交互以桌面应用为主。
 
 模型方面，主要使用 GPT-5.5 和 Claude Opus 4.8。前者适合多数代码实现、重构和验证任务；后者适合复杂架构推理、长上下文审阅和高风险方案判断。KQode 本身也会参考这种“工具入口 + 多模型能力 + 明确计划约束”的工作方式，逐步沉淀出自己的 Agent Runtime。
 
@@ -55,4 +56,4 @@ KQode 的研发会重度使用 [compound-engineering-plugin](https://github.com/
 
 这样写的好处是读者可以看到一个 Coding Agent 从零开始长出来的过程，而不是只看到最后整理好的结果。对于学习 Agent Runtime 和 Harness Engineering 来说，过程中的取舍往往比最终代码更重要。
 
-接下来会进入 U1 研发脚手架阶段，先把 Rust 项目、前端 TUI 项目和自动化命令入口搭起来。但无论界面如何变化，核心研发方向都会保持一致：Rust 负责可复用、可验证的运行时能力，TUI 负责把这些能力清晰地呈现给用户。
+后续 U1、U2 文章记录的是项目早期 Ink TUI 实验，保留用于展示架构演进过程，不代表当前产品仍支持 TUI。当前方向是由 Rust 提供可复用、可验证的运行时能力，React + Tauri 桌面应用负责主要交互，CLI/headless 入口负责自动化运行。

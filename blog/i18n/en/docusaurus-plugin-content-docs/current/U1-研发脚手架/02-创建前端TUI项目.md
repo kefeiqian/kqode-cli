@@ -3,6 +3,13 @@ sidebar_position: 2
 title: 2. Create the Frontend TUI Project
 ---
 
+:::warning Historical implementation
+This article documents KQode's early Ink TUI experiment. The current product is
+a React and Tauri desktop coding agent application with CLI/headless execution;
+it does not provide a TUI. The code, commands, and directories below are kept as
+historical implementation notes.
+:::
+
 After creating the Rust backend project, we create the frontend project. Most Coding Agents today are command-line CLIs, and the most well-known TUI (Terminal UI) solution in this space is Ink.
 
 ## Ink Introduction
