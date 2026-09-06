@@ -1,0 +1,4 @@
+INFO ready
+ERROR 404 missing
+WARN retry
+ERROR 503 unavailable

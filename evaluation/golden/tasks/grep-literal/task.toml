@@ -1,0 +1,33 @@
+schema_version = "1.4"
+
+[task]
+name = "kqode/grep-literal"
+version = "0.1.0"
+authors = [{ name = "KQode contributors" }]
+description = "Search multiple files for a literal string."
+keywords = ["kqode", "golden", "run-command", "grep"]
+
+[metadata]
+difficulty = "easy"
+category = "grep"
+target_tool = "run_command"
+lifecycle = "candidate"
+
+
+[verifier]
+timeout_sec = 120.0
+
+[agent]
+timeout_sec = 300.0
+
+[environment]
+build_timeout_sec = 600.0
+workdir = "/app"
+cpus = 1
+memory_mb = 1024
+storage_mb = 2048
+gpus = 0
+
+[verifier.env]
+
+[solution.env]

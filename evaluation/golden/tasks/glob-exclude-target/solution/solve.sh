@@ -1,0 +1,6 @@
+#!/bin/bash
+set -euo pipefail
+
+mkdir -p /logs/agent
+printf '{"tool":"run_command"}\n' > /logs/agent/tool-events.jsonl
+find /app -path /app/target -prune -o -type f -name '*.rs' -printf '%P\n' | sort > /app/answer.txt

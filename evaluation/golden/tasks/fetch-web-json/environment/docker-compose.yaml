@@ -1,0 +1,16 @@
+services:
+  main:
+    depends_on:
+      fixture-web:
+        condition: service_healthy
+
+  fixture-web:
+    build:
+      context: ./web
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.create_connection(('localhost',8080),timeout=2); s.close()"]
+      interval: 1s
+      timeout: 3s
+      retries: 10

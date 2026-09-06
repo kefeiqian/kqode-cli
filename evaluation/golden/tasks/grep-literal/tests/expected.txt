@@ -1,0 +1,2 @@
+src/lib.rs:1:pub struct ToolRegistry;
+src/main.rs:2:use crate::ToolRegistry;
