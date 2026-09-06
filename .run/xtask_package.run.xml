@@ -1,7 +1,0 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="xtask: package" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
-    <option name="command" value="xtask package" />
-    <option name="workingDirectory" value="$PROJECT_DIR$" />
-    <method v="2" />
-  </configuration>
-</component>

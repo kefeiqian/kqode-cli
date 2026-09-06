@@ -1,36 +1,42 @@
 use std::{path::Path, process::Command};
 
-/// Build variable and value that compile the packaged backend under the
-/// `__PROD__` cfg. Mirrors `KQODE_ENV` in the TUI packaging define.
-const BUILD_ENV_VAR: &str = "KQODE_ENV";
-const PROD_ENV: &str = "prod";
-
-/// Builds a Cargo binary target in release mode from the repository root.
-///
-/// Used by the packaging command to produce the backend that gets embedded into
-/// the standalone executable. The build runs from the trusted `repo_root` so the
-/// manifest and `.cargo` config come from the repository, not a workspace, and
-/// sets `KQODE_ENV=prod` so the backend compiles under the `__PROD__` cfg —
-/// matching the packaged TUI's prod build.
+/// Returns package names in the normal dependency tree for `package`.
 ///
 /// # Errors
 ///
-/// Returns an error when Cargo cannot be started or the build exits non-zero.
-pub fn build_release_bin(repo_root: &Path, bin: &str) -> Result<(), String> {
-    let status = Command::new(command())
-        .args(["build", "--release", "--bin", bin])
-        .env(BUILD_ENV_VAR, PROD_ENV)
+/// Returns an error when Cargo cannot be started, the package is unknown, or
+/// dependency metadata cannot be decoded as UTF-8.
+pub fn dependency_names(repo_root: &Path, package: &str) -> Result<Vec<String>, String> {
+    let output = Command::new(command())
+        .args([
+            "tree",
+            "-p",
+            package,
+            "--edges",
+            "normal,build",
+            "--all-features",
+            "--target",
+            "all",
+            "--prefix",
+            "none",
+            "--format",
+            "{p}",
+        ])
         .current_dir(repo_root)
-        .status()
-        .map_err(|error| format!("run cargo build --release --bin {bin}: {error}"))?;
+        .output()
+        .map_err(|error| format!("run cargo tree for {package}: {error}"))?;
 
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!(
-            "cargo build --release --bin {bin} exited with {status}"
-        ))
+    if !output.status.success() {
+        return Err(format!(
+            "cargo tree for {package} exited with {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
     }
+
+    let stdout = String::from_utf8(output.stdout)
+        .map_err(|error| format!("decode cargo tree output for {package}: {error}"))?;
+    Ok(parse_dependency_names(&stdout))
 }
 
 /// Refreshes `Cargo.lock` so workspace members' locked versions match their
@@ -55,4 +61,25 @@ pub fn update_workspace_lock(repo_root: &Path) -> Result<(), String> {
 
 fn command() -> &'static str {
     if cfg!(windows) { "cargo.exe" } else { "cargo" }
+}
+
+fn parse_dependency_names(output: &str) -> Vec<String> {
+    output
+        .lines()
+        .filter_map(|line| line.split_whitespace().next())
+        .map(str::to_owned)
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_dependency_names;
+
+    #[test]
+    fn parses_package_names_from_cargo_tree_output() {
+        assert_eq!(
+            parse_dependency_names("kqode-core v0.1.3\nserde v1.0.228\nserde_core v1.0.228 (*)\n"),
+            ["kqode-core", "serde", "serde_core"]
+        );
+    }
 }

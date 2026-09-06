@@ -2,40 +2,28 @@
 /target/
 /.kqode-research/
 
-# TUI Node artifacts
-/tui/node_modules/
-/tui/dist/
-/tui/packaged/assets/
-/tui/coverage/
-/tui/.vite/
-/tui/.vitest/
-
-# npm distribution staging
-/packaging/npm/dist/
+# Desktop artifacts
+/crates/kqode-desktop/gen/
+/crates/kqode-desktop/frontend/node_modules/
+/crates/kqode-desktop/frontend/dist/
 
 # Blog Node artifacts
 /blog/node_modules/
 /blog/build/
 /blog/.docusaurus/
 
-# Fixture-local artifacts
-/tests/fixtures/dummy-react-app/node_modules/
-/tests/fixtures/dummy-react-app/dist/
-/tests/fixtures/dummy-react-app/coverage/
-/tests/fixtures/dummy-react-app/.vite/
-/target/kqode-test-workspaces/
-
-# Local reference-implementation mirror for the kqode-research skill.
-# Keep the directory tracked via .gitkeep so /kqode-research has a stable mirror
-# location on fresh clones, but never commit the untrusted mirror contents.
-/docs/claude-code/*
-!/docs/claude-code/.gitkeep
-
 # Local environment and logs
 .env
 .env.*
 !.env.example
 *.log
+
+# Golden-task fixtures intentionally exercise hidden and log files.
+!evaluation/golden/tasks/list-directory-basic/environment/fixture/beta.log
+!evaluation/golden/tasks/list-directory-hidden/environment/fixture/.env
+!evaluation/golden/tasks/grep-case-insensitive/environment/fixture/events.log
+!evaluation/golden/tasks/grep-regex/environment/fixture/service.log
+!evaluation/golden/tasks/read-file-tail/environment/fixture/history.log
 
 # Editor and local workspace state
 .idea/

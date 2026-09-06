@@ -1,0 +1,19 @@
+# The frontend has its own Vite watcher and HMR.
+/crates/kqode-desktop/frontend/
+
+# Repository content that cannot affect the running desktop application.
+/blog/
+/docs/
+/scripts/
+/tests/
+/xtask/
+/.agents/
+/.github/
+/.idea/
+/.obsidian/
+/.run/
+
+# Root-level documentation and editor metadata.
+/*.md
+/.gitignore
+/.gitattributes

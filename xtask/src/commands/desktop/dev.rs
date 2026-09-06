@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use crate::support::bun;
+use crate::support::desktop;
 
 pub fn run(repo_root: &Path) -> Result<(), String> {
-    bun::run(repo_root, &["install"])
+    desktop::dev(repo_root)
 }

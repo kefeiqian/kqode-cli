@@ -1,12 +1,10 @@
 use std::path::Path;
 
 pub mod blog;
-pub mod fixture;
+pub mod desktop;
 pub mod help;
-pub mod package;
-pub mod package_release;
 pub mod set_version;
-pub mod tui;
+pub mod workspace_boundaries;
 
 /// Metadata and executable entrypoint for one xtask command.
 #[derive(Clone, Copy)]
@@ -17,14 +15,9 @@ pub struct CommandSpec {
 }
 
 const HELP_COMMANDS: &[CommandSpec] = &[help::COMMAND];
-const PACKAGE_COMMANDS: &[CommandSpec] = &[
-    package::COMMAND,
-    package_release::COMMAND,
-    set_version::COMMAND,
-];
+const PACKAGE_COMMANDS: &[CommandSpec] = &[workspace_boundaries::COMMAND, set_version::COMMAND];
 const COMMAND_GROUPS: &[&[CommandSpec]] = &[
-    fixture::COMMANDS,
-    tui::COMMANDS,
+    desktop::COMMANDS,
     blog::COMMANDS,
     PACKAGE_COMMANDS,
     HELP_COMMANDS,

@@ -6,7 +6,7 @@
 .DESCRIPTION
     `cargo xtask <cmd>` expands to `cargo run -p xtask`, which relinks the single
     shared `target\debug\xtask.exe` on every call. A long-running command such as
-    `blog-serve` or `tui-dev` keeps that executable locked, so a second
+    `blog-serve` keeps that executable locked, so a second
     `cargo xtask` fails to replace it ("cannot move xtask.exe", os error 32).
 
     This launcher builds the xtask binary once into the private `target\xtask`
@@ -14,15 +14,14 @@
     copy under `target\xtask\debug\xtask-run\`. The canonical `xtask.exe` is never
     held by a running command, so any number of xtask commands can run in parallel.
     The private dir is passed as a --target-dir flag, never exported as
-    CARGO_TARGET_DIR, so it cannot leak into child builds (e.g. tui-prod's backend).
+    CARGO_TARGET_DIR, so it cannot leak into child builds.
 
     `repo_root()` inside xtask is baked in at compile time (CARGO_MANIFEST_DIR),
     so a relocated copy still resolves the real repository.
 
 .EXAMPLE
     ./scripts/xtask.ps1 blog-serve
-    ./scripts/xtask.ps1 tui-dev
-    C:\path\to\KQode\scripts\xtask.ps1 tui-dev-here  # from another project cwd
+    ./scripts/xtask.ps1 blog-serve
 #>
 $ErrorActionPreference = 'Stop'
 
@@ -30,7 +29,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 
 # Private build dir shared with the `cargo xtask` alias (see .cargo/config.toml).
 # Passed as a --target-dir flag, never exported as CARGO_TARGET_DIR, so it cannot
-# leak into child builds such as tui-prod's `cargo build --release --bin kqode`.
+# leak into child builds.
 $targetDir = Join-Path $repoRoot 'target\xtask'
 
 Push-Location $repoRoot
