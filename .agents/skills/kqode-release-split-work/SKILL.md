@@ -105,15 +105,16 @@ git cherry-pick 9cfe801
 
 ### 7. Validate before opening
 
-Run checks appropriate to the touched files. For source/TUI changes, use the CI-equivalent bar:
+Run checks appropriate to the touched files. For Rust and desktop changes, use the CI-equivalent bar:
 
 ```bash
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo build --workspace --all-targets
 cargo test --workspace
-cargo xtask tui-typecheck
-cargo xtask tui-test
+cd desktop
+bun run typecheck
+bun run build
 ```
 
 For workflow/docs-only PRs, still run a focused validation such as diff review plus repository checks that are reasonably relevant. If a check is skipped, record why in the PR body and ledger.

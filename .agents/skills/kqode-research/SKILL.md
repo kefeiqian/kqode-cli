@@ -1,6 +1,6 @@
 ---
 name: kqode-research
-description: "Research KQode's coding-agent reference repositories from source evidence and write one cited Markdown report under docs/research. Use for questions about how reference agents work, especially prompt lifecycle flow, architecture, tooling, safety, sessions, or evaluation patterns. Defaults to KQode's referenced coding-agent list (git repos plus the local Claude Code mirror) and records commit SHAs or mirror provenance."
+description: "Research KQode's coding-agent reference repositories from source evidence and write one cited Markdown report under docs/research. Use for questions about how reference agents work, especially prompt lifecycle flow, architecture, tooling, safety, sessions, or evaluation patterns. Defaults to first-scope repos from references/repo-catalog.md and records commit SHAs."
 ---
 
 # KQode Research
@@ -42,12 +42,13 @@ When no question is supplied, investigate what happens after a user submits a pr
 ## Workflow
 
 1. Resolve the repo scope from `references/repo-catalog.md`.
-2. Fetch current upstream source, or read the local Claude Code mirror at `docs/claude-code`, and record the requested URL/location, resolved URL, branch, commit SHA or mirror provenance, timestamp, and status.
-3. Search and read source evidence using bounded budgets from `references/research-workflow.md`.
-4. Cite every material observed-behavior claim with numbered references whose entries contain commit-pinned source links, or internal repo-relative links for the local Claude Code mirror.
-5. Write one report from `references/report-template.md` under `docs/research`.
-6. Separate observed behavior from KQode lessons.
-7. Mark incomplete, partial, blocked, or no-evidence states explicitly.
+2. Synchronize every selected repo into `~/.kqode/research/repos/<repo-id>`, fetching the latest default-branch HEAD on every invocation.
+3. Check out the fetched HEAD as a detached commit and record requested URL, resolved URL, branch, commit SHA, fetch timestamp, and status.
+4. Search and read source evidence using bounded budgets from `references/research-workflow.md`.
+5. Cite every material observed-behavior claim with numbered references whose entries contain commit-pinned source links.
+6. Write one report from `references/report-template.md` under `docs/research`.
+7. Separate observed behavior from KQode lessons.
+8. Mark incomplete, partial, blocked, or no-evidence states explicitly.
 
 If no repo yields material evidence, write a blocked/no-evidence report and return blocked status instead of producing KQode recommendations.
 

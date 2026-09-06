@@ -12,12 +12,20 @@ These scenarios define deterministic behavior for the `kqode-research` skill. Th
 
 ## Repo catalog
 
-- Given default scope, repos resolve in this order: GitHub Copilot CLI, Claude Code, Codex CLI, Gemini CLI, OpenCode, Kimi Code, KimiX.
+- Given default scope, repos resolve in this order: Codex CLI, OpenCode, Kimi Code, Gemini CLI, Pi Coding Agent, DeepSeek Harness.
 - Given a secondary open-source repo requested by catalog ID, the resolver accepts it.
 - Given GitHub Copilot CLI, the resolver accepts its public repo as a source target.
 - Given Claude Code, the resolver accepts it as a local-mirror source target at `docs/claude-code`.
 - Given a product with no researchable source, such as the Copilot Coding Agent cloud service, Cursor, or Windsurf, the resolver rejects it as a source-repo target.
 - Given an arbitrary URL or arbitrary local path in v1, the resolver rejects it as unsupported.
+
+## Source synchronization
+
+- Given a selected repo has no cache, it is cloned into `~/.kqode/research/repos/<repo-id>`.
+- Given a selected repo already has a cache, its catalog `origin` is fetched and pruned before any source read.
+- Given a cached repo's `origin` differs from the catalog URL, synchronization fails closed for that repo.
+- Given synchronization succeeds, research reads the detached default-branch HEAD fetched during the current invocation.
+- Given one repo fails to synchronize, the run records that repo as incomplete and continues with the other selected repos.
 
 ## Safety
 

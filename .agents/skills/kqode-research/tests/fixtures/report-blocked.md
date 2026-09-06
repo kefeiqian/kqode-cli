@@ -18,7 +18,7 @@ No selected repository produced material evidence. This blocked fixture records 
 | Repo | Requested URL | Resolved URL | Branch | SHA | Status | Notes |
 |---|---|---|---|---|---|---|
 | codex | https://github.com/openai/codex |  |  |  | policy_blocked | fixture denial |
-| copilot-cli | https://github.com/github/copilot-cli |  |  |  | policy_blocked | fixture denial |
+| pi-agent | https://github.com/earendil-works/pi |  |  |  | policy_blocked | fixture denial |
 
 ---
 
@@ -33,7 +33,7 @@ No selected repository produced material evidence. This blocked fixture records 
 ## Evidence Gaps
 
 - `codex`: `policy_blocked`.
-- `copilot-cli`: `policy_blocked`.
+- `pi-agent`: `policy_blocked`.
 - `no_evidence`: no selected repo produced material evidence.
 
 ---

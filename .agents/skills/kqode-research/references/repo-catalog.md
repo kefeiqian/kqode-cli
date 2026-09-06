@@ -1,26 +1,23 @@
 # KQode Research Repo Catalog
 
-`docs/kqode_reference_implementations.md` is the source of truth for KQode reference repositories, and `blog/docs/01-KQode介绍.md` lists KQode's referenced coding agents. This file defines the skill-facing IDs, aliases, and default research scope derived from those sources; update the source catalog first when repository membership changes.
+This file is the source of truth for repositories that the skill may research. Keep its IDs, aliases, default scope, and contract fixtures synchronized.
 
 ## Default scope repositories
 
 The default scope mirrors KQode's referenced coding-agent list. Use these repositories by default, in this order:
 
-| ID | Display name | Source | Upstream / location |
-|---|---|---|---|
-| `copilot-cli` | GitHub Copilot CLI | git | `https://github.com/github/copilot-cli` |
-| `claude-code` | Claude Code | local mirror | `docs/claude-code` (git-ignored) |
-| `codex` | Codex CLI | git | `https://github.com/openai/codex` |
-| `gemini-cli` | Gemini CLI | git | `https://github.com/google-gemini/gemini-cli` |
-| `opencode` | OpenCode | git | `https://github.com/anomalyco/opencode` |
-| `kimi-code` | Kimi Code CLI | git | `https://github.com/moonshotai/kimi-code` |
-| `kimix` | KimiX | git | `https://github.com/Sikao-Engine/KimiX` |
-
-`claude-code` has no public repository. Research it only from the KQode-managed, git-ignored local mirror at `docs/claude-code`, following the local-mirror rules in `safety-and-citations.md`, and cite it with internal repo-relative links rather than an upstream URL.
+| ID | Display name | Upstream |
+|---|---|---|
+| `codex` | Codex CLI | `https://github.com/openai/codex` |
+| `opencode` | OpenCode | `https://github.com/anomalyco/opencode` |
+| `kimi-code` | Kimi Code CLI | `https://github.com/moonshotai/kimi-code` |
+| `gemini-cli` | Gemini CLI | `https://github.com/google-gemini/gemini-cli` |
+| `pi-agent` | Pi Coding Agent | `https://github.com/earendil-works/pi` |
+| `deepseek-harness` | DeepSeek Harness | `https://github.com/deepseek-ai/deepseek-harness` |
 
 ## Optional open-source references
 
-The skill may research these additional open-source references only when the user requests them by catalog ID or alias. Do not include them in the default scope.
+The skill may research these additional open-source references only when the user requests them by name or alias. Do not include them in the default scope.
 
 | ID | Display name | Upstream |
 |---|---|---|
@@ -39,7 +36,7 @@ The skill may research these additional open-source references only when the use
 ## Alias rules
 
 - Match IDs case-insensitively.
-- Accept obvious display-name aliases such as `copilot`, `copilot-cli`, `claude`, `claude-code`, `codex-cli`, `gemini`, `kimi`, `kimix`, and `auto-code-rover`.
+- Accept obvious display-name aliases such as `codex-cli`, `gemini`, `kimi`, `pi`, `pi-coding-agent`, `deepseek`, `deepseek-harness`, and `auto-code-rover`.
 - On unknown aliases, stop and show the known IDs. Do not silently substitute a nearby repo.
 - GitHub Copilot CLI and Claude Code are research targets: Copilot CLI via its public repo, Claude Code via its local mirror. Products without a researchable source, such as the Copilot Coding Agent cloud service, Cursor, and Windsurf, remain product references only and are not source-research targets.
 

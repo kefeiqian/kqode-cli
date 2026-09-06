@@ -67,9 +67,9 @@ status: complete | partial | blocked | cancelled
 
 ## Cross-Repo Comparison
 
-| Dimension | Copilot CLI | Claude Code | Codex | Gemini CLI | OpenCode | Kimi Code | KimiX | Confidence |
-|---|---|---|---|---|---|---|---|---|
-| Prompt ingestion | <cited summary> | <cited summary> | <cited summary> | <cited summary> | <cited summary> | <cited summary> | <cited summary> | high / partial / low |
+| Dimension | Codex | OpenCode | Kimi Code | Gemini CLI | Pi Coding Agent | DeepSeek Harness | Confidence |
+|---|---|---|---|---|---|---|---|
+| Prompt ingestion | <cited summary> | <cited summary> | <cited summary> | <cited summary> | <cited summary> | <cited summary> | high / partial / low |
 
 ---
 

@@ -11,7 +11,7 @@ Create a new Rust `xtask` command for KQode from the user's description of what 
 
 1. Treat the user's freeform request as the command purpose. If the purpose is missing or too ambiguous to choose a command name and behavior, ask for one concise description.
 2. Read relevant existing `xtask/src/commands/**`, `xtask/src/support/**`, and `.run/xtask_*.run.xml` examples before editing.
-3. Choose a kebab-case command name, for example `blog-build` or `fixture-prepare-react-simple`. Prefer group prefixes when the command belongs to an existing area.
+3. Choose a kebab-case command name, for example `blog-build` or `desktop-dev`. Prefer group prefixes when the command belongs to an existing area.
 4. Implement the command as a thin wrapper under `xtask/src/commands/<group>/` when possible.
 5. Put reusable or non-trivial implementation logic in `xtask/src/support/` or another shared module instead of the command wrapper.
 6. Register the command with a `CommandSpec`, include it in the group's `COMMANDS`, and ensure `cargo xtask help` will list it.

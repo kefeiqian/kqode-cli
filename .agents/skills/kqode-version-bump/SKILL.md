@@ -8,8 +8,10 @@ description: "Interactively bump the KQode product version. Use when asked to bu
 Interactively raise the KQode product version. This skill only chooses the new
 version and delegates the actual writes to `cargo xtask set-version`, which is the
 single source of truth for which files change (root `Cargo.toml`,
-`xtask/Cargo.toml`, `packaging/npm/kqode/package.json`, `tui/package.json`, and
-`Cargo.lock`). Do not hand-edit version fields.
+`crates/kqode-desktop/Cargo.toml`, local `kqode-core` dependency requirements,
+`crates/kqode-desktop/frontend/package.json`,
+`crates/kqode-desktop/tauri.conf.json`, and `Cargo.lock`). Do not hand-edit
+version fields.
 
 ## Workflow
 
