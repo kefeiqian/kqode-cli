@@ -1,0 +1,168 @@
+.message-content > :first-child {
+  margin-top: 0;
+}
+
+.message-content > :last-child {
+  margin-bottom: 0;
+}
+
+.message-content.preserve-line-breaks p {
+  white-space: pre-wrap;
+}
+
+.message-content p,
+.message-content ul,
+.message-content ol,
+.message-content blockquote,
+.message-content pre,
+.message-content table {
+  margin: 0 0 14px;
+}
+
+.message-content h1,
+.message-content h2,
+.message-content h3,
+.message-content h4,
+.message-content h5,
+.message-content h6 {
+  margin: 22px 0 10px;
+  line-height: 1.35;
+}
+
+.message-content h1 {
+  font-size: 1.5em;
+}
+
+.message-content h2 {
+  font-size: 1.3em;
+}
+
+.message-content h3 {
+  font-size: 1.15em;
+}
+
+.message-content ul,
+.message-content ol {
+  padding-left: 24px;
+}
+
+.message-content li + li {
+  margin-top: 5px;
+}
+
+.message-content blockquote {
+  padding-left: 14px;
+  border-left: 3px solid #45534e;
+  color: #aeb8b4;
+}
+
+.message-content code {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #303735;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.message-content pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 15px;
+  border: 1px solid #323b38;
+  border-radius: 10px;
+  background: #151a18;
+}
+
+.message-content pre code {
+  padding: 0;
+  background: transparent;
+  font-size: 12px;
+  white-space: pre;
+}
+
+.message-content a {
+  color: #91dfba;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.message-content table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.message-content th,
+.message-content td {
+  padding: 8px 10px;
+  border: 1px solid #3a4541;
+  text-align: left;
+}
+
+.message-content th {
+  background: #222a27;
+}
+
+.message-content hr {
+  margin: 20px 0;
+  border: 0;
+  border-top: 1px solid #35403c;
+}
+
+.message-content .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0;
+}
+
+.message-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  margin-top: 10px;
+}
+
+.copy-message-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 8px;
+  color: #737e7a;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.copy-message-button:hover {
+  color: #dce2df;
+  background: #28302d;
+}
+
+.copy-message-button.copied {
+  color: #91dfba;
+}
+
+.copy-message-button.error {
+  color: #e8a69b;
+}
+
+.open-settings-button {
+  margin-top: 12px;
+  padding: 7px 11px;
+  border: 1px solid #84584f;
+  border-radius: 8px;
+  color: #f2c2b9;
+  background: #432a26;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.open-settings-button:hover {
+  border-color: #a36d62;
+  background: #50302b;
+}

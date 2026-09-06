@@ -1,0 +1,242 @@
+.chat-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% -20%, #24302b 0, transparent 35%),
+    #111413;
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 76px;
+  padding: 15px 28px;
+  border-bottom: 1px solid #252c2a;
+  background: #111413d9;
+}
+
+.eyebrow,
+.conversation-id {
+  display: block;
+  max-width: 650px;
+  overflow: hidden;
+  margin: 0 0 2px;
+  color: #6f7b77;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.conversation-id {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: copy;
+}
+
+.conversation-id:hover {
+  color: #9be7c4;
+}
+
+.conversation-id:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid #8dddb7;
+  outline-offset: 3px;
+}
+
+.chat-header h1 {
+  max-width: 650px;
+  overflow: hidden;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-pill {
+  padding: 5px 10px;
+  border: 1px solid #34403c;
+  border-radius: 999px;
+  color: #9ba7a3;
+  font-size: 12px;
+}
+
+.transcript {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-color: #3f4946 transparent;
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  width: min(520px, calc(100% - 48px));
+  min-height: 100%;
+  margin: auto;
+  color: #8d9894;
+  text-align: center;
+}
+
+.empty-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 18px;
+  border: 1px solid #3b4944;
+  border-radius: 16px;
+  color: #9be7c4;
+  background: #202925;
+}
+
+.empty-state h2 {
+  margin: 0 0 9px;
+  color: #e7ebe9;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.empty-state p {
+  max-width: 460px;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.message-list {
+  width: min(820px, calc(100% - 56px));
+  margin: 0 auto;
+  padding: 40px 0 28px;
+}
+
+.message {
+  margin-bottom: 30px;
+}
+
+.message.user {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  max-width: 78%;
+  margin-left: auto;
+}
+
+.user-message-bubble {
+  max-width: 100%;
+  padding: 13px 16px;
+  border: 1px solid #37413e;
+  border-radius: 18px 18px 4px 18px;
+  background: #262e2b;
+}
+
+.message.user .message-actions {
+  justify-content: flex-end;
+  margin-top: 7px;
+}
+
+.message.error {
+  padding: 13px 16px;
+  border: 1px solid #734943;
+  border-radius: 10px;
+  color: #f1c0b8;
+  background: #321f1d;
+}
+
+.error-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.retry-message-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid #5a7569;
+  border-radius: 8px;
+  color: #b9ebd2;
+  background: #25352e;
+  cursor: pointer;
+}
+
+.retry-message-button:hover:not(:disabled) {
+  background: #30473d;
+}
+
+.retry-message-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.message-label {
+  margin-bottom: 7px;
+  color: #7f8b87;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.message-content {
+  color: #e7ebe9;
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+.message-model {
+  color: #65716d;
+  font-size: 11px;
+}
+
+.typing-indicator {
+  display: flex;
+  gap: 5px;
+  padding: 8px 0;
+}
+
+.typing-indicator span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #8dddb7;
+  animation: pulse 1.2s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation-delay: 240ms;
+}
+
+@keyframes pulse {
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+@media (max-width: 900px) {
+  .message-list {
+    width: calc(100% - 36px);
+  }
+}
