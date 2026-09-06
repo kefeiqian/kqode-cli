@@ -1,3 +1,0 @@
-# Only build/test artifacts; the published binary ships in the per-platform
-# optional-dependency packages, not here.
-node_modules/

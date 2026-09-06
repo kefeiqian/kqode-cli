@@ -1,24 +1,7 @@
-# Builds the standalone `kqode` executable for every supported target on native
-# runners, archives each with checksums via the same `cargo xtask package-release`
-# used locally (U12), and — on version tags — uploads them to a GitHub Release.
+# Builds, installs, validates, and publishes the Windows Tauri application.
 #
-# Authenticity controls: least-privilege permissions (only the release job gets
-# `contents: write`), third-party actions pinned by version, build-provenance
-# attestations, and published checksums. npm publishing is handled separately by
-# npm-publish.yml, which runs automatically after this workflow completes (its
-# workflow_run trigger) — kept separate so it stays a top-level workflow for npm
-# Trusted Publishing. Homebrew/winget registration, signing, notarization, and
-# auto-update are intentionally NOT performed here — see
-# docs/release/kqode_distribution_registration.md.
-#
-# Triggers: pushing a `v*` tag publishes a release; `workflow_dispatch` is a
-# dry run that builds and uploads workflow artifacts without touching a release.
-#
-# ARM64 runners: `ubuntu-22.04-arm` and `windows-11-arm` are free GitHub-hosted
-# runners, but ONLY in PUBLIC repositories — the labels fail in a private repo.
-# Nothing needs enabling for a public repo (just the labels below). If this repo
-# is ever made private, swap those labels for paid larger arm64 runners or drop
-# the arm64 targets, or the required linux-arm64 job will break the release.
+# Version tags publish NSIS and MSI installers. Manual runs execute the same
+# validation and retain the installers as workflow artifacts.
 name: Release
 
 on:
@@ -27,7 +10,6 @@ on:
       - "v*"
   workflow_dispatch: {}
 
-# Read-only by default; the publish job opts into exactly the writes it needs.
 permissions:
   contents: read
 
@@ -36,129 +18,149 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
-    name: build ${{ matrix.target }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { target: kqode-darwin-arm64,  runner: macos-14,         archive: kqode-darwin-arm64.tar.gz,  required: true }
-          - { target: kqode-linux-x64,     runner: ubuntu-22.04,     archive: kqode-linux-x64.tar.gz,     required: true }
-          - { target: kqode-linux-arm64,   runner: ubuntu-22.04-arm, archive: kqode-linux-arm64.tar.gz,   required: true }
-          - { target: kqode-windows-x64,   runner: windows-2022,     archive: kqode-windows-x64.zip,      required: true }
-          - { target: kqode-windows-arm64, runner: windows-11-arm,   archive: kqode-windows-arm64.zip,    required: false }
-    # Best-effort targets (e.g. no native Bun on Windows arm64 yet) must not fail
-    # the release; the publish job simply omits any target that did not build.
-    continue-on-error: ${{ !matrix.required }}
+  build-windows:
+    name: build and validate windows-x64
+    runs-on: windows-latest
+    timeout-minutes: 90
+
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Verify release versions
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          $cargoManifests = @(
+            "Cargo.toml"
+          )
+          $cargoVersions = $cargoManifests | ForEach-Object {
+            $match = Select-String -Path $_ -Pattern '^version = "([^"]+)"$' |
+              Select-Object -First 1
+            $match.Matches[0].Groups[1].Value
+          }
+          $coreDependencyManifests = @(
+            "crates\kqode-cli\Cargo.toml",
+            "crates\kqode-desktop\Cargo.toml",
+            "crates\kqode-provider\Cargo.toml"
+          )
+          $coreDependencyVersions = $coreDependencyManifests | ForEach-Object {
+            Select-String -Path $_ -Pattern '^kqode-core = \{ version = "=([^"]+)"' |
+              ForEach-Object { $_.Matches[0].Groups[1].Value }
+          }
+          $providerDependencyManifests = @(
+            "crates\kqode-desktop\Cargo.toml"
+          )
+          $providerDependencyVersions = $providerDependencyManifests | ForEach-Object {
+            Select-String -Path $_ -Pattern '^kqode-provider = \{ version = "=([^"]+)"' |
+              ForEach-Object { $_.Matches[0].Groups[1].Value }
+          }
+          $desktopVersion = (Get-Content crates\kqode-desktop\frontend\package.json | ConvertFrom-Json).version
+          $tauriVersion = (Get-Content crates\kqode-desktop\tauri.conf.json | ConvertFrom-Json).version
+          $tagVersion = "${{ github.ref_name }}".TrimStart("v")
+          $versions = @((
+            @($cargoVersions) +
+              @($coreDependencyVersions) +
+              @($providerDependencyVersions) +
+              @($desktopVersion, $tauriVersion)
+          ) | Select-Object -Unique)
+          if ($versions.Count -ne 1 -or $versions[0] -ne $tagVersion) {
+            $cargoSummary = ($cargoVersions -join ", ")
+            $coreDependencySummary = ($coreDependencyVersions -join ", ")
+            $providerDependencySummary = ($providerDependencyVersions -join ", ")
+            throw "Tag v$tagVersion does not match Cargo ($cargoSummary), kqode-core dependencies ($coreDependencySummary), kqode-provider dependencies ($providerDependencySummary), desktop ($desktopVersion), and Tauri ($tauriVersion)"
+          }
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.12
-      - name: Install TUI dependencies
-        working-directory: tui
-        run: bun install --frozen-lockfile
-      - name: Build release artifacts
-        run: cargo xtask package-release
-      - name: Verify expected target artifacts exist
-        shell: bash
-        run: |
-          test -f "tui/dist/release/${{ matrix.archive }}"
-          test -f "tui/dist/release/${{ matrix.target }}.sha256"
-      - uses: actions/upload-artifact@v4
+
+      - uses: dtolnay/rust-toolchain@master
         with:
-          name: release-${{ matrix.target }}
-          path: |
-            tui/dist/release/${{ matrix.archive }}
-            tui/dist/release/${{ matrix.target }}.sha256
+          toolchain: 1.94.0
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Verify workspace boundaries
+        run: cargo xtask workspace-boundaries
+
+      - name: Install desktop dependencies
+        working-directory: crates/kqode-desktop/frontend
+        run: bun install --frozen-lockfile
+
+      - name: Build Windows installers
+        id: tauri
+        uses: tauri-apps/tauri-action@v1.0.0
+        with:
+          projectPath: .
+          tauriScript: bun run --cwd crates/kqode-desktop/frontend tauri
+          args: --bundles nsis msi
+
+      - name: Validate installed application and Copilot SDK runtime
+        shell: pwsh
+        run: .\scripts\verify-windows-package.ps1
+
+      - name: Create checksums
+        id: bundles
+        shell: pwsh
+        env:
+          ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
+        run: |
+          $paths = $env:ARTIFACT_PATHS | ConvertFrom-Json
+          if ($paths.Count -eq 0) {
+            throw "Tauri did not report any bundle artifacts"
+          }
+          $releaseDirectory = Join-Path $env:RUNNER_TEMP "kqode-release-assets"
+          New-Item -ItemType Directory -Path $releaseDirectory -Force | Out-Null
+          foreach ($path in $paths) {
+            Copy-Item -LiteralPath $path -Destination $releaseDirectory
+          }
+          Get-ChildItem -LiteralPath $releaseDirectory -File |
+            Sort-Object Name |
+            ForEach-Object {
+              $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+              "$hash  $($_.Name)"
+            } |
+            Set-Content -LiteralPath (Join-Path $releaseDirectory "SHA256SUMS.txt") -Encoding ascii
+          "directory=$releaseDirectory" >> $env:GITHUB_OUTPUT
+
+      - name: Upload validated Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kqode-windows-x64
+          path: ${{ steps.bundles.outputs.directory }}\*
           if-no-files-found: error
-          retention-days: 7
 
   release:
     name: publish release
-    needs: build
-    # Run even if a required build failed so the manifest check can fail closed
-    # with an explicit error rather than silently skipping.
-    if: ${{ !cancelled() }}
-    runs-on: ubuntu-22.04
+    if: github.event_name == 'push'
+    needs: build-windows
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
-      contents: write # create/update the GitHub Release
-      id-token: write # build-provenance attestation
-      attestations: write # build-provenance attestation
-    env:
-      REQUIRED_TARGETS: "kqode-darwin-arm64 kqode-linux-x64 kqode-linux-arm64 kqode-windows-x64"
-      OPTIONAL_TARGETS: "kqode-windows-arm64"
+      contents: write
+
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download validated Windows artifacts
+        uses: actions/download-artifact@v4
         with:
-          path: staging
-          pattern: release-*
-          merge-multiple: true
-      - name: Verify manifest and checksums (fail closed)
-        shell: bash
-        run: |
-          cd staging
-          shopt -s nullglob
-          known="$REQUIRED_TARGETS $OPTIONAL_TARGETS"
-          fail=0
+          name: kqode-windows-x64
+          path: release-assets
 
-          # Every required target must have both its archive and checksum.
-          for t in $REQUIRED_TARGETS; do
-            case "$t" in *windows*) ext=zip ;; *) ext=tar.gz ;; esac
-            [ -f "$t.$ext" ]   || { echo "::error::missing required archive $t.$ext"; fail=1; }
-            [ -f "$t.sha256" ] || { echo "::error::missing required checksum $t.sha256"; fail=1; }
-          done
-
-          # Reject any archive whose target name is not recognized.
-          for f in *.tar.gz *.zip; do
-            base="${f%.tar.gz}"; base="${base%.zip}"
-            case " $known " in *" $base "*) : ;; *) echo "::error::unexpected target archive $f"; fail=1 ;; esac
-          done
-
-          [ "$fail" -eq 0 ] || exit 1
-
-          # Verify every present archive against its published checksum.
-          if ! sha256sum -c *.sha256; then
-            echo "::error::checksum verification failed"
-            exit 1
-          fi
-
-          # Aggregate the per-target checksums into one manifest.
-          cat *.sha256 | sort -k2 > checksums.txt
-          echo "Release manifest:"; cat checksums.txt
-
-      - name: Attest build provenance
-        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: |
-            staging/*.tar.gz
-            staging/*.zip
-
-      - name: Create or update GitHub Release (idempotent)
-        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+      - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
-        shell: bash
         run: |
-          cd staging
-          cat > notes.md <<'NOTES'
-          Standalone `kqode` executables for each supported target.
-
-          Verify a download against `checksums.txt` (`sha256sum -c`) or the build
-          provenance attestation (`gh attestation verify <file> --repo ${{ github.repository }}`).
-          See `docs/release/kqode_distribution_registration.md` for npm, Homebrew, and winget registration.
-          NOTES
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG exists; updating assets."
-          else
-            gh release create "$TAG" --title "$TAG" --notes-file notes.md --verify-tag
+          shopt -s nullglob
+          nsis=(release-assets/*-setup.exe)
+          msi=(release-assets/*.msi)
+          checksums=(release-assets/SHA256SUMS.txt)
+          if [[ "${#nsis[@]}" -ne 1 || "${#msi[@]}" -ne 1 || "${#checksums[@]}" -ne 1 ]]; then
+            echo "Expected exactly one NSIS installer, one MSI installer, and one checksum file." >&2
+            exit 1
           fi
-          gh release upload "$TAG" *.tar.gz *.zip *.sha256 checksums.txt --clobber
+          assets=("${nsis[@]}" "${msi[@]}" "${checksums[@]}")
+          gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "KQode ${GITHUB_REF_NAME#v}" \
+            --generate-notes

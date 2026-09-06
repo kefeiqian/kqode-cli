@@ -1,5 +1,0 @@
-# Generator output and CI staging; never committed. The published binaries live
-# in the per-platform packages this tooling assembles at publish time.
-dist-packages/
-staging/
-node_modules/

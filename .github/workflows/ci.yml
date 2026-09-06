@@ -1,15 +1,4 @@
-# Continuous integration for pushes to `main` and every pull request.
-#
-# Runs the same checks documented in AGENTS.md and used locally, split into two
-# jobs gated by changed paths so docs/skills-only PRs do not spend time on
-# unrelated build matrices:
-#   - rust: cargo fmt --check, clippy (warnings denied), build, and test.
-#   - tui:  cargo xtask tui-typecheck and tui-test (Bun + vscode-jsonrpc).
-#   - packaging: Node's built-in test runner for npm/Homebrew packaging helpers.
-#
-# Authenticity controls mirror the other workflows: read-only permissions and
-# third-party actions pinned by version. This workflow only reads the repo and
-# never publishes, so it never needs write scopes.
+# Continuous integration for the Tauri desktop app and Rust core.
 name: CI
 
 on:
@@ -18,11 +7,9 @@ on:
       - main
   pull_request:
 
-# CI only reads the repository; it never needs write scopes.
 permissions:
   contents: read
 
-# Supersede in-flight runs for the same ref so a new push cancels a stale run.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -33,9 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      packaging: ${{ steps.paths.outputs.packaging }}
+      desktop: ${{ steps.paths.outputs.desktop }}
       rust: ${{ steps.paths.outputs.rust }}
-      tui: ${{ steps.paths.outputs.tui }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -60,55 +46,54 @@ jobs:
           fi
 
           git diff --name-only "$base" "$head" > changed-files.txt
-          packaging=false
+          desktop=false
           rust=false
-          tui=false
 
           while IFS= read -r changed_path; do
             case "$changed_path" in
-              .cargo/*|.github/workflows/ci.yml|Cargo.lock|Cargo.toml|build.rs|main.rs|migrations/*|scripts/*|src/*|tests/*|xtask/*)
+              crates/kqode-desktop/*)
+                rust=true
+                desktop=true
+                ;;
+              .cargo/*|.github/workflows/ci.yml|Cargo.lock|Cargo.toml|crates/kqode-cli/*|crates/kqode-core/*|crates/kqode-provider/*|scripts/*|xtask/*)
                 rust=true
                 ;;
-            esac
-
-            case "$changed_path" in
-              .cargo/*|.github/workflows/ci.yml|Cargo.lock|Cargo.toml|scripts/*|tui/*|xtask/*)
-                tui=true
-                ;;
-            esac
-
-            case "$changed_path" in
-              .github/workflows/ci.yml|.github/workflows/homebrew-publish.yml|.github/workflows/npm-publish.yml|packaging/*)
-                packaging=true
+              .github/workflows/release.yml)
+                rust=true
+                desktop=true
                 ;;
             esac
           done < changed-files.txt
 
           echo "Changed files:"
           cat changed-files.txt
-          echo "packaging=$packaging" >> "$GITHUB_OUTPUT"
+          echo "desktop=$desktop" >> "$GITHUB_OUTPUT"
           echo "rust=$rust" >> "$GITHUB_OUTPUT"
-          echo "tui=$tui" >> "$GITHUB_OUTPUT"
-          echo "Packaging checks: $packaging"
-          echo "Rust checks: $rust"
-          echo "TUI checks: $tui"
 
   rust:
     name: Rust (fmt, clippy, build, test)
     needs: changes
     if: needs.changes.outputs.rust == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      - name: Install Linux build dependencies
-        run: sudo apt-get update && sudo apt-get install --yes libdbus-1-dev pkg-config
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - name: Format
         run: cargo fmt --all --check
+      - name: Workspace boundaries
+        run: cargo xtask workspace-boundaries
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - name: Build
@@ -116,46 +101,20 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-  tui:
-    name: TUI (typecheck, test)
+  desktop:
+    name: Desktop frontend
     needs: changes
-    if: needs.changes.outputs.tui == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    if: needs.changes.outputs.desktop == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Install Linux build dependencies
-        run: sudo apt-get update && sudo apt-get install --yes libdbus-1-dev pkg-config
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.12
-      - name: Install TUI dependencies
-        working-directory: tui
+      - name: Install dependencies
+        working-directory: crates/kqode-desktop/frontend
         run: bun install --frozen-lockfile
-      - name: Typecheck
-        run: cargo xtask tui-typecheck
-      - name: Test
-        run: cargo xtask tui-test
-
-  packaging:
-    name: Packaging (node tests)
-    needs: changes
-    if: needs.changes.outputs.packaging == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: npm packaging tests
-        run: node --test
-        working-directory: packaging/npm/kqode
-      - name: npm helper tests
-        run: node --test
-        working-directory: packaging/npm/scripts
-      - name: Homebrew packaging tests
-        run: node --test
-        working-directory: packaging/homebrew
+      - name: Build
+        working-directory: crates/kqode-desktop/frontend
+        run: bun run build
