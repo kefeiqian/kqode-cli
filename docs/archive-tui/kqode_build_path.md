@@ -2,14 +2,14 @@
 
 ## Build objective
 
-Build KQode as a Rust-first coding-agent harness with a TypeScript TUI. The first public proof is a local terminal agent that modifies its own codebase safely, shows a diff, runs checks, records a trace, and can resume or replay the session.
+Build KQode as a Rust-first coding-agent harness with a Tauri and React desktop application. The first public proof is a local desktop agent that modifies its own codebase safely, shows a diff, runs checks, records a trace, and can resume or replay the session.
 
 ## Architecture path
 
 ```text
-TypeScript Ink TUI
-  -> JSON-RPC or JSONL protocol
-Rust kqode daemon / CLI
+Tauri + React desktop
+  -> Tauri IPC and shared protocol types
+Rust core in the same Tauri process
   -> agent loop
   -> provider adapter
   -> tool registry
@@ -18,7 +18,7 @@ Rust kqode daemon / CLI
   -> eval runner
 ```
 
-Ink is the committed TUI framework. The Rust core must still run headless without the TUI for automation, tests, replay, and non-interactive CLI workflows.
+Tauri with React is the committed UI and the released `kqode` entrypoint.
 
 ## Milestones
 
@@ -27,14 +27,16 @@ Ink is the committed TUI framework. The Rust core must still run headless withou
 **Goal:** Create a repo that can grow without early rewrites.
 
 **Build:**
-- Rust workspace with crates for core, cli, protocol, provider, tools, vfs, sandbox, session, policy, and eval.
-- TypeScript workspace for the Ink TUI and protocol client.
+- Root Rust package with focused modules aligned to the planned core, protocol,
+  provider, tools, VFS, sandbox, session, policy, and eval boundaries. Split
+  crates only when those boundaries need independent compilation or reuse.
+- Nested TypeScript package for the React desktop UI and protocol client.
 - Shared protocol schema generated from Rust or maintained as JSON Schema.
 - Basic CI for Rust format/test and TypeScript typecheck/test.
 
 **Covers:** R1-R3, R8, R73-R84.
 
-**Done when:** `kqode --version`, `kqode run "hello"`, and the TUI shell start successfully.
+**Done when:** the `kqode` desktop application starts and completes a message round trip through the Rust core.
 
 ### M1. Headless agent loop
 
@@ -49,7 +51,7 @@ Ink is the committed TUI framework. The Rust core must still run headless withou
 
 **Covers:** R4-R19, R25-R27.
 
-**Done when:** `kqode run "explain this repo"` can inspect files, search, ask a question if needed, and finish with a completion summary.
+**Done when:** the desktop app can run "explain this repo", inspect files, ask a question if needed, and finish with a completion summary.
 
 **Immediate next slice:** build the smallest deterministic headless tool loop
 before the full edit/sandbox stack. A fake provider should be able to request
@@ -107,12 +109,12 @@ side-effect risk.
 
 **Done when:** killing and restarting KQode can resume a session without double-applying completed file edits.
 
-### M5. First TUI
+### M5. First desktop application
 
 **Goal:** Make the product feel like a real coding agent.
 
 **Build:**
-- TypeScript Ink TUI connected to Rust over JSON-RPC/JSONL.
+- Tauri and React desktop application connected to the Rust core.
 - Streaming assistant output.
 - Tool-call panels.
 - Approval panels.
@@ -122,7 +124,7 @@ side-effect risk.
 
 **Covers:** R64-R72.
 
-**Done when:** the flagship task can be run entirely from the TUI.
+**Done when:** the flagship task can be run entirely from the desktop application.
 
 ### M6. Project context and memory
 

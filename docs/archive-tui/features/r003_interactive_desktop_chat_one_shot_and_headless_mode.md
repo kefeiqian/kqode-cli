@@ -1,19 +1,19 @@
-# R3. Interactive TUI, one-shot prompt mode, and headless/script mode
+# R3. Interactive desktop chat, one-shot prompt mode, and headless/script mode
 
 **Category:** Core product
 **Source:** [2026-06-25-kqode-requirements.md](../2026-06-25-kqode-requirements.md#core-product)
 **Build phase:** M0-M5
-**Primary owner:** Rust CLI and TypeScript TUI
+**Primary owner:** Rust core and Tauri/React desktop
 
 ## Intent
 
-This feature ensures KQode can deliver: Interactive TUI, one-shot prompt mode, and headless/script mode.
+This feature ensures KQode can deliver interactive desktop chat, one-shot prompt mode, and headless/script mode.
 Within the `Core product` area, its focus is product behavior, user-facing workflow, and first demo quality.
 
 ## What to build
 
 - Implement the smallest user-visible behavior that satisfies R3.
-- Connect the behavior to the responsible KQode core surface: Rust CLI and TypeScript TUI.
+- Connect the behavior to the responsible KQode core surface: Rust core and Tauri/React desktop.
 - Record enough trace data for the behavior to be explained after the run.
 - Keep first-scope behavior local-first unless the requirement explicitly says deferred.
 

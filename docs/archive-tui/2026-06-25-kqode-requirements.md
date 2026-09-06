@@ -7,9 +7,9 @@ topic: kqode
 
 ## Core product
 
-- [R1. Terminal-first AI Coding / Code Agent CLI/TUI.](features/r001_terminal_first_ai_coding_code_agent_cli_tui.md)
+- [R1. Desktop-first AI coding application with a Rust core.](features/r001_desktop_first_ai_coding_application_with_rust_core.md)
 - [R2. Standalone product inspired by Codex, Claude Code, Copilot CLI, Kimi Code, Gemini CLI, Aider, OpenCode, OpenHands, Cline, Goose, SWE-agent, and AutoCodeRover.](features/r002_standalone_product_inspired_by_codex_claude_code_copilot_cli_kimi_code_g.md)
-- [R3. Interactive TUI, one-shot prompt mode, and headless/script mode.](features/r003_interactive_tui_one_shot_prompt_mode_and_headless_script_mode.md)
+- [R3. Interactive desktop chat, one-shot prompt mode, and headless/script mode.](features/r003_interactive_desktop_chat_one_shot_and_headless_mode.md)
 - [R4. End-to-end coding tasks: implement, debug, refactor, test, explain, review, and summarize.](features/r004_end_to_end_coding_tasks_implement_debug_refactor_test_explain_review_and.md)
 - [R5. User-switchable modes: code, ask, help, architect, plan, act, read-only, supervised, and autonomous.](features/r005_user_switchable_modes_code_ask_help_architect_plan_act_read_only_supervi.md)
 - [R6. Reviewable diffs, checks, and final change summaries for every meaningful code task.](features/r006_reviewable_diffs_checks_and_final_change_summaries_for_every_meaningful.md)
@@ -86,7 +86,7 @@ topic: kqode
 - [R62. Session export as debug ZIP and human-readable Markdown.](features/r062_session_export_as_debug_zip_and_human_readable_markdown.md)
 - [R63. Session sharing, unsharing, and deletion as deferred features.](features/r063_session_sharing_unsharing_and_deletion_as_deferred_features.md)
 
-## CLI and TUI experience
+## Desktop and CLI experience
 
 - [R64. Syntax-highlighted markdown, code, diffs, and tool output.](features/r064_syntax_highlighted_markdown_code_diffs_and_tool_output.md)
 - [R65. Themes, terminal-background-aware themes, and project/user theme directories.](features/r065_themes_terminal_background_aware_themes_and_project_user_theme_directori.md)
@@ -166,7 +166,7 @@ topic: kqode
 - [R124. GitHub Action automation for PR review, issue triage, mention-triggered help, and scheduled workflows as deferred features.](features/r124_github_action_automation_for_pr_review_issue_triage_mention_triggered_he.md)
 - [R125. Chat connectors for Slack, Telegram, Discord, Google Chat, WhatsApp, and Linear as deferred features.](features/r125_chat_connectors_for_slack_telegram_discord_google_chat_whatsapp_and_line.md)
 - [R126. Access control for messaging-platform agents.](features/r126_access_control_for_messaging_platform_agents.md)
-- [R127. Desktop app, mobile handoff, desktop approval, and browser companion as deferred surfaces.](features/r127_desktop_app_mobile_handoff_desktop_approval_and_browser_companion_as_def.md)
+- [R127. Mobile handoff and browser companion as deferred surfaces extending the primary desktop app.](features/r127_desktop_app_mobile_handoff_desktop_approval_and_browser_companion_as_def.md)
 - [R128. Local AI gateway/proxy for routing across providers as a deferred feature.](features/r128_local_ai_gateway_proxy_for_routing_across_providers_as_a_deferred_featur.md)
 
 ## Multimodal and non-code automation

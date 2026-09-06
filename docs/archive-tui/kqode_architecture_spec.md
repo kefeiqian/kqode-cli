@@ -17,18 +17,17 @@ Rust owns:
 - Replay engine.
 - Eval runner.
 - MCP client/server core.
-- Headless CLI.
 
 ### TypeScript
 
-Use TypeScript for surfaces where iteration speed and ecosystem matter. Ink is the committed terminal UI framework for KQode.
+Use TypeScript for surfaces where iteration speed and ecosystem matter. React inside Tauri is the committed primary UI framework for KQode.
 
 TypeScript owns:
-- Ink TUI.
+- React desktop UI.
 - Protocol client.
 - Plugin authoring helpers.
 - IDE/ACP adapters.
-- Optional web or desktop companion.
+- Optional web companion.
 - Rich visual trace viewer if built later.
 
 ### Python
@@ -42,67 +41,44 @@ Python may own:
 
 Python should not own the main KQode harness.
 
-## Proposed repository shape
+## Repository shape
 
 ```text
-crates/
-  kqode-cli/          # Rust CLI entrypoint
-  kqode-core/         # Agent loop, orchestration, task state
-  kqode-protocol/     # JSON-RPC/JSONL events, schemas, generated bindings
-  kqode-provider/     # LLM providers and model routing
-  kqode-tools/        # Built-in tools and tool registry
-  kqode-vfs/          # Workspace, staged edits, patch validation
-  kqode-sandbox/      # Host process execution and sandbox-lite controls
-  kqode-policy/       # Permission and policy engine
-  kqode-session/      # SQLite index, JSONL logs, replay
-  kqode-mcp/          # MCP client/server support
-  kqode-eval/         # Local task suite and benchmark runner
-
-apps/
-  kqode-tui/          # TypeScript Ink TUI
-
-packages/
-  protocol-ts/        # Generated or hand-maintained TS protocol types
-  plugin-sdk/         # Optional TypeScript plugin helpers
-
-docs/
-  *.md
+Cargo.toml            # Tauri application and Rust core package
+tauri.conf.json       # Desktop build and bundle configuration
+capabilities/         # Tauri permissions
+icons/                # Desktop application icons
+src/
+  main.rs             # Primary Tauri application entrypoint
+  *.rs                # Rust core modules
+desktop/
+  package.json
+  src/                # React frontend only
+xtask/                # Repository automation
 ```
 
-The final layout can change during planning, but the boundary should remain: Rust core, TypeScript Ink TUI and related TypeScript surfaces.
+The root Rust package owns the Tauri application and core runtime. `desktop/`
+owns only the React frontend. Business logic belongs in reusable Rust modules,
+not in Tauri command handlers or React.
 
 ## Process model
 
-KQode should support two process modes.
+KQode currently has one product process.
 
-### Single-process CLI
+### Primary desktop application
 
-Good for early development and headless usage:
-
-```text
-kqode run "task"
-  -> Rust CLI
-  -> agent loop
-  -> tools
-  -> stdout / JSON / stream-json
-```
-
-### Daemon plus TUI
-
-Good for rich terminal sessions:
+The released `kqode` binary is the Tauri desktop application:
 
 ```text
-kqoded
-  -> Rust daemon
-  -> session store
-  -> tool execution
-
-kqode-tui
-  -> TypeScript Ink UI
-  -> local JSON-RPC/JSONL connection
+kqode
+  -> Tauri runtime
+  -> React webview
+  -> Tauri IPC commands
+  -> Rust core
 ```
 
-The daemon mode should not be required for M1-M3.
+The desktop app does not start a separate backend process. The Rust core is
+linked into the same executable.
 
 ## Protocol
 

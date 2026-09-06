@@ -1,19 +1,19 @@
-# R1. Terminal-first AI Coding / Code Agent CLI/TUI
+# R1. Desktop-first AI coding application with a Rust core
 
 **Category:** Core product
 **Source:** [2026-06-25-kqode-requirements.md](../2026-06-25-kqode-requirements.md#core-product)
 **Build phase:** M0-M5
-**Primary owner:** Rust CLI and TypeScript TUI
+**Primary owner:** Rust core and Tauri/React desktop
 
 ## Intent
 
-This feature ensures KQode can deliver: Terminal-first AI Coding / Code Agent CLI/TUI.
+This feature ensures KQode can deliver a desktop-first AI coding application backed by a reusable Rust core.
 Within the `Core product` area, its focus is product behavior, user-facing workflow, and first demo quality.
 
 ## What to build
 
 - Implement the smallest user-visible behavior that satisfies R1.
-- Connect the behavior to the responsible KQode core surface: Rust CLI and TypeScript TUI.
+- Connect the behavior to the responsible KQode core surface: Rust core and Tauri/React desktop.
 - Record enough trace data for the behavior to be explained after the run.
 - Keep first-scope behavior local-first unless the requirement explicitly says deferred.
 
