@@ -120,7 +120,7 @@ def validate_slug(slug: str) -> str:
     if not SLUG_PATTERN.fullmatch(normalized):
         raise SystemExit(
             "Image slug must be stable English kebab-case, start with a letter, "
-            "and avoid numeric ordering prefixes. Example: create-frontend-tui-project."
+            "and avoid numeric ordering prefixes. Example: create-desktop-frontend."
         )
     return normalized
 
@@ -183,7 +183,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--slug",
-        help="Stable English kebab-case image folder slug, such as create-frontend-tui-project.",
+        help="Stable English kebab-case image folder slug, such as create-desktop-frontend.",
     )
     parser.add_argument("--dry-run", action="store_true", help="Print paths without writing files.")
     args = parser.parse_args()

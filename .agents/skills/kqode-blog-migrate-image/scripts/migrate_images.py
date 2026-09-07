@@ -17,7 +17,7 @@ PINYIN_HINTS = {
     "kqode介绍": "kqode-introduction",
     "kqode研发方式": "kqode-development-workflow",
     "创建rust项目": "create-rust-project",
-    "创建前端tui项目": "create-frontend-tui-project",
+    "创建桌面前端项目": "create-desktop-frontend",
     "技术选型": "technical-selection",
     "需求分析": "requirements-analysis",
 }

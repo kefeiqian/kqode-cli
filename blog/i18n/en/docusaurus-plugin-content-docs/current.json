@@ -8,7 +8,7 @@
     "description": "The label for category 'U1-研发脚手架' in sidebar 'docs'"
   },
   "sidebar.docs.category.U1-研发脚手架.link.generated-index.description": {
-    "message": "Rust project, archived Ink TUI experiment, xtask automation, and summary for KQode U1. The TUI is not a current product capability.",
+    "message": "Rust project creation and the foundational KQode development environment.",
     "description": "The generated-index page description for category 'U1-研发脚手架' in sidebar 'docs'"
   }
 }

@@ -31,7 +31,7 @@ python .agents/skills/kqode-blog-translate-en/scripts/list_translation_targets.p
 ## Translation style
 
 - Use clear tutorial English, not literal word-for-word translation.
-- Keep product terms stable: KQode, Rust, RustRover, Cargo, Rustup, Coding Agent, agent runtime, agent harness, TUI.
+- Keep product terms stable: KQode, Rust, RustRover, Cargo, Rustup, Coding Agent, agent runtime, agent harness, Tauri, React.
 - When editing Chinese source docs as part of translation prep or sync, keep spaces on both sides of English words, acronyms, and product names when adjacent to Chinese characters.
 - Keep the default blog Chinese; never overwrite `blog/docs` with English text.
 - If a Chinese doc references shared images under `blog/docs/images/...`, keep the same relative Markdown link in the English doc when the relative depth is the same. Adjust only when the preserved structure changes the relative path.
@@ -49,7 +49,7 @@ python .agents/skills/kqode-blog-translate-en/scripts/list_translation_targets.p
     "description": "The label for category 'U1-研发脚手架' in sidebar 'docs'"
   },
   "sidebar.docs.category.U1-研发脚手架.link.generated-index.description": {
-    "message": "Rust project, Ink TUI, xtask automation, and summary for KQode U1.",
+    "message": "Rust project creation and the foundational KQode development environment.",
     "description": "The generated-index page description for category 'U1-研发脚手架' in sidebar 'docs'"
   }
 }

@@ -4,9 +4,7 @@
 
 Inspect the checked-in implementation before relying on plans or older
 documentation. Files under `docs/plans/` describe product direction and
-implementation order; they may be ahead of the code. Files under
-`docs/archive-tui/` are historical and must not be treated as the current product
-surface.
+implementation order; they may be ahead of the code.
 
 Preserve unrelated working-tree changes. This repository is often developed
 through release worktrees, so do not revert, overwrite, or reformat changes
@@ -153,10 +151,11 @@ keep ACP/Harbor/Paseo integrations as thin adapters over that runtime.
 ## Persistence, credentials, and IPC
 
 The desktop database lives at `~/.kqode/kqode.sqlite3`. Database schema changes
-must be append-only migrations under
-`crates/kqode-desktop/src/database/migrations/`; register each migration,
-increment `LATEST_DATABASE_VERSION`, and test both fresh and upgraded databases.
-Never rewrite an already-released migration.
+must be append-only refinery SQL migrations under
+`crates/kqode-desktop/src/database/migrations/sql/`. Never rewrite an
+already-released migration; add the next `V{n}__description.sql` file and pin
+its checksum in the database tests. Test both fresh databases and supported
+data imports.
 
 Conversation persistence belongs in
 `crates/kqode-desktop/src/conversation/store/`; desktop use cases belong in
@@ -307,14 +306,13 @@ review on the changed bullets inside those subsections rather than on the parent
 
 ## Provider configuration and storage
 
-Provider credentials and the active `(provider, model)` selection are **user-global**. Workspace `.env` files are loaded only for development toggles such as `KQODE_DEBUG`; they do not configure provider credentials, model ids, or base URLs.
+Provider credentials and the active `(provider, model)` selection are **user-global**. Provider credentials, model ids, and base URLs are not loaded from workspace environment files.
 
-- **SQLite index** at `~/.kqode/kqode.db` holds non-secret provider settings + the active selection (plus a provisional sessions/turns spine). It is a rebuildable index over the JSONL transcript truth, opened/migrated at backend init via compile-time-embedded, forward-only `refinery` migrations (`refinery_schema_history`). The store is now fail-closed: any DB open/migrate/sanity failure prevents `kqode.backend.ready`, exits with the store-fatal code, and prints a `KQODE_STORE_FATAL:` remedy. The DB is **never auto-deleted**. The store holds **no key material** — only a non-secret `key_present` bit.
-- **Pre-`refinery` reset:** databases created by the former `user_version` runner (or dirty app tables without `refinery_schema_history`) are not auto-baselined. Delete `~/.kqode/kqode.db` plus `~/.kqode/kqode.db-wal` and `~/.kqode/kqode.db-shm`, then restart; the index rebuilds from JSONL. A `refinery` DB still reports `PRAGMA user_version = 0`, so running a pre-`refinery` binary against it looks like a fresh DB to that older binary.
+- **Desktop SQLite** at `~/.kqode/kqode.sqlite3` holds conversations, pending turns, non-secret provider settings, and model-cache data. It is opened and migrated at desktop startup through compile-time-embedded, forward-only `refinery` migrations (`refinery_schema_history`). Databases without valid refinery migration history are unsupported and fail closed; they are never adopted, rewritten, or deleted automatically.
 - **OS keychain** holds API keys under the service constant `com.nincere.kqode.providers`, keyed by provider id (`kimi`/`custom`). Keys are validated before storage and never logged, serialized, or written to the DB/JSONL. When the keychain is unavailable, `/login` refuses to store and asks the user to retry after the OS keychain is available.
 - **Preset vs Custom:** the preset Kimi base URL is a compiled constant and Kimi is configured via `/login` (keychain) **only**. The **Custom** provider is also `/login`-only: its API key lives in the OS keychain and its validated HTTPS base URL is persisted in the SQLite provider settings row.
 - **Commands:** `/login` connects or clears a provider (masked key entry; the key never enters a Jotai atom, only component-local state → the set-key request); `/model` picks the active model across connected providers.
-- `rusqlite` (bundled), `keyring`, `secrecy`, and `tempfile` (dev) are in the dependency graph for store/keychain work; `bundled` `rusqlite` compiles SQLite via `cc` (a C toolchain requirement in the otherwise pure-Rust/rustls graph).
+- `rusqlite` (bundled), `keyring`, and `secrecy` are in the dependency graph for store/keychain work; `bundled` `rusqlite` compiles SQLite via `cc` (a C toolchain requirement in the otherwise pure-Rust/rustls graph).
 
 ## Commit workflow
 

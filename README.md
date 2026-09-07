@@ -30,13 +30,9 @@ it grows from a starter crate into a full coding-agent harness.
   GitHub Pages workflow.
 
 It opens with an introduction and the development approach, then follows the
-implementation unit by unit (`U1` scaffolding, `U2` interactive home screen, …),
-mirroring the `U#` commit tags. Each entry captures the reasoning, decisions, and
-trade-offs behind that step rather than only the final code.
-
-Earlier terminal-UI experiments and their design documents are retained under
-[`docs/archive-tui/`](docs/archive-tui/) as historical material. They do not
-describe the current product surface.
+implementation unit by unit, mirroring the `U#` commit tags. Each entry captures
+the reasoning, decisions, and trade-offs behind that step rather than only the
+final code.
 
 ## Direction
 

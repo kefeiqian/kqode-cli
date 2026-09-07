@@ -38,7 +38,7 @@ KQode 的研发会重度使用 [compound-engineering-plugin](https://github.com/
 
 在真正写代码之前，我们会先用 `ce-brainstorm` 把模糊想法整理成需求，再用 `ce-plan` 把需求整理成可以执行、可以评审、可以验证的计划。
 
-每个计划项都会被逐条 review，确认范围、边界、风险和验收方式都没有问题之后，才开始进入实现阶段。早期项目曾以 Ink TUI 首页作为第一个 UI 计划，该实验及其计划现已归档到 `docs/archive-tui/`；它记录了当时的需求、技术约束、测试策略和任务拆分，但不代表当前产品界面。
+每个计划项都会被逐条 review，确认范围、边界、风险和验收方式都没有问题之后，才开始进入实现阶段。
 
 这种做法很适合 KQode 这类项目：一方面我们确实在用 Coding Agent 加速开发；另一方面，我们不希望 Agent 直接从一句模糊指令直接跳到代码实现。先 brainstorm、再 plan、逐条 review，能让人类把控产品方向和架构边界，也能让 Agent 在明确上下文里完成更稳定的实现。
 
@@ -56,4 +56,4 @@ KQode 的研发会重度使用 [compound-engineering-plugin](https://github.com/
 
 这样写的好处是读者可以看到一个 Coding Agent 从零开始长出来的过程，而不是只看到最后整理好的结果。对于学习 Agent Runtime 和 Harness Engineering 来说，过程中的取舍往往比最终代码更重要。
 
-后续 U1、U2 文章记录的是项目早期 Ink TUI 实验，保留用于展示架构演进过程，不代表当前产品仍支持 TUI。当前方向是由 Rust 提供可复用、可验证的运行时能力，React + Tauri 桌面应用负责主要交互，CLI/headless 入口负责自动化运行。
+当前方向是由 Rust 提供可复用、可验证的运行时能力，React + Tauri 桌面应用负责主要交互，CLI/headless 入口负责自动化运行。

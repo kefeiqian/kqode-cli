@@ -1,9 +1,0 @@
-{
-  "label": "U2-交互式主屏",
-  "position": 4,
-  "link": {
-    "type": "generated-index",
-    "slug": "/category/u2-interactive-home-screen",
-    "description": "KQode U2 阶段的已归档 Ink TUI 主屏实验；保留用于说明项目演进，不代表当前产品能力。"
-  }
-}

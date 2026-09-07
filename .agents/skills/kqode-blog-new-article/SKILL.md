@@ -18,7 +18,7 @@ Create a new Chinese blog doc in `blog/docs/` and keep its ordering, frontmatter
 5. Run the helper from the repository root:
 
 ```bash
-python .agents/skills/kqode-blog-new-article/scripts/new_article.py "创建前端TUI项目" --slug create-frontend-tui-project
+python .agents/skills/kqode-blog-new-article/scripts/new_article.py "创建桌面前端项目" --slug create-desktop-frontend
 python .agents/skills/kqode-blog-new-article/scripts/new_article.py "插入的新文章" --order 1.5 --slug inserted-topic
 ```
 
@@ -34,7 +34,7 @@ python .agents/skills/kqode-blog-new-article/scripts/new_article.py "插入的�
 - Keep the doc filename ordered, for example `04-新文章.md` or `01.5-插入的新文章.md`.
 - Keep every article's frontmatter with `sidebar_position` matching the display order, for example `sidebar_position: 4` or `sidebar_position: 1.5`.
 - Keep the frontmatter title human-facing, for example `title: 4. 新文章` or `title: 1.5. 插入的新文章`.
-- In Chinese docs, add spaces on both sides of English words, acronyms, and product names when adjacent to Chinese characters, including frontmatter titles, headings, prose, and image alt text. Example: `创建 Rust 项目`, `前端 TUI 项目`, `Rust XTask 自动化`.
+- In Chinese docs, add spaces on both sides of English words, acronyms, and product names when adjacent to Chinese characters, including frontmatter titles, headings, prose, and image alt text. Example: `创建 Rust 项目`, `React 桌面前端`, `Rust XTask 自动化`.
 - Do not rely on filename prefixes alone for sidebar order, because Docusaurus may not sort decimal prefixes between surrounding integer docs by filename alone.
 - For category folders, prefer stable English generated-index slugs in `_category_.json` such as `"/category/u1-development-scaffolding"` so locale switching does not expose Chinese category URL slugs.
 - Do not put numeric ordering prefixes or Chinese titles in image folder names.

@@ -38,7 +38,7 @@ KQode development heavily uses [compound-engineering-plugin](https://github.com/
 
 Before writing code, we use `ce-brainstorm` to turn vague ideas into requirements, then use `ce-plan` to turn those requirements into executable, reviewable, and verifiable plans.
 
-Each plan item is reviewed one by one to confirm scope, boundaries, risks, and acceptance criteria before implementation starts. The project originally used an Ink TUI homepage as its first UI plan. That experiment and its plan now live under `docs/archive-tui/`; they document the requirements, constraints, testing strategy, and task breakdown from that stage, but they do not describe the current product surface.
+Each plan item is reviewed one by one to confirm scope, boundaries, risks, and acceptance criteria before implementation starts.
 
 This approach fits a project like KQode well. On one hand, we are indeed using Coding Agents to accelerate development. On the other hand, we do not want an Agent to jump directly from a vague instruction to code. Brainstorming first, planning next, and reviewing item by item lets humans control product direction and architectural boundaries, while also giving the Agent clearer context for more stable implementation.
 
@@ -56,4 +56,4 @@ This article series is not a retrospective tutorial written after the project is
 
 The benefit is that readers can see a Coding Agent grow from scratch, rather than only seeing a polished final result. For learning Agent Runtime and Harness Engineering, the tradeoffs made along the way are often more important than the final code.
 
-The following U1 and U2 articles document KQode's early Ink TUI experiment. They are retained to show the project's architectural evolution and do not mean that the current product supports a TUI. The current direction keeps reusable, verifiable runtime capabilities in Rust, uses React and Tauri for the primary desktop experience, and exposes CLI/headless entry points for automation.
+The current direction keeps reusable, verifiable runtime capabilities in Rust, uses React and Tauri for the primary desktop experience, and exposes CLI/headless entry points for automation.
