@@ -2263,14 +2263,14 @@ dependencies = [
 
 [[package]]
 name = "kqode-cli"
-version = "0.1.3"
+version = "0.3.0"
 dependencies = [
  "kqode-core",
 ]
 
 [[package]]
 name = "kqode-core"
-version = "0.1.3"
+version = "0.3.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2280,7 +2280,7 @@ dependencies = [
 
 [[package]]
 name = "kqode-desktop"
-version = "0.1.3"
+version = "0.3.0"
 dependencies = [
  "keyring",
  "kqode-core",
@@ -2300,7 +2300,7 @@ dependencies = [
 
 [[package]]
 name = "kqode-provider"
-version = "0.1.3"
+version = "0.3.0"
 dependencies = [
  "futures-util",
  "github-copilot-sdk",
@@ -6177,7 +6177,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.1.3"
+version = "0.3.0"
 
 [[package]]
 name = "yoke"
