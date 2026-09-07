@@ -32,6 +32,7 @@ The skill may research these additional open-source references only when the use
 | `open-swe` | Open SWE | `https://github.com/langchain-ai/open-swe` |
 | `plandex` | Plandex | `https://github.com/plandex-ai/plandex` |
 | `smol-developer` | smol-ai/developer | `https://github.com/smol-ai/developer` |
+| `paseo` | Paseo | `https://github.com/getpaseo/paseo` |
 
 ## Alias rules
 
