@@ -138,38 +138,6 @@ fn generated_titles_require_the_expected_provisional_title() {
 }
 
 #[test]
-fn adds_conversation_state_to_existing_schema() {
-    let connection = Connection::open_in_memory().unwrap();
-    connection
-        .execute_batch(
-            "CREATE TABLE conversations (
-                id TEXT PRIMARY KEY NOT NULL,
-                title TEXT NOT NULL,
-                updated_at INTEGER NOT NULL
-            );",
-        )
-        .unwrap();
-
-    let mut store = ConversationStore::initialize(connection).unwrap();
-    let mut conversation = Conversation {
-        id: "conversation-1".to_owned(),
-        title: "Migrated conversation".to_owned(),
-        updated_at: 0,
-        workspace_path: Some(r"C:\code\migrated".to_owned()),
-        provider: Some(Provider::Openai),
-        model: Some("gpt-test".to_owned()),
-        messages: vec![],
-        pending_turns: vec![],
-    };
-    store.save_conversation(&mut conversation).unwrap();
-
-    assert_eq!(
-        store.load_conversation(&conversation.id).unwrap(),
-        Some(conversation)
-    );
-}
-
-#[test]
 fn archiving_a_conversation_hides_it_without_removing_messages() {
     let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
     let mut conversation = Conversation {

@@ -276,22 +276,17 @@ fn rejects_insecure_custom_api_base_url() {
 }
 
 #[test]
-fn migrates_existing_settings_with_the_provider_default_url() {
-    let connection = Connection::open_in_memory().unwrap();
-    connection
-        .execute_batch(
-            "CREATE TABLE llm_settings (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                provider TEXT NOT NULL,
-                api_key TEXT NOT NULL,
-                model TEXT
-            );
-            INSERT INTO llm_settings (id, provider, api_key, model)
-            VALUES (1, 'kimi', 'secret-key', 'kimi-k3');",
+fn uses_provider_default_url_for_an_empty_stored_url() {
+    let store = SettingsStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    store
+        .connection
+        .execute(
+            "INSERT INTO provider_settings (
+                provider, api_base_url, key_present, highlighted_models_json, model
+             ) VALUES ('kimi', '', 0, '[]', 'kimi-k3')",
+            [],
         )
         .unwrap();
-
-    let store = SettingsStore::initialize(connection).unwrap();
     let settings = store.load_provider_settings(Provider::Kimi).unwrap();
 
     assert_eq!(settings.api_base_url, KIMI_API_BASE_URL);

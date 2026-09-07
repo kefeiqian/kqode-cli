@@ -3,7 +3,6 @@ mod error;
 mod mutation;
 mod pending;
 mod query;
-mod schema;
 
 #[cfg(test)]
 mod pending_tests;
@@ -16,5 +15,3 @@ pub use kqode_core::conversation::{ConversationListItem, PendingTurn};
 pub(crate) use kqode_core::conversation::{StoredMessage, StoredMessageRole};
 
 pub type Conversation = kqode_core::conversation::Conversation<crate::settings::Provider>;
-
-pub(crate) use schema::migrate as migrate_schema;

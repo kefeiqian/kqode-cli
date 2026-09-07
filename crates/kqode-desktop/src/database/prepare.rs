@@ -6,9 +6,7 @@ use std::{
 use rusqlite::Connection;
 use tauri::{AppHandle, Manager, Runtime};
 
-use super::{
-    DATABASE_FILENAME, DatabaseError, KQODE_DATA_DIRECTORY, migrations::migrate_connection,
-};
+use super::{DATABASE_FILENAME, DatabaseError, KQODE_DATA_DIRECTORY, migrate_connection};
 
 /// Resolves the database path and applies migrations.
 ///
@@ -26,7 +24,12 @@ pub(crate) fn prepare<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, Databas
     Ok(database_path)
 }
 
-fn migrate(path: &Path) -> Result<(), DatabaseError> {
+/// Prepares a database path for use by the desktop stores.
+///
+/// # Errors
+///
+/// Returns an error when the database cannot be created or migrated.
+pub(super) fn migrate(path: &Path) -> Result<(), DatabaseError> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|source| DatabaseError::Io {
             operation: "create database directory",

@@ -3,8 +3,6 @@ use std::{fs, path::Path};
 use rusqlite::Connection;
 
 use super::StoreError;
-#[cfg(test)]
-use super::schema;
 
 pub struct ConversationStore {
     pub(super) connection: Connection,
@@ -31,8 +29,9 @@ impl ConversationStore {
     }
 
     #[cfg(test)]
-    pub(crate) fn initialize(connection: Connection) -> Result<Self, StoreError> {
-        schema::migrate(&connection)?;
+    pub(crate) fn initialize(mut connection: Connection) -> Result<Self, StoreError> {
+        crate::database::migrate_connection(&mut connection)
+            .expect("test database migration should succeed");
         Ok(Self { connection })
     }
 }

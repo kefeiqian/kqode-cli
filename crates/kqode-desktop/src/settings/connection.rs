@@ -5,8 +5,6 @@ use rusqlite::Connection;
 use crate::secrets::SecretsStore;
 
 use super::SettingsError;
-#[cfg(test)]
-use super::migration::{migrate_credentials, migrate_schema};
 
 pub struct SettingsStore {
     pub(super) connection: Connection,
@@ -35,9 +33,9 @@ impl SettingsStore {
     }
 
     #[cfg(test)]
-    pub(crate) fn initialize(connection: Connection) -> Result<Self, SettingsError> {
-        migrate_schema(&connection)?;
-        migrate_credentials(&connection)?;
+    pub(crate) fn initialize(mut connection: Connection) -> Result<Self, SettingsError> {
+        crate::database::migrate_connection(&mut connection)
+            .expect("test database migration should succeed");
         Ok(Self {
             connection,
             secrets: SecretsStore::default(),

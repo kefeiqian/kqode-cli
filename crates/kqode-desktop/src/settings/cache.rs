@@ -1,22 +1,10 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{OptionalExtension, params};
 
 use super::{LlmSettings, SettingsError, SettingsStore};
 
 const MODEL_CACHE_TTL_SECONDS: i64 = 24 * 60 * 60;
-const MODEL_CACHE_SCHEMA: &str = "
-    CREATE TABLE IF NOT EXISTS model_cache (
-        provider TEXT PRIMARY KEY,
-        models_json TEXT NOT NULL,
-        fetched_at INTEGER NOT NULL
-    );
-";
-
-pub(super) fn initialize(connection: &Connection) -> Result<(), SettingsError> {
-    connection.execute_batch(MODEL_CACHE_SCHEMA)?;
-    Ok(())
-}
 
 impl SettingsStore {
     pub fn cached_models(
