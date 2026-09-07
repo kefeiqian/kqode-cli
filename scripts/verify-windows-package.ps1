@@ -3,10 +3,7 @@ param(
     [string]$BundleRoot = "target\release\bundle",
 
     [Parameter(Mandatory = $false)]
-    [string]$InstallRoot = "",
-
-    [Parameter(Mandatory = $false)]
-    [switch]$VerifyCopilotLogin
+    [string]$InstallRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -59,18 +56,6 @@ function Invoke-PackagedDiagnostic {
         throw "$BundleName Copilot SDK diagnostic exited with code $($diagnostic.ExitCode)"
     }
 
-    if ($VerifyCopilotLogin) {
-        $authentication = Start-Process -FilePath $application.FullName `
-            -ArgumentList "--verify-copilot-sdk-auth" `
-            -PassThru
-        if (-not $authentication.WaitForExit(60000)) {
-            $authentication.Kill($true)
-            throw "$BundleName Copilot authentication diagnostic timed out after 60 seconds"
-        }
-        if ($authentication.ExitCode -ne 0) {
-            throw "$BundleName Copilot authentication diagnostic exited with code $($authentication.ExitCode)"
-        }
-    }
 }
 
 $nsisRoot = "$resolvedInstallRoot-nsis"

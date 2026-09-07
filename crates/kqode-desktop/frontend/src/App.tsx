@@ -23,6 +23,7 @@ function App() {
     refreshModels,
     saveSettings,
     settings,
+    testProviderConnection,
   } = useLlmSettings();
   const {
     activeConversation,
@@ -136,6 +137,7 @@ function App() {
           onDirtyChange={handleSettingsDirtyChange}
           onRefreshModels={refreshModels}
           onSave={saveSettings}
+          onTestProvider={testProviderConnection}
         />
       ) : (
         <ChatPanel

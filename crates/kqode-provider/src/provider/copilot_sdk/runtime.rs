@@ -9,7 +9,13 @@ use super::config;
 
 const STOP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
-pub async fn verify_packaged_runtime(require_authentication: bool) -> Result<(), ChatError> {
+/// Verifies the Copilot SDK assets embedded in a packaged desktop build.
+///
+/// # Errors
+///
+/// Returns an error when bundled assets are missing, extraction fails, or the
+/// packaged runtime cannot start and respond to a ping.
+pub async fn verify_packaged_runtime() -> Result<(), ChatError> {
     if !github_copilot_sdk::HAS_BUNDLED_CLI {
         return Err(ChatError::Configuration(
             "GitHub Copilot SDK runtime is not embedded in this build".to_owned(),
@@ -24,30 +30,21 @@ pub async fn verify_packaged_runtime(require_authentication: bool) -> Result<(),
         ChatError::Configuration("extract bundled GitHub Copilot SDK runtime".to_owned())
     })?;
     verify_non_empty_file(&runtime_path, "GitHub Copilot SDK runtime")?;
-    let runtime_node = runtime_path.with_file_name("runtime.node");
-    verify_non_empty_file(&runtime_node, "GitHub Copilot SDK runtime.node")?;
+    verify_non_empty_file(
+        &runtime_path.with_file_name("runtime.node"),
+        "GitHub Copilot SDK runtime.node",
+    )?;
 
     let runtime = CopilotSdkRuntime::start().await?;
-    runtime
+    let result = runtime
         .client
         .ping(Some("kqode-packaged-runtime"))
         .await
+        .map(|_| ())
         .map_err(|error| {
             ChatError::Request(format!("ping packaged GitHub Copilot SDK runtime: {error}"))
-        })?;
-    if require_authentication {
-        let models = runtime.client.list_models().await.map_err(|error| {
-            ChatError::Request(format!(
-                "list Copilot models with packaged GitHub authentication: {error}"
-            ))
-        })?;
-        if models.is_empty() {
-            return Err(ChatError::Request(
-                "packaged GitHub Copilot SDK returned no models".to_owned(),
-            ));
-        }
-    }
-    runtime.stop().await
+        });
+    combine_cleanup(result, runtime.stop().await)
 }
 
 fn verify_non_empty_file(path: &std::path::Path, label: &str) -> Result<(), ChatError> {

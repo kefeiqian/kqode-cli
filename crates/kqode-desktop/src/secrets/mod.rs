@@ -13,9 +13,7 @@ use secrecy::{ExposeSecret, SecretString};
 
 #[cfg(not(test))]
 pub const KEYCHAIN_SERVICE: &str = "com.nincere.kqode.providers";
-pub const KEYCHAIN_BACKEND_ENV: &str = "KQODE_KEYCHAIN_BACKEND";
 
-const KEYCHAIN_BACKEND_MOCK: &str = "mock";
 const REDACTED: &str = "<redacted>";
 
 pub struct ApiKey(SecretString);
@@ -124,12 +122,6 @@ impl SecretsStore {
                 Err(error) => Err(map_keyring_error(error)),
             }
         }
-    }
-}
-
-pub fn init_keychain_backend() {
-    if std::env::var(KEYCHAIN_BACKEND_ENV).as_deref() == Ok(KEYCHAIN_BACKEND_MOCK) {
-        keyring::set_default_credential_builder(keyring::mock::default_credential_builder());
     }
 }
 

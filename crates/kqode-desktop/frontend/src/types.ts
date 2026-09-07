@@ -60,3 +60,8 @@ export type LlmSettings = {
   highlightedModels: string[];
   model: string;
 };
+
+export type ProviderConnectionStatus = {
+  provider: Provider;
+  models: string[];
+};

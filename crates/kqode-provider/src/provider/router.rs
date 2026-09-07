@@ -6,6 +6,7 @@ use crate::{
     provider::{Provider, ProviderConfig},
     tools::ToolRegistry,
 };
+use serde::Serialize;
 
 use super::{
     anthropic::AnthropicProvider, copilot::CopilotProvider, copilot_sdk::CopilotSdkProvider,
@@ -93,4 +94,35 @@ pub async fn list_models(config: &ProviderConfig) -> Result<Vec<String>, ChatErr
         Provider::Deepseek => DeepseekProvider::new(config).list_models().await,
         Provider::Custom => CustomProvider::new(config).list_models().await,
     }
+}
+
+/// Successful provider connectivity check.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderConnectionStatus {
+    /// Provider that completed the check.
+    pub provider: Provider,
+    /// Models returned by the provider during the check.
+    pub models: Vec<String>,
+}
+
+/// Verifies that a provider is available and can list models.
+///
+/// # Errors
+///
+/// Returns the provider-specific availability, runtime, authentication, or
+/// model-discovery failure encountered while listing models.
+pub async fn test_connection(
+    config: &ProviderConfig,
+) -> Result<ProviderConnectionStatus, ChatError> {
+    let models = list_models(config).await?;
+    if models.is_empty() {
+        return Err(ChatError::Response(
+            "the provider did not report any available models".to_owned(),
+        ));
+    }
+    Ok(ProviderConnectionStatus {
+        provider: config.provider,
+        models,
+    })
 }

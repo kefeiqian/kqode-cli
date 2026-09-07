@@ -16,7 +16,7 @@ pub use copilot_sdk::verify_packaged_runtime;
 pub use identity::{
     ANTHROPIC_API_BASE_URL, DEEPSEEK_API_BASE_URL, KIMI_API_BASE_URL, OPENAI_API_BASE_URL, Provider,
 };
-pub use router::{chat, list_models};
+pub use router::{ProviderConnectionStatus, chat, list_models, test_connection};
 pub use shared::validate_base_url;
 
 #[cfg(any(test, feature = "test-support"))]

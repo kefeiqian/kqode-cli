@@ -100,6 +100,43 @@
   opacity: 0.5;
 }
 
+.test-provider-button {
+  width: fit-content;
+  padding: 8px 12px;
+  border: 1px solid #46534e;
+  border-radius: 8px;
+  color: #dce2df;
+  background: #222a27;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.test-provider-button:hover,
+.test-provider-button:focus-visible {
+  border-color: #75b99b;
+  outline: 0;
+}
+
+.test-provider-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.provider-test-success,
+.provider-test-error {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.provider-test-success {
+  color: #91dfba;
+}
+
+.provider-test-error {
+  color: #e8a69b;
+}
+
 .provider-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

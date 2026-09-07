@@ -4,7 +4,10 @@ use crate::inference::{ChatCompletion, ChatError, ChatMessage, ChatMode, ChatReq
 use crate::settings::{LlmSettings, Provider, SettingsStore};
 use crate::tools::ToolRegistry;
 use kqode_core::validation::validate_chat_messages;
-use kqode_provider::{ProviderConfig, chat as provider_chat, list_models as provider_models};
+use kqode_provider::{
+    ProviderConfig, ProviderConnectionStatus, chat as provider_chat,
+    list_models as provider_models, test_connection as provider_test_connection,
+};
 
 use super::validation::validate_selection;
 
@@ -125,6 +128,30 @@ impl LlmService {
             .cache_models(&settings, &models)
             .map_err(settings_error)?;
         Ok(models)
+    }
+
+    /// Verifies provider availability and model discovery.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when credentials cannot be resolved or the provider
+    /// cannot start or list models.
+    pub async fn test_connection(
+        &self,
+        settings: LlmSettings,
+    ) -> Result<ProviderConnectionStatus, ChatError> {
+        let settings = {
+            let store = lock_settings(&self.settings_store)?;
+            let settings = store.resolve_api_key(&settings).map_err(settings_error)?;
+            if settings.provider.requires_api_key() && settings.api_key.trim().is_empty() {
+                return Err(ChatError::Configuration(
+                    "enter an API key before testing the provider connection".to_owned(),
+                ));
+            }
+            settings
+        };
+
+        provider_test_connection(&provider_config(&settings)).await
     }
 }
 

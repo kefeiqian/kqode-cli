@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { LlmSettings, Provider } from "./types";
+import type {
+  LlmSettings,
+  Provider,
+  ProviderConnectionStatus,
+} from "./types";
 
 export function useLlmSettings() {
   const [settings, setSettings] = useState<LlmSettings>();
@@ -130,5 +134,9 @@ export function useLlmSettings() {
       loadModels(currentSettings, true),
     saveSettings,
     settings,
+    testProviderConnection: (currentSettings: LlmSettings) =>
+      invoke<ProviderConnectionStatus>("test_provider_connection", {
+        settings: currentSettings,
+      }),
   };
 }

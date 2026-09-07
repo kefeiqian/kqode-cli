@@ -1,9 +1,14 @@
 import { FormEvent, useEffect, useState } from "react";
 import { addHighlightedModel } from "../providers";
-import type { LlmSettings, Provider } from "../types";
+import type {
+  LlmSettings,
+  Provider,
+  ProviderConnectionStatus,
+} from "../types";
 import { ApiKeySettingsField } from "./ApiKeySettingsField";
 import { CustomProviderUrlField } from "./CustomProviderUrlField";
 import { ModelSettingsField } from "./ModelSettingsField";
+import { ProviderConnectionCheck } from "./ProviderConnectionCheck";
 import { ProviderPicker } from "./ProviderPicker";
 import "./SettingsPage.css";
 
@@ -18,6 +23,9 @@ type SettingsPageProps = {
   onLoadProvider: (provider: Provider) => Promise<LlmSettings>;
   onRefreshModels: (settings: LlmSettings) => Promise<string[]>;
   onSave: (settings: LlmSettings) => Promise<void>;
+  onTestProvider: (
+    settings: LlmSettings,
+  ) => Promise<ProviderConnectionStatus>;
 };
 
 export function SettingsPage({
@@ -31,6 +39,7 @@ export function SettingsPage({
   onLoadProvider,
   onRefreshModels,
   onSave,
+  onTestProvider,
 }: SettingsPageProps) {
   const [draft, setDraft] = useState(initialSettings);
   const [draftModels, setDraftModels] = useState(models);
@@ -166,6 +175,16 @@ export function SettingsPage({
                 setDraftModels([]);
               }}
               provider={draft.provider}
+            />
+          )}
+
+          {usesKeylessCopilot && (
+            <ProviderConnectionCheck
+              disabled={isLoading || isSwitchingProvider}
+              key={draft.provider}
+              onModels={setDraftModels}
+              onTest={onTestProvider}
+              settings={draft}
             />
           )}
 

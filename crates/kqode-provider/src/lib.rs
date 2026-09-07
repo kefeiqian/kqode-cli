@@ -21,7 +21,8 @@ mod provider;
 
 pub use provider::{
     ANTHROPIC_API_BASE_URL, DEEPSEEK_API_BASE_URL, KIMI_API_BASE_URL, OPENAI_API_BASE_URL,
-    Provider, ProviderConfig, chat, list_models, validate_base_url, verify_packaged_runtime,
+    Provider, ProviderConfig, ProviderConnectionStatus, chat, list_models, test_connection,
+    validate_base_url, verify_packaged_runtime,
 };
 
 #[cfg(any(test, feature = "test-support"))]
