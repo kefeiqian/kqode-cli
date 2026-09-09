@@ -8,7 +8,7 @@ import type {
 
 export function useLlmSettings() {
   const [settings, setSettings] = useState<LlmSettings>();
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string>();
   const [models, setModels] = useState<string[]>([]);
   const [modelsError, setModelsError] = useState<string>();
@@ -16,7 +16,7 @@ export function useLlmSettings() {
   const chatActivationId = useRef(0);
 
   const loadModels = async (
-    currentSettings: LlmSettings,
+    provider: Provider,
     forceRefresh: boolean,
     isCancelled: () => boolean = () => false,
   ): Promise<string[]> => {
@@ -25,14 +25,7 @@ export function useLlmSettings() {
     try {
       const availableModels = await invoke<string[]>("list_models", {
         forceRefresh,
-        settings: {
-          provider: currentSettings.provider,
-          apiBaseUrl: currentSettings.apiBaseUrl,
-          apiKey: currentSettings.apiKey,
-          apiKeyPreview: currentSettings.apiKeyPreview,
-          highlightedModels: currentSettings.highlightedModels,
-          model: currentSettings.model,
-        },
+        provider,
       });
       if (isCancelled()) return [];
       setModels(availableModels);
@@ -49,31 +42,10 @@ export function useLlmSettings() {
   };
 
   useEffect(() => {
-    let cancelled = false;
-
-    void invoke<LlmSettings>("load_settings")
-      .then((stored) => {
-        if (!cancelled) setSettings(stored);
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setLoadError(`Could not load settings: ${String(error)}`);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
     if (!settings) return;
 
     let cancelled = false;
-    void loadModels(settings, false, () => cancelled);
+    void loadModels(settings.provider, false, () => cancelled);
 
     return () => {
       cancelled = true;
@@ -101,17 +73,30 @@ export function useLlmSettings() {
     model?: string,
   ) => {
     const activationId = ++chatActivationId.current;
-    const providerSettings = await invoke<LlmSettings>(
-      "load_provider_settings",
-      { provider },
-    );
-    if (activationId === chatActivationId.current) {
-      setSettings({
-        ...providerSettings,
-        model: model ?? providerSettings.model,
-      });
+    setIsLoading(true);
+    setLoadError(undefined);
+    try {
+      const providerSettings = await invoke<LlmSettings>(
+        "load_provider_settings",
+        { provider },
+      );
+      if (activationId === chatActivationId.current) {
+        setSettings({
+          ...providerSettings,
+          model: model ?? providerSettings.model,
+        });
+      }
+      return providerSettings;
+    } catch (error) {
+      if (activationId === chatActivationId.current) {
+        setLoadError(`Could not load settings: ${String(error)}`);
+      }
+      return undefined;
+    } finally {
+      if (activationId === chatActivationId.current) {
+        setIsLoading(false);
+      }
     }
-    return providerSettings;
   };
 
   const chatModels = Array.from(new Set(settings?.highlightedModels ?? []))
@@ -130,13 +115,12 @@ export function useLlmSettings() {
     modelsLoading,
     loadProviderSettings: (provider: Provider) =>
       invoke<LlmSettings>("load_provider_settings", { provider }),
-    refreshModels: (currentSettings: LlmSettings) =>
-      loadModels(currentSettings, true),
+    refreshModels: (provider: Provider) => loadModels(provider, true),
     saveSettings,
     settings,
-    testProviderConnection: (currentSettings: LlmSettings) =>
+    testProviderConnection: (provider: Provider) =>
       invoke<ProviderConnectionStatus>("test_provider_connection", {
-        settings: currentSettings,
+        provider,
       }),
   };
 }

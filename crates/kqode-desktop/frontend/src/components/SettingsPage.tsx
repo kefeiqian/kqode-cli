@@ -21,11 +21,9 @@ type SettingsPageProps = {
   modelsLoading: boolean;
   onDirtyChange: (isDirty: boolean) => void;
   onLoadProvider: (provider: Provider) => Promise<LlmSettings>;
-  onRefreshModels: (settings: LlmSettings) => Promise<string[]>;
+  onRefreshModels: (provider: Provider) => Promise<string[]>;
   onSave: (settings: LlmSettings) => Promise<void>;
-  onTestProvider: (
-    settings: LlmSettings,
-  ) => Promise<ProviderConnectionStatus>;
+  onTestProvider: (provider: Provider) => Promise<ProviderConnectionStatus>;
 };
 
 export function SettingsPage({
@@ -59,6 +57,11 @@ export function SettingsPage({
     draft.highlightedModels.some(
       (model, index) => model !== initialSettings.highlightedModels[index],
     );
+  const providerConnectionIsDirty =
+    draft.provider !== initialSettings.provider ||
+    draft.apiBaseUrl !== initialSettings.apiBaseUrl ||
+    draft.apiKey !== initialSettings.apiKey ||
+    draft.apiKeyPreview !== initialSettings.apiKeyPreview;
 
   useEffect(() => {
     setDraft(initialSettings);
@@ -85,7 +88,7 @@ export function SettingsPage({
   }, [draft, initialSettings, models]);
 
   const refreshModels = async () => {
-    const availableModels = await onRefreshModels(draft);
+    const availableModels = await onRefreshModels(draft.provider);
     setDraftModels(availableModels);
     if (availableModels.length > 0 && !availableModels.includes(draft.model)) {
       setDraft((current) => ({
@@ -144,9 +147,10 @@ export function SettingsPage({
           <div className="settings-field">
             <span>Provider</span>
             <ProviderPicker
+              apiBaseUrl={draft.apiBaseUrl}
               disabled={isLoading || isSwitchingProvider}
               onChange={(provider) => void selectProvider(provider)}
-              settings={draft}
+              provider={draft.provider}
             />
           </div>
 
@@ -184,7 +188,7 @@ export function SettingsPage({
               key={draft.provider}
               onModels={setDraftModels}
               onTest={onTestProvider}
-              settings={draft}
+              provider={draft.provider}
             />
           )}
 
@@ -199,6 +203,7 @@ export function SettingsPage({
             models={draftModels}
             modelsLoading={modelsLoading}
             provider={draft.provider}
+            refreshDisabled={providerConnectionIsDirty}
             requiresApiKey={!usesKeylessCopilot}
             onAddHighlight={(model) =>
               setDraft((current) => ({

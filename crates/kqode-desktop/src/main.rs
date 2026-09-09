@@ -29,7 +29,6 @@ fn main() {
             tauri_controller::conversation::commands::steer_conversation_turn,
             tauri_controller::conversation::commands::update_conversation,
             tauri_controller::settings::load_provider_settings,
-            tauri_controller::settings::load_settings,
             tauri_controller::settings::save_settings,
             tauri_controller::llm::list_models,
             tauri_controller::llm::test_provider_connection

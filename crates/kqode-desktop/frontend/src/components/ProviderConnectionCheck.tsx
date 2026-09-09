@@ -1,21 +1,18 @@
 import { useState } from "react";
-import type {
-  LlmSettings,
-  ProviderConnectionStatus,
-} from "../types";
+import type { Provider, ProviderConnectionStatus } from "../types";
 
 type ProviderConnectionCheckProps = {
   disabled: boolean;
   onModels: (models: string[]) => void;
-  onTest: (settings: LlmSettings) => Promise<ProviderConnectionStatus>;
-  settings: LlmSettings;
+  onTest: (provider: Provider) => Promise<ProviderConnectionStatus>;
+  provider: Provider;
 };
 
 export function ProviderConnectionCheck({
   disabled,
   onModels,
   onTest,
-  settings,
+  provider,
 }: ProviderConnectionCheckProps) {
   const [isTesting, setIsTesting] = useState(false);
   const [result, setResult] = useState<{
@@ -27,7 +24,7 @@ export function ProviderConnectionCheck({
     setIsTesting(true);
     setResult(undefined);
     try {
-      const status = await onTest(settings);
+      const status = await onTest(provider);
       onModels(status.models);
       const providerName =
         status.provider === "copilot" ? "Copilot CLI" : "Copilot SDK";

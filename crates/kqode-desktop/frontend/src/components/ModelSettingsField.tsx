@@ -10,6 +10,7 @@ type ModelSettingsFieldProps = {
   models: string[];
   modelsLoading: boolean;
   provider: Provider;
+  refreshDisabled: boolean;
   requiresApiKey: boolean;
   onAddHighlight: (model: string) => void;
   onChange: (model: string) => void;
@@ -26,6 +27,7 @@ export function ModelSettingsField({
   models,
   modelsLoading,
   provider,
+  refreshDisabled,
   requiresApiKey,
   onAddHighlight,
   onChange,
@@ -65,7 +67,9 @@ export function ModelSettingsField({
         <label htmlFor="settings-model">Model</label>
         <button
           className="refresh-models-button"
-          disabled={disabled || modelsLoading || !canFetchModels}
+          disabled={
+            disabled || refreshDisabled || modelsLoading || !canFetchModels
+          }
           onClick={onRefresh}
           type="button"
         >
@@ -73,7 +77,9 @@ export function ModelSettingsField({
         </button>
       </div>
       <small className={`settings-help ${canFetchModels ? "" : "attention"}`}>
-        {!requiresApiKey
+        {refreshDisabled
+          ? "Save provider connection changes before fetching models."
+          : !requiresApiKey
           ? provider === "copilot"
             ? "Models are read from the installed GitHub Copilot CLI. Highlight at least one model so conversations can select it explicitly."
             : "Models are read through the GitHub Copilot SDK. Highlight at least one model so conversations can select it explicitly."

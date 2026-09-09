@@ -3,13 +3,6 @@ use tauri::State;
 use crate::settings::{LlmSettings, Provider, SettingsService};
 
 #[tauri::command]
-pub(crate) fn load_settings(service: State<'_, SettingsService>) -> Result<LlmSettings, String> {
-    service
-        .load(Provider::Kimi)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
 pub(crate) fn load_provider_settings(
     provider: Provider,
     service: State<'_, SettingsService>,

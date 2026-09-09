@@ -102,16 +102,19 @@ impl LlmService {
     ///
     /// # Errors
     ///
-    /// Returns an error when credentials cannot be resolved, the cache cannot
-    /// be accessed, the background task fails, or the provider request fails.
+    /// Returns an error when provider settings cannot be loaded, the cache
+    /// cannot be accessed, the background task fails, or the provider request
+    /// fails.
     pub async fn list_models(
         &self,
-        settings: LlmSettings,
+        provider: Provider,
         force_refresh: bool,
     ) -> Result<Vec<String>, ChatError> {
         let settings = {
             let store = lock_settings(&self.settings_store)?;
-            let settings = store.resolve_api_key(&settings).map_err(settings_error)?;
+            let settings = store
+                .load_provider_settings(provider)
+                .map_err(settings_error)?;
             if settings.provider.requires_api_key() && settings.api_key.trim().is_empty() {
                 return Ok(Vec::new());
             }
@@ -138,11 +141,13 @@ impl LlmService {
     /// cannot start or list models.
     pub async fn test_connection(
         &self,
-        settings: LlmSettings,
+        provider: Provider,
     ) -> Result<ProviderConnectionStatus, ChatError> {
         let settings = {
             let store = lock_settings(&self.settings_store)?;
-            let settings = store.resolve_api_key(&settings).map_err(settings_error)?;
+            let settings = store
+                .load_provider_settings(provider)
+                .map_err(settings_error)?;
             if settings.provider.requires_api_key() && settings.api_key.trim().is_empty() {
                 return Err(ChatError::Configuration(
                     "enter an API key before testing the provider connection".to_owned(),

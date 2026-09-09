@@ -109,14 +109,6 @@ impl SettingsStore {
         }
         Ok(())
     }
-
-    pub fn resolve_api_key(&self, settings: &LlmSettings) -> Result<LlmSettings, SettingsError> {
-        let current = self.load_provider_settings(settings.provider)?;
-        let mut resolved = settings.clone();
-        resolved.api_key =
-            resolve_submitted_api_key(settings, &current.api_base_url, &current.api_key);
-        Ok(resolved)
-    }
 }
 
 fn normalized_api_base_url(settings: &LlmSettings) -> Result<String, SettingsError> {

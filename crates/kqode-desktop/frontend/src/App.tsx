@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ToastContainer } from "react-toastify";
 import { ChatPanel } from "./components/ChatPanel";
+import { ProviderPicker } from "./components/ProviderPicker";
 import { SettingsPage } from "./components/SettingsPage";
 import { Sidebar } from "./components/Sidebar";
 import { useConversationHistory } from "./useConversationHistory";
@@ -49,8 +50,14 @@ function App() {
       isLoadingSettings ||
       activePage !== "chat" ||
       !activeConversation ||
-      !activeConversation.provider ||
-      !settings
+      !activeConversation.provider
+    ) {
+      return;
+    }
+    if (
+      settings?.provider === activeConversation.provider &&
+      (!activeConversation.model ||
+        settings.model === activeConversation.model)
     ) {
       return;
     }
@@ -104,7 +111,7 @@ function App() {
     setSettingsDirty(isDirty);
   }, []);
 
-  if (!activeConversation || (activePage === "settings" && !settings)) {
+  if (!activeConversation) {
     return (
       <main className="app-shell">
         <p>{settingsLoadError ?? historyError ?? "Loading KQode..."}</p>
@@ -125,20 +132,38 @@ function App() {
         onSelect={selectConversationAndOpenChat}
       />
       {activePage === "settings" ? (
-        <SettingsPage
-          initialSettings={settings!}
-          isLoading={isLoadingSettings}
-          key={isLoadingSettings ? "settings-loading" : "settings-loaded"}
-          loadError={settingsLoadError}
-          onLoadProvider={loadProviderSettings}
-          models={models}
-          modelsError={modelsError}
-          modelsLoading={modelsLoading}
-          onDirtyChange={handleSettingsDirtyChange}
-          onRefreshModels={refreshModels}
-          onSave={saveSettings}
-          onTestProvider={testProviderConnection}
-        />
+        settings ? (
+          <SettingsPage
+            initialSettings={settings}
+            isLoading={isLoadingSettings}
+            key={isLoadingSettings ? "settings-loading" : "settings-loaded"}
+            loadError={settingsLoadError}
+            onLoadProvider={loadProviderSettings}
+            models={models}
+            modelsError={modelsError}
+            modelsLoading={modelsLoading}
+            onDirtyChange={handleSettingsDirtyChange}
+            onRefreshModels={refreshModels}
+            onSave={saveSettings}
+            onTestProvider={testProviderConnection}
+          />
+        ) : (
+          <section className="settings-page">
+            <div className="settings-card">
+              <h2>Select a provider</h2>
+              <p>Choose which provider settings to configure.</p>
+              <ProviderPicker
+                disabled={isLoadingSettings}
+                onChange={(provider) =>
+                  void activateChatConfiguration(provider)
+                }
+              />
+              {settingsLoadError && (
+                <p className="settings-error">{settingsLoadError}</p>
+              )}
+            </div>
+          </section>
+        )
       ) : (
         <ChatPanel
           apiBaseUrl={

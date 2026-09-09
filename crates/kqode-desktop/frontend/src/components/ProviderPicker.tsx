@@ -1,20 +1,22 @@
-import type { LlmSettings, Provider } from "../types";
+import type { Provider } from "../types";
 import { PROVIDERS } from "../providers";
 import { ProviderLogo } from "./ProviderLogo";
 
 type ProviderPickerProps = {
+  apiBaseUrl?: string;
   disabled: boolean;
-  settings: LlmSettings;
   onChange: (provider: Provider) => void;
+  provider?: Provider;
 };
 
 export function ProviderPicker({
+  apiBaseUrl,
   disabled,
-  settings,
   onChange,
+  provider: selectedProvider,
 }: ProviderPickerProps) {
   const selectProvider = (provider: Provider) => {
-    if (provider === settings.provider) return;
+    if (provider === selectedProvider) return;
     onChange(provider);
   };
 
@@ -23,7 +25,7 @@ export function ProviderPicker({
       {PROVIDERS.map((provider) => (
         <button
           className={`provider-option ${
-            provider.id === settings.provider ? "selected" : ""
+            provider.id === selectedProvider ? "selected" : ""
           }`}
           disabled={disabled}
           key={provider.id}
@@ -32,9 +34,7 @@ export function ProviderPicker({
         >
           <ProviderLogo
             apiBaseUrl={
-              provider.id === settings.provider
-                ? settings.apiBaseUrl
-                : undefined
+              provider.id === selectedProvider ? apiBaseUrl : undefined
             }
             provider={provider.id}
           />
