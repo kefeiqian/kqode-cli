@@ -108,3 +108,126 @@ fn completes_messages_and_pending_turn_atomically() {
     assert_eq!(conversation.messages.len(), 1);
     assert_eq!(conversation.messages[0].id, "turn-1");
 }
+
+#[test]
+fn recovers_an_unstarted_pending_turn_as_a_retryable_error() {
+    let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    let mut conversation = conversation();
+    store.save_conversation(&mut conversation).unwrap();
+    store
+        .enqueue_pending_turn(&conversation.id, &pending("turn-1", "Hello"))
+        .unwrap();
+
+    assert_eq!(store.recover_interrupted_turns().unwrap(), 1);
+
+    let recovered = store.load_conversation(&conversation.id).unwrap().unwrap();
+    assert!(recovered.pending_turns.is_empty());
+    assert_eq!(recovered.messages.len(), 2);
+    assert_eq!(recovered.messages[0].id, "turn-1");
+    assert_eq!(recovered.messages[0].role, StoredMessageRole::User);
+    assert_eq!(recovered.messages[0].content, "Hello");
+    assert_eq!(recovered.messages[1].role, StoredMessageRole::Error);
+}
+
+#[test]
+fn replaces_a_partial_interrupted_response_with_a_retryable_error() {
+    let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    let mut conversation = conversation();
+    conversation.messages = vec![
+        StoredMessage {
+            id: "turn-1".to_owned(),
+            role: StoredMessageRole::User,
+            content: "Hello".to_owned(),
+            model: None,
+        },
+        StoredMessage {
+            id: "assistant-1".to_owned(),
+            role: StoredMessageRole::Assistant,
+            content: "Partial response".to_owned(),
+            model: Some("test-model".to_owned()),
+        },
+    ];
+    store.save_conversation(&mut conversation).unwrap();
+    store
+        .enqueue_pending_turn(&conversation.id, &pending("turn-1", "Hello"))
+        .unwrap();
+
+    assert_eq!(store.recover_interrupted_turns().unwrap(), 1);
+
+    let recovered = store.load_conversation(&conversation.id).unwrap().unwrap();
+    assert!(recovered.pending_turns.is_empty());
+    assert_eq!(recovered.messages.len(), 2);
+    assert_eq!(recovered.messages[0].role, StoredMessageRole::User);
+    assert_eq!(recovered.messages[1].role, StoredMessageRole::Error);
+}
+
+#[test]
+fn preserves_the_original_error_when_an_unstarted_retry_is_interrupted() {
+    let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    let mut conversation = conversation();
+    conversation.messages = vec![
+        StoredMessage {
+            id: "user-1".to_owned(),
+            role: StoredMessageRole::User,
+            content: "Hello".to_owned(),
+            model: None,
+        },
+        StoredMessage {
+            id: "error-1".to_owned(),
+            role: StoredMessageRole::Error,
+            content: "Original error".to_owned(),
+            model: None,
+        },
+    ];
+    store.save_conversation(&mut conversation).unwrap();
+    store
+        .enqueue_pending_turn(
+            &conversation.id,
+            &PendingTurn {
+                id: "retry-1".to_owned(),
+                content: "Hello".to_owned(),
+                retry_error_id: Some("error-1".to_owned()),
+                is_active: false,
+            },
+        )
+        .unwrap();
+
+    assert_eq!(store.recover_interrupted_turns().unwrap(), 1);
+
+    let recovered = store.load_conversation(&conversation.id).unwrap().unwrap();
+    assert!(recovered.pending_turns.is_empty());
+    assert_eq!(recovered.messages, conversation.messages);
+}
+
+#[test]
+fn recovers_an_interrupted_active_retry_without_duplicating_the_user_message() {
+    let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    let mut conversation = conversation();
+    conversation.messages = vec![StoredMessage {
+        id: "user-1".to_owned(),
+        role: StoredMessageRole::User,
+        content: "Hello".to_owned(),
+        model: None,
+    }];
+    store.save_conversation(&mut conversation).unwrap();
+    store
+        .enqueue_pending_turn(
+            &conversation.id,
+            &PendingTurn {
+                id: "retry-1".to_owned(),
+                content: "Hello".to_owned(),
+                retry_error_id: Some("removed-error".to_owned()),
+                is_active: false,
+            },
+        )
+        .unwrap();
+
+    assert_eq!(store.recover_interrupted_turns().unwrap(), 1);
+
+    let recovered = store.load_conversation(&conversation.id).unwrap().unwrap();
+    assert!(recovered.pending_turns.is_empty());
+    assert_eq!(recovered.messages.len(), 2);
+    assert_eq!(recovered.messages[0].id, "user-1");
+    assert_eq!(recovered.messages[0].role, StoredMessageRole::User);
+    assert_eq!(recovered.messages[1].role, StoredMessageRole::Error);
+}

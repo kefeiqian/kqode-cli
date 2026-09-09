@@ -1,14 +1,98 @@
 use rusqlite::{Transaction, params};
+use uuid::Uuid;
 
 use super::{
     super::{
-        Conversation, ConversationStore, PendingTurn, StoreError,
+        Conversation, ConversationStore, PendingTurn, StoreError, StoredMessage, StoredMessageRole,
         mutation::{current_timestamp, replace_messages},
     },
     ordering::{compact_positions, persist_positions, prioritized_ids},
 };
 
+const INTERRUPTED_RESPONSE_ERROR: &str =
+    "The previous response was interrupted before it completed. Retry to send this message again.";
+
 impl ConversationStore {
+    /// Converts turns left pending by an interrupted application run into
+    /// retryable transcript errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when pending turns or messages cannot be read or the
+    /// recovery transaction cannot be committed.
+    pub(crate) fn recover_interrupted_turns(&mut self) -> Result<usize, StoreError> {
+        let conversation_ids = {
+            let mut statement = self.connection.prepare(
+                "SELECT DISTINCT conversation_id
+                 FROM pending_turns
+                 ORDER BY conversation_id",
+            )?;
+            let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
+            rows.collect::<Result<Vec<_>, _>>()?
+        };
+
+        let mut recovered = 0;
+        for conversation_id in conversation_ids {
+            let Some(mut conversation) = self.load_conversation(&conversation_id)? else {
+                continue;
+            };
+            let pending_turns = std::mem::take(&mut conversation.pending_turns);
+            if pending_turns.is_empty() {
+                continue;
+            }
+
+            for pending in &pending_turns {
+                if pending.retry_error_id.as_deref().is_some_and(|error_id| {
+                    conversation.messages.iter().any(|message| {
+                        message.id == error_id && message.role == StoredMessageRole::Error
+                    })
+                }) {
+                    recovered += 1;
+                    continue;
+                }
+
+                let user_index = if pending.retry_error_id.is_some() {
+                    conversation.messages.iter().rposition(|message| {
+                        message.role == StoredMessageRole::User
+                            && message.content == pending.content
+                    })
+                } else {
+                    conversation.messages.iter().position(|message| {
+                        message.id == pending.id && message.role == StoredMessageRole::User
+                    })
+                };
+
+                if let Some(user_index) = user_index {
+                    conversation.messages.truncate(user_index + 1);
+                } else {
+                    conversation.messages.push(StoredMessage {
+                        id: pending.id.clone(),
+                        role: StoredMessageRole::User,
+                        content: pending.content.clone(),
+                        model: None,
+                    });
+                }
+                conversation.messages.push(StoredMessage {
+                    id: Uuid::new_v4().to_string(),
+                    role: StoredMessageRole::Error,
+                    content: INTERRUPTED_RESPONSE_ERROR.to_owned(),
+                    model: None,
+                });
+                recovered += 1;
+            }
+
+            let transaction = self.connection.transaction()?;
+            replace_messages(&transaction, &conversation.id, &conversation.messages)?;
+            transaction.execute(
+                "DELETE FROM pending_turns WHERE conversation_id = ?1",
+                [&conversation.id],
+            )?;
+            touch_conversation(&transaction, &conversation.id)?;
+            transaction.commit()?;
+        }
+        Ok(recovered)
+    }
+
     pub(crate) fn enqueue_pending_turn(
         &mut self,
         conversation_id: &str,

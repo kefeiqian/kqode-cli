@@ -21,7 +21,9 @@ pub(crate) fn initialize_application(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let database_path = database::prepare(app.handle())?;
     let settings_store = Arc::new(Mutex::new(SettingsStore::open(&database_path)?));
-    let conversation_store = Arc::new(Mutex::new(ConversationStore::open(&database_path)?));
+    let mut conversation_store = ConversationStore::open(&database_path)?;
+    conversation_store.recover_interrupted_turns()?;
+    let conversation_store = Arc::new(Mutex::new(conversation_store));
     let llm_service = LlmService::new(Arc::clone(&settings_store));
     let settings_service = SettingsService::new(settings_store);
     let turn_queue = TurnQueue::default();
