@@ -652,13 +652,26 @@ and secret-environment tests pass.
 
 ### U5. Add sandbox backend and command policy
 
-- [ ] Implement one enforceable first-platform sandbox backend.
+- [x] Add a native Windows PowerShell adapter over the U4 process supervisor:
+      prefer PowerShell 7, then Windows PowerShell 5.1; support an explicit
+      absolute executable path without silently falling back when it is invalid.
+      Use noninteractive, no-profile execution, UTF-16LE encoded script transport,
+      and UTF-8 text output. Preserve PowerShell exit semantics, including
+      explicit `exit N`, and reject oversized scripts before spawning.
+- [ ] Implement an enforceable Windows-native sandbox backend first. Linux and
+      macOS backends are deferred; do not implicitly forward Windows requests
+      through Git Bash, Cygwin, or WSL.
 - [ ] Implement `allow | ask | deny`, read-only and workspace-write profiles, and
       independent network policy.
 - [ ] Fail closed when approval or sandbox support is unavailable.
 
 **Acceptance:** Read-only inspection works; workspace mutation and network access
-are denied unless explicitly permitted.
+are denied unless explicitly permitted. The PowerShell adapter alone does not
+satisfy this acceptance criterion: U5 remains incomplete and the real
+`run_command` handler remains unavailable until policy and OS enforcement exist.
+Policy evaluates the original script and final launch context, not merely its
+base64 transport. AppContainer versus restricted-token/ACL enforcement remains a
+backend decision, independent of the native PowerShell shell choice.
 
 ### U6. Implement the first real tools
 

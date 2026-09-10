@@ -30,8 +30,8 @@ pub use input::{
 pub use model_step::{FinishReason, ModelStep, ModelUsage};
 pub use outcome::{StopReason, TurnOutcome, TurnReport, TurnStatus};
 pub use process::{
-    EnvironmentPolicy, ProcessError, ProcessOutput, ProcessRequest, ProcessSupervisor,
-    WorkspaceError, WorkspacePolicy,
+    EnvironmentPolicy, PowerShell, PowerShellError, ProcessError, ProcessOutput, ProcessRequest,
+    ProcessSupervisor, WorkspaceError, WorkspacePolicy,
 };
 pub use provider::{
     ModelProvider, ModelProviderError, ModelProviderErrorKind, ModelProviderFuture,
