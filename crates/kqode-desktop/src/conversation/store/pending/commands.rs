@@ -79,10 +79,14 @@ impl ConversationStore {
                 }
 
                 let user_message = if pending.retry_error_id.is_some() {
-                    original_messages.iter().rfind(|message| {
+                    let mut matches = original_messages.iter().filter(|message| {
                         message.role == StoredMessageRole::User
                             && message.content == pending.content
-                    })
+                    });
+                    match (matches.next(), matches.next()) {
+                        (Some(message), None) => Some(message),
+                        _ => None,
+                    }
                 } else {
                     original_messages.iter().find(|message| {
                         message.id == pending.id && message.role == StoredMessageRole::User

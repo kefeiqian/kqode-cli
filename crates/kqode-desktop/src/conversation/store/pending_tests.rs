@@ -753,3 +753,58 @@ fn recovers_an_interrupted_active_retry_without_duplicating_the_user_message() {
     assert_eq!(recovered.messages[0].role, StoredMessageRole::User);
     assert_eq!(recovered.messages[1].role, StoredMessageRole::Error);
 }
+
+#[test]
+fn ambiguous_legacy_retry_recovery_creates_an_unambiguous_user_pair() {
+    let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    let mut conversation = conversation();
+    conversation.messages = vec![
+        StoredMessage {
+            id: "user-1".to_owned(),
+            role: StoredMessageRole::User,
+            content: "Repeat".to_owned(),
+            model: None,
+        },
+        StoredMessage {
+            id: "assistant-1".to_owned(),
+            role: StoredMessageRole::Assistant,
+            content: "First response".to_owned(),
+            model: None,
+        },
+        StoredMessage {
+            id: "user-2".to_owned(),
+            role: StoredMessageRole::User,
+            content: "Repeat".to_owned(),
+            model: None,
+        },
+    ];
+    store.save_conversation(&mut conversation).unwrap();
+    store
+        .enqueue_pending_turn(
+            &conversation.id,
+            &PendingTurn {
+                id: "retry-1".to_owned(),
+                content: "Repeat".to_owned(),
+                retry_error_id: Some("removed-error".to_owned()),
+                is_active: false,
+            },
+        )
+        .unwrap();
+
+    assert_eq!(store.recover_interrupted_turns().unwrap(), 1);
+
+    let recovered = store.load_conversation(&conversation.id).unwrap().unwrap();
+    assert!(recovered.pending_turns.is_empty());
+    assert_eq!(recovered.messages.len(), 5);
+    assert_eq!(recovered.messages[3].id, "retry-1");
+    assert_eq!(recovered.messages[3].role, StoredMessageRole::User);
+    assert_eq!(recovered.messages[4].role, StoredMessageRole::Error);
+    assert_eq!(
+        store
+            .prepare_retry_user(&conversation.id, &recovered.messages[4].id)
+            .unwrap()
+            .as_ref()
+            .map(|(id, content)| (id.as_str(), content.as_str())),
+        Some(("retry-1", "Repeat"))
+    );
+}
