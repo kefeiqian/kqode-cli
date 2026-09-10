@@ -526,6 +526,60 @@ fn cancelling_an_active_retry_preserves_the_original_error() {
 }
 
 #[test]
+fn recovery_discards_an_orphaned_retry_stream_and_preserves_the_original_error() {
+    let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    let mut conversation = conversation();
+    conversation.messages = vec![
+        StoredMessage {
+            id: "user-1".to_owned(),
+            role: StoredMessageRole::User,
+            content: "Hello".to_owned(),
+            model: None,
+        },
+        StoredMessage {
+            id: "error-1".to_owned(),
+            role: StoredMessageRole::Error,
+            content: "Original error".to_owned(),
+            model: None,
+        },
+    ];
+    store.save_conversation(&mut conversation).unwrap();
+    store
+        .enqueue_pending_turn(
+            &conversation.id,
+            &PendingTurn {
+                id: "retry-1".to_owned(),
+                content: "Hello".to_owned(),
+                retry_error_id: Some("error-1".to_owned()),
+                is_active: false,
+            },
+        )
+        .unwrap();
+    assert!(
+        store
+            .mark_pending_turn_running(&conversation.id, "retry-1")
+            .unwrap()
+    );
+    store
+        .begin_pending_turn(&conversation.id, "retry-1", Some("error-1"), "assistant-1")
+        .unwrap();
+    store
+        .update_streaming_message(
+            &conversation.id,
+            "assistant-1",
+            "Partial retry",
+            Some("test-model"),
+        )
+        .unwrap();
+
+    assert_eq!(store.recover_interrupted_turns().unwrap(), 1);
+
+    let recovered = store.load_conversation(&conversation.id).unwrap().unwrap();
+    assert!(recovered.pending_turns.is_empty());
+    assert_eq!(recovered.messages, conversation.messages);
+}
+
+#[test]
 fn failing_a_retry_preserves_its_original_user_link() {
     let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
     let mut conversation = conversation();

@@ -1,4 +1,4 @@
-use rusqlite::{Transaction, params};
+use rusqlite::{OptionalExtension, Transaction, params};
 use uuid::Uuid;
 
 use super::{
@@ -42,11 +42,30 @@ impl ConversationStore {
             }
 
             for pending in &pending_turns {
-                if pending.retry_error_id.as_deref().is_some_and(|error_id| {
-                    conversation.messages.iter().any(|message| {
-                        message.id == error_id && message.role == StoredMessageRole::Error
-                    })
-                }) {
+                let preserved_retry_error =
+                    pending.retry_error_id.as_deref().is_some_and(|error_id| {
+                        conversation.messages.iter().any(|message| {
+                            message.id == error_id && message.role == StoredMessageRole::Error
+                        })
+                    });
+                if preserved_retry_error {
+                    let streaming_message_id = self
+                        .connection
+                        .query_row(
+                            "SELECT id
+                             FROM messages
+                             WHERE conversation_id = ?1
+                               AND request_id = ?2
+                               AND status = 'streaming'",
+                            params![conversation_id, pending.id],
+                            |row| row.get::<_, String>(0),
+                        )
+                        .optional()?;
+                    if let Some(message_id) = streaming_message_id {
+                        conversation
+                            .messages
+                            .retain(|message| message.id != message_id);
+                    }
                     recovered += 1;
                     continue;
                 }

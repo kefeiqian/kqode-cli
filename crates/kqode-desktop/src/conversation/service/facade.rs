@@ -211,11 +211,11 @@ impl ConversationService {
     pub(crate) fn claim_pending_work(
         &self,
     ) -> Result<Vec<ConversationWorkItem>, ConversationServiceError> {
-        let queued_work = self
+        let mut store = self
             .store
             .lock()
-            .map_err(|error| ConversationServiceError::Lock(error.to_string()))?
-            .claim_queued_work()?;
+            .map_err(|error| ConversationServiceError::Lock(error.to_string()))?;
+        let queued_work = store.claim_queued_work()?;
         let mut claimed = Vec::with_capacity(queued_work.len());
         for (index, work) in queued_work.iter().enumerate() {
             let queued = match self
@@ -225,7 +225,7 @@ impl ConversationService {
                 Ok(queued) => queued,
                 Err(TurnQueueError::DuplicateRequest(_)) => continue,
                 Err(error) => {
-                    self.rollback_claimed_work(&queued_work[index..], claimed)?;
+                    Self::rollback_claimed_work(&store, &queued_work[index..], claimed)?;
                     return Err(error.into());
                 }
             };
@@ -239,21 +239,16 @@ impl ConversationService {
     }
 
     fn rollback_claimed_work(
-        &self,
+        store: &ConversationStore,
         unclaimed: &[PendingWork],
         claimed: Vec<ConversationWorkItem>,
     ) -> Result<(), ConversationServiceError> {
-        let store = self
-            .store
-            .lock()
-            .map_err(|error| ConversationServiceError::Lock(error.to_string()))?;
         for work in unclaimed {
             store.mark_pending_turn_queued(&work.conversation_id, &work.turn_id)?;
         }
         for work in &claimed {
             store.mark_pending_turn_queued(&work.conversation_id, &work.turn_id)?;
         }
-        drop(store);
         for work in claimed {
             work.queued.abandon()?;
         }
