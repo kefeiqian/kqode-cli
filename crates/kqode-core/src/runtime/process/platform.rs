@@ -19,8 +19,9 @@ fn configure_process_group(command: &mut Command) {
 
 #[cfg(windows)]
 fn configure_process_group(command: &mut Command) {
-    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
-    command.creation_flags(CREATE_NEW_PROCESS_GROUP);
+    use windows_sys::Win32::System::Threading::{CREATE_NEW_PROCESS_GROUP, CREATE_SUSPENDED};
+
+    command.creation_flags(CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED);
 }
 
 pub(super) struct ProcessTree {
@@ -119,7 +120,59 @@ fn attach(child: &Child) -> io::Result<ProcessTree> {
     if assigned == 0 {
         return Err(io::Error::last_os_error());
     }
+    resume_process(process_id)?;
     Ok(ProcessTree { job })
+}
+
+#[cfg(windows)]
+fn resume_process(process_id: u32) -> io::Result<()> {
+    use windows_sys::Win32::{
+        Foundation::{CloseHandle, INVALID_HANDLE_VALUE},
+        System::{
+            Diagnostics::ToolHelp::{
+                CreateToolhelp32Snapshot, TH32CS_SNAPTHREAD, THREADENTRY32, Thread32First,
+                Thread32Next,
+            },
+            Threading::{OpenThread, ResumeThread, THREAD_SUSPEND_RESUME},
+        },
+    };
+
+    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0) };
+    if snapshot == INVALID_HANDLE_VALUE {
+        return Err(io::Error::last_os_error());
+    }
+    let mut entry = THREADENTRY32 {
+        dwSize: u32::try_from(std::mem::size_of::<THREADENTRY32>()).unwrap_or(u32::MAX),
+        ..THREADENTRY32::default()
+    };
+    let mut found = unsafe { Thread32First(snapshot, &mut entry) } != 0;
+    let result = loop {
+        if !found {
+            break Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "suspended child primary thread was not found",
+            ));
+        }
+        if entry.th32OwnerProcessID == process_id {
+            let thread = unsafe { OpenThread(THREAD_SUSPEND_RESUME, 0, entry.th32ThreadID) };
+            if thread.is_null() {
+                break Err(io::Error::last_os_error());
+            }
+            let resumed = unsafe { ResumeThread(thread) };
+            unsafe {
+                CloseHandle(thread);
+            }
+            if resumed == u32::MAX {
+                break Err(io::Error::last_os_error());
+            }
+            break Ok(());
+        }
+        found = unsafe { Thread32Next(snapshot, &mut entry) } != 0;
+    };
+    unsafe {
+        CloseHandle(snapshot);
+    }
+    result
 }
 
 #[cfg(windows)]

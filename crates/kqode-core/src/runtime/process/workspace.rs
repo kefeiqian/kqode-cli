@@ -3,6 +3,9 @@ use std::path::{Path, PathBuf};
 use super::WorkspaceError;
 
 /// Canonical workspace boundary used to validate process working directories.
+///
+/// This rejects existing traversal and link escapes. It is not a sandbox boundary
+/// against concurrent filesystem mutation between validation and process creation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WorkspacePolicy {
     root: PathBuf,

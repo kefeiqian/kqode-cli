@@ -53,6 +53,7 @@ pub enum ProcessError {
     Spawn(io::Error),
     Supervision(io::Error),
     MissingPipe(&'static str),
+    OutputDrainTimeout(&'static str),
 }
 
 impl fmt::Display for ProcessError {
@@ -63,6 +64,9 @@ impl fmt::Display for ProcessError {
             Self::Spawn(error) => write!(formatter, "spawn process: {error}"),
             Self::Supervision(error) => write!(formatter, "supervise process: {error}"),
             Self::MissingPipe(name) => write!(formatter, "child process did not expose {name}"),
+            Self::OutputDrainTimeout(name) => {
+                write!(formatter, "timed out draining child {name}")
+            }
         }
     }
 }
@@ -72,7 +76,7 @@ impl std::error::Error for ProcessError {
         match self {
             Self::Workspace(error) => Some(error),
             Self::Spawn(error) | Self::Supervision(error) => Some(error),
-            Self::InvalidLimit(_) | Self::MissingPipe(_) => None,
+            Self::InvalidLimit(_) | Self::MissingPipe(_) | Self::OutputDrainTimeout(_) => None,
         }
     }
 }

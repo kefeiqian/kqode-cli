@@ -16,6 +16,8 @@ use super::{
     platform::{self, ProcessTree},
 };
 
+const OUTPUT_DRAIN_TIMEOUT: Duration = Duration::from_secs(1);
+
 /// One noninteractive foreground process request.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProcessRequest {
@@ -57,6 +59,10 @@ pub struct ProcessOutput {
 }
 
 /// Runs bounded child processes within one canonical workspace.
+///
+/// This owns ordinary descendants through a platform process group or Job Object.
+/// The later sandbox layer remains responsible for preventing deliberate process
+/// detachment and workspace mutation races.
 #[derive(Clone, Debug)]
 pub struct ProcessSupervisor {
     workspace: WorkspacePolicy,
@@ -148,21 +154,23 @@ impl ProcessSupervisor {
         let mut timed_out = false;
         let mut cancelled = false;
         let status = tokio::select! {
+            biased;
             status = child.wait() => status.map_err(ProcessError::Supervision)?,
             () = tokio::time::sleep(request.timeout) => {
-                timed_out = true;
-                terminate_and_wait(&process_tree, &mut child).await?
+                let (status, terminated) = terminate_running(&process_tree, &mut child).await?;
+                timed_out = terminated;
+                status
             }
             () = cancellation.cancelled() => {
-                cancelled = true;
-                terminate_and_wait(&process_tree, &mut child).await?
+                let (status, terminated) = terminate_running(&process_tree, &mut child).await?;
+                cancelled = terminated;
+                status
             }
         };
         process_tree
             .terminate()
             .map_err(ProcessError::Supervision)?;
-        let stdout = join_output(stdout_task.await, "stdout")?;
-        let stderr = join_output(stderr_task.await, "stderr")?;
+        let (stdout, stderr) = join_outputs(stdout_task, stderr_task).await?;
         drop(permit);
 
         Ok(ProcessOutput {
@@ -179,7 +187,30 @@ impl ProcessSupervisor {
     }
 }
 
-fn join_output(
+async fn join_outputs(
+    mut stdout_task: tokio::task::JoinHandle<Result<CapturedOutput, ProcessError>>,
+    mut stderr_task: tokio::task::JoinHandle<Result<CapturedOutput, ProcessError>>,
+) -> Result<(CapturedOutput, CapturedOutput), ProcessError> {
+    let (stdout, stderr) = match tokio::time::timeout(OUTPUT_DRAIN_TIMEOUT, async {
+        tokio::join!(&mut stdout_task, &mut stderr_task)
+    })
+    .await
+    {
+        Ok(result) => result,
+        Err(_) => {
+            stdout_task.abort();
+            stderr_task.abort();
+            let _ = tokio::join!(stdout_task, stderr_task);
+            return Err(ProcessError::OutputDrainTimeout("output streams"));
+        }
+    };
+    Ok((
+        unwrap_output(stdout, "stdout")?,
+        unwrap_output(stderr, "stderr")?,
+    ))
+}
+
+fn unwrap_output(
     result: Result<Result<CapturedOutput, ProcessError>, tokio::task::JoinError>,
     stream: &'static str,
 ) -> Result<CapturedOutput, ProcessError> {
@@ -190,14 +221,21 @@ fn join_output(
     })?
 }
 
-async fn terminate_and_wait(
+async fn terminate_running(
     process_tree: &ProcessTree,
     child: &mut tokio::process::Child,
-) -> Result<std::process::ExitStatus, ProcessError> {
+) -> Result<(std::process::ExitStatus, bool), ProcessError> {
+    if let Some(status) = child.try_wait().map_err(ProcessError::Supervision)? {
+        return Ok((status, false));
+    }
     process_tree
         .terminate()
         .map_err(ProcessError::Supervision)?;
-    child.wait().await.map_err(ProcessError::Supervision)
+    child
+        .wait()
+        .await
+        .map(|status| (status, true))
+        .map_err(ProcessError::Supervision)
 }
 
 fn cancelled_output(duration: Duration) -> ProcessOutput {
