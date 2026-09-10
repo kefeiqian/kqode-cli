@@ -9,6 +9,7 @@ pub enum PowerShellError {
     InspectExecutable { path: PathBuf, source: io::Error },
     EmptyCommand,
     CommandTooLong { max_utf16_units: usize },
+    CommandLineTooLong { max_utf16_units: usize },
 }
 
 impl fmt::Display for PowerShellError {
@@ -37,6 +38,10 @@ impl fmt::Display for PowerShellError {
             Self::CommandTooLong { max_utf16_units } => write!(
                 f,
                 "PowerShell command exceeds the transport limit of {max_utf16_units} UTF-16 code units",
+            ),
+            Self::CommandLineTooLong { max_utf16_units } => write!(
+                f,
+                "PowerShell executable and encoded command exceed the Windows command-line limit of {max_utf16_units} UTF-16 code units",
             ),
         }
     }

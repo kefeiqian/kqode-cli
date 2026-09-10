@@ -2,7 +2,7 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 
 use super::{
     PowerShellError,
-    command::{MAX_SCRIPT_UTF16_UNITS, UTF8_PREAMBLE, encode_script},
+    command::{BOOTSTRAP, MAX_SCRIPT_UTF16_UNITS, SCRIPT_PLACEHOLDER, encode_script},
 };
 
 #[test]
@@ -15,7 +15,6 @@ fn transport_preserves_quotes_newlines_and_unicode_without_interpolation() {
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
         .collect();
     let bootstrap = String::from_utf16(&units).unwrap();
-    assert!(bootstrap.starts_with(UTF8_PREAMBLE));
     let payload = bootstrap
         .split("FromBase64String('")
         .nth(1)
@@ -24,6 +23,7 @@ fn transport_preserves_quotes_newlines_and_unicode_without_interpolation() {
         .next()
         .unwrap();
     let bytes = STANDARD.decode(payload).unwrap();
+    assert_eq!(bootstrap, BOOTSTRAP.replace(SCRIPT_PLACEHOLDER, payload));
     let units: Vec<u16> = bytes
         .chunks_exact(2)
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
@@ -46,7 +46,7 @@ fn exact_transport_limit_is_enforced_in_utf16_units() {
         encode_script(&"#".repeat(MAX_SCRIPT_UTF16_UNITS))
             .unwrap()
             .len()
-            < 30_000
+            < 32_000
     );
     assert!(matches!(
         encode_script(&"#".repeat(MAX_SCRIPT_UTF16_UNITS + 1)),

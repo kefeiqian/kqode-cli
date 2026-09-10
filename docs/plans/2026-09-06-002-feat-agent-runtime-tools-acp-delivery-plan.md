@@ -656,8 +656,11 @@ and secret-environment tests pass.
       prefer PowerShell 7, then Windows PowerShell 5.1; support an explicit
       absolute executable path without silently falling back when it is invalid.
       Use noninteractive, no-profile execution, UTF-16LE encoded script transport,
-      and UTF-8 text output. Preserve PowerShell exit semantics, including
-      explicit `exit N`, and reject oversized scripts before spawning.
+      and UTF-8 text output. Preserve ordinary scripts' final command success
+      status, including native command failures and explicit `exit N`, and reject
+      oversized scripts before spawning. Top-level named script blocks
+      (`begin`/`process`/`end`/`dynamicparam`/`clean`) are explicitly unsupported;
+      regular commands, leading `using`/`param`, and nested functions remain valid.
 - [ ] Implement an enforceable Windows-native sandbox backend first. Linux and
       macOS backends are deferred; do not implicitly forward Windows requests
       through Git Bash, Cygwin, or WSL.

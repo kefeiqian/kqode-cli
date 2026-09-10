@@ -11,9 +11,10 @@ use super::{PowerShellError, discovery};
 use crate::runtime::ProcessRequest;
 
 // Nested UTF-16LE base64 transport expands each script unit to roughly 64/9 characters.
-pub(super) const MAX_SCRIPT_UTF16_UNITS: usize = 4096;
-pub(super) const UTF8_PREAMBLE: &str = "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)\n\
-     $OutputEncoding = [Console]::OutputEncoding\n";
+pub(super) const MAX_SCRIPT_UTF16_UNITS: usize = 3072;
+const MAX_COMMAND_LINE_UTF16_UNITS: usize = 32766;
+pub(super) const BOOTSTRAP: &str = include_str!("bootstrap.ps1");
+pub(super) const SCRIPT_PLACEHOLDER: &str = "__KQODE_SCRIPT__";
 pub(super) const ARGUMENTS: &[&str] = &[
     "-NoLogo",
     "-NoProfile",
@@ -51,8 +52,9 @@ impl PowerShell {
     /// Builds a closed-stdin process request for execution by `ProcessSupervisor`.
     ///
     /// The script is transported as UTF-16LE base64, not interpolated into a
-    /// cmd/Bash wrapper. It retains PowerShell's exit semantics, including explicit
-    /// `exit N`. Stdout and stderr use UTF-8 text. Before launch, callers must
+    /// cmd/Bash wrapper. Ordinary scripts retain their final command success status
+    /// and explicit `exit N`. Top-level named script blocks are rejected at launch.
+    /// Stdout and stderr use UTF-8 text. Before launch, callers must
     /// authorize the original script and final executable/cwd/environment, then
     /// apply the required sandbox. Encoding is transport, not approval.
     ///
@@ -68,6 +70,17 @@ impl PowerShell {
     ) -> Result<ProcessRequest, PowerShellError> {
         let mut arguments: Vec<OsString> = ARGUMENTS.iter().map(OsString::from).collect();
         arguments.push(OsString::from(encode_script(script)?));
+        let command_line_units = self.executable.to_string_lossy().encode_utf16().count()
+            + 2
+            + arguments
+                .iter()
+                .map(|argument| 1 + argument.to_string_lossy().encode_utf16().count())
+                .sum::<usize>();
+        if command_line_units > MAX_COMMAND_LINE_UTF16_UNITS {
+            return Err(PowerShellError::CommandLineTooLong {
+                max_utf16_units: MAX_COMMAND_LINE_UTF16_UNITS,
+            });
+        }
         Ok(ProcessRequest {
             program: self.executable.clone().into_os_string(),
             arguments,
@@ -94,10 +107,7 @@ pub(super) fn encode_script(script: &str) -> Result<String, PowerShellError> {
         });
     }
     let payload = encode_utf16(script);
-    // Parse the original script independently so leading `using`/`param` stays valid.
-    let bootstrap = format!(
-        "{UTF8_PREAMBLE}& ([scriptblock]::Create([System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String('{payload}'))))"
-    );
+    let bootstrap = BOOTSTRAP.replace(SCRIPT_PLACEHOLDER, &payload);
     Ok(encode_utf16(&bootstrap))
 }
 

@@ -7,6 +7,8 @@ mod error;
 #[cfg(all(test, windows))]
 mod execution_tests;
 #[cfg(all(test, windows))]
+mod exit_tests;
+#[cfg(all(test, windows))]
 mod test_support;
 #[cfg(test)]
 mod tests;
