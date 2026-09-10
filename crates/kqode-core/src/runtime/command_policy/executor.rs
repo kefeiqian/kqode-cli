@@ -2,9 +2,13 @@ use std::{sync::Arc, time::Duration};
 
 use super::{
     ApprovalDecision, ApprovalRequest, AuthorizedCommand, CommandApprovalResponder, CommandContext,
-    CommandGateError, CommandPolicy, PolicyDecision, SandboxBackend, SandboxProfile,
+    CommandGateError, CommandPolicy, PolicyDecision, SandboxBackend, SandboxCapability,
+    SandboxProfile, WorkspaceExecutionMode, snapshot_command::validate_owner,
 };
-use crate::{cancellation::CancellationToken, runtime::ProcessOutput};
+use crate::{
+    cancellation::CancellationToken,
+    runtime::{ProcessOutput, WorkspaceSnapshot},
+};
 
 /// Orders policy, capability checks, fresh approval and sandbox dispatch.
 ///
@@ -53,14 +57,25 @@ impl CommandExecutor {
     /// approval, approval timeout, cancellation, or backend execution failure.
     /// DangerFullAccess always requires fresh approval in this first version,
     /// even when ordinary command policy returns Allow.
+    /// Snapshot contexts must use `run_snapshot` with their owned copy.
     pub async fn run(
         &self,
         context: CommandContext,
         cancellation: CancellationToken,
     ) -> Result<ProcessOutput, CommandGateError> {
+        self.run_inner(context, cancellation, None).await
+    }
+
+    pub(super) async fn run_inner(
+        &self,
+        context: CommandContext,
+        cancellation: CancellationToken,
+        snapshot: Option<&WorkspaceSnapshot>,
+    ) -> Result<ProcessOutput, CommandGateError> {
         if cancellation.is_cancelled() {
             return Err(CommandGateError::Cancelled);
         }
+        validate_owner(&context, snapshot)?;
         let verdict = self.policy.evaluate(&context);
         if verdict == PolicyDecision::Deny {
             return Err(CommandGateError::PolicyDenied);
@@ -69,11 +84,12 @@ impl CommandExecutor {
             .backend
             .as_ref()
             .ok_or(CommandGateError::BackendUnavailable)?;
-        backend.capabilities().validate(context.permissions())?;
+        validate_capabilities(backend.as_ref(), &context)?;
         let context = Arc::new(context);
         let mut approval_deadline = None;
         if verdict == PolicyDecision::Ask
             || context.permissions().profile == SandboxProfile::DangerFullAccess
+            || context.workspace_binding().mode() == WorkspaceExecutionMode::DisposableSnapshot
         {
             let responder = self
                 .approval
@@ -107,10 +123,12 @@ impl CommandExecutor {
             return Err(CommandGateError::Cancelled);
         }
         // Recheck volatile capability availability without ever widening permissions.
-        backend.capabilities().validate(context.permissions())?;
+        validate_capabilities(backend.as_ref(), &context)?;
+        validate_owner(&context, snapshot)?;
         if approval_deadline.is_some_and(|deadline| tokio::time::Instant::now() >= deadline) {
             return Err(CommandGateError::ApprovalTimedOut);
         }
+
         let command = AuthorizedCommand::new(context);
         tokio::select! {
             biased;
@@ -118,4 +136,16 @@ impl CommandExecutor {
             result = async { backend.execute(&command, &cancellation).await } => result,
         }
     }
+}
+
+fn validate_capabilities(
+    backend: &dyn SandboxBackend,
+    context: &CommandContext,
+) -> Result<(), CommandGateError> {
+    let capabilities = backend.capabilities();
+    capabilities.validate(context.permissions())?;
+    if context.workspace_binding().mode() == WorkspaceExecutionMode::DisposableSnapshot {
+        capabilities.require(SandboxCapability::SnapshotWorkspace)?;
+    }
+    Ok(())
 }

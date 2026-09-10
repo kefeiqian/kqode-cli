@@ -9,6 +9,9 @@ mod executor;
 mod permissions;
 mod policy;
 mod powershell;
+mod snapshot_command;
+mod snapshot_execution;
+mod workspace;
 
 #[cfg(test)]
 mod tests;
@@ -27,3 +30,6 @@ pub use permissions::{
 };
 pub use policy::{CommandPolicy, PolicyDecision, RequireApproval};
 pub use powershell::PowerShellCommandOptions;
+pub use snapshot_command::SnapshotCommand;
+pub use snapshot_execution::SnapshotCommandOutput;
+pub use workspace::{CommandWorkspace, WorkspaceExecutionMode};

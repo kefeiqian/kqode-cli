@@ -698,11 +698,20 @@ and secret-environment tests pass.
       copied bytes and depth; check cancellation/deadlines between OS operations.
       Report errors and remove partial copies. Exclude `.git` directories and
       worktree pointer files explicitly, recording their relative paths.
-- [ ] Bind source workspace, execution copy, cwd mapping and copy semantics into
-      fresh command approval before integrating snapshot execution. No current
-      command path silently switches cwd to a copy, and the copy is not a Git
-      worktree. Artifact inspection/publication needs a separate design with
-      baseline/stale checks and protected-path rejection; never auto-write back.
+- [x] Bind source workspace/cwd, execution copy/cwd, execution mode and capture
+      summary into immutable `CommandWorkspace` metadata. `SnapshotCommand`
+      owns the prepared copy; `run_snapshot` keeps it alive through approval and
+      dispatch. A cloned context cannot be used through the ordinary `run`
+      entry point. Snapshot execution always requires fresh approval, even for
+      an ordinary `allow` decision, and requires explicit full `SnapshotWorkspace`
+      support in addition to filesystem/network capabilities. Policy, approval
+      and backend receive the same mapping; disposal follows backend-future
+      cleanup, while completed dispatch returns owned, unpublished artifacts.
+- [ ] Define safe artifact inspection/publication with baseline/stale checks and
+      protected-path rejection; never auto-write back. The copy is not a Git
+      worktree. Absolute paths in scripts/environment are not rewritten; missing
+      or excluded cwd, extra host roots and snapshot `danger-full-access` are
+      refused rather than silently mapped to a different authority.
 - [ ] Fail closed when approval or sandbox support is unavailable.
 
 **Acceptance:** Read-only inspection works; workspace mutation and network access
@@ -767,6 +776,12 @@ copy path, not all filesystem isolation questions. It is not a transactional
 filesystem snapshot, cannot interrupt an already blocked synchronous OS call,
 and does not establish complete host/network confinement or safe publication.
 U5 and the production `run_command` handler remain incomplete.
+
+The snapshot command gate is verified with deterministic backend/responder tests;
+no enforcing production backend is enabled by the new capability contract. Normal
+failure cleanup is awaited on a blocking worker and retains the primary error if
+cleanup also fails. Dropping a future uses the existing synchronous cleanup
+fallback; adapters should await graceful cancellation for large copies.
 
 ### U6. Implement the first real tools
 

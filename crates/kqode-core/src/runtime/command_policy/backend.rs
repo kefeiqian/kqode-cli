@@ -30,6 +30,8 @@ pub type SandboxFuture<'a> =
 /// environment and launch context, enforce the requested limits/permissions before
 /// spawning, and own descendant cleanup on cancellation or future disposal.
 /// If capability availability changes after approval, fail closed at launch.
+/// SnapshotWorkspace support additionally requires respecting the source/copy
+/// distinction: never grant source access or publish changes as part of dispatch.
 /// Returning full capabilities is a backend obligation, not proof provided by this
 /// interface; production backends need real isolation acceptance tests.
 pub trait SandboxBackend: Send + Sync {

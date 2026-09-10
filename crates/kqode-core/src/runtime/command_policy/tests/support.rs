@@ -48,6 +48,7 @@ pub fn full_capabilities() -> SandboxCapabilities {
             ExtraRoots,
             ProcessTree,
             FullAccess,
+            SnapshotWorkspace,
         ]
         .map(|capability| (capability, SandboxEnforcement::Full)),
     )

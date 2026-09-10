@@ -85,6 +85,31 @@ impl WorkspaceSnapshot {
         &self.summary
     }
 
+    /// Confirms that the owned directory still has its frozen execution path.
+    ///
+    /// # Errors
+    ///
+    /// Refuses closed/moved copies, unsupported platforms, and handle-query errors.
+    pub(crate) fn validate_location(&self) -> Result<(), SnapshotError> {
+        #[cfg(windows)]
+        {
+            let directory = self
+                .directory
+                .as_ref()
+                .ok_or(SnapshotError::SnapshotMoved)?;
+            let current = super::windows::final_path(directory)
+                .map_err(|error| SnapshotError::io("revalidate snapshot location", error))?;
+            if current != self.root {
+                return Err(SnapshotError::SnapshotMoved);
+            }
+            Ok(())
+        }
+        #[cfg(not(windows))]
+        {
+            Err(SnapshotError::UnsupportedPlatform)
+        }
+    }
+
     /// Removes this owned temporary tree, reporting cleanup errors explicitly.
     ///
     /// # Errors

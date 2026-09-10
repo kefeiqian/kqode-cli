@@ -13,6 +13,7 @@ pub enum SnapshotError {
     LimitExceeded(&'static str),
     Cancelled,
     SourceChanged(PathBuf),
+    SnapshotMoved,
     Io {
         operation: &'static str,
         source: io::Error,
@@ -45,6 +46,10 @@ impl fmt::Display for SnapshotError {
                 f,
                 "source changed while preparing snapshot: {}",
                 path.display()
+            ),
+            Self::SnapshotMoved => write!(
+                f,
+                "owned workspace snapshot no longer has its prepared location"
             ),
             Self::Io { operation, source } => write!(f, "{operation}: {source}"),
         }

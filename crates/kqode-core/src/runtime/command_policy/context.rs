@@ -8,8 +8,8 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use super::{CommandGateError, SandboxPermissions, environment};
-use crate::runtime::{ProcessRequest, WorkspacePolicy};
+use super::{CommandGateError, CommandWorkspace, SandboxPermissions, environment};
+use crate::runtime::{ProcessRequest, WorkspacePolicy, WorkspaceSnapshot};
 
 /// Names the environment construction policy; the exact resulting values are also frozen.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -29,8 +29,7 @@ pub struct CommandContext {
     original_script: String,
     program: PathBuf,
     arguments: Vec<OsString>,
-    workspace: PathBuf,
-    cwd: PathBuf,
+    workspace: CommandWorkspace,
     environment: BTreeMap<OsString, OsString>,
     permissions: SandboxPermissions,
     timeout: Duration,
@@ -107,8 +106,7 @@ impl CommandContext {
             original_script,
             program,
             arguments: request.arguments,
-            workspace: workspace.root().to_owned(),
-            cwd,
+            workspace: CommandWorkspace::original(workspace.root().to_owned(), cwd),
             environment,
             permissions,
             timeout: request.timeout,
@@ -126,10 +124,22 @@ impl CommandContext {
         &self.arguments
     }
     pub fn workspace(&self) -> &Path {
-        &self.workspace
+        self.workspace.execution_root()
     }
     pub fn cwd(&self) -> &Path {
-        &self.cwd
+        self.workspace.execution_cwd()
+    }
+    pub fn workspace_binding(&self) -> &CommandWorkspace {
+        &self.workspace
+    }
+    pub(super) fn bind_snapshot(&mut self, snapshot: &WorkspaceSnapshot, source_cwd: PathBuf) {
+        self.workspace = CommandWorkspace::snapshot(
+            snapshot.source().to_owned(),
+            source_cwd,
+            self.workspace().to_owned(),
+            self.cwd().to_owned(),
+            snapshot.summary().clone(),
+        );
     }
     pub fn environment_profile(&self) -> EnvironmentProfile {
         EnvironmentProfile::Sanitized
@@ -155,7 +165,6 @@ impl fmt::Debug for CommandContext {
         f.debug_struct("CommandContext")
             .field("program", &self.program)
             .field("workspace", &self.workspace)
-            .field("cwd", &self.cwd)
             .field("permissions", &self.permissions)
             .field("environment_profile", &self.environment_profile())
             .field("timeout", &self.timeout)

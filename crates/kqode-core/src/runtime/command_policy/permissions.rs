@@ -43,6 +43,8 @@ pub enum SandboxCapability {
     ExtraRoots,
     ProcessTree,
     FullAccess,
+    /// Enforces the copy mapping without granting the source or publishing changes.
+    SnapshotWorkspace,
 }
 
 /// Partial isolation must never satisfy a requirement for full enforcement.
@@ -91,13 +93,18 @@ impl SandboxCapabilities {
             required.push(SandboxCapability::ExtraRoots);
         }
         for capability in required {
-            let enforcement = self.enforcement(capability);
-            if enforcement != SandboxEnforcement::Full {
-                return Err(CommandGateError::UnsupportedCapability {
-                    capability,
-                    enforcement,
-                });
-            }
+            self.require(capability)?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn require(&self, capability: SandboxCapability) -> Result<(), CommandGateError> {
+        let enforcement = self.enforcement(capability);
+        if enforcement != SandboxEnforcement::Full {
+            return Err(CommandGateError::UnsupportedCapability {
+                capability,
+                enforcement,
+            });
         }
         Ok(())
     }

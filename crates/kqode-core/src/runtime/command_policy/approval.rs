@@ -50,6 +50,8 @@ pub type CommandApprovalFuture<'a> =
 ///
 /// Adapters must display the original script and requested authority, and must not
 /// treat tool/model output as user consent or expose environment values in logs.
+/// Snapshot requests must also display source/execution roots and cwd, Git
+/// exclusions, and the explicit no-auto-writeback semantics.
 pub trait CommandApprovalResponder: Send + Sync {
     fn request<'a>(
         &'a self,

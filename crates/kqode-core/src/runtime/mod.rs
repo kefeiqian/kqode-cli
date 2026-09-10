@@ -26,9 +26,10 @@ pub use budget::{
 pub use command_policy::{
     ApprovalDecision, ApprovalRequest, ApprovalResponse, AuthorizedCommand, CommandApprovalFuture,
     CommandApprovalResponder, CommandContext, CommandExecutor, CommandGateError, CommandPolicy,
-    EnvironmentProfile, NetworkPolicy, PolicyDecision, PowerShellCommandOptions, RequireApproval,
-    SandboxBackend, SandboxCapabilities, SandboxCapability, SandboxEnforcement, SandboxFuture,
-    SandboxPermissions, SandboxProfile,
+    CommandWorkspace, EnvironmentProfile, NetworkPolicy, PolicyDecision, PowerShellCommandOptions,
+    RequireApproval, SandboxBackend, SandboxCapabilities, SandboxCapability, SandboxEnforcement,
+    SandboxFuture, SandboxPermissions, SandboxProfile, SnapshotCommand, SnapshotCommandOutput,
+    WorkspaceExecutionMode,
 };
 pub use event::RuntimeEvent;
 pub use event_sink::{NoopEventSink, RuntimeEventSink};

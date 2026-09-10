@@ -1,7 +1,7 @@
 use std::{fmt, io};
 
 use super::{SandboxCapability, SandboxEnforcement};
-use crate::runtime::{PowerShellError, ProcessError, WorkspaceError};
+use crate::runtime::{PowerShellError, ProcessError, SnapshotError, WorkspaceError};
 
 /// Typed refusal or execution failure; messages never contain scripts or environment values.
 #[derive(Debug)]
@@ -23,6 +23,17 @@ pub enum CommandGateError {
     ApprovalTimedOut,
     Cancelled,
     Backend(ProcessError),
+    Snapshot(SnapshotError),
+    SnapshotLeaseRequired,
+    SnapshotBindingMismatch,
+    SnapshotCleanup {
+        failure: Box<CommandGateError>,
+        cleanup: SnapshotError,
+    },
+    SnapshotCleanupTask {
+        failure: Box<CommandGateError>,
+        cleanup: tokio::task::JoinError,
+    },
 }
 
 impl fmt::Display for CommandGateError {
@@ -58,6 +69,20 @@ impl fmt::Display for CommandGateError {
             Self::ApprovalTimedOut => write!(f, "command approval deadline exceeded"),
             Self::Cancelled => write!(f, "command cancelled before completion"),
             Self::Backend(error) => error.fmt(f),
+            Self::Snapshot(error) => error.fmt(f),
+            Self::SnapshotLeaseRequired => {
+                write!(f, "snapshot context requires its owned SnapshotCommand")
+            }
+            Self::SnapshotBindingMismatch => write!(
+                f,
+                "snapshot ownership does not match the approved workspace mapping"
+            ),
+            Self::SnapshotCleanup { failure, cleanup } => {
+                write!(f, "{failure}; snapshot cleanup also failed: {cleanup}")
+            }
+            Self::SnapshotCleanupTask { failure, cleanup } => {
+                write!(f, "{failure}; snapshot cleanup worker failed: {cleanup}")
+            }
         }
     }
 }
@@ -69,6 +94,9 @@ impl std::error::Error for CommandGateError {
             Self::Shell(error) => Some(error),
             Self::Workspace(error) => Some(error),
             Self::Backend(error) => Some(error),
+            Self::Snapshot(error) => Some(error),
+            Self::SnapshotCleanup { failure, .. } => Some(failure.as_ref()),
+            Self::SnapshotCleanupTask { failure, .. } => Some(failure.as_ref()),
             _ => None,
         }
     }
@@ -83,5 +111,11 @@ impl From<WorkspaceError> for CommandGateError {
 impl From<ProcessError> for CommandGateError {
     fn from(error: ProcessError) -> Self {
         Self::Backend(error)
+    }
+}
+
+impl From<SnapshotError> for CommandGateError {
+    fn from(error: SnapshotError) -> Self {
+        Self::Snapshot(error)
     }
 }
