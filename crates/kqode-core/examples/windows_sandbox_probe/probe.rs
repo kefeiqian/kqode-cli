@@ -6,6 +6,7 @@ mod launch;
 mod native;
 mod network;
 mod observation;
+mod snapshot;
 mod transport;
 
 use std::{collections::BTreeMap, error::Error, path::PathBuf, time::Duration};
@@ -19,8 +20,20 @@ use fixture::Fixture;
 use identity::Identity;
 
 pub fn run() -> Result<(), Box<dyn Error>> {
+    let arguments: Vec<_> = std::env::args_os().skip(1).collect();
+    let snapshot_only = arguments.len() == 1 && arguments[0] == "--snapshot-only";
+    if !arguments.is_empty() && !snapshot_only {
+        return Err("expected no arguments or --snapshot-only".into());
+    }
     let mut identity = Identity::new()?;
     let fixture = Fixture::new(&identity.text()?)?;
+    if snapshot_only {
+        let result = snapshot::run(&fixture, &PowerShell::resolve(None)?)?;
+        identity.close()?;
+        fixture.close()?;
+        println!("{}", serde_json::to_string_pretty(&result)?);
+        return Ok(());
+    }
     let workspace = WorkspacePolicy::new(fixture.root())?;
     let mut reports = Vec::new();
     let system_root = std::env::var_os("SystemRoot").ok_or("SystemRoot unavailable")?;
@@ -114,6 +127,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
     let evidence = observation::verify_preferred(&reports);
+    let snapshot_evidence = snapshot::run(&fixture, &PowerShell::resolve(None)?)?;
     identity.close()?;
     fixture.close()?;
     println!(
@@ -124,6 +138,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             "fixture_removed": true,
             "profile_removed": true,
             "preferred_evidence_complete": evidence.is_ok(),
+            "snapshot_evidence": snapshot_evidence,
             "reports": reports,
         }))?
     );

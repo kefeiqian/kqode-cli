@@ -689,6 +689,20 @@ and secret-environment tests pass.
 - [ ] Resolve filesystem alias/protected-path enforcement before using LPAC for
       workspace-write. Do not translate successful token creation or ordinary
       ACL-denial tests into a full filesystem capability.
+- [x] Add native Windows `WorkspaceSnapshot::capture` as an explicit preparation
+      primitive, not a transparent replacement for the real workspace. Create
+      fresh file objects beneath a new private user/SYSTEM directory; enumerate
+      and open children relative to directory handles, reject reparse points and
+      named streams, and never copy source ACLs or hard-link topology. Use
+      volume-GUID paths for destination containment checks. Bound entry count,
+      copied bytes and depth; check cancellation/deadlines between OS operations.
+      Report errors and remove partial copies. Exclude `.git` directories and
+      worktree pointer files explicitly, recording their relative paths.
+- [ ] Bind source workspace, execution copy, cwd mapping and copy semantics into
+      fresh command approval before integrating snapshot execution. No current
+      command path silently switches cwd to a copy, and the copy is not a Git
+      worktree. Artifact inspection/publication needs a separate design with
+      baseline/stale checks and protected-path rejection; never auto-write back.
 - [ ] Fail closed when approval or sandbox support is unavailable.
 
 **Acceptance:** Read-only inspection works; workspace mutation and network access
@@ -738,6 +752,21 @@ and [process-attribute contract](https://learn.microsoft.com/en-us/windows/win32
 No Windows user account, firewall rule, loopback exemption or workspace ACL was
 changed. The opt-in example creates a randomly named AppContainer profile and
 grants ACLs only inside its newly created temporary fixture.
+
+**Isolated-copy experiment (September 10, 2026):** the focused
+`cargo run -p kqode-core --example windows_sandbox_probe -- --snapshot-only`
+path captures a temporary source fixture, then grants a fresh LPAC identity
+access only to the copy. On this host, PowerShell 7 modified the copied alias
+without changing either its copied peer or the original outside file; a direct
+write to the original was rejected with access denied. Both the copy and the
+temporary profile were removed. The copy preparation itself makes no source ACL
+changes and is independently tested against junction replacement, existing-file
+overwrite, named streams, limits, cancellation and private initial permissions.
+This resolves the demonstrated pre-existing hard-link alias problem for the
+copy path, not all filesystem isolation questions. It is not a transactional
+filesystem snapshot, cannot interrupt an already blocked synchronous OS call,
+and does not establish complete host/network confinement or safe publication.
+U5 and the production `run_command` handler remain incomplete.
 
 ### U6. Implement the first real tools
 

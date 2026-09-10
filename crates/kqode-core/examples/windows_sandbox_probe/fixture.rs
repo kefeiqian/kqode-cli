@@ -85,7 +85,7 @@ impl Drop for Fixture {
     }
 }
 
-fn grant(path: &Path, sid: &str, rights: &str) -> io::Result<()> {
+pub(super) fn grant(path: &Path, sid: &str, rights: &str) -> io::Result<()> {
     let system_root =
         std::env::var_os("SystemRoot").ok_or_else(|| io::Error::other("SystemRoot unavailable"))?;
     let output = Command::new(PathBuf::from(system_root).join("System32\\icacls.exe"))

@@ -17,6 +17,7 @@ mod repetition;
 mod state;
 mod tool_batch;
 mod turn_queue;
+mod workspace_snapshot;
 
 pub use agent::AgentRuntime;
 pub use budget::{
@@ -45,3 +46,4 @@ pub use provider::{
     ModelProvider, ModelProviderError, ModelProviderErrorKind, ModelProviderFuture,
 };
 pub use turn_queue::{DeleteResult, QueuedTurn, TurnLease, TurnQueue, TurnQueueError};
+pub use workspace_snapshot::{SnapshotError, SnapshotLimits, SnapshotSummary, WorkspaceSnapshot};
