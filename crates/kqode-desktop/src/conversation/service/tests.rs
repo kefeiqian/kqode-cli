@@ -3,8 +3,9 @@ use std::sync::{Arc, Mutex};
 use rusqlite::Connection;
 
 use super::{
-    archive_conversation, create_conversation, delete_turn, error::ConversationServiceError,
-    list_conversations, send_message, steer_turn, update_conversation,
+    ConversationService, archive_conversation, create_conversation, delete_turn,
+    error::ConversationServiceError, list_conversations, send_message, steer_turn,
+    update_conversation,
 };
 use crate::{
     conversation::store::{ConversationStore, PendingTurn, StoredMessage, StoredMessageRole},
@@ -208,24 +209,19 @@ async fn archives_a_conversation_without_loading_a_replacement() {
     );
 }
 
-#[tokio::test]
-async fn rejects_messages_before_a_provider_is_selected() {
+#[test]
+fn rejects_messages_before_a_provider_is_selected() {
     let conversation_store = store();
     let llm_service = llm_service();
-    let turn_queue = TurnQueue::default();
     let conversation = create_conversation(None, None, None, &conversation_store).unwrap();
 
     let error = send_message(
         &conversation.id,
-        "message-1".to_owned(),
         "Hello".to_owned(),
         &conversation_store,
         &llm_service,
-        &turn_queue,
-        None,
     )
-    .await
-    .unwrap_err();
+    .expect_err("message should be rejected");
 
     assert!(matches!(error, ConversationServiceError::Llm(_)));
     assert!(
@@ -240,25 +236,20 @@ async fn rejects_messages_before_a_provider_is_selected() {
     );
 }
 
-#[tokio::test]
-async fn rejects_copilot_messages_before_a_model_is_selected() {
+#[test]
+fn rejects_copilot_messages_before_a_model_is_selected() {
     let conversation_store = store();
     let llm_service = llm_service();
-    let turn_queue = TurnQueue::default();
     let conversation =
         create_conversation(None, Some(Provider::Copilot), None, &conversation_store).unwrap();
 
     let error = send_message(
         &conversation.id,
-        "message-1".to_owned(),
         "Hello".to_owned(),
         &conversation_store,
         &llm_service,
-        &turn_queue,
-        None,
     )
-    .await
-    .unwrap_err();
+    .expect_err("message should be rejected");
 
     assert!(matches!(error, ConversationServiceError::Llm(_)));
     assert!(
@@ -273,11 +264,10 @@ async fn rejects_copilot_messages_before_a_model_is_selected() {
     );
 }
 
-#[tokio::test]
-async fn persists_the_provisional_title_before_the_llm_request_finishes() {
+#[test]
+fn persists_the_provisional_title_before_the_llm_request_finishes() {
     let conversation_store = store();
     let llm_service = llm_service_with_invalid_endpoint();
-    let turn_queue = TurnQueue::default();
     let conversation = create_conversation(
         None,
         Some(Provider::Kimi),
@@ -286,19 +276,14 @@ async fn persists_the_provisional_title_before_the_llm_request_finishes() {
     )
     .unwrap();
 
-    let result = send_message(
+    send_message(
         &conversation.id,
-        "message-1".to_owned(),
         "Explain this update function".to_owned(),
         &conversation_store,
         &llm_service,
-        &turn_queue,
-        None,
     )
-    .await
     .unwrap();
 
-    assert_eq!(result.conversation.title, "Explain this update function");
     assert_eq!(
         conversation_store
             .lock()
@@ -309,6 +294,75 @@ async fn persists_the_provisional_title_before_the_llm_request_finishes() {
             .title,
         "Explain this update function"
     );
+}
+
+#[tokio::test]
+async fn background_turn_processing_persists_a_terminal_error() {
+    let conversation_store = Arc::new(store());
+    let llm_service = llm_service_with_invalid_endpoint();
+    let turn_queue = TurnQueue::default();
+    let service =
+        ConversationService::new(Arc::clone(&conversation_store), llm_service, turn_queue);
+    let conversation = service
+        .create(None, Some(Provider::Kimi), Some("kimi-test".to_owned()))
+        .unwrap();
+    service.send(&conversation.id, "Hello".to_owned()).unwrap();
+    let work = service.claim_pending_work().unwrap().pop().unwrap();
+
+    service
+        .run_queued(&work.conversation_id, &work.turn_id, work.queued, None)
+        .await
+        .unwrap();
+
+    let saved = conversation_store
+        .lock()
+        .unwrap()
+        .load_conversation(&conversation.id)
+        .unwrap()
+        .unwrap();
+    assert!(saved.pending_turns.is_empty());
+    assert_eq!(saved.messages.len(), 2);
+    assert_eq!(saved.messages[0].role, StoredMessageRole::User);
+    assert_eq!(saved.messages[1].role, StoredMessageRole::Error);
+}
+
+#[test]
+fn service_claims_backend_generated_turns_from_persistent_storage() {
+    let conversation_store = Arc::new(store());
+    let llm_service = llm_service_with_invalid_endpoint();
+    let turn_queue = TurnQueue::default();
+    let service =
+        ConversationService::new(Arc::clone(&conversation_store), llm_service, turn_queue);
+    let conversation = service
+        .create(None, Some(Provider::Kimi), Some("kimi-test".to_owned()))
+        .unwrap();
+
+    service.send(&conversation.id, "First".to_owned()).unwrap();
+    service.send(&conversation.id, "Second".to_owned()).unwrap();
+
+    let mut claimed = service.claim_pending_work().unwrap();
+    assert_eq!(claimed.len(), 2);
+    let first = claimed.remove(0);
+    let second = claimed.remove(0);
+    assert_ne!(first.turn_id, second.turn_id);
+    assert!(!first.turn_id.is_empty());
+    assert!(!second.turn_id.is_empty());
+    let turn_ids = [first.turn_id.clone(), second.turn_id.clone()];
+    assert!(service.claim_pending_work().unwrap().is_empty());
+    first.queued.abandon().unwrap();
+    second.queued.abandon().unwrap();
+    let saved = conversation_store
+        .lock()
+        .unwrap()
+        .load_conversation(&conversation.id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(saved.pending_turns.len(), 2);
+    assert_eq!(saved.messages.len(), 2);
+    assert_eq!(saved.pending_turns[0].id, turn_ids[0]);
+    assert_eq!(saved.pending_turns[1].id, turn_ids[1]);
+    assert_eq!(saved.messages[0].id, turn_ids[0]);
+    assert_eq!(saved.messages[1].id, turn_ids[1]);
 }
 
 #[tokio::test]
@@ -360,6 +414,54 @@ async fn steer_cancels_the_active_turn_and_reorders_persisted_turns() {
     );
     drop(active);
     assert!(third.acquire().await.unwrap().is_some());
+}
+
+#[tokio::test]
+async fn steer_view_marks_the_target_turn_active_immediately() {
+    let conversation_store = Arc::new(store());
+    let queue = TurnQueue::default();
+    let service = ConversationService::new(
+        Arc::clone(&conversation_store),
+        llm_service(),
+        queue.clone(),
+    );
+    let conversation = service.create(None, None, None).unwrap();
+    {
+        let mut store = conversation_store.lock().unwrap();
+        for (id, content) in [("turn-1", "First"), ("turn-2", "Second")] {
+            store
+                .enqueue_pending_turn(
+                    &conversation.id,
+                    &PendingTurn {
+                        id: id.to_owned(),
+                        content: content.to_owned(),
+                        retry_error_id: None,
+                        is_active: false,
+                    },
+                )
+                .unwrap();
+        }
+    }
+    let active = queue
+        .enqueue_request(&conversation.id, "turn-1")
+        .unwrap()
+        .acquire()
+        .await
+        .unwrap()
+        .unwrap();
+    let _second = queue.enqueue_request(&conversation.id, "turn-2").unwrap();
+
+    let view = service.steer(&conversation.id, "turn-2").unwrap();
+
+    assert!(active.cancellation().unwrap().is_cancelled());
+    assert_eq!(
+        view.pending_turns
+            .iter()
+            .filter(|turn| turn.is_active)
+            .map(|turn| turn.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["turn-2"]
+    );
 }
 
 #[tokio::test]

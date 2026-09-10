@@ -1,3 +1,4 @@
 mod commands;
-mod ordering;
+pub(super) mod ordering;
 mod query;
+pub(crate) mod worker;

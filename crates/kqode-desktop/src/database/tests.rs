@@ -8,7 +8,7 @@ fn migrates_a_new_database_to_the_refinery_baseline() {
 
     migrate_connection(&mut connection).unwrap();
 
-    assert_eq!(applied_version(&connection), 1);
+    assert_eq!(applied_version(&connection), 3);
     assert_eq!(user_version(&connection), 0);
     for table in [
         "conversations",
@@ -20,6 +20,10 @@ fn migrates_a_new_database_to_the_refinery_baseline() {
         assert!(table_exists(&connection, table), "expected table {table}");
     }
     assert!(!column_exists(&connection, "provider_settings", "api_key"));
+    for column in ["request_id", "status", "revision"] {
+        assert!(column_exists(&connection, "messages", column));
+    }
+    assert!(column_exists(&connection, "pending_turns", "status"));
 }
 
 #[test]
@@ -29,7 +33,7 @@ fn refinery_migrations_are_idempotent() {
     migrate_connection(&mut connection).unwrap();
     migrate_connection(&mut connection).unwrap();
 
-    assert_eq!(applied_version(&connection), 1);
+    assert_eq!(applied_version(&connection), 3);
 }
 
 #[test]
@@ -46,6 +50,38 @@ fn v1_migration_checksum_is_pinned() {
         .unwrap();
 
     assert_eq!(checksum, "980297202996443176");
+}
+
+#[test]
+fn v2_migration_checksum_is_pinned() {
+    let mut connection = Connection::open_in_memory().unwrap();
+    migrate_connection(&mut connection).unwrap();
+
+    let checksum: String = connection
+        .query_row(
+            "SELECT checksum FROM refinery_schema_history WHERE version = 2",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+
+    assert_eq!(checksum, "190378600197280521");
+}
+
+#[test]
+fn v3_migration_checksum_is_pinned() {
+    let mut connection = Connection::open_in_memory().unwrap();
+    migrate_connection(&mut connection).unwrap();
+
+    let checksum: String = connection
+        .query_row(
+            "SELECT checksum FROM refinery_schema_history WHERE version = 3",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+
+    assert_eq!(checksum, "18379063644927416206");
 }
 
 #[test]

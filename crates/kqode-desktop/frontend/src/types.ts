@@ -7,16 +7,25 @@ export type Message = {
   model?: string;
   requestId?: string;
   streaming?: boolean;
+  revision: number;
+  position: number;
 };
 
 export type ConversationMessageStream = {
   conversationId: string;
   turnId: string;
-  userMessageId: string;
-  userContent: string;
   messageId: string;
-  content: string;
-  model?: string;
+  revision: number;
+};
+
+export type ConversationUpdated = {
+  conversationId: string;
+};
+
+export type MessagePage = {
+  messages: Message[];
+  hasMoreMessages: boolean;
+  oldestMessagePosition?: number;
 };
 
 export type PendingTurn = {
@@ -35,6 +44,8 @@ export type Conversation = {
   model?: string;
   messages: Message[];
   pendingTurns: PendingTurn[];
+  hasMoreMessages: boolean;
+  oldestMessagePosition?: number;
 };
 
 export type ConversationListItem = {

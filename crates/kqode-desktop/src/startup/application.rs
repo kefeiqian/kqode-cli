@@ -4,10 +4,14 @@ use kqode_core::runtime::TurnQueue;
 use tauri::Manager;
 
 use crate::{
-    conversation::{service::ConversationService, store::ConversationStore},
+    conversation::{
+        service::ConversationService, store::ConversationStore,
+        worker::run as run_conversation_worker,
+    },
     database,
     llm::LlmService,
     settings::{SettingsService, SettingsStore},
+    tauri_controller,
 };
 
 /// Initializes persistent stores and registers application services with Tauri.
@@ -29,6 +33,11 @@ pub(crate) fn initialize_application(
     let turn_queue = TurnQueue::default();
     let conversation_service =
         ConversationService::new(conversation_store, llm_service.clone(), turn_queue);
+    tauri::async_runtime::spawn(run_conversation_worker(
+        conversation_service.clone(),
+        tauri_controller::conversation::stream_handler(app.handle()),
+        tauri_controller::conversation::update_handler(app.handle()),
+    ));
 
     app.manage(settings_service);
     app.manage(llm_service);

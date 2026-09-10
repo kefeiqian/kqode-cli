@@ -172,3 +172,47 @@ fn archiving_a_conversation_hides_it_without_removing_messages() {
         .unwrap();
     assert_eq!(archived, 1);
 }
+
+#[test]
+fn loads_messages_in_reverse_cursor_pages() {
+    let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    let mut conversation = Conversation {
+        id: "conversation-1".to_owned(),
+        title: "Long conversation".to_owned(),
+        updated_at: 0,
+        workspace_path: None,
+        provider: None,
+        model: None,
+        messages: (0..120)
+            .map(|index| {
+                message(
+                    &format!("message-{index}"),
+                    StoredMessageRole::User,
+                    &format!("Message {index}"),
+                    None,
+                )
+            })
+            .collect(),
+        pending_turns: vec![],
+    };
+    store.save_conversation(&mut conversation).unwrap();
+
+    let latest = store.load_message_page(&conversation.id, None, 50).unwrap();
+    assert!(latest.has_more);
+    assert_eq!(latest.messages.first().unwrap().position, 70);
+    assert_eq!(latest.messages.last().unwrap().position, 119);
+
+    let middle = store
+        .load_message_page(&conversation.id, Some(70), 50)
+        .unwrap();
+    assert!(middle.has_more);
+    assert_eq!(middle.messages.first().unwrap().position, 20);
+    assert_eq!(middle.messages.last().unwrap().position, 69);
+
+    let oldest = store
+        .load_message_page(&conversation.id, Some(20), 50)
+        .unwrap();
+    assert!(!oldest.has_more);
+    assert_eq!(oldest.messages.first().unwrap().position, 0);
+    assert_eq!(oldest.messages.last().unwrap().position, 19);
+}

@@ -106,6 +106,7 @@ impl ConversationStore {
             .ok_or_else(|| missing_conversation(conversation_id))
     }
 
+    #[cfg(test)]
     pub(crate) fn save_messages_and_remove_pending_turn(
         &mut self,
         conversation: &mut Conversation,

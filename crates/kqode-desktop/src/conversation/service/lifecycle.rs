@@ -18,14 +18,6 @@ pub(crate) fn list_conversations(
     Ok(lock_conversations(conversation_store)?.list_conversations()?)
 }
 
-pub(crate) fn load_conversation(
-    conversation_id: &str,
-    conversation_store: &Mutex<ConversationStore>,
-) -> Result<Conversation, ConversationServiceError> {
-    let store = lock_conversations(conversation_store)?;
-    super::state::require_conversation(&store, conversation_id)
-}
-
 pub(crate) fn create_conversation(
     workspace_path: Option<String>,
     provider: Option<Provider>,

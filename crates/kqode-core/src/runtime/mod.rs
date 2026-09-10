@@ -31,4 +31,4 @@ pub use outcome::{StopReason, TurnOutcome, TurnReport, TurnStatus};
 pub use provider::{
     ModelProvider, ModelProviderError, ModelProviderErrorKind, ModelProviderFuture,
 };
-pub use turn_queue::{DeleteResult, QueuedTurn, SteerResult, TurnLease, TurnQueue, TurnQueueError};
+pub use turn_queue::{DeleteResult, QueuedTurn, TurnLease, TurnQueue, TurnQueueError};

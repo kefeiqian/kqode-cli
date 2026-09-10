@@ -3,17 +3,14 @@ use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
 use super::{
-    error::ConversationServiceError,
-    message_stream::{ConversationMessageStreamHandler, StreamedCompletion, stream_delta_handler},
+    ConversationMessageStreamHandler, ConversationServiceError, TitleGenerationRequest,
+    message_stream::{StreamedCompletion, flush_streamed_completion, stream_delta_handler},
     state::{lock_conversations, require_conversation},
-    title::TitleGenerationRequest,
-    transcript::{
-        append_user_message, chat_messages, retry_user_message_id, stored_message,
-        stored_message_with_id,
-    },
+    title::provisional_title,
+    transcript::{chat_messages, retry_user_message_id},
 };
 use crate::{
-    conversation::store::{Conversation, ConversationStore, StoredMessageRole},
+    conversation::store::{ConversationStore, StoredMessageRole},
     inference::{ChatError, ChatMode, ChatRequestOptions},
     llm::LlmService,
 };
@@ -21,7 +18,6 @@ use kqode_core::runtime::QueuedTurn;
 
 #[derive(Debug)]
 pub(crate) struct SendMessageResult {
-    pub(crate) conversation: Conversation,
     pub(crate) title_generation: Option<TitleGenerationRequest>,
 }
 
@@ -29,143 +25,149 @@ pub(crate) async fn process_pending_turn(
     conversation_id: &str,
     turn_id: &str,
     queued: QueuedTurn,
-    conversation_store: &Mutex<ConversationStore>,
+    conversation_store: &Arc<Mutex<ConversationStore>>,
     llm_service: &LlmService,
     stream_handler: Option<ConversationMessageStreamHandler>,
 ) -> Result<SendMessageResult, ConversationServiceError> {
     let Some(lease) = queued.acquire().await? else {
-        return current_result(conversation_id, conversation_store);
+        return Ok(SendMessageResult {
+            title_generation: None,
+        });
     };
-    let (mut conversation, pending, expected_title, user_message_id) = {
+    let assistant_message_id = Uuid::new_v4().to_string();
+    let (conversation, pending, expected_title, current_user_message_id) = {
         let mut store = lock_conversations(conversation_store)?;
         let mut conversation = require_conversation(&store, conversation_id)?;
         let Some(pending) = store.load_pending_turn(conversation_id, turn_id)? else {
-            drop(store);
-            return current_result(conversation_id, conversation_store);
+            return Ok(SendMessageResult {
+                title_generation: None,
+            });
         };
-        let (retry_error_index, user_message_id) = retry_user_message_id(&conversation, &pending);
+        let (retry_error_index, current_user_message_id) =
+            retry_user_message_id(&conversation, &pending);
         if let Some(index) = retry_error_index {
             conversation.messages.remove(index);
         }
-        let expected_title = append_user_message(&mut conversation, &pending);
-        if expected_title.is_some() {
-            store.save_conversation(&mut conversation)?;
-        } else {
-            store.save_messages(&mut conversation)?;
-        }
-        (conversation, pending, expected_title, user_message_id)
+        let expected_title = (pending.retry_error_id.is_none()
+            && conversation.messages.len() == 1
+            && conversation.messages[0].id == pending.id
+            && conversation.title == provisional_title(&pending.content))
+        .then(|| conversation.title.clone());
+        store.begin_pending_turn(
+            conversation_id,
+            turn_id,
+            pending.retry_error_id.as_deref(),
+            &assistant_message_id,
+        )?;
+        (
+            conversation,
+            pending,
+            expected_title,
+            current_user_message_id,
+        )
     };
-    let first_user_message = expected_title
-        .as_ref()
-        .and_then(|_| conversation.messages.last())
-        .map(|message| message.content.clone());
+    let first_user_message = expected_title.as_ref().map(|_| pending.content.clone());
     let cancellation = lease
         .cancellation()
         .expect("request turns always carry cancellation state");
-    let assistant_message_id = Uuid::new_v4().to_string();
     let streamed = Arc::new(Mutex::new(StreamedCompletion::default()));
     let completion = llm_service
         .chat_cancellable_with_deltas(
             conversation.provider,
             conversation.model.clone(),
-            chat_messages(&conversation),
+            chat_messages(&conversation, &current_user_message_id),
             ChatMode::default(),
             ChatRequestOptions::streaming_for_conversation(
                 conversation_id,
                 cancellation.clone(),
                 stream_delta_handler(
                     conversation_id,
-                    &pending,
-                    &user_message_id,
+                    turn_id,
                     &assistant_message_id,
+                    cancellation.clone(),
                     Arc::clone(&streamed),
-                    stream_handler,
+                    Arc::clone(conversation_store),
+                    stream_handler.clone(),
                 ),
             ),
         )
         .await;
 
-    let title_generation = apply_completion(
-        &mut conversation,
-        assistant_message_id,
-        completion,
-        cancellation.is_cancelled(),
+    if let Err(error) = flush_streamed_completion(
+        conversation_id,
+        turn_id,
+        &assistant_message_id,
         &streamed,
-        expected_title,
-        first_user_message,
-    );
-    lock_conversations(conversation_store)?
-        .save_messages_and_remove_pending_turn(&mut conversation, &pending.id)?;
-    Ok(SendMessageResult {
-        conversation,
-        title_generation,
-    })
-}
+        conversation_store,
+        &stream_handler,
+        &cancellation,
+    ) {
+        lock_conversations(conversation_store)?.finish_pending_turn(
+            conversation_id,
+            turn_id,
+            &assistant_message_id,
+            StoredMessageRole::Error,
+            &error.to_string(),
+            None,
+        )?;
+        return Err(error);
+    }
 
-fn apply_completion(
-    conversation: &mut Conversation,
-    assistant_message_id: String,
-    completion: Result<crate::inference::ChatCompletion, ChatError>,
-    cancelled: bool,
-    streamed: &Mutex<StreamedCompletion>,
-    expected_title: Option<String>,
-    first_user_message: Option<String>,
-) -> Option<TitleGenerationRequest> {
-    match completion {
-        Ok(completion) if !cancelled => {
-            let title =
-                expected_title
-                    .zip(first_user_message)
-                    .map(|(expected_title, user_message)| {
-                        TitleGenerationRequest::new(
-                            conversation,
-                            expected_title,
-                            user_message,
-                            completion.message.clone(),
-                        )
-                    });
-            conversation.messages.push(stored_message_with_id(
-                assistant_message_id,
+    let (streamed_content, streamed_model) = {
+        let streamed = streamed.lock().expect("streamed completion mutex poisoned");
+        (streamed.content.clone(), streamed.model.clone())
+    };
+    let title_generation = match completion {
+        Ok(completion) if !cancellation.is_cancelled() => {
+            lock_conversations(conversation_store)?.finish_pending_turn(
+                conversation_id,
+                turn_id,
+                &assistant_message_id,
                 StoredMessageRole::Assistant,
-                completion.message,
-                Some(completion.model),
-            ));
-            title
+                &completion.message,
+                Some(&completion.model),
+            )?;
+            expected_title
+                .zip(first_user_message)
+                .map(|(expected_title, user_message)| {
+                    TitleGenerationRequest::new(
+                        &conversation,
+                        expected_title,
+                        user_message,
+                        completion.message,
+                    )
+                })
         }
-        Ok(_) => None,
-        Err(ChatError::Cancelled) => {
-            let partial = streamed
-                .lock()
-                .expect("streamed completion mutex poisoned")
-                .clone();
-            if !partial.content.trim().is_empty() {
-                conversation.messages.push(stored_message_with_id(
-                    assistant_message_id,
-                    StoredMessageRole::Assistant,
-                    partial.content,
-                    partial.model,
-                ));
-            }
+        Ok(_) | Err(ChatError::Cancelled) if streamed_content.trim().is_empty() => {
+            lock_conversations(conversation_store)?.discard_pending_stream(
+                conversation_id,
+                turn_id,
+                &assistant_message_id,
+            )?;
+            None
+        }
+        Ok(_) | Err(ChatError::Cancelled) => {
+            lock_conversations(conversation_store)?.finish_pending_turn(
+                conversation_id,
+                turn_id,
+                &assistant_message_id,
+                StoredMessageRole::Assistant,
+                &streamed_content,
+                streamed_model.as_deref(),
+            )?;
             None
         }
         Err(error) => {
-            conversation.messages.push(stored_message(
+            lock_conversations(conversation_store)?.finish_pending_turn(
+                conversation_id,
+                turn_id,
+                &assistant_message_id,
                 StoredMessageRole::Error,
-                error.to_string(),
+                &error.to_string(),
                 None,
-            ));
+            )?;
             None
         }
-    }
-}
-
-fn current_result(
-    conversation_id: &str,
-    store: &Mutex<ConversationStore>,
-) -> Result<SendMessageResult, ConversationServiceError> {
-    let store = lock_conversations(store)?;
-    Ok(SendMessageResult {
-        conversation: require_conversation(&store, conversation_id)?,
-        title_generation: None,
-    })
+    };
+    Ok(SendMessageResult { title_generation })
 }

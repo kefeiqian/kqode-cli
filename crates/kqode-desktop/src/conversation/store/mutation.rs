@@ -1,6 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use rusqlite::{Transaction, params};
+use rusqlite::{OptionalExtension, Transaction, params};
 
 use super::{Conversation, ConversationStore, StoreError, StoredMessage};
 
@@ -51,6 +51,7 @@ impl ConversationStore {
     ///
     /// Returns an error when the transaction cannot be written or the system
     /// clock cannot produce an update timestamp.
+    #[cfg(test)]
     pub fn save_messages(&mut self, conversation: &mut Conversation) -> Result<(), StoreError> {
         let updated_at = current_timestamp()?;
         let transaction = self.connection.transaction()?;
@@ -121,30 +122,57 @@ pub(super) fn replace_messages(
     conversation_id: &str,
     messages: &[StoredMessage],
 ) -> Result<(), StoreError> {
+    let metadata = messages
+        .iter()
+        .map(|message| {
+            transaction
+                .query_row(
+                    "SELECT request_id, status, revision
+                     FROM messages
+                     WHERE conversation_id = ?1 AND id = ?2",
+                    params![conversation_id, message.id],
+                    |row| {
+                        Ok((
+                            row.get::<_, Option<String>>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, i64>(2)?,
+                        ))
+                    },
+                )
+                .optional()
+                .map(|stored| stored.unwrap_or_else(|| (None, "complete".to_owned(), 0)))
+                .map_err(StoreError::from)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     transaction.execute(
         "DELETE FROM messages WHERE conversation_id = ?1",
         params![conversation_id],
     )?;
 
-    for (position, message) in messages.iter().enumerate() {
+    for ((position, message), (request_id, status, revision)) in
+        messages.iter().enumerate().zip(metadata)
+    {
         transaction.execute(
             "INSERT INTO messages
-                (id, conversation_id, position, role, content, model)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                (id, conversation_id, position, role, content, model, request_id, status, revision)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             params![
                 message.id,
                 conversation_id,
                 position as i64,
                 message.role.as_str(),
                 message.content,
-                message.model
+                message.model,
+                request_id,
+                status,
+                revision
             ],
         )?;
     }
     Ok(())
 }
 
-fn load_updated_at(
+pub(super) fn load_updated_at(
     transaction: &Transaction<'_>,
     conversation_id: &str,
 ) -> Result<i64, StoreError> {

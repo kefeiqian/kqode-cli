@@ -24,6 +24,8 @@ fn main() {
             tauri_controller::conversation::commands::delete_conversation_turn,
             tauri_controller::conversation::commands::list_conversations,
             tauri_controller::conversation::commands::load_conversation,
+            tauri_controller::conversation::commands::load_conversation_message,
+            tauri_controller::conversation::commands::load_older_conversation_messages,
             tauri_controller::conversation::commands::retry_message,
             tauri_controller::conversation::commands::send_message,
             tauri_controller::conversation::commands::steer_conversation_turn,

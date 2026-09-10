@@ -43,7 +43,7 @@ pub(super) fn persist_positions(
     Ok(())
 }
 
-pub(super) fn compact_positions(
+pub(crate) fn compact_positions(
     transaction: &Transaction<'_>,
     conversation_id: &str,
 ) -> Result<(), StoreError> {

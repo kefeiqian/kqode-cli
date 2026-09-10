@@ -8,4 +8,4 @@ mod tests;
 
 pub use error::TurnQueueError;
 pub use lease::{QueuedTurn, TurnLease};
-pub use queue::{DeleteResult, SteerResult, TurnQueue};
+pub use queue::{DeleteResult, TurnQueue};

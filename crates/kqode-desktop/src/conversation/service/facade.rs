@@ -1,17 +1,21 @@
 use std::sync::{Arc, Mutex};
 
 use super::{
-    ConversationMessageStreamHandler, ConversationServiceError, SendMessageResult,
-    TitleGenerationRequest, archive_conversation, create_conversation, delete_turn,
-    generate_conversation_title, list_conversations, load_conversation, process_pending_turn,
-    retry_message, send_message, steer_turn, update_conversation,
+    ConversationMessageStreamHandler, ConversationServiceError, ConversationView, MessagePageView,
+    MessageView, SendMessageResult, TitleGenerationRequest, archive_conversation,
+    create_conversation, delete_turn, generate_conversation_title, list_conversations,
+    process_pending_turn, retry_message, send_message, steer_turn, update_conversation,
+    view::MESSAGE_PAGE_SIZE,
 };
 use crate::{
-    conversation::store::{Conversation, ConversationListItem, ConversationStore},
+    conversation::{
+        store::{ConversationListItem, ConversationStore},
+        worker::ConversationWorkItem,
+    },
     llm::LlmService,
     settings::Provider,
 };
-use kqode_core::runtime::{QueuedTurn, TurnQueue};
+use kqode_core::runtime::{QueuedTurn, TurnQueue, TurnQueueError};
 
 /// Application boundary for conversation use cases.
 #[derive(Clone)]
@@ -37,8 +41,8 @@ impl ConversationService {
     pub(crate) fn load(
         &self,
         conversation_id: &str,
-    ) -> Result<Conversation, ConversationServiceError> {
-        self.with_active_turn(load_conversation(conversation_id, self.store.as_ref())?)
+    ) -> Result<ConversationView, ConversationServiceError> {
+        self.load_view(conversation_id)
     }
 
     pub(crate) fn create(
@@ -46,8 +50,10 @@ impl ConversationService {
         workspace_path: Option<String>,
         provider: Option<Provider>,
         model: Option<String>,
-    ) -> Result<Conversation, ConversationServiceError> {
-        create_conversation(workspace_path, provider, model, self.store.as_ref())
+    ) -> Result<ConversationView, ConversationServiceError> {
+        let conversation =
+            create_conversation(workspace_path, provider, model, self.store.as_ref())?;
+        self.load_view(&conversation.id)
     }
 
     pub(crate) async fn archive(
@@ -63,8 +69,8 @@ impl ConversationService {
         title: Option<String>,
         provider: Option<Provider>,
         model: Option<String>,
-    ) -> Result<Conversation, ConversationServiceError> {
-        update_conversation(
+    ) -> Result<ConversationView, ConversationServiceError> {
+        let conversation = update_conversation(
             conversation_id,
             title,
             provider,
@@ -72,55 +78,45 @@ impl ConversationService {
             self.store.as_ref(),
             &self.queue,
         )
-        .await
+        .await?;
+        self.load_view(&conversation.id)
     }
 
-    pub(crate) async fn send(
+    pub(crate) fn send(
         &self,
         conversation_id: &str,
-        message_id: String,
         content: String,
-        stream_handler: Option<ConversationMessageStreamHandler>,
-    ) -> Result<SendMessageResult, ConversationServiceError> {
-        send_message(
-            conversation_id,
-            message_id,
-            content,
-            self.store.as_ref(),
-            &self.llm,
-            &self.queue,
-            stream_handler,
-        )
-        .await
+    ) -> Result<ConversationView, ConversationServiceError> {
+        send_message(conversation_id, content, self.store.as_ref(), &self.llm)?;
+        self.load_view(conversation_id)
     }
 
-    pub(crate) async fn retry(
+    pub(crate) fn retry(
         &self,
         conversation_id: &str,
         error_message_id: &str,
-        turn_id: String,
-        stream_handler: Option<ConversationMessageStreamHandler>,
-    ) -> Result<SendMessageResult, ConversationServiceError> {
+    ) -> Result<ConversationView, ConversationServiceError> {
         retry_message(
             conversation_id,
             error_message_id,
-            turn_id,
             self.store.as_ref(),
             &self.llm,
-            &self.queue,
-            stream_handler,
-        )
-        .await
+        )?;
+        self.load_view(conversation_id)
     }
 
     pub(crate) fn steer(
         &self,
         conversation_id: &str,
         turn_id: &str,
-    ) -> Result<super::SteerTurnResult, ConversationServiceError> {
-        let mut result = steer_turn(conversation_id, turn_id, self.store.as_ref(), &self.queue)?;
-        result.conversation = self.with_active_turn(result.conversation)?;
-        Ok(result)
+    ) -> Result<ConversationView, ConversationServiceError> {
+        let result = steer_turn(conversation_id, turn_id, self.store.as_ref(), &self.queue)?;
+        let conversation_id = result.conversation.id;
+        let mut view = self.load_view(&conversation_id)?;
+        for turn in &mut view.pending_turns {
+            turn.is_active = turn.id == turn_id;
+        }
+        Ok(view)
     }
 
     pub(crate) async fn run_queued(
@@ -134,7 +130,7 @@ impl ConversationService {
             conversation_id,
             turn_id,
             queued,
-            self.store.as_ref(),
+            &self.store,
             &self.llm,
             stream_handler,
         )
@@ -145,34 +141,119 @@ impl ConversationService {
         &self,
         conversation_id: &str,
         turn_id: &str,
-    ) -> Result<Conversation, ConversationServiceError> {
-        self.with_active_turn(delete_turn(
-            conversation_id,
-            turn_id,
-            self.store.as_ref(),
-            &self.queue,
-        )?)
+    ) -> Result<ConversationView, ConversationServiceError> {
+        delete_turn(conversation_id, turn_id, self.store.as_ref(), &self.queue)?;
+        self.load_view(conversation_id)
     }
 
     pub(crate) async fn generate_title(
         &self,
         request: TitleGenerationRequest,
-    ) -> Result<Option<Conversation>, ConversationServiceError> {
+    ) -> Result<Option<ConversationView>, ConversationServiceError> {
         let conversation =
             generate_conversation_title(request, self.store.as_ref(), &self.llm).await?;
         conversation
-            .map(|conversation| self.with_active_turn(conversation))
+            .map(|conversation| self.load_view(&conversation.id))
             .transpose()
     }
 
-    pub(crate) fn with_active_turn(
+    pub(crate) fn load_older_messages(
         &self,
-        mut conversation: Conversation,
-    ) -> Result<Conversation, ConversationServiceError> {
-        let active_id = self.queue.active_request_id(&conversation.id)?;
-        for turn in &mut conversation.pending_turns {
+        conversation_id: &str,
+        before_position: i64,
+    ) -> Result<MessagePageView, ConversationServiceError> {
+        let store = self
+            .store
+            .lock()
+            .map_err(|error| ConversationServiceError::Lock(error.to_string()))?;
+        Ok(store
+            .load_message_page(conversation_id, Some(before_position), MESSAGE_PAGE_SIZE)?
+            .into())
+    }
+
+    pub(crate) fn load_message(
+        &self,
+        conversation_id: &str,
+        message_id: &str,
+    ) -> Result<MessageView, ConversationServiceError> {
+        let store = self
+            .store
+            .lock()
+            .map_err(|error| ConversationServiceError::Lock(error.to_string()))?;
+        store
+            .load_message_record(conversation_id, message_id)?
+            .map(MessageView::from)
+            .ok_or_else(|| ConversationServiceError::MessageNotFound(message_id.to_owned()))
+    }
+
+    fn load_view(
+        &self,
+        conversation_id: &str,
+    ) -> Result<ConversationView, ConversationServiceError> {
+        let (mut header, page) = {
+            let store = self
+                .store
+                .lock()
+                .map_err(|error| ConversationServiceError::Lock(error.to_string()))?;
+            let header = store
+                .load_conversation_header(conversation_id)?
+                .ok_or_else(|| ConversationServiceError::NotFound(conversation_id.to_owned()))?;
+            let page = store.load_message_page(conversation_id, None, MESSAGE_PAGE_SIZE)?;
+            (header, MessagePageView::from(page))
+        };
+        let active_id = self.queue.active_request_id(conversation_id)?;
+        for turn in &mut header.pending_turns {
             turn.is_active = active_id.as_deref() == Some(&turn.id);
         }
-        Ok(conversation)
+        Ok(ConversationView::new(header, page))
+    }
+
+    pub(crate) fn claim_pending_work(
+        &self,
+    ) -> Result<Vec<ConversationWorkItem>, ConversationServiceError> {
+        let queued_work = self
+            .store
+            .lock()
+            .map_err(|error| ConversationServiceError::Lock(error.to_string()))?
+            .load_queued_work()?;
+        let mut claimed = Vec::with_capacity(queued_work.len());
+        for work in queued_work {
+            let queued = match self
+                .queue
+                .enqueue_request(&work.conversation_id, &work.turn_id)
+            {
+                Ok(queued) => queued,
+                Err(TurnQueueError::DuplicateRequest(_)) => continue,
+                Err(error) => return Err(error.into()),
+            };
+            let marked_running = self
+                .store
+                .lock()
+                .map_err(|error| ConversationServiceError::Lock(error.to_string()))?
+                .mark_pending_turn_running(&work.conversation_id, &work.turn_id)?;
+            if !marked_running {
+                queued.abandon()?;
+                continue;
+            }
+            claimed.push(ConversationWorkItem {
+                conversation_id: work.conversation_id,
+                turn_id: work.turn_id,
+                queued,
+            });
+        }
+        Ok(claimed)
+    }
+
+    pub(crate) fn fail_pending_work(
+        &self,
+        conversation_id: &str,
+        turn_id: &str,
+        error: &str,
+    ) -> Result<(), ConversationServiceError> {
+        self.store
+            .lock()
+            .map_err(|lock_error| ConversationServiceError::Lock(lock_error.to_string()))?
+            .fail_pending_turn(conversation_id, turn_id, error)?;
+        Ok(())
     }
 }

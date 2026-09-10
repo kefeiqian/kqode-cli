@@ -15,6 +15,7 @@ pub(crate) enum ConversationServiceError {
     MessageNotFound(String),
     NotFound(String),
     PendingTurnNotFound(String),
+    StreamPersistence(String),
     Llm(ChatError),
     TurnQueue(TurnQueueError),
     Store(StoreError),
@@ -37,6 +38,9 @@ impl fmt::Display for ConversationServiceError {
             Self::MessageNotFound(id) => write!(formatter, "message {id} was not found"),
             Self::NotFound(id) => write!(formatter, "conversation {id} was not found"),
             Self::PendingTurnNotFound(id) => write!(formatter, "queued turn {id} was not found"),
+            Self::StreamPersistence(error) => {
+                write!(formatter, "persist streamed response: {error}")
+            }
             Self::Llm(error) => error.fmt(formatter),
             Self::TurnQueue(error) => error.fmt(formatter),
             Self::Store(error) => error.fmt(formatter),

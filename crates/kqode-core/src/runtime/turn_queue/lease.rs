@@ -43,6 +43,37 @@ impl QueuedTurn {
         )
         .await
     }
+
+    /// Removes this turn from the queue without executing it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when queue synchronization fails.
+    pub fn abandon(self) -> Result<(), TurnQueueError> {
+        let mut registry = super::state::lock_registry(&self.state)?;
+        let Some(queue) = registry.conversations.get_mut(&self.conversation_id) else {
+            return Ok(());
+        };
+        if queue
+            .active
+            .as_ref()
+            .is_some_and(|active| active.entry_id == self.entry_id)
+        {
+            queue.active = None;
+            promote_next(queue);
+        } else if let Some(index) = queue
+            .waiting
+            .iter()
+            .position(|entry| entry.entry_id == self.entry_id)
+        {
+            let entry = queue.waiting.remove(index).expect("queue index exists");
+            let _ = entry.sender.send(TurnPermit::Removed);
+        }
+        if queue.active.is_none() && queue.waiting.is_empty() {
+            registry.conversations.remove(&self.conversation_id);
+        }
+        Ok(())
+    }
 }
 
 impl TurnLease {

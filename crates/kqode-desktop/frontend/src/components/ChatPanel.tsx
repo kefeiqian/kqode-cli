@@ -27,6 +27,8 @@ type ChatPanelProps = {
   conversation: Conversation;
   error?: string;
   isSending: boolean;
+  hasMoreMessages: boolean;
+  isLoadingOlderMessages: boolean;
   model?: string;
   models: string[];
   modelsError?: string;
@@ -34,6 +36,7 @@ type ChatPanelProps = {
   pendingTurns: PendingTurn[];
   onDeleteTurn: (turnId: string) => Promise<void>;
   onModelChange: (model: string) => Promise<void>;
+  onLoadOlderMessages: () => Promise<boolean>;
   onOpenSettings: () => void;
   onProviderChange: (provider?: Provider) => Promise<void>;
   onSend: (content: string) => Promise<void>;
@@ -49,6 +52,8 @@ export function ChatPanel({
   conversation,
   error,
   isSending,
+  hasMoreMessages,
+  isLoadingOlderMessages,
   model,
   models,
   modelsError,
@@ -56,6 +61,7 @@ export function ChatPanel({
   pendingTurns,
   onDeleteTurn,
   onModelChange,
+  onLoadOlderMessages,
   onOpenSettings,
   onProviderChange,
   onSend,
@@ -68,20 +74,35 @@ export function ChatPanel({
   const [configurationError, setConfigurationError] = useState<string>();
   const composerTextareaRef = useRef<HTMLTextAreaElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
+  const restoreScrollHeightRef = useRef<number | undefined>(undefined);
+  const stickToBottomRef = useRef(true);
+  const previousConversationIdRef = useRef(conversation.id);
   const draft = drafts[conversation.id] ?? "";
   const retryErrorIds = new Set(
     pendingTurns.flatMap((turn) =>
       turn.retryErrorId ? [turn.retryErrorId] : [],
     ),
   );
+  const startedTurnIds = new Set(
+    conversation.messages.flatMap((message) =>
+      message.role !== "user" && message.requestId
+        ? [message.requestId]
+        : [],
+    ),
+  );
+  const visiblePendingTurnId =
+    pendingTurns.find((turn) => turn.isActive)?.id ?? pendingTurns[0]?.id;
   const transcriptMessages = conversation.messages.filter(
-    (message) => !retryErrorIds.has(message.id),
+    (message) =>
+      !retryErrorIds.has(message.id) &&
+      (message.role !== "user" ||
+        !message.requestId ||
+        !pendingTurns.some((turn) => turn.id === message.requestId) ||
+        startedTurnIds.has(message.requestId) ||
+        message.requestId === visiblePendingTurnId),
   );
   const displayedPendingTurns = pendingTurns.filter(
-    (turn) =>
-      !conversation.messages.some(
-        (message) => message.requestId === turn.id,
-      ),
+    (turn) => !startedTurnIds.has(turn.id),
   );
   const queuedTurnCount = displayedPendingTurns.filter(
     (turn) => !turn.isActive,
@@ -127,12 +148,23 @@ export function ChatPanel({
     return () => window.removeEventListener("resize", resizeComposer);
   }, [resizeComposer]);
 
-  useEffect(() => {
-    transcriptRef.current?.scrollTo({
-      top: transcriptRef.current.scrollHeight,
-      behavior: "smooth",
-    });
-  }, [conversation.messages, isSending]);
+  useLayoutEffect(() => {
+    const transcript = transcriptRef.current;
+    if (!transcript) return;
+    if (restoreScrollHeightRef.current !== undefined) {
+      transcript.scrollTop +=
+        transcript.scrollHeight - restoreScrollHeightRef.current;
+      restoreScrollHeightRef.current = undefined;
+      return;
+    }
+    if (
+      previousConversationIdRef.current !== conversation.id ||
+      stickToBottomRef.current
+    ) {
+      transcript.scrollTop = transcript.scrollHeight;
+    }
+    previousConversationIdRef.current = conversation.id;
+  }, [conversation.id, conversation.messages, isSending]);
 
   useEffect(() => {
     setConfigurationError(undefined);
@@ -175,6 +207,25 @@ export function ChatPanel({
     }
   };
 
+  const handleTranscriptScroll = () => {
+    const transcript = transcriptRef.current;
+    if (!transcript) return;
+    stickToBottomRef.current =
+      transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight <
+      80;
+    if (
+      transcript.scrollTop <= 80 &&
+      hasMoreMessages &&
+      !isLoadingOlderMessages &&
+      restoreScrollHeightRef.current === undefined
+    ) {
+      restoreScrollHeightRef.current = transcript.scrollHeight;
+      void onLoadOlderMessages().then((loaded) => {
+        if (!loaded) restoreScrollHeightRef.current = undefined;
+      });
+    }
+  };
+
   return (
     <section className="chat-panel">
       <header className="chat-header">
@@ -193,7 +244,11 @@ export function ChatPanel({
         <span className="model-pill">{model || "No model selected"}</span>
       </header>
 
-      <div className="transcript" ref={transcriptRef}>
+      <div
+        className="transcript"
+        onScroll={handleTranscriptScroll}
+        ref={transcriptRef}
+      >
         {error && <p className="settings-error">{error}</p>}
         {transcriptMessages.length === 0 && !isSending ? (
           <div className="empty-state">
@@ -208,6 +263,9 @@ export function ChatPanel({
           </div>
         ) : (
           <div className="message-list">
+            {isLoadingOlderMessages && (
+              <p className="older-messages-loading">Loading older messages…</p>
+            )}
             {transcriptMessages.map((message, index) => {
               const actions = (
                 <MessageActions

@@ -120,6 +120,13 @@
   padding: 40px 0 28px;
 }
 
+.older-messages-loading {
+  margin: 0 0 24px;
+  color: #7f8b87;
+  font-size: 12px;
+  text-align: center;
+}
+
 .message {
   margin-bottom: 30px;
 }

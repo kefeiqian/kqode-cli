@@ -110,6 +110,152 @@ fn completes_messages_and_pending_turn_atomically() {
 }
 
 #[test]
+fn polls_queued_turns_in_order_and_excludes_running_turns() {
+    let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    let mut conversation = conversation();
+    store.save_conversation(&mut conversation).unwrap();
+    for turn in [
+        pending("turn-1", "First"),
+        pending("turn-2", "Second"),
+        pending("turn-3", "Third"),
+    ] {
+        store.enqueue_pending_turn(&conversation.id, &turn).unwrap();
+    }
+
+    assert_eq!(
+        store
+            .load_queued_work()
+            .unwrap()
+            .into_iter()
+            .map(|work| work.turn_id)
+            .collect::<Vec<_>>(),
+        vec!["turn-1", "turn-2", "turn-3"]
+    );
+    assert!(
+        store
+            .mark_pending_turn_running(&conversation.id, "turn-1")
+            .unwrap()
+    );
+    assert!(
+        !store
+            .mark_pending_turn_running(&conversation.id, "turn-1")
+            .unwrap()
+    );
+    assert_eq!(
+        store
+            .load_queued_work()
+            .unwrap()
+            .into_iter()
+            .map(|work| work.turn_id)
+            .collect::<Vec<_>>(),
+        vec!["turn-2", "turn-3"]
+    );
+}
+
+#[test]
+fn failing_a_running_stream_persists_one_terminal_error() {
+    let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    let mut conversation = conversation();
+    store.save_conversation(&mut conversation).unwrap();
+    let turn = pending("turn-1", "Hello");
+    store
+        .enqueue_message_turn(
+            &conversation.id,
+            &turn,
+            &StoredMessage {
+                id: turn.id.clone(),
+                role: StoredMessageRole::User,
+                content: turn.content.clone(),
+                model: None,
+            },
+            None,
+        )
+        .unwrap();
+    assert!(
+        store
+            .mark_pending_turn_running(&conversation.id, &turn.id)
+            .unwrap()
+    );
+    store
+        .begin_pending_turn(&conversation.id, &turn.id, None, "assistant-1")
+        .unwrap();
+
+    assert!(
+        store
+            .fail_pending_turn(&conversation.id, &turn.id, "worker failed")
+            .unwrap()
+    );
+
+    let failed = store.load_conversation(&conversation.id).unwrap().unwrap();
+    assert!(failed.pending_turns.is_empty());
+    assert_eq!(failed.messages.len(), 2);
+    assert_eq!(failed.messages[1].id, "assistant-1");
+    assert_eq!(failed.messages[1].role, StoredMessageRole::Error);
+    assert_eq!(failed.messages[1].content, "worker failed");
+    assert!(
+        !store
+            .fail_pending_turn(&conversation.id, &turn.id, "duplicate")
+            .unwrap()
+    );
+}
+
+#[test]
+fn beginning_a_queued_turn_moves_its_user_message_to_the_transcript_tail() {
+    let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    let mut conversation = conversation();
+    store.save_conversation(&mut conversation).unwrap();
+    for turn in [
+        pending("turn-1", "First"),
+        pending("turn-2", "Second"),
+        pending("turn-3", "Third"),
+    ] {
+        store
+            .enqueue_message_turn(
+                &conversation.id,
+                &turn,
+                &StoredMessage {
+                    id: turn.id.clone(),
+                    role: StoredMessageRole::User,
+                    content: turn.content.clone(),
+                    model: None,
+                },
+                None,
+            )
+            .unwrap();
+    }
+    store
+        .begin_pending_turn(&conversation.id, "turn-1", None, "assistant-1")
+        .unwrap();
+    store
+        .finish_pending_turn(
+            &conversation.id,
+            "turn-1",
+            "assistant-1",
+            StoredMessageRole::Assistant,
+            "First response",
+            None,
+        )
+        .unwrap();
+
+    store
+        .begin_pending_turn(&conversation.id, "turn-3", None, "assistant-3")
+        .unwrap();
+
+    let messages = store
+        .load_conversation(&conversation.id)
+        .unwrap()
+        .unwrap()
+        .messages;
+    assert_eq!(
+        messages
+            .iter()
+            .map(|message| message.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["turn-2", "turn-1", "assistant-1", "turn-3", "assistant-3"]
+    );
+}
+
+#[test]
 fn recovers_an_unstarted_pending_turn_as_a_retryable_error() {
     let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
     let mut conversation = conversation();

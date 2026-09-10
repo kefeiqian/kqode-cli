@@ -19,12 +19,6 @@ pub struct TurnQueue {
     state: Arc<Mutex<QueueRegistry>>,
 }
 
-/// Result of prioritizing a queued request ahead of the current waiting turns.
-pub struct SteerResult {
-    pub active_request_id: Option<String>,
-    pub waiter: Option<QueuedTurn>,
-}
-
 /// Outcome of trying to remove one request from a queue.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DeleteResult {
@@ -77,60 +71,38 @@ impl TurnQueue {
         })
     }
 
-    /// Prioritizes an existing request or registers it at the front of the queue.
+    /// Prioritizes an existing request and cancels the active request.
     ///
-    /// The active request is cancelled so the prioritized request can run next.
+    /// Requests not yet claimed by a worker remain absent from the in-memory
+    /// queue and can be claimed from durable storage later.
     ///
     /// # Errors
     ///
     /// Returns an error when queue synchronization fails.
-    pub fn steer_or_enqueue_request(
+    pub fn steer_request(
         &self,
         conversation_id: &str,
         request_id: &str,
-    ) -> Result<Option<SteerResult>, TurnQueueError> {
+    ) -> Result<Option<String>, TurnQueueError> {
         let mut registry = lock_registry(&self.state)?;
-        let queue = registry
-            .conversations
-            .entry(conversation_id.to_owned())
-            .or_default();
+        let Some(queue) = registry.conversations.get_mut(conversation_id) else {
+            return Ok(None);
+        };
         if queue
             .active
             .as_ref()
             .is_some_and(|entry| entry.request_id.as_deref() == Some(request_id))
         {
-            return Ok(Some(SteerResult {
-                active_request_id: Some(request_id.to_owned()),
-                waiter: None,
-            }));
+            return Ok(Some(request_id.to_owned()));
         }
-
-        let waiter = if let Some(index) = queue
+        if let Some(index) = queue
             .waiting
             .iter()
             .position(|entry| entry.request_id.as_deref() == Some(request_id))
         {
             let target = queue.waiting.remove(index).expect("queue index exists");
             queue.waiting.push_front(target);
-            None
-        } else {
-            let cancellation = ChatCancellationToken::default();
-            let entry_id = Uuid::new_v4();
-            let (sender, receiver) = oneshot::channel();
-            queue.waiting.push_front(WaitingEntry {
-                entry_id,
-                request_id: Some(request_id.to_owned()),
-                cancellation: Some(cancellation.clone()),
-                sender,
-            });
-            Some(QueuedTurn {
-                conversation_id: conversation_id.to_owned(),
-                entry_id,
-                cancellation,
-                receiver,
-                state: Arc::clone(&self.state),
-            })
-        };
+        }
         let active_request_id = queue
             .active
             .as_ref()
@@ -143,10 +115,7 @@ impl TurnQueue {
             cancellation.cancel();
         }
         promote_next(queue);
-        Ok(Some(SteerResult {
-            active_request_id,
-            waiter,
-        }))
+        Ok(active_request_id)
     }
 
     /// Returns the active request identifier for the supplied queue key.

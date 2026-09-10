@@ -33,7 +33,10 @@ function App() {
     deleteTurn,
     archiveConversation,
     historyError,
+    hasMoreMessages,
+    isLoadingOlderMessages,
     isSending,
+    loadOlderMessages,
     pendingTurns,
     retryMessage,
     sendMessage,
@@ -183,6 +186,8 @@ function App() {
                 settings.apiKeyPreview),
           )}
           isSending={isSending}
+          hasMoreMessages={hasMoreMessages}
+          isLoadingOlderMessages={isLoadingOlderMessages}
           pendingTurns={pendingTurns}
           model={activeConversation.model}
           models={activeConversation.provider ? chatModels : []}
@@ -191,6 +196,7 @@ function App() {
             Boolean(activeConversation.provider) && modelsLoading
           }
           onModelChange={setConversationModel}
+          onLoadOlderMessages={loadOlderMessages}
           onDeleteTurn={deleteTurn}
           onOpenSettings={() => setActivePage("settings")}
           onProviderChange={async (provider) => {

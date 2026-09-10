@@ -49,11 +49,10 @@ async fn steer_cancels_active_and_promotes_target() {
         .unwrap();
 
     let result = queue
-        .steer_or_enqueue_request("conversation-1", "message-3")
+        .steer_request("conversation-1", "message-3")
         .unwrap()
         .unwrap();
-    assert_eq!(result.active_request_id.as_deref(), Some("message-1"));
-    assert!(result.waiter.is_none());
+    assert_eq!(result, "message-1");
     assert!(active.cancellation().unwrap().is_cancelled());
     drop(active);
 
@@ -87,21 +86,45 @@ async fn allows_different_conversations_to_run_concurrently() {
 }
 
 #[tokio::test]
-async fn steer_can_start_a_persisted_unregistered_turn() {
+async fn steer_leaves_unclaimed_persisted_turns_for_the_worker() {
     let queue = TurnQueue::default();
-
-    let result = queue
-        .steer_or_enqueue_request("conversation-1", "message-1")
+    let active = queue
+        .enqueue_request("conversation-1", "message-1")
+        .unwrap()
+        .acquire()
+        .await
         .unwrap()
         .unwrap();
 
-    assert!(result.waiter.is_some());
+    let active_request_id = queue
+        .steer_request("conversation-1", "message-2")
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(active_request_id, "message-1");
+    assert!(active.cancellation().unwrap().is_cancelled());
+    drop(active);
+    assert!(queue.active_request_id("conversation-1").unwrap().is_none());
+}
+
+#[tokio::test]
+async fn abandoning_an_active_request_promotes_the_next_turn() {
+    let queue = TurnQueue::default();
+    let first = queue
+        .enqueue_request("conversation-1", "message-1")
+        .unwrap();
+    let second = queue
+        .enqueue_request("conversation-1", "message-2")
+        .unwrap();
+
+    first.abandon().unwrap();
+
     assert_eq!(
         queue
             .active_request_id("conversation-1")
             .unwrap()
             .as_deref(),
-        Some("message-1")
+        Some("message-2")
     );
-    assert!(result.waiter.unwrap().acquire().await.unwrap().is_some());
+    assert!(second.acquire().await.unwrap().is_some());
 }

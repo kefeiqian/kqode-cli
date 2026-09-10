@@ -2,11 +2,10 @@ use std::sync::Mutex;
 
 use super::{error::ConversationServiceError, state::lock_conversations};
 use crate::conversation::store::{Conversation, ConversationStore};
-use kqode_core::runtime::{DeleteResult, QueuedTurn, TurnQueue};
+use kqode_core::runtime::{DeleteResult, TurnQueue};
 
 pub(crate) struct SteerTurnResult {
     pub(crate) conversation: Conversation,
-    pub(crate) waiter: Option<QueuedTurn>,
 }
 
 pub(crate) fn steer_turn(
@@ -15,20 +14,11 @@ pub(crate) fn steer_turn(
     store: &Mutex<ConversationStore>,
     queue: &TurnQueue,
 ) -> Result<SteerTurnResult, ConversationServiceError> {
-    let result = queue
-        .steer_or_enqueue_request(conversation_id, turn_id)?
-        .ok_or_else(|| ConversationServiceError::PendingTurnNotFound(turn_id.to_owned()))?;
+    let active_request_id = queue.steer_request(conversation_id, turn_id)?;
     let conversation = lock_conversations(store)?
-        .prioritize_pending_turn(
-            conversation_id,
-            result.active_request_id.as_deref(),
-            turn_id,
-        )?
+        .prioritize_pending_turn(conversation_id, active_request_id.as_deref(), turn_id)?
         .ok_or_else(|| ConversationServiceError::PendingTurnNotFound(turn_id.to_owned()))?;
-    Ok(SteerTurnResult {
-        conversation,
-        waiter: result.waiter,
-    })
+    Ok(SteerTurnResult { conversation })
 }
 
 pub(crate) fn delete_turn(

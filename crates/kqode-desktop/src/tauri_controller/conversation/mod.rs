@@ -1,3 +1,4 @@
 pub(crate) mod commands;
 mod events;
-mod tasks;
+
+pub(crate) use events::{stream_handler, update_handler};
