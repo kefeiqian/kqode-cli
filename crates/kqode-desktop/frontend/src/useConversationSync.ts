@@ -18,6 +18,7 @@ import type {
   ConversationListItem,
   ConversationMessageStream,
   ConversationUpdated,
+  Message,
 } from "./types";
 
 const CONVERSATION_UPDATED_EVENT = "conversation-updated";
@@ -33,6 +34,7 @@ export function useConversationSync() {
   const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
   const [historyError, setHistoryError] = useState<string>();
   const deletedMessageIds = useRef(new Map<string, Set<string>>());
+  const deletedMessages = useRef(new Map<string, Map<string, Message>>());
 
   const activeConversation = useMemo(
     () => (activeId ? conversationDetails[activeId] : undefined),
@@ -43,6 +45,7 @@ export function useConversationSync() {
     setConversationDetails((current) => {
       const existing = current[replacement.id];
       const deleted = deletedMessageIds.current.get(replacement.id);
+      const restored: Message[] = [];
       if (deleted && existing) {
         for (const turn of existing.pendingTurns) {
           if (
@@ -56,7 +59,14 @@ export function useConversationSync() {
                 message.requestId === turn.id && message.role !== "user",
             )
           ) {
+            const message = deletedMessages.current
+              .get(replacement.id)
+              ?.get(turn.retryErrorId);
+            if (message) restored.push(message);
             deleted.delete(turn.retryErrorId);
+            deletedMessages.current
+              .get(replacement.id)
+              ?.delete(turn.retryErrorId);
           }
         }
       }
@@ -71,11 +81,18 @@ export function useConversationSync() {
       if (existing && existing.updatedAt > filtered.updatedAt) {
         return current;
       }
+      const merged = existing
+        ? mergeConversationPage(existing, filtered)
+        : filtered;
       return {
         ...current,
-        [filtered.id]: existing
-          ? mergeConversationPage(existing, filtered)
-          : filtered,
+        [filtered.id]:
+          restored.length === 0
+            ? merged
+            : {
+                ...merged,
+                messages: mergeMessages(merged.messages, restored),
+              },
       };
     });
     setConversations((current) =>
@@ -92,6 +109,16 @@ export function useConversationSync() {
       setConversationDetails((current) => {
         const conversation = current[conversationId];
         if (!conversation) return current;
+        const message = conversation.messages.find(
+          (candidate) => candidate.id === messageId,
+        );
+        if (message) {
+          const messages =
+            deletedMessages.current.get(conversationId) ??
+            new Map<string, Message>();
+          messages.set(messageId, message);
+          deletedMessages.current.set(conversationId, messages);
+        }
         return {
           ...current,
           [conversationId]: {
@@ -109,6 +136,21 @@ export function useConversationSync() {
   const restoreMessage = useCallback(
     (conversationId: string, messageId: string) => {
       deletedMessageIds.current.get(conversationId)?.delete(messageId);
+      const deleted = deletedMessages.current.get(conversationId);
+      const message = deleted?.get(messageId);
+      deleted?.delete(messageId);
+      if (!message) return;
+      setConversationDetails((current) => {
+        const conversation = current[conversationId];
+        if (!conversation) return current;
+        return {
+          ...current,
+          [conversationId]: {
+            ...conversation,
+            messages: mergeMessages(conversation.messages, [message]),
+          },
+        };
+      });
     },
     [],
   );
