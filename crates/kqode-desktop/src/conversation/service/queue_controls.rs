@@ -27,7 +27,16 @@ pub(crate) fn delete_turn(
     store: &Mutex<ConversationStore>,
     queue: &TurnQueue,
 ) -> Result<Conversation, ConversationServiceError> {
-    match queue.delete_request(conversation_id, turn_id)? {
+    let mut deleted = None;
+    match queue.delete_request_with(conversation_id, turn_id, || {
+        deleted = lock_conversations(store)?.delete_pending_turn(conversation_id, turn_id)?;
+        if deleted.is_none() {
+            return Err(ConversationServiceError::PendingTurnNotFound(
+                turn_id.to_owned(),
+            ));
+        }
+        Ok(())
+    })? {
         DeleteResult::Active => {
             return Err(ConversationServiceError::ActiveTurnCannotBeDeleted(
                 turn_id.to_owned(),
@@ -35,7 +44,5 @@ pub(crate) fn delete_turn(
         }
         DeleteResult::Deleted | DeleteResult::NotFound => {}
     }
-    lock_conversations(store)?
-        .delete_pending_turn(conversation_id, turn_id)?
-        .ok_or_else(|| ConversationServiceError::PendingTurnNotFound(turn_id.to_owned()))
+    deleted.ok_or_else(|| ConversationServiceError::PendingTurnNotFound(turn_id.to_owned()))
 }

@@ -86,6 +86,35 @@ fn reprioritizes_and_deletes_waiting_turns() {
 }
 
 #[test]
+fn deleting_an_unstarted_turn_removes_its_user_message() {
+    let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    let mut conversation = conversation();
+    store.save_conversation(&mut conversation).unwrap();
+    let turn = pending("turn-1", "Queued");
+    store
+        .enqueue_message_turn(
+            &conversation.id,
+            &turn,
+            &StoredMessage {
+                id: turn.id.clone(),
+                role: StoredMessageRole::User,
+                content: turn.content.clone(),
+                model: None,
+            },
+            None,
+        )
+        .unwrap();
+
+    let deleted = store
+        .delete_pending_turn(&conversation.id, &turn.id)
+        .unwrap()
+        .unwrap();
+
+    assert!(deleted.pending_turns.is_empty());
+    assert!(deleted.messages.is_empty());
+}
+
+#[test]
 fn completes_messages_and_pending_turn_atomically() {
     let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
     let mut conversation = conversation();
@@ -150,6 +179,27 @@ fn polls_queued_turns_in_order_and_excludes_running_turns() {
             .collect::<Vec<_>>(),
         vec!["turn-2", "turn-3"]
     );
+}
+
+#[test]
+fn claims_all_queued_work_in_one_durable_transition() {
+    let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    let mut conversation = conversation();
+    store.save_conversation(&mut conversation).unwrap();
+    for turn in [pending("turn-1", "First"), pending("turn-2", "Second")] {
+        store.enqueue_pending_turn(&conversation.id, &turn).unwrap();
+    }
+
+    let claimed = store.claim_queued_work().unwrap();
+
+    assert_eq!(
+        claimed
+            .iter()
+            .map(|work| work.turn_id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["turn-1", "turn-2"]
+    );
+    assert!(store.load_queued_work().unwrap().is_empty());
 }
 
 #[test]

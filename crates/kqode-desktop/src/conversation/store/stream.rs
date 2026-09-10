@@ -286,7 +286,7 @@ fn remove_pending_turn(
     compact_positions(transaction, conversation_id)
 }
 
-fn compact_message_positions(
+pub(super) fn compact_message_positions(
     transaction: &Transaction<'_>,
     conversation_id: &str,
 ) -> Result<(), StoreError> {

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tokio::sync::oneshot;
 
-use super::{DeleteResult, TurnQueue};
+use super::{DeleteResult, TurnQueue, TurnQueueError};
 
 #[tokio::test]
 async fn serializes_requests_for_one_conversation() {
@@ -127,4 +127,49 @@ async fn abandoning_an_active_request_promotes_the_next_turn() {
         Some("message-2")
     );
     assert!(second.acquire().await.unwrap().is_some());
+}
+
+#[tokio::test]
+async fn dropping_an_unacquired_turn_releases_its_queue_entry() {
+    let queue = TurnQueue::default();
+    let first = queue
+        .enqueue_request("conversation-1", "message-1")
+        .unwrap();
+    let second = queue
+        .enqueue_request("conversation-1", "message-2")
+        .unwrap();
+
+    drop(first);
+
+    assert_eq!(
+        queue
+            .active_request_id("conversation-1")
+            .unwrap()
+            .as_deref(),
+        Some("message-2")
+    );
+    assert!(second.acquire().await.unwrap().is_some());
+}
+
+#[tokio::test]
+async fn failed_durable_deletion_keeps_the_waiting_entry() {
+    let queue = TurnQueue::default();
+    let active = queue
+        .enqueue_request("conversation-1", "message-1")
+        .unwrap()
+        .acquire()
+        .await
+        .unwrap()
+        .unwrap();
+    let waiting = queue
+        .enqueue_request("conversation-1", "message-2")
+        .unwrap();
+
+    let result = queue.delete_request_with("conversation-1", "message-2", || {
+        Err::<(), _>(TurnQueueError::Wait("durable deletion failed".to_owned()))
+    });
+
+    assert!(result.is_err());
+    drop(active);
+    assert!(waiting.acquire().await.unwrap().is_some());
 }

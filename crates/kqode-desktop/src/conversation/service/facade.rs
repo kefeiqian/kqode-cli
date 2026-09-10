@@ -9,7 +9,7 @@ use super::{
 };
 use crate::{
     conversation::{
-        store::{ConversationListItem, ConversationStore},
+        store::{ConversationListItem, ConversationStore, PendingWork},
         worker::ConversationWorkItem,
     },
     llm::LlmService,
@@ -215,33 +215,49 @@ impl ConversationService {
             .store
             .lock()
             .map_err(|error| ConversationServiceError::Lock(error.to_string()))?
-            .load_queued_work()?;
+            .claim_queued_work()?;
         let mut claimed = Vec::with_capacity(queued_work.len());
-        for work in queued_work {
+        for (index, work) in queued_work.iter().enumerate() {
             let queued = match self
                 .queue
                 .enqueue_request(&work.conversation_id, &work.turn_id)
             {
                 Ok(queued) => queued,
                 Err(TurnQueueError::DuplicateRequest(_)) => continue,
-                Err(error) => return Err(error.into()),
+                Err(error) => {
+                    self.rollback_claimed_work(&queued_work[index..], claimed)?;
+                    return Err(error.into());
+                }
             };
-            let marked_running = self
-                .store
-                .lock()
-                .map_err(|error| ConversationServiceError::Lock(error.to_string()))?
-                .mark_pending_turn_running(&work.conversation_id, &work.turn_id)?;
-            if !marked_running {
-                queued.abandon()?;
-                continue;
-            }
             claimed.push(ConversationWorkItem {
-                conversation_id: work.conversation_id,
-                turn_id: work.turn_id,
+                conversation_id: work.conversation_id.clone(),
+                turn_id: work.turn_id.clone(),
                 queued,
             });
         }
         Ok(claimed)
+    }
+
+    fn rollback_claimed_work(
+        &self,
+        unclaimed: &[PendingWork],
+        claimed: Vec<ConversationWorkItem>,
+    ) -> Result<(), ConversationServiceError> {
+        let store = self
+            .store
+            .lock()
+            .map_err(|error| ConversationServiceError::Lock(error.to_string()))?;
+        for work in unclaimed {
+            store.mark_pending_turn_queued(&work.conversation_id, &work.turn_id)?;
+        }
+        for work in &claimed {
+            store.mark_pending_turn_queued(&work.conversation_id, &work.turn_id)?;
+        }
+        drop(store);
+        for work in claimed {
+            work.queued.abandon()?;
+        }
+        Ok(())
     }
 
     pub(crate) fn fail_pending_work(

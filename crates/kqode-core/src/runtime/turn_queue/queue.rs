@@ -68,6 +68,7 @@ impl TurnQueue {
             cancellation,
             receiver,
             state: Arc::clone(&self.state),
+            registered: true,
         })
     }
 
@@ -160,6 +161,47 @@ impl TurnQueue {
             .iter()
             .position(|entry| entry.request_id.as_deref() == Some(request_id))
         else {
+            return Ok(DeleteResult::NotFound);
+        };
+        let entry = queue.waiting.remove(index).expect("queue index exists");
+        let _ = entry.sender.send(TurnPermit::Removed);
+        Ok(DeleteResult::Deleted)
+    }
+
+    /// Runs a durable deletion while the queue state is locked, then removes
+    /// the waiting entry only when the durable action succeeds.
+    ///
+    /// # Errors
+    ///
+    /// Returns the caller error when either queue synchronization or the
+    /// durable deletion fails.
+    pub fn delete_request_with<E>(
+        &self,
+        conversation_id: &str,
+        request_id: &str,
+        delete: impl FnOnce() -> Result<(), E>,
+    ) -> Result<DeleteResult, E>
+    where
+        E: From<TurnQueueError>,
+    {
+        let mut registry = lock_registry(&self.state).map_err(E::from)?;
+        let Some(queue) = registry.conversations.get_mut(conversation_id) else {
+            delete()?;
+            return Ok(DeleteResult::NotFound);
+        };
+        if queue
+            .active
+            .as_ref()
+            .is_some_and(|entry| entry.request_id.as_deref() == Some(request_id))
+        {
+            return Ok(DeleteResult::Active);
+        }
+        let index = queue
+            .waiting
+            .iter()
+            .position(|entry| entry.request_id.as_deref() == Some(request_id));
+        delete()?;
+        let Some(index) = index else {
             return Ok(DeleteResult::NotFound);
         };
         let entry = queue.waiting.remove(index).expect("queue index exists");

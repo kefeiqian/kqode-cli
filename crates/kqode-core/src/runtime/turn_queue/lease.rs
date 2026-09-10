@@ -17,6 +17,7 @@ pub struct QueuedTurn {
     pub(super) cancellation: ChatCancellationToken,
     pub(super) receiver: oneshot::Receiver<TurnPermit>,
     pub(super) state: Arc<Mutex<QueueRegistry>>,
+    pub(super) registered: bool,
 }
 
 /// Releases the active queue slot when the turn leaves scope.
@@ -33,15 +34,20 @@ impl QueuedTurn {
     /// # Errors
     ///
     /// Returns an error when queue synchronization fails.
-    pub async fn acquire(self) -> Result<Option<TurnLease>, TurnQueueError> {
-        wait_for_turn(
-            self.conversation_id,
-            self.entry_id,
-            Some(self.cancellation),
-            self.receiver,
-            self.state,
-        )
-        .await
+    pub async fn acquire(mut self) -> Result<Option<TurnLease>, TurnQueueError> {
+        let permit = (&mut self.receiver)
+            .await
+            .map_err(|error| TurnQueueError::Wait(error.to_string()))?;
+        self.registered = false;
+        match permit {
+            TurnPermit::Acquired => Ok(Some(TurnLease {
+                conversation_id: self.conversation_id.clone(),
+                entry_id: self.entry_id,
+                cancellation: Some(self.cancellation.clone()),
+                state: Arc::clone(&self.state),
+            })),
+            TurnPermit::Removed => Ok(None),
+        }
     }
 
     /// Removes this turn from the queue without executing it.
@@ -49,7 +55,13 @@ impl QueuedTurn {
     /// # Errors
     ///
     /// Returns an error when queue synchronization fails.
-    pub fn abandon(self) -> Result<(), TurnQueueError> {
+    pub fn abandon(mut self) -> Result<(), TurnQueueError> {
+        self.remove_registration()?;
+        self.registered = false;
+        Ok(())
+    }
+
+    fn remove_registration(&self) -> Result<(), TurnQueueError> {
         let mut registry = super::state::lock_registry(&self.state)?;
         let Some(queue) = registry.conversations.get_mut(&self.conversation_id) else {
             return Ok(());
@@ -73,6 +85,14 @@ impl QueuedTurn {
             registry.conversations.remove(&self.conversation_id);
         }
         Ok(())
+    }
+}
+
+impl Drop for QueuedTurn {
+    fn drop(&mut self) {
+        if self.registered {
+            let _ = self.remove_registration();
+        }
     }
 }
 
