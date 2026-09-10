@@ -44,13 +44,7 @@ impl ConversationStore {
         assistant_message_id: &str,
     ) -> Result<(), StoreError> {
         let transaction = self.connection.transaction()?;
-        if let Some(error_id) = retry_error_id {
-            transaction.execute(
-                "DELETE FROM messages WHERE conversation_id = ?1 AND id = ?2",
-                params![conversation_id, error_id],
-            )?;
-            compact_message_positions(&transaction, conversation_id)?;
-        } else {
+        if retry_error_id.is_none() {
             transaction.execute(
                 "UPDATE messages
                  SET position = COALESCE(
@@ -121,6 +115,16 @@ impl ConversationStore {
         model: Option<&str>,
     ) -> Result<(), StoreError> {
         let transaction = self.connection.transaction()?;
+        let retry_error_id = transaction
+            .query_row(
+                "SELECT retry_error_id
+                 FROM pending_turns
+                 WHERE conversation_id = ?1 AND id = ?2",
+                params![conversation_id, turn_id],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()?
+            .flatten();
         let changed = transaction.execute(
             "UPDATE messages
              SET role = ?1,
@@ -139,6 +143,13 @@ impl ConversationStore {
         )?;
         if changed == 0 {
             return Err(StoreError::MissingMessage(assistant_message_id.to_owned()));
+        }
+        if let Some(error_id) = retry_error_id.as_deref() {
+            transaction.execute(
+                "DELETE FROM messages WHERE conversation_id = ?1 AND id = ?2",
+                params![conversation_id, error_id],
+            )?;
+            compact_message_positions(&transaction, conversation_id)?;
         }
         remove_pending_turn(&transaction, conversation_id, turn_id)?;
         touch_conversation(&transaction, conversation_id)?;
@@ -205,6 +216,13 @@ impl ConversationStore {
                  WHERE id = ?2",
                 params![error, message_id],
             )?;
+            if let Some(error_id) = retry_error_id.as_deref() {
+                transaction.execute(
+                    "DELETE FROM messages WHERE conversation_id = ?1 AND id = ?2",
+                    params![conversation_id, error_id],
+                )?;
+                compact_message_positions(&transaction, conversation_id)?;
+            }
         } else if retry_error_id.is_none() {
             insert_message(
                 &transaction,

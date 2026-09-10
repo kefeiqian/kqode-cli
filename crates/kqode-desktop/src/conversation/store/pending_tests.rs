@@ -483,6 +483,102 @@ fn preserves_the_original_error_when_an_unstarted_retry_is_interrupted() {
 }
 
 #[test]
+fn cancelling_an_active_retry_preserves_the_original_error() {
+    let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    let mut conversation = conversation();
+    conversation.messages = vec![
+        StoredMessage {
+            id: "user-1".to_owned(),
+            role: StoredMessageRole::User,
+            content: "Hello".to_owned(),
+            model: None,
+        },
+        StoredMessage {
+            id: "error-1".to_owned(),
+            role: StoredMessageRole::Error,
+            content: "Original error".to_owned(),
+            model: None,
+        },
+    ];
+    store.save_conversation(&mut conversation).unwrap();
+    store
+        .enqueue_pending_turn(
+            &conversation.id,
+            &PendingTurn {
+                id: "retry-1".to_owned(),
+                content: "Hello".to_owned(),
+                retry_error_id: Some("error-1".to_owned()),
+                is_active: false,
+            },
+        )
+        .unwrap();
+    store
+        .begin_pending_turn(&conversation.id, "retry-1", Some("error-1"), "assistant-1")
+        .unwrap();
+
+    store
+        .discard_pending_stream(&conversation.id, "retry-1", "assistant-1")
+        .unwrap();
+
+    let saved = store.load_conversation(&conversation.id).unwrap().unwrap();
+    assert!(saved.pending_turns.is_empty());
+    assert_eq!(saved.messages, conversation.messages);
+}
+
+#[test]
+fn completing_a_retry_replaces_the_original_error() {
+    let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    let mut conversation = conversation();
+    conversation.messages = vec![
+        StoredMessage {
+            id: "user-1".to_owned(),
+            role: StoredMessageRole::User,
+            content: "Hello".to_owned(),
+            model: None,
+        },
+        StoredMessage {
+            id: "error-1".to_owned(),
+            role: StoredMessageRole::Error,
+            content: "Original error".to_owned(),
+            model: None,
+        },
+    ];
+    store.save_conversation(&mut conversation).unwrap();
+    store
+        .enqueue_pending_turn(
+            &conversation.id,
+            &PendingTurn {
+                id: "retry-1".to_owned(),
+                content: "Hello".to_owned(),
+                retry_error_id: Some("error-1".to_owned()),
+                is_active: false,
+            },
+        )
+        .unwrap();
+    store
+        .begin_pending_turn(&conversation.id, "retry-1", Some("error-1"), "assistant-1")
+        .unwrap();
+
+    store
+        .finish_pending_turn(
+            &conversation.id,
+            "retry-1",
+            "assistant-1",
+            StoredMessageRole::Assistant,
+            "Recovered",
+            Some("test-model"),
+        )
+        .unwrap();
+
+    let saved = store.load_conversation(&conversation.id).unwrap().unwrap();
+    assert!(saved.pending_turns.is_empty());
+    assert_eq!(saved.messages.len(), 2);
+    assert_eq!(saved.messages[0].id, "user-1");
+    assert_eq!(saved.messages[1].id, "assistant-1");
+    assert_eq!(saved.messages[1].content, "Recovered");
+}
+
+#[test]
 fn recovers_an_interrupted_active_retry_without_duplicating_the_user_message() {
     let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
     let mut conversation = conversation();
