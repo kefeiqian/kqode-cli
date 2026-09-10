@@ -53,22 +53,19 @@ pub(crate) fn retry_message(
     let mut store = lock_conversations(conversation_store)?;
     let conversation = require_conversation(&store, conversation_id)?;
     llm_service.validate_selection(conversation.provider, conversation.model.as_deref())?;
-    let error_index = conversation
+    let error_message = conversation
         .messages
         .iter()
-        .position(|message| message.id == error_message_id)
+        .find(|message| message.id == error_message_id)
         .ok_or_else(|| ConversationServiceError::MessageNotFound(error_message_id.to_owned()))?;
-    if conversation.messages[error_index].role != StoredMessageRole::Error || error_index == 0 {
+    if error_message.role != StoredMessageRole::Error {
         return Err(ConversationServiceError::InvalidRetry(
             error_message_id.to_owned(),
         ));
     }
-    let user_message = &conversation.messages[error_index - 1];
-    if user_message.role != StoredMessageRole::User {
-        return Err(ConversationServiceError::InvalidRetry(
-            error_message_id.to_owned(),
-        ));
-    }
+    let user_content = store
+        .load_retry_user_content(conversation_id, error_message_id)?
+        .ok_or_else(|| ConversationServiceError::InvalidRetry(error_message_id.to_owned()))?;
     if conversation
         .pending_turns
         .iter()
@@ -82,7 +79,7 @@ pub(crate) fn retry_message(
         conversation_id,
         &PendingTurn {
             id: turn_id,
-            content: user_message.content.clone(),
+            content: user_content,
             retry_error_id: Some(error_message_id.to_owned()),
             is_active: false,
         },

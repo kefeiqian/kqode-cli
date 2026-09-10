@@ -5,7 +5,6 @@ use super::{
     super::{
         Conversation, ConversationStore, PendingTurn, StoreError, StoredMessage, StoredMessageRole,
         mutation::{current_timestamp, replace_messages},
-        stream::compact_message_positions,
     },
     ordering::{compact_positions, persist_positions, prioritized_ids},
 };
@@ -150,7 +149,6 @@ impl ConversationStore {
             params![conversation_id, turn_id],
         )?;
         compact_positions(&transaction, conversation_id)?;
-        compact_message_positions(&transaction, conversation_id)?;
         touch_conversation(&transaction, conversation_id)?;
         transaction.commit()?;
         self.load_conversation(conversation_id)

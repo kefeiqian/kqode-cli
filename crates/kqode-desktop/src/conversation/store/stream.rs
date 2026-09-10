@@ -115,28 +115,42 @@ impl ConversationStore {
         model: Option<&str>,
     ) -> Result<(), StoreError> {
         let transaction = self.connection.transaction()?;
-        let retry_error_id = transaction
+        let retry = transaction
             .query_row(
-                "SELECT retry_error_id
-                 FROM pending_turns
-                 WHERE conversation_id = ?1 AND id = ?2",
+                "SELECT pending.retry_error_id, COALESCE(source.request_id, previous.id)
+                 FROM pending_turns pending
+                 LEFT JOIN messages source
+                   ON source.conversation_id = pending.conversation_id
+                  AND source.id = pending.retry_error_id
+                 LEFT JOIN messages previous
+                   ON previous.conversation_id = source.conversation_id
+                  AND previous.position = source.position - 1
+                  AND previous.role = 'user'
+                 WHERE pending.conversation_id = ?1 AND pending.id = ?2",
                 params![conversation_id, turn_id],
-                |row| row.get::<_, Option<String>>(0),
+                |row| {
+                    Ok((
+                        row.get::<_, Option<String>>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                    ))
+                },
             )
-            .optional()?
-            .flatten();
+            .optional()?;
+        let (retry_error_id, retry_request_id) = retry.unwrap_or_default();
         let changed = transaction.execute(
             "UPDATE messages
              SET role = ?1,
                  content = ?2,
                  model = ?3,
+                 request_id = COALESCE(?4, request_id),
                  status = 'complete',
                  revision = revision + 1
-             WHERE conversation_id = ?4 AND id = ?5",
+             WHERE conversation_id = ?5 AND id = ?6",
             params![
                 role.as_str(),
                 content,
                 model,
+                retry_request_id,
                 conversation_id,
                 assistant_message_id
             ],
@@ -167,7 +181,6 @@ impl ConversationStore {
             "DELETE FROM messages WHERE conversation_id = ?1 AND id = ?2",
             params![conversation_id, assistant_message_id],
         )?;
-        compact_message_positions(&transaction, conversation_id)?;
         remove_pending_turn(&transaction, conversation_id, turn_id)?;
         touch_conversation(&transaction, conversation_id)?;
         transaction.commit()?;
@@ -181,16 +194,28 @@ impl ConversationStore {
         error: &str,
     ) -> Result<bool, StoreError> {
         let transaction = self.connection.transaction()?;
-        let retry_error_id = transaction
+        let retry = transaction
             .query_row(
-                "SELECT retry_error_id
-                 FROM pending_turns
-                 WHERE conversation_id = ?1 AND id = ?2",
+                "SELECT pending.retry_error_id, COALESCE(source.request_id, previous.id)
+                 FROM pending_turns pending
+                 LEFT JOIN messages source
+                   ON source.conversation_id = pending.conversation_id
+                  AND source.id = pending.retry_error_id
+                 LEFT JOIN messages previous
+                   ON previous.conversation_id = source.conversation_id
+                  AND previous.position = source.position - 1
+                  AND previous.role = 'user'
+                 WHERE pending.conversation_id = ?1 AND pending.id = ?2",
                 params![conversation_id, turn_id],
-                |row| row.get::<_, Option<String>>(0),
+                |row| {
+                    Ok((
+                        row.get::<_, Option<String>>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                    ))
+                },
             )
             .optional()?;
-        let Some(retry_error_id) = retry_error_id else {
+        let Some((retry_error_id, retry_request_id)) = retry else {
             return Ok(false);
         };
         let streaming_message_id = transaction
@@ -210,10 +235,11 @@ impl ConversationStore {
                  SET role = 'error',
                      content = ?1,
                      model = NULL,
+                     request_id = COALESCE(?2, request_id),
                      status = 'complete',
                      revision = revision + 1
-                 WHERE id = ?2",
-                params![error, message_id],
+                 WHERE id = ?3",
+                params![error, retry_request_id, message_id],
             )?;
             if let Some(error_id) = retry_error_id.as_deref() {
                 transaction.execute(
@@ -300,41 +326,6 @@ fn remove_pending_turn(
         params![conversation_id, turn_id],
     )?;
     compact_positions(transaction, conversation_id)
-}
-
-pub(super) fn compact_message_positions(
-    transaction: &Transaction<'_>,
-    conversation_id: &str,
-) -> Result<(), StoreError> {
-    let ordered = {
-        let mut statement = transaction.prepare(
-            "SELECT id
-             FROM messages
-             WHERE conversation_id = ?1
-             ORDER BY position ASC",
-        )?;
-        let rows = statement.query_map([conversation_id], |row| row.get::<_, String>(0))?;
-        rows.collect::<Result<Vec<_>, _>>()?
-    };
-    for (position, id) in ordered.iter().enumerate() {
-        transaction.execute(
-            "UPDATE messages SET position = ?1
-             WHERE conversation_id = ?2 AND id = ?3",
-            params![
-                -i64::try_from(position).unwrap_or(i64::MAX) - 1,
-                conversation_id,
-                id
-            ],
-        )?;
-    }
-    for (position, id) in ordered.iter().enumerate() {
-        transaction.execute(
-            "UPDATE messages SET position = ?1
-             WHERE conversation_id = ?2 AND id = ?3",
-            params![position as i64, conversation_id, id],
-        )?;
-    }
-    Ok(())
 }
 
 fn touch_conversation(

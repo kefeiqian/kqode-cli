@@ -23,6 +23,11 @@ import type {
 const CONVERSATION_UPDATED_EVENT = "conversation-updated";
 const CONVERSATION_MESSAGE_STREAM_EVENT = "conversation-message-stream";
 
+type RetryTombstone = {
+  errorMessageId: string;
+  responseRequestId?: string;
+};
+
 export function useConversationSync() {
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
   const [conversationDetails, setConversationDetails] = useState<
@@ -34,7 +39,9 @@ export function useConversationSync() {
   const [historyError, setHistoryError] = useState<string>();
   const deletedMessageIds = useRef(new Map<string, Set<string>>());
   const conversationRevisions = useRef(new Map<string, number>());
-  const retryTombstones = useRef(new Map<string, Map<string, string>>());
+  const retryTombstones = useRef(
+    new Map<string, Map<string, RetryTombstone>>(),
+  );
 
   const activeConversation = useMemo(
     () => (activeId ? conversationDetails[activeId] : undefined),
@@ -47,8 +54,8 @@ export function useConversationSync() {
       deletedMessageIds.current.get(conversationId)?.delete(messageId);
       const retries = retryTombstones.current.get(conversationId);
       if (retries) {
-        for (const [turnId, errorMessageId] of retries) {
-          if (errorMessageId === messageId) retries.delete(turnId);
+        for (const [turnId, tombstone] of retries) {
+          if (tombstone.errorMessageId === messageId) retries.delete(turnId);
         }
       }
       setConversationDetails((current) => {
@@ -78,19 +85,26 @@ export function useConversationSync() {
       conversationRevisions.current.set(replacement.id, replacement.updatedAt);
       const retries = retryTombstones.current.get(replacement.id);
       if (retries) {
-        for (const [turnId, errorMessageId] of retries) {
+        for (const [turnId, tombstone] of retries) {
           if (
             replacement.pendingTurns.some((pending) => pending.id === turnId)
           ) {
             continue;
           }
-          retries.delete(turnId);
+          const responseRequestId = tombstone.responseRequestId ?? turnId;
           const hasResponse = replacement.messages.some(
             (message) =>
-              message.requestId === turnId && message.role !== "user",
+              message.id !== tombstone.errorMessageId &&
+              message.requestId === responseRequestId &&
+              message.role !== "user",
           );
-          if (!hasResponse) {
-            void restoreMessage(replacement.id, errorMessageId).catch(
+          if (hasResponse) {
+            retries.delete(turnId);
+          } else {
+            void restoreMessage(
+              replacement.id,
+              tombstone.errorMessageId,
+            ).catch(
               (error: unknown) => {
                 setHistoryError(
                   `Could not restore the retryable error: ${String(error)}`,
@@ -130,7 +144,12 @@ export function useConversationSync() {
   );
 
   const tombstoneMessage = useCallback(
-    (conversationId: string, messageId: string, retryTurnId?: string) => {
+    (
+      conversationId: string,
+      messageId: string,
+      retryTurnId?: string,
+      responseRequestId?: string,
+    ) => {
       const deleted =
         deletedMessageIds.current.get(conversationId) ?? new Set<string>();
       deleted.add(messageId);
@@ -138,8 +157,8 @@ export function useConversationSync() {
       if (retryTurnId) {
         const retries =
           retryTombstones.current.get(conversationId) ??
-          new Map<string, string>();
-        retries.set(retryTurnId, messageId);
+          new Map<string, RetryTombstone>();
+        retries.set(retryTurnId, { errorMessageId: messageId, responseRequestId });
         retryTombstones.current.set(conversationId, retries);
       }
       setConversationDetails((current) => {

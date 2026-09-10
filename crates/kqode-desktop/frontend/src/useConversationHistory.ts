@@ -162,6 +162,9 @@ export function useConversationHistory() {
 
   const retryMessage = async (errorMessageId: string) => {
     if (!activeConversation) return;
+    const responseRequestId = activeConversation.messages.find(
+      (message) => message.id === errorMessageId,
+    )?.requestId;
     try {
       const replacement = await retryStoredMessage(
         activeConversation.id,
@@ -174,6 +177,7 @@ export function useConversationHistory() {
         activeConversation.id,
         errorMessageId,
         retryTurnId,
+        responseRequestId,
       );
       replaceConversation(replacement);
     } catch (error) {

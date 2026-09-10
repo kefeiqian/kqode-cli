@@ -526,7 +526,7 @@ fn cancelling_an_active_retry_preserves_the_original_error() {
 }
 
 #[test]
-fn completing_a_retry_replaces_the_original_error() {
+fn failing_a_retry_preserves_its_original_user_link() {
     let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
     let mut conversation = conversation();
     conversation.messages = vec![
@@ -570,9 +570,9 @@ fn completing_a_retry_replaces_the_original_error() {
             &conversation.id,
             "retry-1",
             "assistant-1",
-            StoredMessageRole::Assistant,
-            "Recovered",
-            Some("test-model"),
+            StoredMessageRole::Error,
+            "Retry failed",
+            None,
         )
         .unwrap();
 
@@ -582,16 +582,26 @@ fn completing_a_retry_replaces_the_original_error() {
     assert_eq!(saved.messages[0].id, "user-1");
     assert_eq!(saved.messages[1].id, "user-2");
     assert_eq!(saved.messages[2].id, "assistant-1");
-    assert_eq!(saved.messages[2].content, "Recovered");
+    assert_eq!(saved.messages[2].role, StoredMessageRole::Error);
+    assert_eq!(saved.messages[2].content, "Retry failed");
+    let messages = store
+        .load_message_page(&conversation.id, None, 10)
+        .unwrap()
+        .messages;
     assert_eq!(
-        store
-            .load_message_page(&conversation.id, None, 10)
-            .unwrap()
-            .messages
-            .into_iter()
+        messages
+            .iter()
             .map(|message| message.position)
             .collect::<Vec<_>>(),
         vec![0, 2, 3]
+    );
+    assert_eq!(messages[2].request_id.as_deref(), Some("user-1"));
+    assert_eq!(
+        store
+            .load_retry_user_content(&conversation.id, "assistant-1")
+            .unwrap()
+            .as_deref(),
+        Some("Hello")
     );
 }
 

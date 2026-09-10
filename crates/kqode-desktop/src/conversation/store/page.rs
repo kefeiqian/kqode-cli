@@ -137,6 +137,48 @@ impl ConversationStore {
             .optional()
             .map_err(StoreError::from)
     }
+
+    pub(crate) fn load_retry_user_content(
+        &self,
+        conversation_id: &str,
+        error_message_id: &str,
+    ) -> Result<Option<String>, StoreError> {
+        let linked = self
+            .connection
+            .query_row(
+                "SELECT user.content
+                 FROM messages error
+                 JOIN messages user
+                   ON user.conversation_id = error.conversation_id
+                  AND user.id = error.request_id
+                  AND user.role = 'user'
+                 WHERE error.conversation_id = ?1
+                   AND error.id = ?2
+                   AND error.role = 'error'",
+                params![conversation_id, error_message_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if linked.is_some() {
+            return Ok(linked);
+        }
+        self.connection
+            .query_row(
+                "SELECT user.content
+                 FROM messages error
+                 JOIN messages user
+                   ON user.conversation_id = error.conversation_id
+                  AND user.position = error.position - 1
+                  AND user.role = 'user'
+                 WHERE error.conversation_id = ?1
+                   AND error.id = ?2
+                   AND error.role = 'error'",
+                params![conversation_id, error_message_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(StoreError::from)
+    }
 }
 
 fn message_record(row: &Row<'_>) -> rusqlite::Result<StoredMessageRecord> {
