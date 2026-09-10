@@ -413,26 +413,87 @@ fn recovers_an_unstarted_pending_turn_as_a_retryable_error() {
 }
 
 #[test]
+fn recovers_multiple_pending_turns_without_dropping_the_active_turn() {
+    let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    let mut conversation = conversation();
+    store.save_conversation(&mut conversation).unwrap();
+    for turn in [pending("turn-1", "First"), pending("turn-2", "Second")] {
+        store
+            .enqueue_message_turn(
+                &conversation.id,
+                &turn,
+                &StoredMessage {
+                    id: turn.id.clone(),
+                    role: StoredMessageRole::User,
+                    content: turn.content.clone(),
+                    model: None,
+                },
+                None,
+            )
+            .unwrap();
+    }
+    assert!(
+        store
+            .mark_pending_turn_running(&conversation.id, "turn-1")
+            .unwrap()
+    );
+    store
+        .begin_pending_turn(&conversation.id, "turn-1", None, "assistant-1")
+        .unwrap();
+    store
+        .update_streaming_message(
+            &conversation.id,
+            "assistant-1",
+            "Partial response",
+            Some("test-model"),
+        )
+        .unwrap();
+
+    assert_eq!(store.recover_interrupted_turns().unwrap(), 2);
+
+    let recovered = store.load_conversation(&conversation.id).unwrap().unwrap();
+    assert!(recovered.pending_turns.is_empty());
+    assert_eq!(recovered.messages.len(), 4);
+    assert_eq!(recovered.messages[0].id, "turn-1");
+    assert_eq!(recovered.messages[1].role, StoredMessageRole::Error);
+    assert_eq!(recovered.messages[2].id, "turn-2");
+    assert_eq!(recovered.messages[3].role, StoredMessageRole::Error);
+}
+
+#[test]
 fn replaces_a_partial_interrupted_response_with_a_retryable_error() {
     let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
     let mut conversation = conversation();
-    conversation.messages = vec![
-        StoredMessage {
-            id: "turn-1".to_owned(),
-            role: StoredMessageRole::User,
-            content: "Hello".to_owned(),
-            model: None,
-        },
-        StoredMessage {
-            id: "assistant-1".to_owned(),
-            role: StoredMessageRole::Assistant,
-            content: "Partial response".to_owned(),
-            model: Some("test-model".to_owned()),
-        },
-    ];
     store.save_conversation(&mut conversation).unwrap();
+    let turn = pending("turn-1", "Hello");
     store
-        .enqueue_pending_turn(&conversation.id, &pending("turn-1", "Hello"))
+        .enqueue_message_turn(
+            &conversation.id,
+            &turn,
+            &StoredMessage {
+                id: turn.id.clone(),
+                role: StoredMessageRole::User,
+                content: turn.content.clone(),
+                model: None,
+            },
+            None,
+        )
+        .unwrap();
+    assert!(
+        store
+            .mark_pending_turn_running(&conversation.id, &turn.id)
+            .unwrap()
+    );
+    store
+        .begin_pending_turn(&conversation.id, &turn.id, None, "assistant-1")
+        .unwrap();
+    store
+        .update_streaming_message(
+            &conversation.id,
+            "assistant-1",
+            "Partial response",
+            Some("test-model"),
+        )
         .unwrap();
 
     assert_eq!(store.recover_interrupted_turns().unwrap(), 1);

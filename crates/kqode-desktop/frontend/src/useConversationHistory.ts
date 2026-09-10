@@ -154,6 +154,8 @@ export function useConversationHistory() {
       );
       if (retryErrorId) {
         await sync.restoreMessage(activeConversation.id, retryErrorId);
+      } else {
+        sync.tombstoneMessage(activeConversation.id, turnId);
       }
       replaceConversation(replacement);
     } catch (error) {

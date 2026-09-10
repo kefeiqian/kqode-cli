@@ -1,4 +1,6 @@
-use rusqlite::{OptionalExtension, Transaction, params};
+use std::collections::HashSet;
+
+use rusqlite::{Transaction, params};
 use uuid::Uuid;
 
 use super::{
@@ -41,67 +43,86 @@ impl ConversationStore {
                 continue;
             }
 
+            let original_messages = conversation.messages.clone();
+            let pending_ids = pending_turns
+                .iter()
+                .map(|pending| pending.id.as_str())
+                .collect::<HashSet<_>>();
+            let streaming_message_ids = {
+                let mut statement = self.connection.prepare(
+                    "SELECT id
+                     FROM messages
+                     WHERE conversation_id = ?1
+                       AND status = 'streaming'",
+                )?;
+                let rows =
+                    statement.query_map([&conversation_id], |row| row.get::<_, String>(0))?;
+                rows.collect::<Result<HashSet<_>, _>>()?
+            };
+            conversation.messages.retain(|message| {
+                !(streaming_message_ids.contains(&message.id)
+                    || message.role == StoredMessageRole::User
+                        && pending_ids.contains(message.id.as_str()))
+            });
+            let mut recovered_error_links = Vec::new();
+
             for pending in &pending_turns {
                 let preserved_retry_error =
                     pending.retry_error_id.as_deref().is_some_and(|error_id| {
-                        conversation.messages.iter().any(|message| {
+                        original_messages.iter().any(|message| {
                             message.id == error_id && message.role == StoredMessageRole::Error
                         })
                     });
                 if preserved_retry_error {
-                    let streaming_message_id = self
-                        .connection
-                        .query_row(
-                            "SELECT id
-                             FROM messages
-                             WHERE conversation_id = ?1
-                               AND request_id = ?2
-                               AND status = 'streaming'",
-                            params![conversation_id, pending.id],
-                            |row| row.get::<_, String>(0),
-                        )
-                        .optional()?;
-                    if let Some(message_id) = streaming_message_id {
-                        conversation
-                            .messages
-                            .retain(|message| message.id != message_id);
-                    }
                     recovered += 1;
                     continue;
                 }
 
-                let user_index = if pending.retry_error_id.is_some() {
-                    conversation.messages.iter().rposition(|message| {
+                let user_message = if pending.retry_error_id.is_some() {
+                    original_messages.iter().rfind(|message| {
                         message.role == StoredMessageRole::User
                             && message.content == pending.content
                     })
                 } else {
-                    conversation.messages.iter().position(|message| {
+                    original_messages.iter().find(|message| {
                         message.id == pending.id && message.role == StoredMessageRole::User
                     })
-                };
-
-                if let Some(user_index) = user_index {
-                    conversation.messages.truncate(user_index + 1);
-                } else {
-                    conversation.messages.push(StoredMessage {
-                        id: pending.id.clone(),
-                        role: StoredMessageRole::User,
-                        content: pending.content.clone(),
-                        model: None,
-                    });
                 }
+                .cloned()
+                .unwrap_or_else(|| StoredMessage {
+                    id: pending.id.clone(),
+                    role: StoredMessageRole::User,
+                    content: pending.content.clone(),
+                    model: None,
+                });
+                if !conversation
+                    .messages
+                    .iter()
+                    .any(|message| message.id == user_message.id)
+                {
+                    conversation.messages.push(user_message.clone());
+                }
+                let error_id = Uuid::new_v4().to_string();
                 conversation.messages.push(StoredMessage {
-                    id: Uuid::new_v4().to_string(),
+                    id: error_id.clone(),
                     role: StoredMessageRole::Error,
                     content: INTERRUPTED_RESPONSE_ERROR.to_owned(),
                     model: None,
                 });
+                recovered_error_links.push((error_id, user_message.id));
                 recovered += 1;
             }
 
             let transaction = self.connection.transaction()?;
             replace_messages(&transaction, &conversation.id, &conversation.messages)?;
+            for (error_id, user_message_id) in recovered_error_links {
+                transaction.execute(
+                    "UPDATE messages
+                     SET request_id = ?1
+                     WHERE conversation_id = ?2 AND id = ?3",
+                    params![user_message_id, conversation.id, error_id],
+                )?;
+            }
             transaction.execute(
                 "DELETE FROM pending_turns WHERE conversation_id = ?1",
                 [&conversation.id],
