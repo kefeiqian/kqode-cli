@@ -6,6 +6,7 @@ use crate::{
 pub(super) fn retry_user_message_id(
     conversation: &Conversation,
     pending: &PendingTurn,
+    linked_user_message_id: Option<&str>,
 ) -> (Option<usize>, String) {
     let retry_error_index = pending.retry_error_id.as_deref().and_then(|error_id| {
         conversation
@@ -13,11 +14,15 @@ pub(super) fn retry_user_message_id(
             .iter()
             .position(|message| message.id == error_id)
     });
-    let user_message_id = retry_error_index
-        .and_then(|index| index.checked_sub(1))
-        .and_then(|index| conversation.messages.get(index))
-        .filter(|message| message.role == StoredMessageRole::User)
-        .map(|message| message.id.clone())
+    let user_message_id = linked_user_message_id
+        .map(str::to_owned)
+        .or_else(|| {
+            retry_error_index
+                .and_then(|index| index.checked_sub(1))
+                .and_then(|index| conversation.messages.get(index))
+                .filter(|message| message.role == StoredMessageRole::User)
+                .map(|message| message.id.clone())
+        })
         .unwrap_or_else(|| pending.id.clone());
     (retry_error_index, user_message_id)
 }

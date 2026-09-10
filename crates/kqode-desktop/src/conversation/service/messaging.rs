@@ -63,8 +63,8 @@ pub(crate) fn retry_message(
             error_message_id.to_owned(),
         ));
     }
-    let user_content = store
-        .load_retry_user_content(conversation_id, error_message_id)?
+    let (_, user_content) = store
+        .prepare_retry_user(conversation_id, error_message_id)?
         .ok_or_else(|| ConversationServiceError::InvalidRetry(error_message_id.to_owned()))?;
     if conversation
         .pending_turns

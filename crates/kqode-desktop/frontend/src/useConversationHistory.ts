@@ -3,6 +3,7 @@ import {
   createStoredConversation,
   deleteStoredTurn,
   loadStoredConversation,
+  loadStoredMessage,
   retryStoredMessage,
   sendStoredMessage,
   steerStoredTurn,
@@ -162,7 +163,7 @@ export function useConversationHistory() {
 
   const retryMessage = async (errorMessageId: string) => {
     if (!activeConversation) return;
-    const responseRequestId = activeConversation.messages.find(
+    let responseRequestId = activeConversation.messages.find(
       (message) => message.id === errorMessageId,
     )?.requestId;
     try {
@@ -170,6 +171,11 @@ export function useConversationHistory() {
         activeConversation.id,
         errorMessageId,
       );
+      if (!responseRequestId) {
+        responseRequestId = (
+          await loadStoredMessage(activeConversation.id, errorMessageId)
+        ).requestId;
+      }
       const retryTurnId = replacement.pendingTurns.find(
         (turn) => turn.retryErrorId === errorMessageId,
       )?.id;

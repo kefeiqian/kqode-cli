@@ -43,8 +43,15 @@ pub(crate) async fn process_pending_turn(
                 title_generation: None,
             });
         };
+        let linked_user_message_id = pending
+            .retry_error_id
+            .as_deref()
+            .map(|error_id| store.load_message_record(conversation_id, error_id))
+            .transpose()?
+            .flatten()
+            .and_then(|message| message.request_id);
         let (retry_error_index, current_user_message_id) =
-            retry_user_message_id(&conversation, &pending);
+            retry_user_message_id(&conversation, &pending, linked_user_message_id.as_deref());
         if let Some(index) = retry_error_index {
             conversation.messages.remove(index);
         }

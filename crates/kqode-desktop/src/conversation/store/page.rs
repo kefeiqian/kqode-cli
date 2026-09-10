@@ -138,15 +138,15 @@ impl ConversationStore {
             .map_err(StoreError::from)
     }
 
-    pub(crate) fn load_retry_user_content(
+    pub(crate) fn prepare_retry_user(
         &self,
         conversation_id: &str,
         error_message_id: &str,
-    ) -> Result<Option<String>, StoreError> {
+    ) -> Result<Option<(String, String)>, StoreError> {
         let linked = self
             .connection
             .query_row(
-                "SELECT user.content
+                "SELECT user.id, user.content
                  FROM messages error
                  JOIN messages user
                    ON user.conversation_id = error.conversation_id
@@ -156,17 +156,18 @@ impl ConversationStore {
                    AND error.id = ?2
                    AND error.role = 'error'",
                 params![conversation_id, error_message_id],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .optional()?;
         if linked.is_some() {
             return Ok(linked);
         }
-        self.connection
+        let fallback = self
+            .connection
             .query_row(
-                "SELECT user.content
-                 FROM messages error
-                 JOIN messages user
+                "SELECT user.id, user.content
+                  FROM messages error
+                  JOIN messages user
                    ON user.conversation_id = error.conversation_id
                   AND user.position = error.position - 1
                   AND user.role = 'user'
@@ -174,10 +175,18 @@ impl ConversationStore {
                    AND error.id = ?2
                    AND error.role = 'error'",
                 params![conversation_id, error_message_id],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
-            .optional()
-            .map_err(StoreError::from)
+            .optional()?;
+        if let Some((user_id, _)) = fallback.as_ref() {
+            self.connection.execute(
+                "UPDATE messages
+                 SET request_id = ?1
+                 WHERE conversation_id = ?2 AND id = ?3",
+                params![user_id, conversation_id, error_message_id],
+            )?;
+        }
+        Ok(fallback)
     }
 }
 

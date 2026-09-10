@@ -598,10 +598,11 @@ fn failing_a_retry_preserves_its_original_user_link() {
     assert_eq!(messages[2].request_id.as_deref(), Some("user-1"));
     assert_eq!(
         store
-            .load_retry_user_content(&conversation.id, "assistant-1")
+            .prepare_retry_user(&conversation.id, "assistant-1")
             .unwrap()
-            .as_deref(),
-        Some("Hello")
+            .as_ref()
+            .map(|(id, content)| (id.as_str(), content.as_str())),
+        Some(("user-1", "Hello"))
     );
 }
 
