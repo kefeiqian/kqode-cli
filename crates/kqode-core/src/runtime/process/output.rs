@@ -4,12 +4,12 @@ use tokio::io::{AsyncRead, AsyncReadExt};
 
 use super::ProcessError;
 
-pub(super) struct CapturedOutput {
+pub(crate) struct CapturedOutput {
     pub text: String,
     pub omitted_bytes: usize,
 }
 
-pub(super) async fn read_bounded(
+pub(crate) async fn read_bounded(
     mut reader: impl AsyncRead + Unpin,
     limit: usize,
 ) -> Result<CapturedOutput, ProcessError> {

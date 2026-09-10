@@ -1,12 +1,22 @@
+#[path = "../../src/runtime/command_policy/windows_sandbox/attributes.rs"]
 mod attributes;
+#[path = "../../src/runtime/command_policy/windows_sandbox/capabilities.rs"]
 mod capabilities;
+#[path = "../../src/runtime/command_policy/windows_sandbox/descendants.rs"]
+mod descendants;
 mod fixture;
+#[path = "../../src/runtime/command_policy/windows_sandbox/identity.rs"]
 mod identity;
+#[path = "../../src/runtime/command_policy/windows_sandbox/job.rs"]
+mod job;
 mod launch;
+#[path = "../../src/runtime/command_policy/windows_sandbox/native.rs"]
 mod native;
 mod network;
 mod observation;
 mod snapshot;
+mod supervisor;
+#[path = "../../src/runtime/command_policy/windows_sandbox/transport.rs"]
 mod transport;
 
 use std::{collections::BTreeMap, error::Error, path::PathBuf, time::Duration};
@@ -22,11 +32,22 @@ use identity::Identity;
 pub fn run() -> Result<(), Box<dyn Error>> {
     let arguments: Vec<_> = std::env::args_os().skip(1).collect();
     let snapshot_only = arguments.len() == 1 && arguments[0] == "--snapshot-only";
-    if !arguments.is_empty() && !snapshot_only {
-        return Err("expected no arguments or --snapshot-only".into());
+    let supervisor_only = arguments.len() == 1 && arguments[0] == "--supervisor-only";
+    if !arguments.is_empty() && !snapshot_only && !supervisor_only {
+        return Err("expected no arguments, --snapshot-only or --supervisor-only".into());
     }
     let mut identity = Identity::new()?;
     let fixture = Fixture::new(&identity.text()?)?;
+    if supervisor_only {
+        let result = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?
+            .block_on(supervisor::run(&fixture, &PowerShell::resolve(None)?))?;
+        identity.close()?;
+        fixture.close()?;
+        println!("{}", serde_json::to_string_pretty(&result)?);
+        return Ok(());
+    }
     if snapshot_only {
         let result = snapshot::run(&fixture, &PowerShell::resolve(None)?)?;
         identity.close()?;

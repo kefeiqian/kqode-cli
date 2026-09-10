@@ -27,7 +27,7 @@ impl Drop for SidArray {
     }
 }
 
-/// Owns capability SID allocations until all native startup attributes are dropped.
+/// Owns capability SID allocations through native process creation.
 pub(super) struct Capabilities {
     _sids: Vec<SidArray>,
     pub entries: Vec<SID_AND_ATTRIBUTES>,

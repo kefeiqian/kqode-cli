@@ -14,7 +14,7 @@ use super::native::wide;
 
 /// Owns a uniquely named, temporary profile. Never adopts a pre-existing profile.
 pub(super) struct Identity {
-    sid: PSID,
+    sid: Vec<u32>,
     name: Vec<u16>,
     registered: bool,
 }
@@ -38,24 +38,28 @@ impl Identity {
                 "create temporary profile: HRESULT {status:#x}"
             )));
         }
-        let identity = Self {
-            sid,
+        let copied = copy_sid(sid);
+        if !sid.is_null() {
+            unsafe {
+                FreeSid(sid);
+            }
+        }
+        let mut identity = Self {
+            sid: Vec::new(),
             name,
             registered: true,
         };
-        if identity.sid.is_null() {
-            return Err(io::Error::other("profile creation returned null SID"));
-        }
+        identity.sid = copied?;
         Ok(identity)
     }
 
     pub fn raw(&self) -> PSID {
-        self.sid
+        self.sid.as_ptr().cast_mut().cast()
     }
 
     pub fn text(&self) -> io::Result<String> {
         let mut text = ptr::null_mut();
-        if unsafe { ConvertSidToStringSidW(self.sid, &mut text) } == 0 {
+        if unsafe { ConvertSidToStringSidW(self.raw(), &mut text) } == 0 {
             return Err(io::Error::last_os_error());
         }
         // The API returns an allocated, NUL-terminated UTF-16 SID string.
@@ -93,10 +97,21 @@ impl Drop for Identity {
                 String::from_utf16_lossy(&self.name[..self.name.len() - 1])
             );
         }
-        if !self.sid.is_null() {
-            unsafe {
-                FreeSid(self.sid);
-            }
-        }
     }
+}
+
+fn copy_sid(sid: PSID) -> io::Result<Vec<u32>> {
+    use windows_sys::Win32::Security::{CopySid, GetLengthSid};
+    if sid.is_null() {
+        return Err(io::Error::other("profile creation returned null SID"));
+    }
+    let bytes = unsafe { GetLengthSid(sid) };
+    if bytes == 0 {
+        return Err(io::Error::last_os_error());
+    }
+    let mut buffer = vec![0u32; (bytes as usize).div_ceil(size_of::<u32>())];
+    if unsafe { CopySid(bytes, buffer.as_mut_ptr().cast(), sid) } == 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(buffer)
 }

@@ -26,6 +26,10 @@ pub enum CommandGateError {
     Snapshot(SnapshotError),
     SnapshotLeaseRequired,
     SnapshotBindingMismatch,
+    NativeSandbox {
+        operation: &'static str,
+        source: io::Error,
+    },
     SnapshotCleanup {
         failure: Box<CommandGateError>,
         cleanup: SnapshotError,
@@ -77,6 +81,7 @@ impl fmt::Display for CommandGateError {
                 f,
                 "snapshot ownership does not match the approved workspace mapping"
             ),
+            Self::NativeSandbox { operation, source } => write!(f, "{operation}: {source}"),
             Self::SnapshotCleanup { failure, cleanup } => {
                 write!(f, "{failure}; snapshot cleanup also failed: {cleanup}")
             }
@@ -95,6 +100,7 @@ impl std::error::Error for CommandGateError {
             Self::Workspace(error) => Some(error),
             Self::Backend(error) => Some(error),
             Self::Snapshot(error) => Some(error),
+            Self::NativeSandbox { source, .. } => Some(source),
             Self::SnapshotCleanup { failure, .. } => Some(failure.as_ref()),
             Self::SnapshotCleanupTask { failure, .. } => Some(failure.as_ref()),
             _ => None,

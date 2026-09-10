@@ -707,6 +707,16 @@ and secret-environment tests pass.
       support in addition to filesystem/network capabilities. Policy, approval
       and backend receive the same mapping; disposal follows backend-future
       cleanup, while completed dispatch returns owned, unpublished artifacts.
+- [ ] Add the native LPAC execution primitive (implemented; awaiting review):
+      `WindowsSandboxBackend::run_diagnostic` consumes an owned snapshot and
+      accepts only native PowerShell 7, confined profiles and denied network.
+      Share token/transport primitives with the opt-in probe, pin and validate
+      copy objects before ACL grants, atomically assign suspended processes to
+      a Job, verify token state before resume, and supervise bounded output,
+      concurrency, timeout, cancellation and descendant cleanup. This explicit
+      host diagnostic bypasses approval and must never become a model/tool
+      entry point. Automatic dispatch continues to reject partial process-tree,
+      filesystem and network capabilities; no unconfined fallback exists.
 - [ ] Define safe artifact inspection/publication with baseline/stale checks and
       protected-path rejection; never auto-write back. The copy is not a Git
       worktree. Absolute paths in scripts/environment are not rewritten; missing
@@ -753,7 +763,8 @@ consume the frozen environment without re-inheritance, and own process cleanup.
   Native PowerShell 5.1 also required conventional local-drive path spelling in
   this probe's `CreateProcessW` transport; verbatim path spelling failed its
   unconfined initialization. The probe rejects unusual/long paths instead of
-  changing their semantics; production transport still needs its own integration.
+  changing their semantics. Native diagnostic execution now shares this
+  transport without widening its supported path spellings.
 
 The native mechanism follows Microsoft's
 [AppContainer launch documentation](https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer)
@@ -782,6 +793,37 @@ no enforcing production backend is enabled by the new capability contract. Norma
 failure cleanup is awaited on a blocking worker and retains the primary error if
 cleanup also fails. Dropping a future uses the existing synchronous cleanup
 fallback; adapters should await graceful cancellation for large copies.
+
+**Native execution milestone (September 10, 2026):** the diagnostic backend now
+uses private named pipes and the existing independent per-stream head/tail
+capture limits, reporting exact omitted byte counts. Fresh profiles are removed
+after Job termination and explicit joins for the root and pinned descendants;
+dropping the future also terminates the Job before disposing the copy. Job
+activity reaching zero was observed before descendant handles became signaled;
+cleanup now pins current members before termination and waits on those handles.
+Members created concurrently with that enumeration still rely on Job
+termination/accounting, so `ProcessTree` remains `Partial` pending stronger
+high-churn lifecycle acceptance. Completed execution, including
+nonzero exits and supervised cancellation/timeouts, returns owned artifacts for
+explicit inspection/disposal; infrastructure failures dispose the copy and
+preserve cleanup errors. Setup and bounded kill/join still use synchronous Win32
+calls and must run on a runtime worker, not a UI thread.
+
+Six opt-in native tests passed on this host: Unicode/frozen environment/nonzero
+exit; bounded dual-stream output; read-only and copy-write/source-denial behavior;
+continuous-output timeout; actual descendant termination on exit, cancellation
+and future drop; and cancellation while waiting for the concurrency permit.
+Ordinary tests additionally reject hardlinks/junctions injected into a captured
+copy before granting access, preserve their source targets, and enforce preflight
+entry limits/cancellation. Both focused probe modes still complete.
+
+This milestone establishes the native lifecycle primitive, not U5 acceptance.
+Process-tree, read-only filesystem, workspace-write filesystem, protected paths and denied
+network remain `Partial`; the LPAC token-query gap is still reported. Global
+filesystem/network confinement, new aliases created during execution, safe
+artifact publication and production PowerShell syntax policy remain unresolved.
+The automatic sandbox gate still refuses this backend and real `run_command`
+remains unavailable.
 
 ### U6. Implement the first real tools
 

@@ -11,7 +11,7 @@ use windows_sys::Win32::{
     },
 };
 
-/// Owns aligned attribute storage and borrows every value until after creation.
+/// Shared native startup attributes; referenced values outlive process creation.
 pub(super) struct Attributes<'a> {
     storage: Vec<usize>,
     values: PhantomData<&'a ()>,

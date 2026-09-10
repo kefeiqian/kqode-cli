@@ -110,6 +110,23 @@ impl WorkspaceSnapshot {
         }
     }
 
+    /// Pins and checks every private-copy object before native access is granted.
+    #[cfg(windows)]
+    pub(crate) fn execution_files(
+        &self,
+        limit: usize,
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<std::fs::File>, SnapshotError> {
+        self.validate_location()?;
+        super::windows::execution_files(
+            self.directory
+                .as_ref()
+                .ok_or(SnapshotError::SnapshotMoved)?,
+            limit,
+            cancellation,
+        )
+    }
+
     /// Removes this owned temporary tree, reporting cleanup errors explicitly.
     ///
     /// # Errors

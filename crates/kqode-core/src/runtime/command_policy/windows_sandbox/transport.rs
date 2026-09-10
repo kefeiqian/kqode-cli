@@ -1,9 +1,9 @@
 use std::{ffi::OsStr, io, os::windows::ffi::OsStrExt};
 
+use super::CommandContext;
 use super::native::wide;
-use kqode_core::runtime::CommandContext;
 
-/// Probe-only conventional path spelling for legacy .NET initialization.
+/// Conventional local path spelling supported by this first native runner.
 /// Reject unusual names rather than changing verbatim-path semantics.
 pub(super) fn conventional_path(path: &OsStr) -> io::Result<Vec<u16>> {
     let text = path

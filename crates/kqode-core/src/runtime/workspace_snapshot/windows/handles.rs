@@ -11,7 +11,7 @@ use std::{
     ptr,
 };
 
-use super::security::PrivateDescriptor;
+use crate::runtime::windows_security::PrivateDescriptor;
 use windows_sys::{
     Wdk::{
         Foundation::OBJECT_ATTRIBUTES,

@@ -17,12 +17,19 @@ use windows_sys::Win32::{
 };
 
 /// Creates private, inheritable user/SYSTEM permissions before any source bytes are copied.
-pub(super) struct PrivateDescriptor(PSECURITY_DESCRIPTOR);
+pub(crate) struct PrivateDescriptor(PSECURITY_DESCRIPTOR);
 
 impl PrivateDescriptor {
     pub fn new() -> io::Result<Self> {
+        Self::with_package(None)
+    }
+
+    pub fn with_package(package: Option<(&str, u32)>) -> io::Result<Self> {
         let user = current_user_sid()?;
-        let sddl: Vec<u16> = format!("D:P(A;OICI;FA;;;{user})(A;OICI;FA;;;SY)")
+        let package = package
+            .map(|(sid, mask)| format!("(A;OICI;{mask:#x};;;{sid})"))
+            .unwrap_or_default();
+        let sddl: Vec<u16> = format!("D:P(A;OICI;FA;;;{user})(A;OICI;FA;;;SY){package}")
             .encode_utf16()
             .chain([0])
             .collect();

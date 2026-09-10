@@ -2,6 +2,7 @@
 //!
 //! Run with `cargo run -p kqode-core --example windows_sandbox_probe`.
 //! Use `-- --snapshot-only` for the focused copy-isolation comparison.
+//! Use `-- --supervisor-only` to exercise the bounded native execution layer.
 //! Changes ACLs only on newly created temporary fixtures. Creates and removes a
 //! uniquely named AppContainer profile. No accounts, firewall rules or loopback
 //! exemptions are created. This probe runs only fixed, checked-in scripts.

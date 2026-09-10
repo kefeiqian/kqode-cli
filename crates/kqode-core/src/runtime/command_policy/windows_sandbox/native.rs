@@ -8,20 +8,14 @@ use std::{
     ptr,
 };
 
+pub(super) use super::job::Job;
 use windows_sys::Win32::{
     Foundation::HANDLE,
     Security::{
         GetTokenInformation, TOKEN_INFORMATION_CLASS, TOKEN_QUERY, TokenIsAppContainer,
         TokenIsLessPrivilegedAppContainer,
     },
-    System::{
-        JobObjects::{
-            CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-            JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
-            SetInformationJobObject, TerminateJobObject,
-        },
-        Threading::OpenProcessToken,
-    },
+    System::Threading::OpenProcessToken,
 };
 
 pub(super) fn wide(value: impl AsRef<OsStr>) -> io::Result<Vec<u16>> {
@@ -45,38 +39,9 @@ pub(super) unsafe fn owned(handle: HANDLE) -> io::Result<OwnedHandle> {
     Ok(unsafe { OwnedHandle::from_raw_handle(handle.cast()) })
 }
 
-pub(super) struct Job(OwnedHandle);
-impl Job {
-    pub fn new() -> io::Result<Self> {
-        let handle = unsafe { owned(CreateJobObjectW(ptr::null(), ptr::null()))? };
-        let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-        if unsafe {
-            SetInformationJobObject(
-                handle.as_raw_handle().cast(),
-                JobObjectExtendedLimitInformation,
-                ptr::from_ref(&limits).cast(),
-                std::mem::size_of_val(&limits) as u32,
-            )
-        } == 0
-        {
-            return Err(io::Error::last_os_error());
-        }
-        Ok(Self(handle))
-    }
-    pub fn raw(&self) -> HANDLE {
-        self.0.as_raw_handle().cast()
-    }
-    pub fn terminate(&self) -> io::Result<()> {
-        if unsafe { TerminateJobObject(self.raw(), 1) } == 0 {
-            return Err(io::Error::last_os_error());
-        }
-        Ok(())
-    }
-}
-
-#[derive(Default, serde::Serialize)]
-pub(super) struct TokenObservation {
+/// Observed token flags, retaining an unsupported LPAC query as an explicit gap.
+#[derive(Clone, Debug, Default, serde::Serialize)]
+pub struct TokenObservation {
     appcontainer: bool,
     lpac: Option<bool>,
     lpac_query_error: Option<i32>,

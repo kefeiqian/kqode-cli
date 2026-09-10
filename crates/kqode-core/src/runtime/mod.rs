@@ -17,7 +17,11 @@ mod repetition;
 mod state;
 mod tool_batch;
 mod turn_queue;
+#[cfg(windows)]
+mod windows_security;
 mod workspace_snapshot;
+#[cfg(windows)]
+pub use command_policy::{LpacDiagnosticOutput, LpacTokenObservation, WindowsSandboxBackend};
 
 pub use agent::AgentRuntime;
 pub use budget::{

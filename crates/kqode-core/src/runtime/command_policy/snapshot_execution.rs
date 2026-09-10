@@ -15,6 +15,17 @@ pub struct SnapshotCommandOutput {
 }
 
 impl SnapshotCommandOutput {
+    pub(super) fn new(
+        output: ProcessOutput,
+        workspace: CommandWorkspace,
+        snapshot: WorkspaceSnapshot,
+    ) -> Self {
+        Self {
+            output,
+            workspace,
+            snapshot,
+        }
+    }
     pub fn output(&self) -> &ProcessOutput {
         &self.output
     }
@@ -47,11 +58,7 @@ impl CommandExecutor {
         let SnapshotCommand { context, snapshot } = command;
         let workspace = context.workspace_binding().clone();
         match self.run_inner(context, cancellation, Some(&snapshot)).await {
-            Ok(output) => Ok(SnapshotCommandOutput {
-                output,
-                workspace,
-                snapshot,
-            }),
+            Ok(output) => Ok(SnapshotCommandOutput::new(output, workspace, snapshot)),
             Err(failure) => Err(dispose_async(snapshot, failure).await),
         }
     }
@@ -61,7 +68,10 @@ pub(super) fn dispose(snapshot: WorkspaceSnapshot, failure: CommandGateError) ->
     disposal_result(snapshot.close(), failure)
 }
 
-async fn dispose_async(snapshot: WorkspaceSnapshot, failure: CommandGateError) -> CommandGateError {
+pub(super) async fn dispose_async(
+    snapshot: WorkspaceSnapshot,
+    failure: CommandGateError,
+) -> CommandGateError {
     match tokio::task::spawn_blocking(move || snapshot.close()).await {
         Ok(result) => disposal_result(result, failure),
         Err(cleanup) => CommandGateError::SnapshotCleanupTask {
