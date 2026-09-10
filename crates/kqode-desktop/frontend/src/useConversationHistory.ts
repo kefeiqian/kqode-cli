@@ -171,19 +171,7 @@ export function useConversationHistory() {
         activeConversation.id,
         errorMessageId,
       );
-      setConversationDetails((current) => {
-        const conversation = current[replacement.id];
-        if (!conversation) return current;
-        return {
-          ...current,
-          [replacement.id]: {
-            ...conversation,
-            messages: conversation.messages.filter(
-              (message) => message.id !== errorMessageId,
-            ),
-          },
-        };
-      });
+      sync.tombstoneMessage(activeConversation.id, errorMessageId);
       replaceConversation(replacement);
     } catch (error) {
       setHistoryError(`Could not retry the message: ${String(error)}`);

@@ -115,6 +115,78 @@ fn deleting_an_unstarted_turn_removes_its_user_message() {
 }
 
 #[test]
+fn deleting_after_message_reordering_compacts_without_position_collisions() {
+    let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    let mut conversation = conversation();
+    store.save_conversation(&mut conversation).unwrap();
+    for (id, content) in [
+        ("turn-1", "First"),
+        ("turn-2", "Second"),
+        ("turn-3", "Third"),
+    ] {
+        let turn = pending(id, content);
+        store
+            .enqueue_message_turn(
+                &conversation.id,
+                &turn,
+                &StoredMessage {
+                    id: id.to_owned(),
+                    role: StoredMessageRole::User,
+                    content: content.to_owned(),
+                    model: None,
+                },
+                None,
+            )
+            .unwrap();
+    }
+    store
+        .begin_pending_turn(&conversation.id, "turn-1", None, "assistant-1")
+        .unwrap();
+
+    let deleted = store
+        .delete_pending_turn(&conversation.id, "turn-3")
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        deleted
+            .messages
+            .iter()
+            .map(|message| message.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["turn-2", "turn-1", "assistant-1"]
+    );
+}
+
+#[test]
+fn deleting_the_first_pending_turn_compacts_without_position_collisions() {
+    let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    let mut conversation = conversation();
+    store.save_conversation(&mut conversation).unwrap();
+    for turn in [
+        pending("turn-1", "First"),
+        pending("turn-2", "Second"),
+        pending("turn-3", "Third"),
+    ] {
+        store.enqueue_pending_turn(&conversation.id, &turn).unwrap();
+    }
+
+    let deleted = store
+        .delete_pending_turn(&conversation.id, "turn-1")
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        deleted
+            .pending_turns
+            .iter()
+            .map(|turn| turn.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["turn-2", "turn-3"]
+    );
+}
+
+#[test]
 fn completes_messages_and_pending_turn_atomically() {
     let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
     let mut conversation = conversation();

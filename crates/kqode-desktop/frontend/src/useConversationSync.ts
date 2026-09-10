@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import {
   createStoredConversation,
@@ -32,6 +32,7 @@ export function useConversationSync() {
   const [isHistoryLoaded, setIsHistoryLoaded] = useState(false);
   const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
   const [historyError, setHistoryError] = useState<string>();
+  const deletedMessageIds = useRef(new Map<string, Set<string>>());
 
   const activeConversation = useMemo(
     () => (activeId ? conversationDetails[activeId] : undefined),
@@ -39,22 +40,54 @@ export function useConversationSync() {
   );
 
   const replaceConversation = useCallback((replacement: Conversation) => {
+    const deleted = deletedMessageIds.current.get(replacement.id);
+    const filtered = deleted
+      ? {
+          ...replacement,
+          messages: replacement.messages.filter(
+            (message) => !deleted.has(message.id),
+          ),
+        }
+      : replacement;
     setConversationDetails((current) => {
-      const existing = current[replacement.id];
-      if (existing && existing.updatedAt > replacement.updatedAt) {
+      const existing = current[filtered.id];
+      if (existing && existing.updatedAt > filtered.updatedAt) {
         return current;
       }
       return {
         ...current,
-        [replacement.id]: existing
-          ? mergeConversationPage(existing, replacement)
-          : replacement,
+        [filtered.id]: existing
+          ? mergeConversationPage(existing, filtered)
+          : filtered,
       };
     });
     setConversations((current) =>
-      replaceConversationListItem(current, replacement),
+      replaceConversationListItem(current, filtered),
     );
   }, []);
+
+  const tombstoneMessage = useCallback(
+    (conversationId: string, messageId: string) => {
+      const deleted =
+        deletedMessageIds.current.get(conversationId) ?? new Set<string>();
+      deleted.add(messageId);
+      deletedMessageIds.current.set(conversationId, deleted);
+      setConversationDetails((current) => {
+        const conversation = current[conversationId];
+        if (!conversation) return current;
+        return {
+          ...current,
+          [conversationId]: {
+            ...conversation,
+            messages: conversation.messages.filter(
+              (message) => message.id !== messageId,
+            ),
+          },
+        };
+      });
+    },
+    [],
+  );
 
   const refreshConversation = useCallback(
     async (conversationId: string) => {
@@ -75,6 +108,13 @@ export function useConversationSync() {
           event.conversationId,
           event.messageId,
         );
+        if (
+          deletedMessageIds.current
+            .get(event.conversationId)
+            ?.has(message.id)
+        ) {
+          return;
+        }
         setConversationDetails((current) => {
           const conversation = current[event.conversationId];
           if (!conversation) return current;
@@ -196,6 +236,10 @@ export function useConversationSync() {
         conversation.id,
         conversation.oldestMessagePosition,
       );
+      const deleted = deletedMessageIds.current.get(conversation.id);
+      const messages = deleted
+        ? page.messages.filter((message) => !deleted.has(message.id))
+        : page.messages;
       setConversationDetails((current) => {
         const latest = current[conversation.id];
         if (!latest) return current;
@@ -203,7 +247,7 @@ export function useConversationSync() {
           ...current,
           [conversation.id]: {
             ...latest,
-            messages: mergeMessages(page.messages, latest.messages),
+            messages: mergeMessages(messages, latest.messages),
             hasMoreMessages: page.hasMoreMessages,
             oldestMessagePosition:
               page.oldestMessagePosition ?? latest.oldestMessagePosition,
@@ -235,5 +279,6 @@ export function useConversationSync() {
     setConversationDetails,
     setConversations,
     setHistoryError,
+    tombstoneMessage,
   };
 }

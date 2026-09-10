@@ -290,17 +290,34 @@ pub(super) fn compact_message_positions(
     transaction: &Transaction<'_>,
     conversation_id: &str,
 ) -> Result<(), StoreError> {
-    transaction.execute(
-        "UPDATE messages
-         SET position = (
-             SELECT COUNT(*) - 1
-             FROM messages earlier
-             WHERE earlier.conversation_id = messages.conversation_id
-               AND earlier.position <= messages.position
-         )
-         WHERE conversation_id = ?1",
-        [conversation_id],
-    )?;
+    let ordered = {
+        let mut statement = transaction.prepare(
+            "SELECT id
+             FROM messages
+             WHERE conversation_id = ?1
+             ORDER BY position ASC",
+        )?;
+        let rows = statement.query_map([conversation_id], |row| row.get::<_, String>(0))?;
+        rows.collect::<Result<Vec<_>, _>>()?
+    };
+    for (position, id) in ordered.iter().enumerate() {
+        transaction.execute(
+            "UPDATE messages SET position = ?1
+             WHERE conversation_id = ?2 AND id = ?3",
+            params![
+                -i64::try_from(position).unwrap_or(i64::MAX) - 1,
+                conversation_id,
+                id
+            ],
+        )?;
+    }
+    for (position, id) in ordered.iter().enumerate() {
+        transaction.execute(
+            "UPDATE messages SET position = ?1
+             WHERE conversation_id = ?2 AND id = ?3",
+            params![position as i64, conversation_id, id],
+        )?;
+    }
     Ok(())
 }
 

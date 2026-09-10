@@ -47,18 +47,17 @@ pub(crate) fn compact_positions(
     transaction: &Transaction<'_>,
     conversation_id: &str,
 ) -> Result<(), StoreError> {
-    transaction.execute(
-        "UPDATE pending_turns
-         SET position = (
-             SELECT COUNT(*) - 1
-             FROM pending_turns earlier
-             WHERE earlier.conversation_id = pending_turns.conversation_id
-               AND earlier.position <= pending_turns.position
-         )
-         WHERE conversation_id = ?1",
-        [conversation_id],
-    )?;
-    Ok(())
+    let ordered = {
+        let mut statement = transaction.prepare(
+            "SELECT id
+             FROM pending_turns
+             WHERE conversation_id = ?1
+             ORDER BY position ASC",
+        )?;
+        let rows = statement.query_map([conversation_id], |row| row.get::<_, String>(0))?;
+        rows.collect::<Result<Vec<_>, _>>()?
+    };
+    persist_positions(transaction, conversation_id, &ordered)
 }
 
 fn temporary_position(position: usize) -> i64 {
