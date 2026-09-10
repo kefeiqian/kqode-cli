@@ -678,6 +678,17 @@ and secret-environment tests pass.
 - [ ] Add production PowerShell syntax analysis for chains, pipelines, and
       redirection. The current production default is always `ask`; the
       deny-dominant segment-decision combiner is not a PowerShell parser.
+- [x] Add an opt-in native AppContainer/LPAC feasibility probe:
+      `cargo run -p kqode-core --example windows_sandbox_probe`. Use fixed scripts,
+      fresh temporary fixtures/profile, explicit handle inheritance and atomic
+      Job assignment; verify AppContainer token state before resuming the child.
+      Include unconfined positive controls, filesystem counterexamples and actual
+      IPv4 loopback TCP/UDP receiver observations. Remove the profile and fixture
+      explicitly; return failure if the preferred-shell evidence is incomplete.
+      This example is not a production backend and never grants tool authority.
+- [ ] Resolve filesystem alias/protected-path enforcement before using LPAC for
+      workspace-write. Do not translate successful token creation or ordinary
+      ACL-denial tests into a full filesystem capability.
 - [ ] Fail closed when approval or sandbox support is unavailable.
 
 **Acceptance:** Read-only inspection works; workspace mutation and network access
@@ -692,6 +703,41 @@ but has no production enforcing backend and is not wired to the real tool handle
 Its immutable snapshot binds values, not filesystem object identity across time;
 the native backend must enforce path boundaries against concurrent replacement,
 consume the frozen environment without re-inheritance, and own process cleanup.
+
+**Native feasibility observations (September 10, 2026, this Windows host):**
+
+- Both installed PowerShell versions completed the native unconfined controls
+  and ordinary AppContainer probes. Ordinary AppContainer denied writes to the
+  read-only and outside-private fixtures, but permitted the outside fixture
+  explicitly writable by `ALL APPLICATION PACKAGES`.
+- PowerShell 7 completed LPAC with the explicit non-network capabilities
+  `registryRead` and `lpacInstrumentation`. This configuration also denied the
+  shared-package fixture and returned socket access-denied errors for both IPv4
+  loopback probes; the host receivers observed neither connection nor datagram.
+  These observations do not establish external-network, IPv6 or descendant
+  network isolation.
+- Granting write permission on a hard-link alias changed the file reachable
+  through the outside path in both AppContainer and supported LPAC. This is a
+  fixture-only demonstration of object-based ACL semantics, not a safe
+  workspace-write implementation. LPAC is a candidate for further work, not an
+  accepted full-enforcement backend.
+- Zero-capability LPAC did not complete the scripts. Windows PowerShell 5.1 also
+  did not complete with the two support capabilities. Startup errors/timeouts
+  remain inconclusive rather than being counted as successful access denials.
+- This host rejected `GetTokenInformation(TokenIsLessPrivilegedAppContainer)`
+  with error 87. The report preserves that query gap; LPAC was requested through
+  the documented process attribute and its shared-package behavior was measured.
+  Native PowerShell 5.1 also required conventional local-drive path spelling in
+  this probe's `CreateProcessW` transport; verbatim path spelling failed its
+  unconfined initialization. The probe rejects unusual/long paths instead of
+  changing their semantics; production transport still needs its own integration.
+
+The native mechanism follows Microsoft's
+[AppContainer launch documentation](https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer)
+and [process-attribute contract](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-updateprocthreadattribute).
+No Windows user account, firewall rule, loopback exemption or workspace ACL was
+changed. The opt-in example creates a randomly named AppContainer profile and
+grants ACLs only inside its newly created temporary fixture.
 
 ### U6. Implement the first real tools
 

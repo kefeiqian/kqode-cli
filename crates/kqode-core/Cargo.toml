@@ -26,3 +26,11 @@ windows-sys = { version = "0.61", features = [
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread"] }
+
+[target.'cfg(windows)'.dev-dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Security_Authorization",
+    "Win32_Security_Isolation",
+    "Win32_System_SystemServices",
+    "Win32_System_WindowsProgramming",
+] }
