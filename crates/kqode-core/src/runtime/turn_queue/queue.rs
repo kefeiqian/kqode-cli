@@ -85,8 +85,27 @@ impl TurnQueue {
         conversation_id: &str,
         request_id: &str,
     ) -> Result<Option<String>, TurnQueueError> {
+        self.steer_request_with(conversation_id, request_id, |_| Ok(()))
+    }
+
+    /// Performs a durable reorder before mutating or cancelling the live queue.
+    ///
+    /// # Errors
+    ///
+    /// Returns the caller error without changing queue state when the durable
+    /// reorder fails.
+    pub fn steer_request_with<E>(
+        &self,
+        conversation_id: &str,
+        request_id: &str,
+        reorder: impl FnOnce(Option<&str>) -> Result<(), E>,
+    ) -> Result<Option<String>, E>
+    where
+        E: From<TurnQueueError>,
+    {
         let mut registry = lock_registry(&self.state)?;
         let Some(queue) = registry.conversations.get_mut(conversation_id) else {
+            reorder(None)?;
             return Ok(None);
         };
         if queue
@@ -94,8 +113,14 @@ impl TurnQueue {
             .as_ref()
             .is_some_and(|entry| entry.request_id.as_deref() == Some(request_id))
         {
+            reorder(Some(request_id))?;
             return Ok(Some(request_id.to_owned()));
         }
+        let active_request_id = queue
+            .active
+            .as_ref()
+            .and_then(|active| active.request_id.clone());
+        reorder(active_request_id.as_deref())?;
         if let Some(index) = queue
             .waiting
             .iter()
@@ -104,10 +129,6 @@ impl TurnQueue {
             let target = queue.waiting.remove(index).expect("queue index exists");
             queue.waiting.push_front(target);
         }
-        let active_request_id = queue
-            .active
-            .as_ref()
-            .and_then(|active| active.request_id.clone());
         if let Some(cancellation) = queue
             .active
             .as_ref()

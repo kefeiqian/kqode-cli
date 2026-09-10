@@ -14,9 +14,21 @@ pub(crate) fn steer_turn(
     store: &Mutex<ConversationStore>,
     queue: &TurnQueue,
 ) -> Result<SteerTurnResult, ConversationServiceError> {
-    let active_request_id = queue.steer_request(conversation_id, turn_id)?;
-    let conversation = lock_conversations(store)?
-        .prioritize_pending_turn(conversation_id, active_request_id.as_deref(), turn_id)?
+    let mut conversation = None;
+    queue.steer_request_with(conversation_id, turn_id, |active_request_id| {
+        conversation = lock_conversations(store)?.prioritize_pending_turn(
+            conversation_id,
+            active_request_id,
+            turn_id,
+        )?;
+        if conversation.is_none() {
+            return Err(ConversationServiceError::PendingTurnNotFound(
+                turn_id.to_owned(),
+            ));
+        }
+        Ok(())
+    })?;
+    let conversation = conversation
         .ok_or_else(|| ConversationServiceError::PendingTurnNotFound(turn_id.to_owned()))?;
     Ok(SteerTurnResult { conversation })
 }

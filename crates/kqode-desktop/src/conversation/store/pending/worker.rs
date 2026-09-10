@@ -15,7 +15,20 @@ impl ConversationStore {
             "SELECT p.conversation_id, p.id
              FROM pending_turns p
              JOIN conversations c ON c.id = p.conversation_id
-             WHERE p.status = 'queued' AND c.archived = 0
+             WHERE p.status = 'queued'
+               AND c.archived = 0
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM pending_turns active
+                   WHERE active.conversation_id = p.conversation_id
+                     AND active.status = 'running'
+               )
+               AND p.position = (
+                   SELECT MIN(next.position)
+                   FROM pending_turns next
+                   WHERE next.conversation_id = p.conversation_id
+                     AND next.status = 'queued'
+               )
              ORDER BY c.updated_at ASC, p.position ASC",
         )?;
         let rows = statement.query_map([], |row| {
@@ -62,7 +75,20 @@ impl ConversationStore {
                 "SELECT p.conversation_id, p.id
                  FROM pending_turns p
                  JOIN conversations c ON c.id = p.conversation_id
-                 WHERE p.status = 'queued' AND c.archived = 0
+                 WHERE p.status = 'queued'
+                   AND c.archived = 0
+                   AND NOT EXISTS (
+                       SELECT 1
+                       FROM pending_turns active
+                       WHERE active.conversation_id = p.conversation_id
+                         AND active.status = 'running'
+                   )
+                   AND p.position = (
+                       SELECT MIN(next.position)
+                       FROM pending_turns next
+                       WHERE next.conversation_id = p.conversation_id
+                         AND next.status = 'queued'
+                   )
                  ORDER BY c.updated_at ASC, p.position ASC",
             )?;
             let rows = statement.query_map([], |row| {

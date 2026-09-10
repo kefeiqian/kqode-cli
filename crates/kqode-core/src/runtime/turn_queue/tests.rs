@@ -173,3 +173,30 @@ async fn failed_durable_deletion_keeps_the_waiting_entry() {
     drop(active);
     assert!(waiting.acquire().await.unwrap().is_some());
 }
+
+#[tokio::test]
+async fn failed_durable_steer_does_not_cancel_or_reorder_the_queue() {
+    let queue = TurnQueue::default();
+    let active = queue
+        .enqueue_request("conversation-1", "message-1")
+        .unwrap()
+        .acquire()
+        .await
+        .unwrap()
+        .unwrap();
+    let second = queue
+        .enqueue_request("conversation-1", "message-2")
+        .unwrap();
+    let _target = queue
+        .enqueue_request("conversation-1", "message-3")
+        .unwrap();
+
+    let result = queue.steer_request_with("conversation-1", "message-3", |_| {
+        Err::<(), _>(TurnQueueError::Wait("durable steering failed".to_owned()))
+    });
+
+    assert!(result.is_err());
+    assert!(!active.cancellation().unwrap().is_cancelled());
+    drop(active);
+    assert!(second.acquire().await.unwrap().is_some());
+}

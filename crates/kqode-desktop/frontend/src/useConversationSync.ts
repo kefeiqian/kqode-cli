@@ -40,17 +40,34 @@ export function useConversationSync() {
   );
 
   const replaceConversation = useCallback((replacement: Conversation) => {
-    const deleted = deletedMessageIds.current.get(replacement.id);
-    const filtered = deleted
-      ? {
-          ...replacement,
-          messages: replacement.messages.filter(
-            (message) => !deleted.has(message.id),
-          ),
-        }
-      : replacement;
     setConversationDetails((current) => {
-      const existing = current[filtered.id];
+      const existing = current[replacement.id];
+      const deleted = deletedMessageIds.current.get(replacement.id);
+      if (deleted && existing) {
+        for (const turn of existing.pendingTurns) {
+          if (
+            turn.retryErrorId &&
+            deleted.has(turn.retryErrorId) &&
+            !replacement.pendingTurns.some(
+              (pending) => pending.id === turn.id,
+            ) &&
+            !existing.messages.some(
+              (message) =>
+                message.requestId === turn.id && message.role !== "user",
+            )
+          ) {
+            deleted.delete(turn.retryErrorId);
+          }
+        }
+      }
+      const filtered = deleted
+        ? {
+            ...replacement,
+            messages: replacement.messages.filter(
+              (message) => !deleted.has(message.id),
+            ),
+          }
+        : replacement;
       if (existing && existing.updatedAt > filtered.updatedAt) {
         return current;
       }
@@ -62,7 +79,7 @@ export function useConversationSync() {
       };
     });
     setConversations((current) =>
-      replaceConversationListItem(current, filtered),
+      replaceConversationListItem(current, replacement),
     );
   }, []);
 
@@ -85,6 +102,13 @@ export function useConversationSync() {
           },
         };
       });
+    },
+    [],
+  );
+
+  const restoreMessage = useCallback(
+    (conversationId: string, messageId: string) => {
+      deletedMessageIds.current.get(conversationId)?.delete(messageId);
     },
     [],
   );
@@ -279,6 +303,7 @@ export function useConversationSync() {
     setConversationDetails,
     setConversations,
     setHistoryError,
+    restoreMessage,
     tombstoneMessage,
   };
 }

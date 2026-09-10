@@ -341,16 +341,11 @@ fn service_claims_backend_generated_turns_from_persistent_storage() {
     service.send(&conversation.id, "Second".to_owned()).unwrap();
 
     let mut claimed = service.claim_pending_work().unwrap();
-    assert_eq!(claimed.len(), 2);
+    assert_eq!(claimed.len(), 1);
     let first = claimed.remove(0);
-    let second = claimed.remove(0);
-    assert_ne!(first.turn_id, second.turn_id);
     assert!(!first.turn_id.is_empty());
-    assert!(!second.turn_id.is_empty());
-    let turn_ids = [first.turn_id.clone(), second.turn_id.clone()];
     assert!(service.claim_pending_work().unwrap().is_empty());
     first.queued.abandon().unwrap();
-    second.queued.abandon().unwrap();
     let saved = conversation_store
         .lock()
         .unwrap()
@@ -359,10 +354,8 @@ fn service_claims_backend_generated_turns_from_persistent_storage() {
         .unwrap();
     assert_eq!(saved.pending_turns.len(), 2);
     assert_eq!(saved.messages.len(), 2);
-    assert_eq!(saved.pending_turns[0].id, turn_ids[0]);
-    assert_eq!(saved.pending_turns[1].id, turn_ids[1]);
-    assert_eq!(saved.messages[0].id, turn_ids[0]);
-    assert_eq!(saved.messages[1].id, turn_ids[1]);
+    assert_eq!(saved.pending_turns[0].id, first.turn_id);
+    assert_ne!(saved.pending_turns[0].id, saved.pending_turns[1].id);
 }
 
 #[tokio::test]
@@ -414,6 +407,63 @@ async fn steer_cancels_the_active_turn_and_reorders_persisted_turns() {
     );
     drop(active);
     assert!(third.acquire().await.unwrap().is_some());
+}
+
+#[tokio::test]
+async fn steering_an_unclaimed_turn_makes_it_the_next_durable_claim() {
+    let conversation_store = Arc::new(store());
+    let queue = TurnQueue::default();
+    let service = ConversationService::new(
+        Arc::clone(&conversation_store),
+        llm_service(),
+        queue.clone(),
+    );
+    let conversation = service.create(None, None, None).unwrap();
+    {
+        let mut store = conversation_store.lock().unwrap();
+        for (id, content) in [
+            ("turn-1", "First"),
+            ("turn-2", "Second"),
+            ("turn-3", "Third"),
+        ] {
+            store
+                .enqueue_pending_turn(
+                    &conversation.id,
+                    &PendingTurn {
+                        id: id.to_owned(),
+                        content: content.to_owned(),
+                        retry_error_id: None,
+                        is_active: false,
+                    },
+                )
+                .unwrap();
+        }
+        assert!(
+            store
+                .mark_pending_turn_running(&conversation.id, "turn-1")
+                .unwrap()
+        );
+    }
+    let active = queue
+        .enqueue_request(&conversation.id, "turn-1")
+        .unwrap()
+        .acquire()
+        .await
+        .unwrap()
+        .unwrap();
+
+    service.steer(&conversation.id, "turn-3").unwrap();
+
+    assert!(active.cancellation().unwrap().is_cancelled());
+    drop(active);
+    conversation_store
+        .lock()
+        .unwrap()
+        .delete_pending_turn(&conversation.id, "turn-1")
+        .unwrap();
+    let claimed = service.claim_pending_work().unwrap();
+    assert_eq!(claimed.len(), 1);
+    assert_eq!(claimed[0].turn_id, "turn-3");
 }
 
 #[tokio::test]

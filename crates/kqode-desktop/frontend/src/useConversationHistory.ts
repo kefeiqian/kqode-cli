@@ -146,10 +146,18 @@ export function useConversationHistory() {
 
   const deleteTurn = async (turnId: string) => {
     if (!activeConversation) return;
+    const retryErrorId = activeConversation.pendingTurns.find(
+      (turn) => turn.id === turnId,
+    )?.retryErrorId;
     try {
-      replaceConversation(
-        await deleteStoredTurn(activeConversation.id, turnId),
+      const replacement = await deleteStoredTurn(
+        activeConversation.id,
+        turnId,
       );
+      if (retryErrorId) {
+        sync.restoreMessage(activeConversation.id, retryErrorId);
+      }
+      replaceConversation(replacement);
     } catch (error) {
       setHistoryError(`Could not delete the queued message: ${String(error)}`);
     }

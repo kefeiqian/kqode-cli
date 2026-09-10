@@ -230,7 +230,7 @@ fn polls_queued_turns_in_order_and_excludes_running_turns() {
             .into_iter()
             .map(|work| work.turn_id)
             .collect::<Vec<_>>(),
-        vec!["turn-1", "turn-2", "turn-3"]
+        vec!["turn-1"]
     );
     assert!(
         store
@@ -249,12 +249,27 @@ fn polls_queued_turns_in_order_and_excludes_running_turns() {
             .into_iter()
             .map(|work| work.turn_id)
             .collect::<Vec<_>>(),
-        vec!["turn-2", "turn-3"]
+        Vec::<String>::new()
+    );
+    assert!(
+        store
+            .delete_pending_turn(&conversation.id, "turn-1")
+            .unwrap()
+            .is_some()
+    );
+    assert_eq!(
+        store
+            .load_queued_work()
+            .unwrap()
+            .into_iter()
+            .map(|work| work.turn_id)
+            .collect::<Vec<_>>(),
+        vec!["turn-2"]
     );
 }
 
 #[test]
-fn claims_all_queued_work_in_one_durable_transition() {
+fn claims_only_the_next_turn_for_each_conversation() {
     let mut store = ConversationStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
     let mut conversation = conversation();
     store.save_conversation(&mut conversation).unwrap();
@@ -269,7 +284,7 @@ fn claims_all_queued_work_in_one_durable_transition() {
             .iter()
             .map(|work| work.turn_id.as_str())
             .collect::<Vec<_>>(),
-        vec!["turn-1", "turn-2"]
+        vec!["turn-1"]
     );
     assert!(store.load_queued_work().unwrap().is_empty());
 }
