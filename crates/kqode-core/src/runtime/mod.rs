@@ -2,6 +2,7 @@ mod agent;
 #[cfg(test)]
 mod agent_tests;
 mod budget;
+mod command_policy;
 mod driver;
 mod event;
 mod event_sink;
@@ -20,6 +21,13 @@ mod turn_queue;
 pub use agent::AgentRuntime;
 pub use budget::{
     BudgetError, BudgetErrorKind, BudgetTracker, RepeatAction, TurnBudget, TurnBudgetOverrides,
+};
+pub use command_policy::{
+    ApprovalDecision, ApprovalRequest, ApprovalResponse, AuthorizedCommand, CommandApprovalFuture,
+    CommandApprovalResponder, CommandContext, CommandExecutor, CommandGateError, CommandPolicy,
+    EnvironmentProfile, NetworkPolicy, PolicyDecision, PowerShellCommandOptions, RequireApproval,
+    SandboxBackend, SandboxCapabilities, SandboxCapability, SandboxEnforcement, SandboxFuture,
+    SandboxPermissions, SandboxProfile,
 };
 pub use event::RuntimeEvent;
 pub use event_sink::{NoopEventSink, RuntimeEventSink};

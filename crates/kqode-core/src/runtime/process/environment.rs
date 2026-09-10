@@ -46,7 +46,7 @@ impl Default for EnvironmentPolicy {
 }
 
 impl EnvironmentPolicy {
-    pub(super) fn build(
+    pub(crate) fn build(
         &self,
         overrides: &BTreeMap<String, String>,
     ) -> BTreeMap<OsString, OsString> {
@@ -73,7 +73,7 @@ impl EnvironmentPolicy {
     }
 }
 
-fn environment_key(name: &OsStr) -> OsString {
+pub(crate) fn environment_key(name: &OsStr) -> OsString {
     #[cfg(windows)]
     {
         use std::os::windows::ffi::{OsStrExt, OsStringExt};
@@ -95,7 +95,7 @@ fn environment_key(name: &OsStr) -> OsString {
     }
 }
 
-fn is_secret_name(name: &OsStr) -> bool {
+pub(crate) fn is_secret_name(name: &OsStr) -> bool {
     let normalized = name.to_string_lossy().to_ascii_uppercase();
     [
         "TOKEN",

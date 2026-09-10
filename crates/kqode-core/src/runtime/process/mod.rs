@@ -10,6 +10,7 @@ mod workspace;
 mod tests;
 
 pub use environment::EnvironmentPolicy;
+pub(crate) use environment::{environment_key, is_secret_name};
 pub use error::{ProcessError, WorkspaceError};
 pub use powershell::{PowerShell, PowerShellError};
 pub use supervisor::{ProcessOutput, ProcessRequest, ProcessSupervisor};

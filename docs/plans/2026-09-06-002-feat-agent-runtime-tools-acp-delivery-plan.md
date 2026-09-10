@@ -666,6 +666,18 @@ and secret-environment tests pass.
       through Git Bash, Cygwin, or WSL.
 - [ ] Implement `allow | ask | deny`, read-only and workspace-write profiles, and
       independent network policy.
+- [x] Add the command authorization gate and immutable context contracts:
+      native PowerShell derives actual argv from the original approval script;
+      freeze canonical executable/workspace/cwd, effective sanitized environment,
+      filesystem/network permissions, extra roots, timeout, and output limits.
+      Use a fresh single-use approval challenge for each execution; missing,
+      rejected, stale, timed-out, or cancelled approval never dispatches a backend.
+      Even an `allow` decision requires fresh approval for `danger-full-access`.
+      Check full backend capabilities before approval and again before dispatch;
+      partial support is insufficient, and network denial remains independent.
+- [ ] Add production PowerShell syntax analysis for chains, pipelines, and
+      redirection. The current production default is always `ask`; the
+      deny-dominant segment-decision combiner is not a PowerShell parser.
 - [ ] Fail closed when approval or sandbox support is unavailable.
 
 **Acceptance:** Read-only inspection works; workspace mutation and network access
@@ -675,6 +687,11 @@ satisfy this acceptance criterion: U5 remains incomplete and the real
 Policy evaluates the original script and final launch context, not merely its
 base64 transport. AppContainer versus restricted-token/ACL enforcement remains a
 backend decision, independent of the native PowerShell shell choice.
+The authorization gate is covered with deterministic fake backend/responder tests,
+but has no production enforcing backend and is not wired to the real tool handler.
+Its immutable snapshot binds values, not filesystem object identity across time;
+the native backend must enforce path boundaries against concurrent replacement,
+consume the frozen environment without re-inheritance, and own process cleanup.
 
 ### U6. Implement the first real tools
 
