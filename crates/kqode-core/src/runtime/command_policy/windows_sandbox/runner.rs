@@ -60,9 +60,9 @@ impl WindowsSandboxBackend {
     /// Always uses LPAC, never an unconfined fallback. Only confined snapshots,
     /// PowerShell 7 transport and denied network are accepted. Missing LPAC token
     /// introspection is reported, not interpreted as complete enforcement.
-    /// Cleanup pins current descendants before termination and joins those handles.
-    /// Descendants created concurrently with enumeration still rely on Job
-    /// termination/accounting, so process-tree enforcement remains partial.
+    /// Cleanup closes Job admission before pinning and joining current descendants.
+    /// Already-exiting members and creation in flight at the fence still require
+    /// broader lifecycle acceptance, so process-tree enforcement remains partial.
     ///
     /// # Errors
     /// Refuses incompatible contexts or dirty copies (links/reparses), and reports

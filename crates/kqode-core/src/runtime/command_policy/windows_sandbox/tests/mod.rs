@@ -1,4 +1,5 @@
 mod contracts;
+mod native_churn;
 mod native_execution;
 mod native_lifetime;
-mod support;
+pub(super) mod support;

@@ -9,7 +9,7 @@ use std::{
 use windows_sys::Win32::{
     Foundation::HANDLE,
     System::JobObjects::{
-        CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        CreateJobObjectW, JOB_OBJECT_LIMIT_ACTIVE_PROCESS, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
         JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
         JobObjectBasicAccountingInformation, JobObjectExtendedLimitInformation,
         QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
@@ -18,6 +18,7 @@ use windows_sys::Win32::{
 
 const TERMINATION_TIMEOUT: Duration = Duration::from_secs(5);
 const TERMINATION_POLL: Duration = Duration::from_millis(5);
+const SHUTDOWN_PROCESS_LIMIT: u32 = 1;
 
 pub(super) struct Job {
     handle: OwnedHandle,
@@ -53,13 +54,48 @@ impl Job {
         }
         Ok(())
     }
+    /// Prevents existing members from admitting another process during shutdown.
+    ///
+    /// A creator itself consumes the one remaining slot. With no active members,
+    /// there is no in-job creator; this private Job is never assigned new host work.
+    pub fn close_admission(&self) -> io::Result<()> {
+        let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+        if unsafe {
+            QueryInformationJobObject(
+                self.raw(),
+                JobObjectExtendedLimitInformation,
+                ptr::from_mut(&mut limits).cast(),
+                size_of_val(&limits) as u32,
+                ptr::null_mut(),
+            )
+        } == 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+        limits.BasicLimitInformation.LimitFlags |= JOB_OBJECT_LIMIT_ACTIVE_PROCESS;
+        limits.BasicLimitInformation.ActiveProcessLimit = SHUTDOWN_PROCESS_LIMIT;
+        if unsafe {
+            SetInformationJobObject(
+                self.raw(),
+                JobObjectExtendedLimitInformation,
+                ptr::from_ref(&limits).cast(),
+                size_of_val(&limits) as u32,
+            )
+        } == 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(())
+    }
     pub fn stop(&self) -> io::Result<()> {
         if self.stopped.get() {
             return Ok(());
         }
         let deadline = Instant::now() + TERMINATION_TIMEOUT;
-        let handles = descendants::pin(self.raw());
-        // Always terminate, even when collecting wait handles failed.
+        let handles = self
+            .close_admission()
+            .and_then(|()| descendants::pin(self.raw()));
+        // Always terminate, even when fencing or collecting wait handles failed.
         self.terminate()?;
         let handles = handles?;
         loop {

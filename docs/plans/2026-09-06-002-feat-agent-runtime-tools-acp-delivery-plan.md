@@ -717,6 +717,13 @@ and secret-environment tests pass.
       host diagnostic bypasses approval and must never become a model/tool
       entry point. Automatic dispatch continues to reject partial process-tree,
       filesystem and network capabilities; no unconfined fallback exists.
+- [ ] Fence Job admission before shutdown enumeration (implemented; awaiting
+      review). Preserve the current extended limits, including kill-on-close,
+      and set the active-process limit to one before pinning members. An
+      existing creator already occupies that slot; no new host work is assigned
+      to this private Job. Even if fencing or enumeration fails, still request
+      termination and report failure rather than returning successful cleanup.
+      Keep process-tree enforcement `Partial` until broader lifecycle acceptance.
 - [ ] Define safe artifact inspection/publication with baseline/stale checks and
       protected-path rejection; never auto-write back. The copy is not a Git
       worktree. Absolute paths in scripts/environment are not rewritten; missing
@@ -800,16 +807,17 @@ capture limits, reporting exact omitted byte counts. Fresh profiles are removed
 after Job termination and explicit joins for the root and pinned descendants;
 dropping the future also terminates the Job before disposing the copy. Job
 activity reaching zero was observed before descendant handles became signaled;
-cleanup now pins current members before termination and waits on those handles.
-Members created concurrently with that enumeration still rely on Job
-termination/accounting, so `ProcessTree` remains `Partial` pending stronger
-high-churn lifecycle acceptance. Completed execution, including
+cleanup pins current members before termination and waits on those handles.
+The admission-fence follow-up below limits further creation before enumeration;
+`ProcessTree` remains `Partial` pending broader lifecycle acceptance for members
+already exiting and process creation in flight when the fence is installed.
+Completed execution, including
 nonzero exits and supervised cancellation/timeouts, returns owned artifacts for
 explicit inspection/disposal; infrastructure failures dispose the copy and
 preserve cleanup errors. Setup and bounded kill/join still use synchronous Win32
 calls and must run on a runtime worker, not a UI thread.
 
-Six opt-in native tests passed on this host: Unicode/frozen environment/nonzero
+The initial six opt-in native tests passed on this host: Unicode/frozen environment/nonzero
 exit; bounded dual-stream output; read-only and copy-write/source-denial behavior;
 continuous-output timeout; actual descendant termination on exit, cancellation
 and future drop; and cancellation while waiting for the concurrency permit.
@@ -824,6 +832,26 @@ filesystem/network confinement, new aliases created during execution, safe
 artifact publication and production PowerShell syntax policy remain unresolved.
 The automatic sandbox gate still refuses this backend and real `run_command`
 remains unavailable.
+
+**Admission-fence follow-up (September 10, 2026):** a deterministic native
+fixture first launches two children successfully, then installs the fence while
+all three known processes remain alive. A subsequent launch fails with
+`ERROR_NOT_ENOUGH_QUOTA`; the known processes are still alive until explicit
+termination and handle joins. Assertions correlate their actual PIDs rather than
+assuming that Windows creates no additional helper processes.
+
+A second fixture runs two concurrent spawners, each replacing short-lived leaves
+sequentially with a bounded total of 24 launches. After both have replaced a leaf,
+normal exit, cancellation, timeout and future drop each stop the pinned spawners
+and dispose the owned copy without changing source data. All eight opt-in native
+tests pass on this host. This exercises concurrent creation but does not prove
+that every already-exiting or in-flight process handle has been joined.
+No capability is promoted and no production tool is enabled.
+
+The fence uses Microsoft's documented
+[active-process limit](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_limit_information)
+and preserves existing settings using the query/modify/set pattern described by
+[SetInformationJobObject](https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-setinformationjobobject).
 
 ### U6. Implement the first real tools
 

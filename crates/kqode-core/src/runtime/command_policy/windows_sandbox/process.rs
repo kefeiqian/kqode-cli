@@ -36,6 +36,10 @@ pub(super) struct NativeProcess {
 
 const PROCESS_JOIN_TIMEOUT_MS: u32 = 5_000;
 
+#[cfg(test)]
+#[path = "tests/admission.rs"]
+mod tests;
+
 impl NativeProcess {
     pub fn spawn(
         context: &CommandContext,
