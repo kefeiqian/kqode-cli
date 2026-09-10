@@ -2272,10 +2272,12 @@ dependencies = [
 name = "kqode-core"
 version = "0.3.0"
 dependencies = [
+ "libc",
  "serde",
  "serde_json",
  "tokio",
  "uuid",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

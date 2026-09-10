@@ -643,9 +643,9 @@ state.
 
 ### U4. Add workspace policy and process supervision
 
-- [ ] Implement cwd normalization, environment construction, process ownership,
+- [x] Implement cwd normalization, environment construction, process ownership,
       timeout, cancellation, output limits, and descendant cleanup.
-- [ ] Do not expose `run_command` to the model.
+- [x] Do not expose `run_command` to the model.
 
 **Acceptance:** Escape, timeout, cancellation, child cleanup, output truncation,
 and secret-environment tests pass.
