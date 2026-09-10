@@ -266,7 +266,7 @@ export function ChatPanel({
             {isLoadingOlderMessages && (
               <p className="older-messages-loading">Loading older messages…</p>
             )}
-            {transcriptMessages.map((message, index) => {
+            {transcriptMessages.map((message) => {
               const actions = (
                 <MessageActions
                   content={message.content}
@@ -296,10 +296,6 @@ export function ChatPanel({
                         <div className="error-actions">
                           <button
                             className="retry-message-button"
-                            disabled={
-                              index === 0 ||
-                              transcriptMessages[index - 1].role !== "user"
-                            }
                             onClick={() => void onRetry(message.id)}
                             type="button"
                           >

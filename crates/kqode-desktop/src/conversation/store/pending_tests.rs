@@ -542,6 +542,12 @@ fn completing_a_retry_replaces_the_original_error() {
             content: "Original error".to_owned(),
             model: None,
         },
+        StoredMessage {
+            id: "user-2".to_owned(),
+            role: StoredMessageRole::User,
+            content: "Later message".to_owned(),
+            model: None,
+        },
     ];
     store.save_conversation(&mut conversation).unwrap();
     store
@@ -572,10 +578,21 @@ fn completing_a_retry_replaces_the_original_error() {
 
     let saved = store.load_conversation(&conversation.id).unwrap().unwrap();
     assert!(saved.pending_turns.is_empty());
-    assert_eq!(saved.messages.len(), 2);
+    assert_eq!(saved.messages.len(), 3);
     assert_eq!(saved.messages[0].id, "user-1");
-    assert_eq!(saved.messages[1].id, "assistant-1");
-    assert_eq!(saved.messages[1].content, "Recovered");
+    assert_eq!(saved.messages[1].id, "user-2");
+    assert_eq!(saved.messages[2].id, "assistant-1");
+    assert_eq!(saved.messages[2].content, "Recovered");
+    assert_eq!(
+        store
+            .load_message_page(&conversation.id, None, 10)
+            .unwrap()
+            .messages
+            .into_iter()
+            .map(|message| message.position)
+            .collect::<Vec<_>>(),
+        vec![0, 2, 3]
+    );
 }
 
 #[test]

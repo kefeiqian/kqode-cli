@@ -149,7 +149,6 @@ impl ConversationStore {
                 "DELETE FROM messages WHERE conversation_id = ?1 AND id = ?2",
                 params![conversation_id, error_id],
             )?;
-            compact_message_positions(&transaction, conversation_id)?;
         }
         remove_pending_turn(&transaction, conversation_id, turn_id)?;
         touch_conversation(&transaction, conversation_id)?;
@@ -221,7 +220,6 @@ impl ConversationStore {
                     "DELETE FROM messages WHERE conversation_id = ?1 AND id = ?2",
                     params![conversation_id, error_id],
                 )?;
-                compact_message_positions(&transaction, conversation_id)?;
             }
         } else if retry_error_id.is_none() {
             insert_message(
