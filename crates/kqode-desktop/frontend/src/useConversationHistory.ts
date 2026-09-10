@@ -78,10 +78,7 @@ export function useConversationHistory() {
         archivedConversation.model,
       );
       remaining = [toConversationListItem(replacement)];
-      setConversationDetails((current) => ({
-        ...current,
-        [replacement.id]: replacement,
-      }));
+      replaceConversation(replacement);
     }
     setConversations(remaining);
     if (activeId === conversationId) activateConversation(remaining[0].id);
@@ -155,7 +152,7 @@ export function useConversationHistory() {
         turnId,
       );
       if (retryErrorId) {
-        sync.restoreMessage(activeConversation.id, retryErrorId);
+        await sync.restoreMessage(activeConversation.id, retryErrorId);
       }
       replaceConversation(replacement);
     } catch (error) {
@@ -179,7 +176,14 @@ export function useConversationHistory() {
         activeConversation.id,
         errorMessageId,
       );
-      sync.tombstoneMessage(activeConversation.id, errorMessageId);
+      const retryTurnId = replacement.pendingTurns.find(
+        (turn) => turn.retryErrorId === errorMessageId,
+      )?.id;
+      sync.tombstoneMessage(
+        activeConversation.id,
+        errorMessageId,
+        retryTurnId,
+      );
       replaceConversation(replacement);
     } catch (error) {
       setHistoryError(`Could not retry the message: ${String(error)}`);

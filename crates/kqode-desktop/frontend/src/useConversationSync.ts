@@ -18,7 +18,6 @@ import type {
   ConversationListItem,
   ConversationMessageStream,
   ConversationUpdated,
-  Message,
 } from "./types";
 
 const CONVERSATION_UPDATED_EVENT = "conversation-updated";
@@ -34,112 +33,24 @@ export function useConversationSync() {
   const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
   const [historyError, setHistoryError] = useState<string>();
   const deletedMessageIds = useRef(new Map<string, Set<string>>());
-  const deletedMessages = useRef(new Map<string, Map<string, Message>>());
+  const conversationRevisions = useRef(new Map<string, number>());
+  const retryTombstones = useRef(new Map<string, Map<string, string>>());
 
   const activeConversation = useMemo(
     () => (activeId ? conversationDetails[activeId] : undefined),
     [activeId, conversationDetails],
   );
 
-  const replaceConversation = useCallback((replacement: Conversation) => {
-    setConversationDetails((current) => {
-      const existing = current[replacement.id];
-      const deleted = deletedMessageIds.current.get(replacement.id);
-      const restored: Message[] = [];
-      if (deleted && existing) {
-        for (const turn of existing.pendingTurns) {
-          if (
-            turn.retryErrorId &&
-            deleted.has(turn.retryErrorId) &&
-            !replacement.pendingTurns.some(
-              (pending) => pending.id === turn.id,
-            ) &&
-            !existing.messages.some(
-              (message) =>
-                message.requestId === turn.id && message.role !== "user",
-            )
-          ) {
-            const message = deletedMessages.current
-              .get(replacement.id)
-              ?.get(turn.retryErrorId);
-            if (message) restored.push(message);
-            deleted.delete(turn.retryErrorId);
-            deletedMessages.current
-              .get(replacement.id)
-              ?.delete(turn.retryErrorId);
-          }
-        }
-      }
-      const filtered = deleted
-        ? {
-            ...replacement,
-            messages: replacement.messages.filter(
-              (message) => !deleted.has(message.id),
-            ),
-          }
-        : replacement;
-      if (existing && existing.updatedAt > filtered.updatedAt) {
-        return current;
-      }
-      const merged = existing
-        ? mergeConversationPage(existing, filtered)
-        : filtered;
-      return {
-        ...current,
-        [filtered.id]:
-          restored.length === 0
-            ? merged
-            : {
-                ...merged,
-                messages: mergeMessages(merged.messages, restored),
-              },
-      };
-    });
-    setConversations((current) =>
-      replaceConversationListItem(current, replacement),
-    );
-  }, []);
-
-  const tombstoneMessage = useCallback(
-    (conversationId: string, messageId: string) => {
-      const deleted =
-        deletedMessageIds.current.get(conversationId) ?? new Set<string>();
-      deleted.add(messageId);
-      deletedMessageIds.current.set(conversationId, deleted);
-      setConversationDetails((current) => {
-        const conversation = current[conversationId];
-        if (!conversation) return current;
-        const message = conversation.messages.find(
-          (candidate) => candidate.id === messageId,
-        );
-        if (message) {
-          const messages =
-            deletedMessages.current.get(conversationId) ??
-            new Map<string, Message>();
-          messages.set(messageId, message);
-          deletedMessages.current.set(conversationId, messages);
-        }
-        return {
-          ...current,
-          [conversationId]: {
-            ...conversation,
-            messages: conversation.messages.filter(
-              (message) => message.id !== messageId,
-            ),
-          },
-        };
-      });
-    },
-    [],
-  );
-
   const restoreMessage = useCallback(
-    (conversationId: string, messageId: string) => {
+    async (conversationId: string, messageId: string) => {
+      const message = await loadStoredMessage(conversationId, messageId);
       deletedMessageIds.current.get(conversationId)?.delete(messageId);
-      const deleted = deletedMessages.current.get(conversationId);
-      const message = deleted?.get(messageId);
-      deleted?.delete(messageId);
-      if (!message) return;
+      const retries = retryTombstones.current.get(conversationId);
+      if (retries) {
+        for (const [turnId, errorMessageId] of retries) {
+          if (errorMessageId === messageId) retries.delete(turnId);
+        }
+      }
       setConversationDetails((current) => {
         const conversation = current[conversationId];
         if (!conversation) return current;
@@ -148,6 +59,99 @@ export function useConversationSync() {
           [conversationId]: {
             ...conversation,
             messages: mergeMessages(conversation.messages, [message]),
+          },
+        };
+      });
+    },
+    [],
+  );
+
+  const replaceConversation = useCallback(
+    (replacement: Conversation) => {
+      const currentRevision = conversationRevisions.current.get(replacement.id);
+      if (
+        currentRevision !== undefined &&
+        currentRevision > replacement.updatedAt
+      ) {
+        return;
+      }
+      conversationRevisions.current.set(replacement.id, replacement.updatedAt);
+      const retries = retryTombstones.current.get(replacement.id);
+      if (retries) {
+        for (const [turnId, errorMessageId] of retries) {
+          if (
+            replacement.pendingTurns.some((pending) => pending.id === turnId)
+          ) {
+            continue;
+          }
+          retries.delete(turnId);
+          const hasResponse = replacement.messages.some(
+            (message) =>
+              message.requestId === turnId && message.role !== "user",
+          );
+          if (!hasResponse) {
+            void restoreMessage(replacement.id, errorMessageId).catch(
+              (error: unknown) => {
+                setHistoryError(
+                  `Could not restore the retryable error: ${String(error)}`,
+                );
+              },
+            );
+          }
+        }
+      }
+      setConversationDetails((current) => {
+        const existing = current[replacement.id];
+        const deleted = deletedMessageIds.current.get(replacement.id);
+        const filtered = deleted
+          ? {
+              ...replacement,
+              messages: replacement.messages.filter(
+                (message) => !deleted.has(message.id),
+              ),
+            }
+          : replacement;
+        if (existing && existing.updatedAt > filtered.updatedAt) {
+          return current;
+        }
+        const merged = existing
+          ? mergeConversationPage(existing, filtered)
+          : filtered;
+        return {
+          ...current,
+          [filtered.id]: merged,
+        };
+      });
+      setConversations((current) =>
+        replaceConversationListItem(current, replacement),
+      );
+    },
+    [restoreMessage],
+  );
+
+  const tombstoneMessage = useCallback(
+    (conversationId: string, messageId: string, retryTurnId?: string) => {
+      const deleted =
+        deletedMessageIds.current.get(conversationId) ?? new Set<string>();
+      deleted.add(messageId);
+      deletedMessageIds.current.set(conversationId, deleted);
+      if (retryTurnId) {
+        const retries =
+          retryTombstones.current.get(conversationId) ??
+          new Map<string, string>();
+        retries.set(retryTurnId, messageId);
+        retryTombstones.current.set(conversationId, retries);
+      }
+      setConversationDetails((current) => {
+        const conversation = current[conversationId];
+        if (!conversation) return current;
+        return {
+          ...current,
+          [conversationId]: {
+            ...conversation,
+            messages: conversation.messages.filter(
+              (message) => message.id !== messageId,
+            ),
           },
         };
       });
@@ -261,6 +265,7 @@ export function useConversationSync() {
         if (stored.length === 0) stored = [toConversationListItem(active)];
         setConversations(stored);
         setActiveId(active.id);
+        conversationRevisions.current.set(active.id, active.updatedAt);
         setConversationDetails((current) => ({
           ...current,
           [active.id]: active,
