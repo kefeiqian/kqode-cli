@@ -66,3 +66,21 @@ fn native_limits_are_explicit_and_diagnostic_future_is_send() {
     fn assert_send<T: Send>(_: T) {}
     assert_send(backend.run_diagnostic(command, CancellationToken::default()));
 }
+
+#[test]
+fn security_environment_cannot_mix_with_explicit_appcontainer_attributes() {
+    let security = windows_sys::Win32::Security::SECURITY_CAPABILITIES::default();
+    let policy = 1;
+    let handle = std::ptr::null_mut();
+    let handles = [handle; 3];
+    for (security, policy) in [(Some(&security), None), (None, Some(&policy))] {
+        let result = super::super::attributes::Attributes::new(
+            security,
+            &handle,
+            &handles,
+            policy,
+            Some(&handle),
+        );
+        assert!(matches!(result, Err(error) if error.kind() == std::io::ErrorKind::InvalidInput));
+    }
+}

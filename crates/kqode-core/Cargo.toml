@@ -35,3 +35,7 @@ windows-sys = { version = "0.61", features = [
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread"] }
+
+[target.'cfg(windows)'.dev-dependencies]
+flatbuffers = "25"
+windows-sys = { version = "0.61", features = ["Win32_System_LibraryLoader"] }

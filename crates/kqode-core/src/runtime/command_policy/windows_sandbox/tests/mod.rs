@@ -1,5 +1,12 @@
 mod contracts;
+mod native_boundaries;
 mod native_churn;
 mod native_execution;
 mod native_lifetime;
+mod native_network;
+mod psec_api;
+mod psec_probe;
+mod sbox_api;
+mod sbox_probe;
+mod sbox_spec;
 pub(super) mod support;

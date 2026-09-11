@@ -57,6 +57,11 @@ impl Identity {
         self.sid.as_ptr().cast_mut().cast()
     }
 
+    /// Returns the owned profile name for native APIs that take an identity string.
+    pub fn name(&self) -> &[u16] {
+        &self.name
+    }
+
     pub fn text(&self) -> io::Result<String> {
         let mut text = ptr::null_mut();
         if unsafe { ConvertSidToStringSidW(self.raw(), &mut text) } == 0 {
@@ -77,7 +82,7 @@ impl Identity {
 
     pub fn close(&mut self) -> io::Result<()> {
         if self.registered {
-            let status = unsafe { DeleteAppContainerProfile(self.name.as_ptr()) };
+            let status = unsafe { DeleteAppContainerProfile(self.name().as_ptr()) };
             if status < 0 {
                 return Err(io::Error::other(format!(
                     "delete temporary profile: HRESULT {status:#x}"

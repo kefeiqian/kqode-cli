@@ -724,6 +724,13 @@ and secret-environment tests pass.
       to this private Job. Even if fencing or enumeration fails, still request
       termination and report failure rather than returning successful cleanup.
       Keep process-tree enforcement `Partial` until broader lifecycle acceptance.
+- [ ] Establish an enforced write boundary rather than additive path grants.
+      September 11 probes reproduce writes to an outside source file carrying an
+      `ALL RESTRICTED APPLICATION PACKAGES` write ACE, including under a requested
+      read-only LPAC profile. The tested native SBOX and PSEC contracts also permit that
+      ambient write until the source is explicitly denied. Neither result
+      satisfies global read-only/workspace-write enforcement. This blocks U5
+      acceptance and production dispatch; do not promote capabilities to bypass it.
 - [ ] Define safe artifact inspection/publication with baseline/stale checks and
       protected-path rejection; never auto-write back. The copy is not a Git
       worktree. Absolute paths in scripts/environment are not rewritten; missing
@@ -852,6 +859,73 @@ The fence uses Microsoft's documented
 [active-process limit](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_limit_information)
 and preserves existing settings using the query/modify/set pattern described by
 [SetInformationJobObject](https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-setinformationjobobject).
+
+**Isolation-boundary findings (September 11, 2026):**
+
+- The LPAC fixture denies source writes with ordinary private permissions, then
+  permits them after an explicit `S-1-15-2-2` write grant on that same fresh
+  fixture file. Both requested `ReadOnly` and `WorkspaceWrite` profiles reproduce
+  the outside mutation. The regression asserts the file's actual contents, not
+  just a command exit code. Passing this counterexample test is evidence of a
+  limitation, not successful U5 isolation.
+- Native network probes now cover TCP and UDP over IPv4 and IPv6 loopback in
+  the parent and a PID-distinct PowerShell child. Each case has fresh receivers
+  and an unconfined positive control. LPAC reports socket access denial and the
+  receivers observe no traffic; UDP's local send result alone is not counted as
+  delivery. These checks do not establish external-network or arbitrary
+  protocol/broker isolation, so `DenyNetwork` remains `Partial`.
+- A write-restricted token alternative was investigated without changing host
+  desktop/window-station permissions. Using the package SID as the restricting
+  SID failed with Win32 87. A fresh ordinary restricting SID was accepted, but
+  PowerShell exited with `0xc0000142` before executing the script, even after
+  handle-based grants for that SID on the owned copy. This experiment is not
+  shipped as a backend; startup failure is not classified as access denial.
+- This host reports build `26200.9445`. Its system `processmodel.dll` exports
+  both PSEC and experimental SBOX entry points; `Experimental_QuerySandboxSupport`
+  succeeds with mask `0x7`. Export presence and capability bits are not sufficient
+  acceptance evidence.
+- The retained opt-in SBOX probe uses schema version `0.1.0`, preserves the
+  explicit environment, starts suspended, assigns the process to the owned Job
+  before resume, and checks token state and actual file effects. The tested
+  extended-startup form returned Win32 50; the plain startup form works. It can
+  write inside the copy, but outside ARAP-writable files remain writable without
+  an explicit source deny. Adding that deny protects the source while keeping
+  copy writes functional. Additional exploratory volume-wide read-only grants
+  did not remove the outside write; a drive-root deny prevented the existing
+  PowerShell transport/script from completing, with constrained-language errors.
+  These observations do not prove that all possible SBOX/PSEC configurations
+  are insufficient; they do mean the tested configurations cannot be promoted.
+- The two-phase PSEC 1.0 contract was also exercised using
+  `CreateProcessSecurityEnvironment`, then the security-environment startup
+  attribute on `CreateProcessW`, with atomic Job assignment, an explicit handle
+  list and the frozen environment. It reproduces the same additive-grant
+  counterexample: the outside ARAP-writable file changes with grants alone;
+  explicit source denial protects it while copy writes remain functional.
+  The environment is closed after process/Job cleanup. This is a test-only
+  probe, not a production backend or a capability promotion.
+
+The SBOX/PSEC probes are test-only and use FlatBuffers as a Windows dev dependency.
+Its wire slots and ABI are based on Microsoft's
+[BaseContainer schema](https://github.com/microsoft/mxc/blob/main/external/windows-sdk/BaseContainerSpecification.fbs)
+and [native runner](https://github.com/microsoft/mxc/blob/main/src/backends/appcontainer/common/src/base_container_runner.rs),
+plus the [PSEC schema](https://github.com/microsoft/mxc/blob/main/external/windows-sdk/ProcessSecurityEnvironment.fbs)
+and [two-phase ABI](https://github.com/microsoft/mxc/blob/main/src/backends/learning_mode/windows/src/secenv.rs).
+No production sandbox fallback or model-facing execution path was added.
+The failed restricted-token prototype is retained only in session artifacts,
+not in the product or passing-test suite.
+
+Reproduce the focused evidence with:
+
+```text
+cargo test -p kqode-core native_lpac_shared_restricted -- --ignored --test-threads=1
+cargo test -p kqode-core native_lpac_dual_stack -- --ignored --test-threads=1
+cargo test -p kqode-core native_sbox_additive -- --ignored --test-threads=1
+cargo test -p kqode-core native_psec_additive -- --ignored --test-threads=1
+```
+
+U5 remains blocked on an effective filesystem enforcement design. The production
+execution entry point, artifact inspection/publication and syntax policy remain
+unfinished; the diagnostic APIs must not substitute for them.
 
 ### U6. Implement the first real tools
 

@@ -64,6 +64,13 @@ impl WindowsSandboxBackend {
     /// Already-exiting members and creation in flight at the fence still require
     /// broader lifecycle acceptance, so process-tree enforcement remains partial.
     ///
+    /// # Isolation limits
+    ///
+    /// This is not a filesystem security boundary. Ambient grants to
+    /// ALL RESTRICTED APPLICATION PACKAGES can permit writes outside the copy,
+    /// including with a requested ReadOnly profile. Never dispatch model-origin
+    /// commands through this diagnostic API.
+    ///
     /// # Errors
     /// Refuses incompatible contexts or dirty copies (links/reparses), and reports
     /// native launch, capture and cleanup errors. Setup and bounded kill/join use

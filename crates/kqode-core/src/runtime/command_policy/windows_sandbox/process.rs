@@ -64,7 +64,7 @@ impl NativeProcess {
             };
             let policy = PROCESS_CREATION_ALL_APPLICATION_PACKAGES_OPT_OUT;
             let mut attributes =
-                Attributes::new(Some(&security), &job_handle, &handles, Some(&policy))?;
+                Attributes::new(Some(&security), &job_handle, &handles, Some(&policy), None)?;
             let mut startup = STARTUPINFOEXW::default();
             startup.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
             startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;

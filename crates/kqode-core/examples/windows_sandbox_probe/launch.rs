@@ -87,6 +87,7 @@ pub(super) fn launch(
         &job_handle,
         &handles,
         (isolation == Some(true)).then_some(&opt_out),
+        None,
     )?;
     let mut startup = STARTUPINFOEXW::default();
     startup.StartupInfo.cb = std::mem::size_of::<STARTUPINFOEXW>() as u32;

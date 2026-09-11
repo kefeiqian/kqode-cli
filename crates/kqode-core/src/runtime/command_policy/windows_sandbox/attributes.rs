@@ -23,8 +23,18 @@ impl<'a> Attributes<'a> {
         job: &'a HANDLE,
         handles: &'a [HANDLE; 3],
         lpac: Option<&'a u32>,
+        environment: Option<&'a HANDLE>,
     ) -> io::Result<Self> {
-        let count = 2 + u32::from(security.is_some()) + u32::from(lpac.is_some());
+        if environment.is_some() && (security.is_some() || lpac.is_some()) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "security environment cannot be combined with explicit AppContainer attributes",
+            ));
+        }
+        let count = 2
+            + u32::from(security.is_some())
+            + u32::from(lpac.is_some())
+            + u32::from(environment.is_some());
         let mut bytes = 0;
         unsafe {
             InitializeProcThreadAttributeList(ptr::null_mut(), count, 0, &mut bytes);
@@ -54,6 +64,10 @@ impl<'a> Attributes<'a> {
                 PROC_THREAD_ATTRIBUTE_ALL_APPLICATION_PACKAGES_POLICY,
                 policy,
             )?;
+        }
+        if let Some(environment) = environment {
+            const SECURITY_ENVIRONMENT_ATTRIBUTE: u32 = 35 | 0x0002_0000;
+            result.set(SECURITY_ENVIRONMENT_ATTRIBUTE, environment)?;
         }
         Ok(result)
     }
