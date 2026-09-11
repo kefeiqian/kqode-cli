@@ -29,10 +29,25 @@ impl PrivateDescriptor {
         let package = package
             .map(|(sid, mask)| format!("(A;OICI;{mask:#x};;;{sid})"))
             .unwrap_or_default();
-        let sddl: Vec<u16> = format!("D:P(A;OICI;FA;;;{user})(A;OICI;FA;;;SY){package}")
-            .encode_utf16()
-            .chain([0])
-            .collect();
+        Self::from_sddl(&format!("D:P(A;OICI;FA;;;{user})(A;OICI;FA;;;SY){package}"))
+    }
+
+    /// Creates a descriptor for newly owned probe objects, never existing host objects.
+    #[cfg(test)]
+    pub fn for_probe(principals: &[(&str, u32)], low_integrity: bool) -> io::Result<Self> {
+        let user = current_user_sid()?;
+        let grants = principals
+            .iter()
+            .map(|(sid, mask)| format!("(A;OICI;{mask:#x};;;{sid})"))
+            .collect::<String>();
+        let label = if low_integrity { "S:(ML;;NW;;;LW)" } else { "" };
+        Self::from_sddl(&format!(
+            "D:P(A;OICI;GA;;;{user})(A;OICI;GA;;;SY){grants}{label}"
+        ))
+    }
+
+    fn from_sddl(sddl: &str) -> io::Result<Self> {
+        let sddl: Vec<u16> = sddl.encode_utf16().chain([0]).collect();
         let mut descriptor = ptr::null_mut();
         if unsafe {
             ConvertStringSecurityDescriptorToSecurityDescriptorW(

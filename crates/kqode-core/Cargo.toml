@@ -38,4 +38,8 @@ tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread"] }
 
 [target.'cfg(windows)'.dev-dependencies]
 flatbuffers = "25"
-windows-sys = { version = "0.61", features = ["Win32_System_LibraryLoader"] }
+windows-sys = { version = "0.61", features = [
+    "Win32_System_LibraryLoader",
+    "Win32_System_StationsAndDesktops",
+    "Win32_Graphics_Gdi",
+] }

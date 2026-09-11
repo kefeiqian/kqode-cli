@@ -911,8 +911,9 @@ and [native runner](https://github.com/microsoft/mxc/blob/main/src/backends/appc
 plus the [PSEC schema](https://github.com/microsoft/mxc/blob/main/external/windows-sdk/ProcessSecurityEnvironment.fbs)
 and [two-phase ABI](https://github.com/microsoft/mxc/blob/main/src/backends/learning_mode/windows/src/secenv.rs).
 No production sandbox fallback or model-facing execution path was added.
-The failed restricted-token prototype is retained only in session artifacts,
-not in the product or passing-test suite.
+The initial failed restricted-token prototype is retained in session artifacts.
+The follow-up below adds a separately labelled compatibility counterexample,
+not a production restricted-token backend.
 
 Reproduce the focused evidence with:
 
@@ -926,6 +927,50 @@ cargo test -p kqode-core native_psec_additive -- --ignored --test-threads=1
 U5 remains blocked on an effective filesystem enforcement design. The production
 execution entry point, artifact inspection/publication and syntax policy remain
 unfinished; the diagnostic APIs must not substitute for them.
+
+**Restricted-token/private-desktop follow-up (September 11, 2026):**
+
+- A new low-integrity private desktop did not by itself fix `0xc0000142`.
+  Creating a uniquely named private window station returned access denied under
+  ordinary privileges; an unnamed create-only request returned already-exists
+  and was not allowed to adopt the existing station. The user authorized exactly
+  one elevated fixed-test run. That run created the separate station/desktop,
+  but the original startup probe still exited with `0xc0000142`. Its log is in
+  session artifacts. No persistent elevation, service installation, default
+  desktop ACL changes or further elevated runs were authorized or performed.
+- The prototype's token default DACL was then completed for newly created
+  objects, both before lowbox derivation and on the suspended child token.
+  Under ordinary privileges this progressed startup to a concrete
+  `BCrypt.dll` initialization failure in PowerShell/.NET, rather than successful
+  script execution. The child token was checked to retain the fresh restricting
+  SID; the restriction was not simply lost during lowbox creation.
+- Adding `Everyone` to the restricting SID list was tested only as an explicitly
+  unsafe compatibility control. PowerShell could execute fixed permitted
+  cmdlets, but constrained-language mode rejected the production bootstrap.
+  The retained test uses a separate raw encoded command with explicit paths;
+  it does not bypass execution policy or claim compatibility with the approval
+  context/production transport. A TEMP-targeted exploratory command reported
+  the profile's `AC\Temp` path instead of the intended copy scratch location;
+  the cause of that mapping was not established.
+- The counterexample keeps an outside fixture writable to ARAP, then compares
+  absence/presence of an additional `Everyone` write ACE. Copy writes succeed
+  in both cases; the outside write is denied without the extra ACE and succeeds
+  with it. Actual file contents and process status are asserted. This shows why
+  adding a broad compatibility SID is not a fix for strict workspace-write.
+  Only fresh fixture files, private token defaults and newly created desktop
+  objects are modified. All helper modules remain test-only.
+
+```text
+cargo test -p kqode-core native_restricted_compatibility -- --ignored --test-threads=1
+```
+
+The desktop/station helpers restore the **test process/thread** associations
+before returning to async work; they are not suitable as in-process Tauri UI
+helpers. Named station creation follows the privilege constraints documented by
+[CreateWindowStationW](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-createwindowstationw).
+The measured tradeoff also matches the explicitly partial design described in
+[DeepSeek Harness's restricted-token note](https://github.com/deepseek-ai/deepseek-harness/blob/master/.agents/notes/implemented/feature/2026-08-08-windows-acl-restricted-token-sandbox.md).
+No capability is promoted, and U5 remains incomplete.
 
 ### U6. Implement the first real tools
 
