@@ -1,10 +1,9 @@
-use std::{fs, path::Path, time::Instant};
+use std::{fs, path::Path};
 
+use super::super::budget::Budget;
 use super::super::{SnapshotError, SnapshotLimits, SnapshotSummary, WorkspaceSnapshot};
 use super::{handles, walk::Walker};
 use crate::{cancellation::CancellationToken, runtime::WorkspacePolicy};
-
-const MAX_SUPPORTED_DEPTH: usize = 64;
 
 pub(in crate::runtime::workspace_snapshot) fn capture(
     workspace: &WorkspacePolicy,
@@ -12,22 +11,7 @@ pub(in crate::runtime::workspace_snapshot) fn capture(
     limits: SnapshotLimits,
     cancellation: &CancellationToken,
 ) -> Result<WorkspaceSnapshot, SnapshotError> {
-    if limits.max_entries == 0 {
-        return Err(SnapshotError::InvalidLimit("max_entries"));
-    }
-    if limits.max_bytes == 0 {
-        return Err(SnapshotError::InvalidLimit("max_bytes"));
-    }
-    if limits.max_depth == 0 || limits.max_depth > MAX_SUPPORTED_DEPTH {
-        return Err(SnapshotError::InvalidLimit("max_depth (1..=64)"));
-    }
-    let deadline = Instant::now()
-        .checked_add(limits.timeout)
-        .filter(|_| !limits.timeout.is_zero())
-        .ok_or(SnapshotError::InvalidLimit("timeout"))?;
-    if cancellation.is_cancelled() {
-        return Err(SnapshotError::Cancelled);
-    }
+    let budget = Budget::new(limits, cancellation)?;
     let source = handles::open_root(workspace.root(), false)
         .map_err(|error| SnapshotError::io("open source workspace", error))?;
     if handles::final_path(&source)
@@ -59,6 +43,7 @@ pub(in crate::runtime::workspace_snapshot) fn capture(
         root: parent.join(&name),
         directory: Some(directory),
         summary: SnapshotSummary::default(),
+        baseline: Default::default(),
     };
     snapshot.root = handles::final_path(snapshot.directory.as_ref().unwrap())
         .map_err(|error| SnapshotError::io("resolve snapshot directory", error))?;
@@ -69,11 +54,9 @@ pub(in crate::runtime::workspace_snapshot) fn capture(
         return Err(SnapshotError::DestinationInsideSource);
     }
     let mut walker = Walker {
-        limits,
-        cancellation,
-        deadline,
-        entries: 0,
+        budget,
         summary: SnapshotSummary::default(),
+        baseline: Default::default(),
     };
     walker.directory(
         &source,
@@ -88,5 +71,6 @@ pub(in crate::runtime::workspace_snapshot) fn capture(
         return Err(SnapshotError::SourceChanged(workspace.root().to_owned()));
     }
     snapshot.summary = walker.summary;
+    snapshot.baseline = walker.baseline;
     Ok(snapshot)
 }

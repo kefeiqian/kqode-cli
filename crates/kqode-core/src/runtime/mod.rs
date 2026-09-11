@@ -51,4 +51,7 @@ pub use provider::{
     ModelProvider, ModelProviderError, ModelProviderErrorKind, ModelProviderFuture,
 };
 pub use turn_queue::{DeleteResult, QueuedTurn, TurnLease, TurnQueue, TurnQueueError};
-pub use workspace_snapshot::{SnapshotError, SnapshotLimits, SnapshotSummary, WorkspaceSnapshot};
+pub use workspace_snapshot::{
+    SnapshotChange, SnapshotEntry, SnapshotError, SnapshotLimits, SnapshotSummary,
+    WorkspaceSnapshot,
+};

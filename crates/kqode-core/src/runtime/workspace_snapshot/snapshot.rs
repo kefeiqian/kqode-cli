@@ -38,6 +38,8 @@ pub struct WorkspaceSnapshot {
     pub(super) root: PathBuf,
     pub(super) summary: SnapshotSummary,
     #[cfg(windows)]
+    pub(super) baseline: super::changes::Inventory,
+    #[cfg(windows)]
     pub(super) directory: Option<std::fs::File>,
 }
 

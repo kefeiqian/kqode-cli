@@ -60,6 +60,11 @@ pub(super) fn child(parent: &File, name: &OsStr, create: Option<bool>) -> io::Re
     )
 }
 
+/// Denies ordinary write/delete sharing while an artifact is inspected.
+pub(super) fn inspection_child(parent: &File, name: &OsStr) -> io::Result<File> {
+    open_child(parent, name, None, FILE_SHARE_READ, None)
+}
+
 pub(super) fn snapshot_root(parent: &File, name: &OsStr) -> io::Result<File> {
     let descriptor = PrivateDescriptor::new()?;
     open_child(

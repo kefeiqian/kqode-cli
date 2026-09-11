@@ -731,7 +731,16 @@ and secret-environment tests pass.
       ambient write until the source is explicitly denied. Neither result
       satisfies global read-only/workspace-write enforcement. This blocks U5
       acceptance and production dispatch; do not promote capabilities to bypass it.
-- [ ] Define safe artifact inspection/publication with baseline/stale checks and
+- [ ] Add bounded `WorkspaceSnapshot::inspect_changes` (implemented; awaiting
+      review). Capture an owned, immutable relative-path inventory and SHA-256
+      hashes of bytes actually copied. Report sorted additions, modifications
+      and deletions, including empty directories and type replacements, without
+      reading or writing the source. Reject reparse points, hard-linked files,
+      named streams, new `.git` controls and special names. Pin inspected objects,
+      recheck observable changes, and fail without a partial report on exhausted
+      entry/byte/depth/time limits or cancellation. This is not a publication
+      approval, source-freshness check, transactional snapshot or sandbox claim.
+- [ ] Add approved artifact publication with source baseline/stale checks and
       protected-path rejection; never auto-write back. The copy is not a Git
       worktree. Absolute paths in scripts/environment are not rewritten; missing
       or excluded cwd, extra host roots and snapshot `danger-full-access` are
@@ -971,6 +980,31 @@ helpers. Named station creation follows the privilege constraints documented by
 The measured tradeoff also matches the explicitly partial design described in
 [DeepSeek Harness's restricted-token note](https://github.com/deepseek-ai/deepseek-harness/blob/master/.agents/notes/implemented/feature/2026-08-08-windows-acl-restricted-token-sandbox.md).
 No capability is promoted, and U5 remains incomplete.
+
+**Owned artifact inspection (September 11, 2026):**
+
+The copy-time content inventory is private to `WorkspaceSnapshot`; changing the
+source, inspecting repeatedly or restoring a copied file does not reset it.
+Inspection returns typed `SnapshotChange`/`SnapshotEntry` data, not file contents.
+Same-length edits with restored modification times are detected by content hash.
+Renames, including case-only renames, appear as addition/deletion; no rename
+inference or ACL/timestamp diff is attempted. Excluded source `.git` entries are
+not mistaken for deleted artifacts, and new copy-side Git controls are rejected.
+
+The inspector validates the owned root location and reopens it with file identity
+and volume-GUID-path checks before enumeration. Separate opens give independent
+multi-page directory cursors. Children are opened handle-relative without ordinary
+write/delete sharing and retained until final metadata/stream/link checks.
+`ReOpenFile` returned access denied in this environment; the implementation uses
+the existing identity-checked path-reopen pattern rather than dropping identity
+verification. Entry limits cover the baseline/current path union, so removals
+cannot produce an unbounded report; byte limits apply to current default-stream
+data read. All copy writers and descendants must already be stopped. These are
+cooperative limits and observable-change checks, not a transactional seal of
+directory entries or an authorization to publish after handles are released.
+Publication must separately check current source freshness, protected targets,
+approval and conflicts. Production dispatch and all partial capabilities remain
+unchanged.
 
 ### U6. Implement the first real tools
 

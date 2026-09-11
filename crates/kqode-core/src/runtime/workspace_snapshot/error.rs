@@ -1,6 +1,6 @@
 use std::{fmt, io, path::PathBuf};
 
-/// Snapshot preparation failures never return a partially prepared workspace.
+/// Capture and inspection failures never return partial successful results.
 #[derive(Debug)]
 pub enum SnapshotError {
     UnsupportedPlatform,
@@ -13,6 +13,7 @@ pub enum SnapshotError {
     LimitExceeded(&'static str),
     Cancelled,
     SourceChanged(PathBuf),
+    SnapshotChanged(PathBuf),
     SnapshotMoved,
     Io {
         operation: &'static str,
@@ -30,7 +31,7 @@ impl fmt::Display for SnapshotError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnsupportedPlatform => {
-                write!(f, "workspace snapshot preparation requires native Windows")
+                write!(f, "workspace snapshots require native Windows")
             }
             Self::InvalidLimit(name) => write!(f, "invalid workspace snapshot limit: {name}"),
             Self::DestinationInsideSource => write!(
@@ -41,7 +42,7 @@ impl fmt::Display for SnapshotError {
                 write!(f, "unsupported snapshot entry {}: {reason}", path.display())
             }
             Self::LimitExceeded(name) => write!(f, "workspace snapshot limit exceeded: {name}"),
-            Self::Cancelled => write!(f, "workspace snapshot preparation cancelled"),
+            Self::Cancelled => write!(f, "workspace snapshot operation cancelled"),
             Self::SourceChanged(path) => write!(
                 f,
                 "source changed while preparing snapshot: {}",
@@ -50,6 +51,11 @@ impl fmt::Display for SnapshotError {
             Self::SnapshotMoved => write!(
                 f,
                 "owned workspace snapshot no longer has its prepared location"
+            ),
+            Self::SnapshotChanged(path) => write!(
+                f,
+                "workspace copy changed during inspection: {}",
+                path.display()
             ),
             Self::Io { operation, source } => write!(f, "{operation}: {source}"),
         }
