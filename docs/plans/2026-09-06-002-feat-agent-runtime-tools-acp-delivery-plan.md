@@ -731,6 +731,13 @@ and secret-environment tests pass.
       ambient write until the source is explicitly denied. Neither result
       satisfies global read-only/workspace-write enforcement. This blocks U5
       acceptance and production dispatch; do not promote capabilities to bypass it.
+- [ ] Verify PSEC ancestor-denial precedence and read-only exceptions
+      (implemented; awaiting review). Fixed cmdlets run successfully with the
+      tested volume denied and explicit copy/system grants, separating access
+      checks from production bootstrap compatibility. However, a read-only path
+      exception reopens ambient ARAP writes under that path, including outside
+      the copy. Preserve the positive controls and actual-content counterexamples;
+      this composition still cannot justify full read-only/workspace-write support.
 - [ ] Add bounded `WorkspaceSnapshot::inspect_changes` (implemented; awaiting
       review). Capture an owned, immutable relative-path inventory and SHA-256
       hashes of bytes actually copied. Report sorted additions, modifications
@@ -1043,6 +1050,43 @@ must be stopped beforehand. Publication still needs proposal-level alias handlin
 protected-target policy, fresh approval, serialization and atomic revalidation
 against current source state. Neither tree is written; production dispatch,
 capability levels and U5's unresolved strict-isolation acceptance are unchanged.
+
+**PSEC deny-all/exception follow-up (September 12, 2026):**
+
+The fixed-cmdlet probe tests no denial, source-directory denial, fixture-ancestor
+denial and volume-root denial. Copy reads/writes complete in all four cases;
+the outside ARAP-writable source changes only with no denial. This is stronger
+evidence than the previous production-bootstrap attempt: startup/CLM errors
+had not proved that the OS rejected every deny-root/grant-child composition.
+The raw encoded command is explicitly test-only and is not the approved
+production transport or an execution-policy bypass.
+
+Further controls still reject this composition as a strict write boundary:
+
+- With the volume denied and the copy granted **read-only**, a private copy
+  rejects edits and creates. Adding an inheritable ARAP modify ACE to the fresh
+  copy permits both operations under the same PSEC configuration.
+- With the volume denied and only the copy granted read/write, the outside
+  fixture remains unchanged. Adding the outside source to **read-only** grants
+  permits writing its ARAP-modifiable file. Exit status, exact operation markers
+  and actual file contents are checked. Thus the issue is not confined to
+  metadata KQode can strip from its own disposable copy.
+- An exploratory `New-Item -ItemType HardLink` script failed at link creation
+  even without a volume denial. That run is inconclusive for alias enforcement
+  and is not counted as an isolation success.
+
+The retained PSEC tests share a bounded, suspended/Job-assigned runner that checks
+token state before resume, terminates the Job and explicitly joins the root before
+closing the security environment. Truncated output is rejected. Only newly created
+fixture/copy ACEs are changed; native PSEC policy is used directly, without a
+host-DACL fallback. No capability is promoted and production dispatch stays closed.
+
+Read-only prerequisite inspection on this host reports Hyper-V and
+VirtualMachinePlatform enabled, and a hypervisor present. Windows Sandbox's
+optional feature is disabled; neither `wsb.exe` nor `WindowsSandbox.exe` is
+available. No system feature was enabled, no restart was requested, and the earlier
+one-off elevated experiment does not authorize a new setup operation. A stronger
+Windows virtualization route requires an explicit architecture/setup decision.
 
 ### U6. Implement the first real tools
 
