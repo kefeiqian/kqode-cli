@@ -2,16 +2,16 @@ use std::{
     ffi::OsStr,
     fs::{File, OpenOptions},
     io,
-    os::windows::{ffi::OsStringExt, fs::OpenOptionsExt, io::AsRawHandle},
-    path::PathBuf,
+    os::windows::fs::OpenOptionsExt,
 };
 
-use super::child_handle::open_child;
+pub(in crate::runtime::workspace_snapshot) use crate::runtime::windows_file::final_path;
+use crate::runtime::windows_file::open_child;
+pub(super) use crate::runtime::windows_file::volume_path;
 use crate::runtime::windows_security::PrivateDescriptor;
 use windows_sys::Win32::Storage::FileSystem::{
     FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
-    FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, GetFinalPathNameByHandleW,
-    VOLUME_NAME_GUID,
+    FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
 };
 
 /// Opens the root itself without following a final reparse point.
@@ -64,35 +64,4 @@ pub(super) fn snapshot_root(parent: &File, name: &OsStr) -> io::Result<File> {
         Some(&descriptor),
         false,
     )
-}
-
-pub(in crate::runtime::workspace_snapshot) fn final_path(file: &File) -> io::Result<PathBuf> {
-    path_by_handle(file, 0)
-}
-
-pub(super) fn volume_path(file: &File) -> io::Result<PathBuf> {
-    path_by_handle(file, VOLUME_NAME_GUID)
-}
-
-fn path_by_handle(file: &File, flags: u32) -> io::Result<PathBuf> {
-    let mut buffer = vec![0u16; 512];
-    loop {
-        let count = unsafe {
-            GetFinalPathNameByHandleW(
-                file.as_raw_handle().cast(),
-                buffer.as_mut_ptr(),
-                buffer.len() as u32,
-                flags,
-            )
-        };
-        if count == 0 {
-            return Err(io::Error::last_os_error());
-        }
-        if (count as usize) < buffer.len() {
-            return Ok(PathBuf::from(std::ffi::OsString::from_wide(
-                &buffer[..count as usize],
-            )));
-        }
-        buffer.resize(count as usize + 1, 0);
-    }
 }

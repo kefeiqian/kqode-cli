@@ -18,13 +18,16 @@ mod state;
 mod tool_batch;
 mod turn_queue;
 #[cfg(windows)]
+mod windows_file;
+#[cfg(windows)]
 mod windows_security;
 mod workspace_snapshot;
 #[cfg(windows)]
 pub use command_policy::{
-    DisabledSandboxAccounts, LpacDiagnosticOutput, LpacTokenObservation, ProtectedSandboxPasswords,
-    SandboxAccountCheckpoint, SandboxAccountIdentity, SandboxAccountJournal, SandboxAccountRole,
-    SandboxAccountSetupError, WindowsSandboxAccountPlan, WindowsSandboxBackend,
+    DisabledSandboxAccounts, LpacDiagnosticOutput, LpacTokenObservation,
+    PrivateSandboxAccountJournal, ProtectedSandboxPasswords, SandboxAccountCheckpoint,
+    SandboxAccountIdentity, SandboxAccountJournal, SandboxAccountRole, SandboxAccountSetupError,
+    WindowsSandboxAccountPlan, WindowsSandboxBackend,
 };
 
 pub use agent::AgentRuntime;

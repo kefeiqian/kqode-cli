@@ -2,6 +2,7 @@
 
 mod credentials;
 mod error;
+mod file_journal;
 mod journal;
 mod model;
 mod native;
@@ -12,6 +13,7 @@ mod workflow;
 
 pub use credentials::ProtectedSandboxPasswords;
 pub use error::SandboxAccountSetupError;
+pub use file_journal::PrivateSandboxAccountJournal;
 pub use journal::{SandboxAccountCheckpoint, SandboxAccountJournal};
 pub use model::{
     DisabledSandboxAccounts, SandboxAccountIdentity, SandboxAccountRole, WindowsSandboxAccountPlan,

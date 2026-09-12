@@ -678,6 +678,15 @@ and secret-environment tests pass.
       write-ahead intents before mutations. Failures stop with disabled partial
       state for explicit recovery, not implicit account deletion or execution.
       Native SAM creation is compiled but not exercised on this host.
+- [ ] Add private durable account-journal storage (implemented; awaiting review).
+      Bind to a trusted local directory handle, create a new installation
+      subdirectory and exclusive JSONL file with protected process-user/SYSTEM
+      DACLs, and flush every bounded record before acknowledging it. Reject
+      reparse/collision targets, thread impersonation, invalid checkpoint order
+      and mismatched identity receipts; poison the writer after any failure.
+      Do not reopen, truncate, repair, resume or delete existing setup state.
+      The trusted-parent selector, recovery reader and authorized privileged
+      helper remain required before production account setup.
 - [ ] Implement `allow | ask | deny`, read-only and workspace-write profiles, and
       independent network policy.
 - [x] Add the command authorization gate and immutable context contracts:
@@ -1127,11 +1136,31 @@ be recorded before stopping. Missing records, name collisions, changed SIDs or
 non-disabled/nonordinary account observations require explicit recovery; there is
 no automatic adoption, password reset, account enablement or deletion.
 
-The concrete private-file journal, its loader/recovery protocol, authenticated
-privileged helper, logon-right restrictions, ACL/network setup, and readiness
-activation are still pending. The account workflow is tested with fake SAM
-operations; only RNG/DPAPI operations are exercised natively without elevation.
-No system account or group has been created, and no host ACL/firewall or Windows
+`PrivateSandboxAccountJournal` now supplies the concrete first-write-only file
+adapter. Its trusted caller supplies a securely opened, stable local parent
+outside sandbox-writable trees; the writer validates a non-reparse directory,
+volume-GUID resolution and persistent ACL support. Single-component
+handle-relative creates prevent child-path redirection and reject existing
+installation names. New directory/file DACLs are protected and grant only the
+current process user and SYSTEM. Creation refuses thread impersonation so the
+descriptor principal cannot silently differ from the effective creator.
+
+The versioned JSONL header contains the immutable plan and protected passwords;
+subsequent records carry strictly increasing sequence numbers and the exact
+intent/receipt order through `PreparedDisabled`. Each complete record, including
+its newline, is at most 64 KiB and requires successful write, flush and file
+`sync_all` before acknowledgment. A partial write, flush failure, invalid order,
+or identity mismatch permanently poisons that writer. Handles stay owned until
+drop; drop closes them without deleting partial recovery evidence. This provides
+OS-reported file durability, not an independently tested power-loss guarantee or
+permission to assume a missing/torn journal means no SAM mutation happened.
+
+The trusted-parent selection boundary, strict loader/recovery protocol,
+authenticated privileged helper, logon-right restrictions, ACL/network setup,
+and readiness activation are still pending. Account workflow tests use fake SAM
+operations with real private temporary journal files and non-elevated RNG/DPAPI.
+No system account or group has been created; ACLs are set only on newly owned
+temporary journal fixtures, not existing host objects. No firewall or Windows
 feature configuration has been changed. `PreparedDisabled` is not U5 completion;
 production dispatch and existing partial capability reports remain unchanged.
 

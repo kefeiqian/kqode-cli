@@ -76,7 +76,8 @@ impl Drop for PrivateDescriptor {
     }
 }
 
-fn current_user_sid() -> io::Result<String> {
+/// Copies the current process user's SID for private object descriptors.
+pub(crate) fn current_user_sid() -> io::Result<String> {
     let mut token = ptr::null_mut();
     if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) } == 0 {
         return Err(io::Error::last_os_error());

@@ -32,8 +32,9 @@ pub enum SandboxAccountCheckpoint {
 /// Implementations must create a new installation journal, reject existing/reparse
 /// targets, restrict it to the authorized owner/SYSTEM (excluding sandbox accounts),
 /// and durably flush every record before returning. DPAPI machine protection alone
-/// does not make a world-readable journal safe. No production file adapter or
-/// privileged CLI is wired yet; the host must supply that boundary before use.
+/// does not make a world-readable journal safe. `PrivateSandboxAccountJournal`
+/// provides first-write-only storage; an authorized privileged helper and recovery
+/// reader are not wired yet and remain required before production setup.
 pub trait SandboxAccountJournal {
     /// Durably stores the immutable plan and encrypted passwords before SAM mutations.
     ///
