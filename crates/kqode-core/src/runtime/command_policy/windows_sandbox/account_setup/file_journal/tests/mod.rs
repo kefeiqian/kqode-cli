@@ -1,6 +1,6 @@
-mod boundaries;
+pub(super) mod boundaries;
 mod disk;
 mod failures;
 mod permissions;
-mod support;
+pub(super) mod support;
 mod transitions;

@@ -7,7 +7,7 @@ use std::{
     io::{self, Write},
 };
 
-const FORMAT_VERSION: u32 = 1;
+pub(super) const FORMAT_VERSION: u32 = 1;
 pub(super) const MAX_RECORD_BYTES: usize = 64 * 1024;
 
 #[derive(Serialize)]

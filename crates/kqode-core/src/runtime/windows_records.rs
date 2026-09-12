@@ -1,7 +1,7 @@
 use std::{ffi::OsString, io, os::windows::ffi::OsStringExt};
 
 /// Parses bounded native directory/stream records without borrowing unaligned structs.
-pub(super) fn names(
+pub(crate) fn names(
     buffer: &[u8],
     name_offset: usize,
     length_offset: usize,

@@ -2,6 +2,9 @@ use super::super::{
     SandboxAccountCheckpoint as Checkpoint, SandboxAccountIdentity, SandboxAccountRole as Role,
     WindowsSandboxAccountPlan,
 };
+use super::inspection::{
+    SandboxAccountJournalInspection, SandboxAccountJournalState, SandboxAccountPendingMutation,
+};
 use std::io;
 
 enum Expected {
@@ -21,6 +24,25 @@ pub(super) struct Progress {
 }
 
 impl Progress {
+    /// Observations are intentionally weaker than verified disabled-account readiness.
+    pub fn inspection(self) -> SandboxAccountJournalInspection {
+        let pending_mutation = match self.expected {
+            Expected::Created(role) => Some(SandboxAccountPendingMutation::Create { role }),
+            Expected::MemberAdded(role) => Some(SandboxAccountPendingMutation::AddMember { role }),
+            _ => None,
+        };
+        SandboxAccountJournalInspection {
+            state: if matches!(self.expected, Expected::Complete) {
+                SandboxAccountJournalState::PreparedDisabledRecorded
+            } else {
+                SandboxAccountJournalState::Incomplete
+            },
+            record_count: self.sequence + 1,
+            identities: self.identities,
+            pending_mutation,
+        }
+    }
+
     pub fn new(plan: WindowsSandboxAccountPlan) -> Self {
         Self {
             plan,

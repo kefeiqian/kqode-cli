@@ -20,14 +20,19 @@ mod turn_queue;
 #[cfg(windows)]
 mod windows_file;
 #[cfg(windows)]
+mod windows_records;
+#[cfg(windows)]
 mod windows_security;
+#[cfg(windows)]
+mod windows_streams;
 mod workspace_snapshot;
 #[cfg(windows)]
 pub use command_policy::{
     DisabledSandboxAccounts, LpacDiagnosticOutput, LpacTokenObservation,
     PrivateSandboxAccountJournal, ProtectedSandboxPasswords, SandboxAccountCheckpoint,
-    SandboxAccountIdentity, SandboxAccountJournal, SandboxAccountRole, SandboxAccountSetupError,
-    WindowsSandboxAccountPlan, WindowsSandboxBackend,
+    SandboxAccountIdentity, SandboxAccountJournal, SandboxAccountJournalInspection,
+    SandboxAccountJournalState, SandboxAccountPendingMutation, SandboxAccountRole,
+    SandboxAccountSetupError, WindowsSandboxAccountPlan, WindowsSandboxBackend,
 };
 
 pub use agent::AgentRuntime;

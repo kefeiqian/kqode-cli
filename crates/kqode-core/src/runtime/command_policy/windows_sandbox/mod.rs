@@ -17,8 +17,9 @@ mod transport;
 use super::CommandContext;
 pub use account_setup::{
     DisabledSandboxAccounts, PrivateSandboxAccountJournal, ProtectedSandboxPasswords,
-    SandboxAccountCheckpoint, SandboxAccountIdentity, SandboxAccountJournal, SandboxAccountRole,
-    SandboxAccountSetupError, WindowsSandboxAccountPlan,
+    SandboxAccountCheckpoint, SandboxAccountIdentity, SandboxAccountJournal,
+    SandboxAccountJournalInspection, SandboxAccountJournalState, SandboxAccountPendingMutation,
+    SandboxAccountRole, SandboxAccountSetupError, WindowsSandboxAccountPlan,
 };
 pub use native::TokenObservation as LpacTokenObservation;
 pub use runner::{LpacDiagnosticOutput, WindowsSandboxBackend};

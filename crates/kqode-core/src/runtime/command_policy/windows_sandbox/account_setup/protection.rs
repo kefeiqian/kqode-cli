@@ -3,13 +3,14 @@ use std::ptr;
 use windows_sys::Win32::{
     Foundation::LocalFree,
     Security::Cryptography::{
-        CRYPT_INTEGER_BLOB, CRYPTPROTECT_LOCAL_MACHINE, CRYPTPROTECT_UI_FORBIDDEN, CryptProtectData,
+        CRYPT_INTEGER_BLOB, CRYPTPROTECT_LOCAL_MACHINE, CRYPTPROTECT_UI_FORBIDDEN,
+        CryptProtectData, CryptUnprotectData,
     },
 };
 use zeroize::{Zeroize, Zeroizing};
 
 const DOMAIN: &[u8] = b"KQode Windows sandbox account password v1";
-const MAX_CIPHERTEXT_BYTES: usize = 8192;
+pub(super) const MAX_CIPHERTEXT_BYTES: usize = 8192;
 
 /// Binds each encrypted password to this installation and its account role.
 pub(super) fn protect(
@@ -43,6 +44,52 @@ pub(super) fn protect(
         ));
     }
     Ok(unsafe { std::slice::from_raw_parts(output.0.pbData, length) }.to_vec())
+}
+
+/// Checks decodability and password shape without returning or retaining plaintext.
+pub(super) fn verify_password(
+    encrypted: &mut [u8],
+    plan: &WindowsSandboxAccountPlan,
+    role: SandboxAccountRole,
+) -> Result<(), SandboxAccountSetupError> {
+    use super::credentials::{COMPLEXITY_PREFIX, PASSWORD_TEXT_BYTES};
+    if encrypted.is_empty() || encrypted.len() > MAX_CIPHERTEXT_BYTES {
+        return Err(SandboxAccountSetupError::InvalidNativeData(
+            "protected password length",
+        ));
+    }
+    let mut extra = entropy(plan, role);
+    let mut output = LocalBlob(CRYPT_INTEGER_BLOB::default());
+    if unsafe {
+        CryptUnprotectData(
+            &blob(encrypted)?,
+            ptr::null_mut(),
+            &blob(&mut extra)?,
+            ptr::null(),
+            ptr::null(),
+            CRYPTPROTECT_UI_FORBIDDEN,
+            &mut output.0,
+        )
+    } == 0
+    {
+        return Err(SandboxAccountSetupError::last_os("CryptUnprotectData"));
+    }
+    if output.0.pbData.is_null() || output.0.cbData as usize != PASSWORD_TEXT_BYTES {
+        return Err(SandboxAccountSetupError::InvalidNativeData(
+            "protected password shape",
+        ));
+    }
+    let bytes = unsafe { std::slice::from_raw_parts(output.0.pbData, PASSWORD_TEXT_BYTES) };
+    if !bytes.starts_with(COMPLEXITY_PREFIX.as_bytes())
+        || !bytes[COMPLEXITY_PREFIX.len()..]
+            .iter()
+            .all(|byte| byte.is_ascii_alphanumeric() || [b'+', b'/'].contains(byte))
+    {
+        return Err(SandboxAccountSetupError::InvalidNativeData(
+            "protected password shape",
+        ));
+    }
+    Ok(())
 }
 
 fn entropy(plan: &WindowsSandboxAccountPlan, role: SandboxAccountRole) -> Vec<u8> {

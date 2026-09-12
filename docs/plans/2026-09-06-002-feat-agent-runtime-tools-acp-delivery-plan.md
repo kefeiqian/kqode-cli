@@ -685,8 +685,16 @@ and secret-environment tests pass.
       reparse/collision targets, thread impersonation, invalid checkpoint order
       and mismatched identity receipts; poison the writer after any failure.
       Do not reopen, truncate, repair, resume or delete existing setup state.
-      The trusted-parent selector, recovery reader and authorized privileged
+      The trusted-parent selector, live reconciliation and authorized privileged
       helper remain required before production account setup.
+- [ ] Add strict read-only account-journal inspection (implemented; awaiting review).
+      Reopen through trusted parent and child handles with no ordinary write/delete
+      sharing. Verify private DACLs, trusted ownership, object types and absence of
+      reparse points, hardlink aliases and named streams. Reject missing/torn,
+      oversized, unknown/duplicate-field or out-of-order records without repair.
+      Check the expected installation and password decodability without exporting
+      plaintext. Report only recorded receipts and unresolved mutation intents;
+      a completed journal is not live SAM verification or authority to resume.
 - [ ] Implement `allow | ask | deny`, read-only and workspace-write profiles, and
       independent network policy.
 - [x] Add the command authorization gate and immutable context contracts:
@@ -1155,8 +1163,33 @@ drop; drop closes them without deleting partial recovery evidence. This provides
 OS-reported file durability, not an independently tested power-loss guarantee or
 permission to assume a missing/torn journal means no SAM mutation happened.
 
-The trusted-parent selection boundary, strict loader/recovery protocol,
-authenticated privileged helper, logon-right restrictions, ACL/network setup,
+`PrivateSandboxAccountJournal::inspect` now loads existing state read-only through
+the same trusted-parent boundary. It requires protected process-user/SYSTEM DACLs
+on both directory and file; the owner must be that user, SYSTEM, or Administrators
+(the possible default owner for an elevated creator). It rejects impersonation,
+ordinary concurrent writers, reparse targets, named streams and multiply linked
+files. It checks these object properties again after reading and returns no
+lasting lock or mutation lease.
+
+Inspection permits at most twelve newline-terminated records and 768 KiB total.
+Private deserialization DTOs reject unknown/duplicate fields and preserve the
+public plan's generated-name-only construction invariant. Header version,
+expected installation, exact sequence/order, canonical local-account SID syntax
+and receipt-set consistency are required. Password envelopes must decode with
+the expected installation/role entropy and match the generated-password format;
+decrypted output is zeroized without being returned. Neither this check nor the
+private DACL is a cryptographic attestation of journal history or live SAM state.
+
+The non-secret result distinguishes `Incomplete` from
+`PreparedDisabledRecorded`, with recorded SID receipts and any creation or
+membership intent lacking its receipt. Such an intent has an unknown native
+outcome. An incomplete prefix without a pending intent does not prove no later
+mutation occurred. Empty, torn or invalid state is an error, never a silently
+accepted prefix. The reader does not restore passwords, enable/delete/adopt
+accounts, append/repair records or automatically resume setup.
+
+The trusted-parent selection boundary, live SAM reconciliation and explicit
+recovery protocol, authenticated privileged helper, logon-right restrictions, ACL/network setup,
 and readiness activation are still pending. Account workflow tests use fake SAM
 operations with real private temporary journal files and non-elevated RNG/DPAPI.
 No system account or group has been created; ACLs are set only on newly owned

@@ -11,7 +11,7 @@ use windows_sys::Win32::{
     Storage::FileSystem::{FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT},
 };
 
-fn junction(link: &Path, target: &Path) {
+pub(in super::super) fn junction(link: &Path, target: &Path) {
     let result = Command::new("powershell.exe")
         .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
             "$ErrorActionPreference='Stop'; New-Item -ItemType Junction -Path $env:KQODE_JOURNAL_LINK -Target $env:KQODE_JOURNAL_TARGET | Out-Null"])
@@ -46,9 +46,9 @@ fn junction_collision_does_not_touch_the_target_and_reparse_parent_is_rejected()
     fs::remove_dir(link).unwrap();
 }
 
-struct Impersonation;
+pub(in super::super) struct Impersonation;
 impl Impersonation {
-    fn begin() -> Self {
+    pub(in super::super) fn begin() -> Self {
         assert_ne!(unsafe { ImpersonateSelf(SecurityImpersonation) }, 0);
         Self
     }

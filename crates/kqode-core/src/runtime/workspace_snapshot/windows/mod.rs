@@ -12,7 +12,7 @@ mod inspection_handles;
 mod inspection_tests;
 mod names;
 mod read_data;
-mod records;
+use crate::runtime::windows_records as records;
 mod source_check;
 mod source_lookup;
 mod source_targets;

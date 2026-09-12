@@ -9,8 +9,10 @@ use zeroize::Zeroizing;
 use super::{SandboxAccountRole, SandboxAccountSetupError, WindowsSandboxAccountPlan, protection};
 
 const RANDOM_PASSWORD_BYTES: usize = 48;
-const COMPLEXITY_PREFIX: &str = "Kq1!";
-const PASSWORD_ENVELOPE_VERSION: u32 = 1;
+pub(super) const COMPLEXITY_PREFIX: &str = "Kq1!";
+pub(super) const PASSWORD_TEXT_BYTES: usize =
+    COMPLEXITY_PREFIX.len() + RANDOM_PASSWORD_BYTES / 3 * 4;
+pub(super) const PASSWORD_ENVELOPE_VERSION: u32 = 1;
 
 /// Machine-DPAPI ciphertext, still requiring private storage. Debug never dumps the blobs.
 ///
@@ -85,7 +87,7 @@ fn generate() -> Result<SecretString, SandboxAccountSetupError> {
             code: status as u32,
         });
     }
-    let mut text = String::with_capacity(COMPLEXITY_PREFIX.len() + RANDOM_PASSWORD_BYTES / 3 * 4);
+    let mut text = String::with_capacity(PASSWORD_TEXT_BYTES);
     text.push_str(COMPLEXITY_PREFIX);
     STANDARD.encode_string(random.as_slice(), &mut text);
     Ok(SecretString::from(text))
