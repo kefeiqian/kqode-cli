@@ -111,8 +111,17 @@ fn current_user_sid() -> io::Result<String> {
         return Err(io::Error::last_os_error());
     }
     let user = unsafe { &*buffer.as_ptr().cast::<TOKEN_USER>() };
+    unsafe { sid_to_string(user.User.Sid) }
+}
+
+/// Copies an OS-provided SID without exposing its backing native allocation.
+///
+/// # Safety
+///
+/// `sid` must point to a valid SID for the duration of this call.
+pub(crate) unsafe fn sid_to_string(sid: windows_sys::Win32::Security::PSID) -> io::Result<String> {
     let mut text = ptr::null_mut();
-    if unsafe { ConvertSidToStringSidW(user.User.Sid, &mut text) } == 0 {
+    if unsafe { ConvertSidToStringSidW(sid, &mut text) } == 0 {
         return Err(io::Error::last_os_error());
     }
     unsafe {

@@ -35,5 +35,9 @@ pub use powershell::PowerShellCommandOptions;
 pub use snapshot_command::SnapshotCommand;
 pub use snapshot_execution::SnapshotCommandOutput;
 #[cfg(windows)]
-pub use windows_sandbox::{LpacDiagnosticOutput, LpacTokenObservation, WindowsSandboxBackend};
+pub use windows_sandbox::{
+    DisabledSandboxAccounts, LpacDiagnosticOutput, LpacTokenObservation, ProtectedSandboxPasswords,
+    SandboxAccountCheckpoint, SandboxAccountIdentity, SandboxAccountJournal, SandboxAccountRole,
+    SandboxAccountSetupError, WindowsSandboxAccountPlan, WindowsSandboxBackend,
+};
 pub use workspace::{CommandWorkspace, WorkspaceExecutionMode};

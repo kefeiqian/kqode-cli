@@ -21,7 +21,11 @@ mod turn_queue;
 mod windows_security;
 mod workspace_snapshot;
 #[cfg(windows)]
-pub use command_policy::{LpacDiagnosticOutput, LpacTokenObservation, WindowsSandboxBackend};
+pub use command_policy::{
+    DisabledSandboxAccounts, LpacDiagnosticOutput, LpacTokenObservation, ProtectedSandboxPasswords,
+    SandboxAccountCheckpoint, SandboxAccountIdentity, SandboxAccountJournal, SandboxAccountRole,
+    SandboxAccountSetupError, WindowsSandboxAccountPlan, WindowsSandboxBackend,
+};
 
 pub use agent::AgentRuntime;
 pub use budget::{

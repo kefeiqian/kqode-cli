@@ -664,6 +664,20 @@ and secret-environment tests pass.
 - [ ] Implement an enforceable Windows-native sandbox backend first. Linux and
       macOS backends are deferred; do not implicitly forward Windows requests
       through Git Bash, Cygwin, or WSL.
+- [ ] Implement the Codex-style native architecture selected by the user on
+      September 12: dedicated ordinary offline/online accounts, restricted tokens,
+      scoped ACLs, independently enforced network rules and Job supervision.
+      Windows Sandbox VM is not the selected implementation. Account/ACL/network
+      setup requires a separate administrator-consent boundary; choosing this
+      architecture does not authorize host setup or promote any capability.
+- [ ] Add first-time disabled-account preparation (implemented; awaiting review).
+      Generate fixed-role names from an installation ID, reject existing names
+      without adoption or password reset, create only ordinary disabled accounts
+      and a new local group, and retain SID-bound ownership evidence. Require a
+      private durable journal to store DPAPI-protected random passwords and
+      write-ahead intents before mutations. Failures stop with disabled partial
+      state for explicit recovery, not implicit account deletion or execution.
+      Native SAM creation is compiled but not exercised on this host.
 - [ ] Implement `allow | ask | deny`, read-only and workspace-write profiles, and
       independent network policy.
 - [x] Add the command authorization gate and immutable context contracts:
@@ -1087,6 +1101,39 @@ optional feature is disabled; neither `wsb.exe` nor `WindowsSandbox.exe` is
 available. No system feature was enabled, no restart was requested, and the earlier
 one-off elevated experiment does not authorize a new setup operation. A stronger
 Windows virtualization route requires an explicit architecture/setup decision.
+
+**Native-account preparation (September 12, 2026):**
+
+The user selected the Codex-style native approach after the six-repository
+comparison, rather than enabling the Windows Sandbox optional feature. KQode
+implements its own account preparation primitive; reference agent code is not
+copied, executed or installed.
+
+`WindowsSandboxAccountPlan::provision_disabled` is a synchronous trusted-helper
+API, not a tool or a self-elevating command. It rejects non-elevated callers and
+domain-controller hosts, uses local-only NetAPI calls, and creates one new
+installation-specific group plus two new `USER_PRIV_USER` accounts with
+`UF_ACCOUNTDISABLE`. Offline/online are intended roles, not installed network
+guarantees. No logon rights, filesystem grants, firewall rules, enabled accounts
+or model execution are introduced by this unit.
+
+Passwords are independently generated with BCrypt, memory-redacted/zeroized, and
+machine-DPAPI encrypted with installation/role binding before the journal begins.
+Machine protection does not replace a private journal DACL: ciphertext must never
+be exposed to sandbox users, logs or frontend IPC. The host-provided journal
+contract requires create-new private storage and durable intent/result writes.
+Cancellation after a successful mutation still permits its ownership receipt to
+be recorded before stopping. Missing records, name collisions, changed SIDs or
+non-disabled/nonordinary account observations require explicit recovery; there is
+no automatic adoption, password reset, account enablement or deletion.
+
+The concrete private-file journal, its loader/recovery protocol, authenticated
+privileged helper, logon-right restrictions, ACL/network setup, and readiness
+activation are still pending. The account workflow is tested with fake SAM
+operations; only RNG/DPAPI operations are exercised natively without elevation.
+No system account or group has been created, and no host ACL/firewall or Windows
+feature configuration has been changed. `PreparedDisabled` is not U5 completion;
+production dispatch and existing partial capability reports remain unchanged.
 
 ### U6. Implement the first real tools
 
