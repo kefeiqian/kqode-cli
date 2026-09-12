@@ -8,6 +8,7 @@ mod compare;
 mod error;
 mod inspection;
 mod snapshot;
+mod source_check;
 #[cfg(all(test, windows))]
 mod tests;
 #[cfg(windows)]
@@ -16,3 +17,4 @@ mod windows;
 pub use changes::{SnapshotChange, SnapshotEntry};
 pub use error::SnapshotError;
 pub use snapshot::{SnapshotLimits, SnapshotSummary, WorkspaceSnapshot};
+pub use source_check::{SnapshotConflictKind, SnapshotSourceCheck, SnapshotSourceConflict};

@@ -3,4 +3,8 @@ mod inspection;
 mod inspection_limits;
 mod inspection_rejections;
 mod limits;
+mod source_conflicts;
+mod source_conversions;
+mod source_limits;
+mod source_safety;
 pub(super) mod support;

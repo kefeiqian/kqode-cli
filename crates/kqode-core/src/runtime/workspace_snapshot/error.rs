@@ -13,6 +13,7 @@ pub enum SnapshotError {
     LimitExceeded(&'static str),
     Cancelled,
     SourceChanged(PathBuf),
+    SourceRootChanged,
     SnapshotChanged(PathBuf),
     SnapshotMoved,
     Io {
@@ -45,12 +46,16 @@ impl fmt::Display for SnapshotError {
             Self::Cancelled => write!(f, "workspace snapshot operation cancelled"),
             Self::SourceChanged(path) => write!(
                 f,
-                "source changed while preparing snapshot: {}",
+                "source changed during snapshot operation: {}",
                 path.display()
             ),
             Self::SnapshotMoved => write!(
                 f,
                 "owned workspace snapshot no longer has its prepared location"
+            ),
+            Self::SourceRootChanged => write!(
+                f,
+                "source workspace no longer has its captured identity and location"
             ),
             Self::SnapshotChanged(path) => write!(
                 f,

@@ -1,7 +1,5 @@
-use sha2::{Digest, Sha256};
 use std::{
     fs::{File, Metadata},
-    io::Read,
     path::{Path, PathBuf},
 };
 
@@ -9,10 +7,8 @@ use super::super::{
     SnapshotChange, SnapshotEntry, SnapshotError, SnapshotLimits, WorkspaceSnapshot,
     budget::Budget, changes::Inventory, compare::compare,
 };
-use super::{directory, entry, handles, inspection_handles, names};
+use super::{directory, entry, handles, inspection_handles, names, read_data::read_data};
 use crate::cancellation::CancellationToken;
-
-const READ_BUFFER_BYTES: usize = 64 * 1024;
 
 #[cfg(test)]
 mod tests;
@@ -22,8 +18,15 @@ pub(in crate::runtime::workspace_snapshot) fn inspect(
     limits: SnapshotLimits,
     cancellation: &CancellationToken,
 ) -> Result<Vec<SnapshotChange>, SnapshotError> {
-    let budget = Budget::new(limits, cancellation)?;
-    if snapshot.baseline.len() > limits.max_entries {
+    let mut budget = Budget::new(limits, cancellation)?;
+    with_budget(snapshot, &mut budget)
+}
+
+pub(super) fn with_budget(
+    snapshot: &WorkspaceSnapshot,
+    budget: &mut Budget<'_>,
+) -> Result<Vec<SnapshotChange>, SnapshotError> {
+    if snapshot.baseline.len() > budget.limits.max_entries {
         return Err(SnapshotError::LimitExceeded("max_entries"));
     }
     snapshot.validate_location()?;
@@ -39,20 +42,20 @@ pub(in crate::runtime::workspace_snapshot) fn inspect(
         pinned: Vec::new(),
     };
     scan.walk(root, Path::new(""), 0)?;
-    let changes = compare(&snapshot.baseline, &scan.current, &scan.budget)?;
+    let changes = compare(&snapshot.baseline, &scan.current, scan.budget)?;
     scan.validate()?;
     snapshot.validate_location()?;
     scan.budget.check()?;
     Ok(changes)
 }
 
-struct Scan<'a> {
-    budget: Budget<'a>,
+struct Scan<'a, 'b> {
+    budget: &'a mut Budget<'b>,
     current: Inventory,
     pinned: Vec<(PathBuf, File, Metadata)>,
 }
 
-impl Scan<'_> {
+impl Scan<'_, '_> {
     fn validate(&self) -> Result<(), SnapshotError> {
         for (path, file, before) in &self.pinned {
             self.budget.check()?;
@@ -100,7 +103,13 @@ impl Scan<'_> {
             SnapshotEntry::Directory
         } else if before.is_file() {
             inspection_handles::single_link(&file, relative)?;
-            self.read_file(&mut file, relative, before.len())?
+            read_data(
+                &mut file,
+                relative,
+                before.len(),
+                self.budget,
+                SnapshotError::SnapshotChanged,
+            )?
         } else {
             return Err(entry::unsupported(
                 relative,
@@ -114,36 +123,5 @@ impl Scan<'_> {
         }
         self.pinned.push((relative.to_owned(), file, before));
         Ok(())
-    }
-
-    fn read_file(
-        &mut self,
-        file: &mut File,
-        path: &Path,
-        bytes: u64,
-    ) -> Result<SnapshotEntry, SnapshotError> {
-        if bytes > self.budget.remaining_bytes() {
-            return Err(SnapshotError::LimitExceeded("max_bytes"));
-        }
-        let mut remaining = bytes;
-        let mut buffer = [0u8; READ_BUFFER_BYTES];
-        let mut digest = Sha256::new();
-        while remaining != 0 {
-            self.budget.check()?;
-            let length = remaining.min(buffer.len() as u64) as usize;
-            let count = file
-                .read(&mut buffer[..length])
-                .map_err(|error| SnapshotError::io("read artifact data", error))?;
-            if count == 0 {
-                return Err(SnapshotError::SnapshotChanged(path.to_owned()));
-            }
-            remaining -= count as u64;
-            self.budget.bytes += count as u64;
-            digest.update(&buffer[..count]);
-        }
-        Ok(SnapshotEntry::File {
-            bytes,
-            sha256: digest.finalize().into(),
-        })
     }
 }

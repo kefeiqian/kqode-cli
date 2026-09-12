@@ -52,6 +52,6 @@ pub use provider::{
 };
 pub use turn_queue::{DeleteResult, QueuedTurn, TurnLease, TurnQueue, TurnQueueError};
 pub use workspace_snapshot::{
-    SnapshotChange, SnapshotEntry, SnapshotError, SnapshotLimits, SnapshotSummary,
-    WorkspaceSnapshot,
+    SnapshotChange, SnapshotConflictKind, SnapshotEntry, SnapshotError, SnapshotLimits,
+    SnapshotSourceCheck, SnapshotSourceConflict, SnapshotSummary, WorkspaceSnapshot,
 };

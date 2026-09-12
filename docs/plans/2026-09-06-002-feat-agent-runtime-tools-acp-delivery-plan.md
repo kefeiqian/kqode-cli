@@ -740,7 +740,15 @@ and secret-environment tests pass.
       recheck observable changes, and fail without a partial report on exhausted
       entry/byte/depth/time limits or cancellation. This is not a publication
       approval, source-freshness check, transactional snapshot or sandbox claim.
-- [ ] Add approved artifact publication with source baseline/stale checks and
+- [ ] Add `WorkspaceSnapshot::check_source_conflicts` (implemented; awaiting
+      review). Bind the captured source root's volume-qualified 128-bit file ID
+      and volume-GUID path. Check affected source contents, ancestors and direct
+      children of removed/replaced directories against the copy-time baseline.
+      Report missing/existing targets, content/type/path changes and new
+      descendants; reject unsafe entries and encompassed Git controls. Share
+      copy/source read budgets and deadline. Do not read unrelated source data,
+      write either tree or treat an empty conflict list as publication authority.
+- [ ] Add approved artifact publication with atomic source baseline/stale checks and
       protected-path rejection; never auto-write back. The copy is not a Git
       worktree. Absolute paths in scripts/environment are not rewritten; missing
       or excluded cwd, extra host roots and snapshot `danger-full-access` are
@@ -1005,6 +1013,36 @@ directory entries or an authorization to publish after handles are released.
 Publication must separately check current source freshness, protected targets,
 approval and conflicts. Production dispatch and all partial capabilities remain
 unchanged.
+
+**Source conflict preflight (September 12, 2026):**
+
+`check_source_conflicts` produces an informational `SnapshotSourceCheck` containing
+the copy changes and sorted source conflicts. An unchanged copy does not open the
+source. Otherwise, the root must still have its captured object identity and
+location, even if a replacement directory contains identical bytes. Existing file
+contents are compared against the original SHA-256 baseline; source file
+ACLs/timestamps and same-content file replacement are not baseline differences.
+
+Source traversal opens one normal component at a time relative to a verified
+directory handle, using native case-insensitive lookup and checking the resulting
+canonical spelling. It does not silently accept a case alias as an absent target.
+Only missing-name/path NTSTATUS values become absence; sharing, access and other
+I/O errors abort without a partial report. Opened targets and ancestors remain
+pinned through final metadata/stream/link checks. New children of destructively
+changed directories are conflicts without reading their contents. Captured
+excluded Git descendants and newly observed Git controls prevent parent
+publication. Children under a planned new directory or file-to-directory
+replacement are covered by that parent's source check, not incorrectly treated as
+independent conflicts against the old file.
+
+Copy hashing and source checks share one byte budget and deadline. The entry
+budget counts copy entries, source component opens and source directory visits;
+the baseline/copy union remains bounded separately by the same entry limit.
+These are observations, not a transactional seal or name reservation. Copy writers
+must be stopped beforehand. Publication still needs proposal-level alias handling,
+protected-target policy, fresh approval, serialization and atomic revalidation
+against current source state. Neither tree is written; production dispatch,
+capability levels and U5's unresolved strict-isolation acceptance are unchanged.
 
 ### U6. Implement the first real tools
 

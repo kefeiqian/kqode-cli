@@ -40,6 +40,8 @@ pub struct WorkspaceSnapshot {
     #[cfg(windows)]
     pub(super) baseline: super::changes::Inventory,
     #[cfg(windows)]
+    pub(super) source_identity: super::windows::ObjectIdentity,
+    #[cfg(windows)]
     pub(super) directory: Option<std::fs::File>,
 }
 

@@ -2,7 +2,7 @@ use std::{fs, path::Path};
 
 use super::super::budget::Budget;
 use super::super::{SnapshotError, SnapshotLimits, SnapshotSummary, WorkspaceSnapshot};
-use super::{handles, walk::Walker};
+use super::{ObjectIdentity, handles, walk::Walker};
 use crate::{cancellation::CancellationToken, runtime::WorkspacePolicy};
 
 pub(in crate::runtime::workspace_snapshot) fn capture(
@@ -20,6 +20,7 @@ pub(in crate::runtime::workspace_snapshot) fn capture(
     {
         return Err(SnapshotError::SourceChanged(workspace.root().to_owned()));
     }
+    let source_identity = ObjectIdentity::read(&source)?;
     let parent = fs::canonicalize(destination_parent)
         .map_err(|error| SnapshotError::io("resolve destination parent", error))?;
     if parent.starts_with(workspace.root()) {
@@ -44,6 +45,7 @@ pub(in crate::runtime::workspace_snapshot) fn capture(
         directory: Some(directory),
         summary: SnapshotSummary::default(),
         baseline: Default::default(),
+        source_identity,
     };
     snapshot.root = handles::final_path(snapshot.directory.as_ref().unwrap())
         .map_err(|error| SnapshotError::io("resolve snapshot directory", error))?;
@@ -72,5 +74,9 @@ pub(in crate::runtime::workspace_snapshot) fn capture(
     }
     snapshot.summary = walker.summary;
     snapshot.baseline = walker.baseline;
+    if ObjectIdentity::read(&source)? != snapshot.source_identity {
+        return Err(SnapshotError::SourceRootChanged);
+    }
+    walker.budget.check()?;
     Ok(snapshot)
 }

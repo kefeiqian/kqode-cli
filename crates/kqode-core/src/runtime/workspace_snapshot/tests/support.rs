@@ -52,6 +52,11 @@ pub fn limits() -> SnapshotLimits {
         timeout: Duration::from_secs(5),
     }
 }
+pub fn check_source(snapshot: &WorkspaceSnapshot) -> super::super::SnapshotSourceCheck {
+    snapshot
+        .check_source_conflicts(limits(), &CancellationToken::default())
+        .unwrap()
+}
 pub fn junction(link: &Path, target: &Path) {
     let command = PathBuf::from(std::env::var_os("SystemRoot").unwrap()).join("System32\\cmd.exe");
     let result = std::process::Command::new(command)

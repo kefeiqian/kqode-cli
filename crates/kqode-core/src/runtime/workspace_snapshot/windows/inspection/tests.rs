@@ -8,8 +8,9 @@ fn inspection_rechecks_pinned_directory_metadata_before_accepting_a_report() {
     let snapshot = fixture.capture(limits()).unwrap();
     let cancellation = CancellationToken::default();
     let original = snapshot.directory.as_ref().unwrap();
+    let mut budget = Budget::new(limits(), &cancellation).unwrap();
     let mut scan = Scan {
-        budget: Budget::new(limits(), &cancellation).unwrap(),
+        budget: &mut budget,
         current: Inventory::new(),
         pinned: Vec::new(),
     };

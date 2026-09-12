@@ -3,30 +3,16 @@ use windows_sys::Win32::Storage::FileSystem::{
     BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle,
 };
 
-use super::{super::SnapshotError, entry::unsupported, handles};
+use super::{super::SnapshotError, ObjectIdentity, entry::unsupported, handles};
 
 /// Reopens the owned object, giving concurrent inspectors independent enumeration cursors.
 pub(super) fn root(file: &File) -> Result<File, SnapshotError> {
-    let original = information(file)?;
+    let original = ObjectIdentity::read(file)?;
     let path = handles::final_path(file)
         .map_err(|error| SnapshotError::io("resolve inspection root", error))?;
     let opened = handles::open_root(&path, false)
         .map_err(|error| SnapshotError::io("open inspection root", error))?;
-    let actual = information(&opened)?;
-    let volume_path = |file: &File| {
-        handles::volume_path(file)
-            .map_err(|error| SnapshotError::io("verify inspection volume path", error))
-    };
-    if (
-        original.dwVolumeSerialNumber,
-        original.nFileIndexHigh,
-        original.nFileIndexLow,
-    ) != (
-        actual.dwVolumeSerialNumber,
-        actual.nFileIndexHigh,
-        actual.nFileIndexLow,
-    ) || volume_path(file)? != volume_path(&opened)?
-    {
+    if original != ObjectIdentity::read(&opened)? || original != ObjectIdentity::read(file)? {
         return Err(SnapshotError::SnapshotMoved);
     }
     Ok(opened)
