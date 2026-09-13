@@ -685,7 +685,7 @@ and secret-environment tests pass.
       reparse/collision targets, thread impersonation, invalid checkpoint order
       and mismatched identity receipts; poison the writer after any failure.
       Do not reopen, truncate, repair, resume or delete existing setup state.
-      The trusted-parent selector, explicit recovery and authorized privileged
+      Explicit recovery and an authorized privileged
       helper remain required before production account setup.
 - [ ] Add strict read-only account-journal inspection (implemented; awaiting review).
       Reopen through trusted parent and child handles with no ordinary write/delete
@@ -703,6 +703,15 @@ and secret-environment tests pass.
       stable differences, but fail on query errors, observed drift, cancellation
       or limits. No repair, credential reset, account enablement or execution
       capability is returned.
+- [ ] Add the fixed current-user account-store boundary (implemented; awaiting review).
+      Resolve LocalAppData through the OS known-folder API without environment or
+      workspace overrides, preflight direct local-volume mapping, and pin every
+      path component while validating ownership and ancestor mutation rights.
+      Create only a fresh private `KQodeSandbox` root and durable `store.json`
+      marker; opening existing state must not repair or initialize missing data.
+      Derive the installation plan from that validated marker and revalidate the
+      store before journal preparation, inspection or reconciliation. This does
+      not supply cross-user helper authentication, setup consent or Full isolation.
 - [ ] Implement `allow | ask | deny`, read-only and workspace-write profiles, and
       independent network policy.
 - [x] Add the command authorization gate and immutable context contracts:
@@ -1230,8 +1239,51 @@ reported missing. It did not create accounts or exercise a provisioned group's
 native membership query. Deterministic comparison, drift, error and budget cases
 use the fake read-only interface; native SID copying has a separate fixture test.
 
-The trusted-parent selection boundary, explicit recovery protocol,
-authenticated privileged helper, logon-right restrictions, ACL/network setup,
+**Fixed account-store boundary (September 13, 2026):**
+
+`WindowsSandboxAccountStore` supplies a current-process-user-only entry point
+above the low-level trusted-parent APIs. It resolves the registered LocalAppData
+known folder without requesting Shell existence verification, then accepts only
+literal drive-rooted components and a direct local hard-disk volume mapping.
+UNC/device paths, SUBST mappings, dot/stream components and excessive depth are
+rejected. Filesystem traversal is handle-relative, with no delete sharing; the
+opened root must also resolve as a local volume-GUID root with persistent ACLs.
+
+Every ancestor must remain a non-reparse directory with a trusted owner and no
+effective allow ACE granting another principal deletion, child deletion,
+security/ownership modification, extended-attribute or attribute-write rights.
+Current-user, SYSTEM, Administrators and the locally resolved TrustedInstaller
+service SID are trusted for ancestors. Read and sibling-creation grants may be
+present; new private children use protected user/SYSTEM DACLs rather than
+inheriting those grants. Ambiguous/unsupported ACL forms fail closed. Existing
+ancestor or store permissions are never rewritten.
+
+Initialization is create-new only. The private root's marker records a format
+version, application identifier, owner SID and fresh installation ID. The complete
+marker is flushed before success, bounded to 4 KiB, and loaded through a strict
+schema with canonical ID validation. Its read handle stays pinned against
+ordinary writes/deletion, together with the ancestor chain. An existing root
+without a valid private marker is not adopted, repaired or reinitialized.
+Failure may leave private initialization evidence; dropping the store never
+deletes it. Store operations share their original cooperative deadline through
+validation and the existing account workflow.
+
+Temporary-directory inspection found pre-existing grants to other sandbox
+identities on this host. The implementation correctly refuses that ancestry
+rather than relaxing its policy. Tests therefore use new private, UUID-named
+fixture directories under the validated LocalAppData anchor and remove those
+fixtures afterwards. The native opt-in probe only opened the registered anchor;
+the actual persistent `KQodeSandbox` namespace was not initialized.
+
+Before production dispatch, this store and its aliases must also enter the
+protected-path policy and must never be copied into execution snapshots or
+exposed through model read/write grants. Private storage ACLs do not make an
+intentional host-side copy safe. The current implementation remains scoped to
+the process user: cross-user elevated-service selection/authentication is not
+implemented, and the host must still obtain explicit administrator setup consent.
+
+The explicit recovery protocol, authenticated privileged helper,
+protected-store integration, logon-right restrictions, ACL/network setup,
 and readiness activation are still pending. Account mutation tests continue to
 use fake SAM operations with real private temporary journals and non-elevated RNG/DPAPI.
 No system account or group has been created; ACLs are set only on newly owned

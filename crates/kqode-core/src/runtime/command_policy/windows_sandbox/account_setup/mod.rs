@@ -7,8 +7,11 @@ mod guard;
 mod journal;
 mod model;
 mod native;
+mod private_acl;
+mod private_object;
 mod protection;
 mod reconciliation;
+mod store;
 #[cfg(test)]
 mod tests;
 mod workflow;
@@ -24,3 +27,4 @@ pub use model::{
     DisabledSandboxAccounts, SandboxAccountIdentity, SandboxAccountRole, WindowsSandboxAccountPlan,
 };
 pub use reconciliation::{SandboxAccountDiscrepancy, SandboxAccountReconciliation};
+pub use store::WindowsSandboxAccountStore;

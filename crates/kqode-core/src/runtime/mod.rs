@@ -33,7 +33,7 @@ pub use command_policy::{
     SandboxAccountDiscrepancy, SandboxAccountIdentity, SandboxAccountJournal,
     SandboxAccountJournalInspection, SandboxAccountJournalState, SandboxAccountPendingMutation,
     SandboxAccountReconciliation, SandboxAccountRole, SandboxAccountSetupError,
-    WindowsSandboxAccountPlan, WindowsSandboxBackend,
+    WindowsSandboxAccountPlan, WindowsSandboxAccountStore, WindowsSandboxBackend,
 };
 
 pub use agent::AgentRuntime;

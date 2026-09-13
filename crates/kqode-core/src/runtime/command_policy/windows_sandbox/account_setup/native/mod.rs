@@ -7,3 +7,4 @@ mod reader;
 mod sid;
 pub(super) use host::NativeHost;
 pub(super) use reader::NativeReader;
+pub(super) use sid::trusted_installer;

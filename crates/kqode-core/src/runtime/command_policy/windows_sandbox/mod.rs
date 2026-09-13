@@ -20,7 +20,7 @@ pub use account_setup::{
     SandboxAccountCheckpoint, SandboxAccountDiscrepancy, SandboxAccountIdentity,
     SandboxAccountJournal, SandboxAccountJournalInspection, SandboxAccountJournalState,
     SandboxAccountPendingMutation, SandboxAccountReconciliation, SandboxAccountRole,
-    SandboxAccountSetupError, WindowsSandboxAccountPlan,
+    SandboxAccountSetupError, WindowsSandboxAccountPlan, WindowsSandboxAccountStore,
 };
 pub use native::TokenObservation as LpacTokenObservation;
 pub use runner::{LpacDiagnosticOutput, WindowsSandboxBackend};

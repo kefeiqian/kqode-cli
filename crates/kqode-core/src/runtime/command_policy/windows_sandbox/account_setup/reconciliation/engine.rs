@@ -47,7 +47,7 @@ impl Plan {
     }
 }
 
-pub(super) fn run(
+pub(in super::super) fn run(
     plan: &Plan,
     journal: SandboxAccountJournalInspection,
     host: &mut dyn ReadHost,

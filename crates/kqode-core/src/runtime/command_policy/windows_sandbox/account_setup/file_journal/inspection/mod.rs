@@ -1,6 +1,5 @@
 //! Strict read-only inspection, not authority to resume setup or enable accounts.
 
-mod acl;
 mod input;
 mod parser;
 mod report;

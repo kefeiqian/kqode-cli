@@ -12,4 +12,6 @@ mod writer;
 pub use inspection::{
     SandboxAccountJournalInspection, SandboxAccountJournalState, SandboxAccountPendingMutation,
 };
+pub(super) use storage::require_process_identity;
+pub(super) use storage::validate_parent;
 pub use writer::PrivateSandboxAccountJournal;

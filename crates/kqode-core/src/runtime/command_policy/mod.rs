@@ -41,6 +41,6 @@ pub use windows_sandbox::{
     SandboxAccountDiscrepancy, SandboxAccountIdentity, SandboxAccountJournal,
     SandboxAccountJournalInspection, SandboxAccountJournalState, SandboxAccountPendingMutation,
     SandboxAccountReconciliation, SandboxAccountRole, SandboxAccountSetupError,
-    WindowsSandboxAccountPlan, WindowsSandboxBackend,
+    WindowsSandboxAccountPlan, WindowsSandboxAccountStore, WindowsSandboxBackend,
 };
 pub use workspace::{CommandWorkspace, WorkspaceExecutionMode};

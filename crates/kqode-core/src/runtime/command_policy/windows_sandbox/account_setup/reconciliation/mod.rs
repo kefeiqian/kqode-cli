@@ -7,5 +7,6 @@ mod report;
 mod tests;
 
 pub(super) use engine::ReadHost;
+pub(super) use engine::run;
 pub(super) const MAX_MEMBERS: usize = 256;
 pub use report::{SandboxAccountDiscrepancy, SandboxAccountReconciliation};

@@ -65,6 +65,15 @@ pub(super) fn run(
     cancellation: &CancellationToken,
 ) -> Result<DisabledSandboxAccounts, Error> {
     let guard = Guard::new(timeout, cancellation)?;
+    run_guarded(plan, host, journal, &guard)
+}
+
+pub(super) fn run_guarded(
+    plan: &WindowsSandboxAccountPlan,
+    host: &mut dyn Host,
+    journal: &mut dyn SandboxAccountJournal,
+    guard: &Guard<'_>,
+) -> Result<DisabledSandboxAccounts, Error> {
     let check = || guard.check();
     check()?;
     host.require_elevated()?;

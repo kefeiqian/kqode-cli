@@ -71,7 +71,7 @@ impl Storage {
 }
 
 /// Rejects non-directory/reparse handles and storage without local persistent ACL support.
-pub(super) fn validate_parent(parent: &File) -> io::Result<()> {
+pub(in super::super) fn validate_parent(parent: &File) -> io::Result<()> {
     require_process_identity()?;
     let metadata = parent.metadata()?;
     if !metadata.is_dir() || metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
@@ -117,7 +117,7 @@ pub(super) fn validate_parent(parent: &File) -> io::Result<()> {
 }
 
 /// Descriptor principals must match the creator, not a helper thread's impersonated client.
-fn require_process_identity() -> io::Result<()> {
+pub(in super::super) fn require_process_identity() -> io::Result<()> {
     let mut token = ptr::null_mut();
     if unsafe { OpenThreadToken(GetCurrentThread(), TOKEN_QUERY, 1, &mut token) } != 0 {
         if !token.is_null() {

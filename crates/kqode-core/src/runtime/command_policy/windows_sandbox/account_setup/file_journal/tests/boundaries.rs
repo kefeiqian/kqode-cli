@@ -11,7 +11,10 @@ use windows_sys::Win32::{
     Storage::FileSystem::{FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT},
 };
 
-pub(in super::super) fn junction(link: &Path, target: &Path) {
+pub(in crate::runtime::command_policy::windows_sandbox::account_setup) fn junction(
+    link: &Path,
+    target: &Path,
+) {
     let result = Command::new("powershell.exe")
         .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
             "$ErrorActionPreference='Stop'; New-Item -ItemType Junction -Path $env:KQODE_JOURNAL_LINK -Target $env:KQODE_JOURNAL_TARGET | Out-Null"])

@@ -1,17 +1,20 @@
-use super::invalid;
 use crate::runtime::windows_security::{current_user_sid, sid_to_string};
 use std::{fs::File, io, os::windows::io::AsRawHandle, ptr};
 use windows_sys::Win32::{
-    Foundation::LocalFree,
+    Foundation::{GENERIC_ALL, GENERIC_WRITE, LocalFree},
     Security::{
         ACCESS_ALLOWED_ACE,
         Authorization::{GetSecurityInfo, SE_FILE_OBJECT},
         CONTAINER_INHERIT_ACE, DACL_SECURITY_INFORMATION, GetAce, GetSecurityDescriptorControl,
-        IsValidAcl, IsValidSecurityDescriptor, OBJECT_INHERIT_ACE, OWNER_SECURITY_INFORMATION,
+        INHERIT_ONLY_ACE, INHERITED_ACE, IsValidAcl, IsValidSecurityDescriptor,
+        NO_PROPAGATE_INHERIT_ACE, OBJECT_INHERIT_ACE, OWNER_SECURITY_INFORMATION,
         PSECURITY_DESCRIPTOR, SE_DACL_PROTECTED,
     },
-    Storage::FileSystem::FILE_ALL_ACCESS,
-    System::SystemServices::ACCESS_ALLOWED_ACE_TYPE,
+    Storage::FileSystem::{
+        DELETE, FILE_ALL_ACCESS, FILE_DELETE_CHILD, FILE_WRITE_ATTRIBUTES, FILE_WRITE_EA,
+        WRITE_DAC, WRITE_OWNER,
+    },
+    System::SystemServices::{ACCESS_ALLOWED_ACE_TYPE, ACCESS_DENIED_ACE_TYPE},
 };
 
 const SYSTEM_SID: &str = "S-1-5-18";
@@ -19,6 +22,15 @@ const ADMINISTRATORS_SID: &str = "S-1-5-32-544";
 const SID_HEADER_BYTES: usize = 8;
 const SID_REVISION: u8 = 1;
 const MAX_SID_SUBAUTHORITIES: u8 = 15;
+const MAX_ANCESTOR_ACES: u16 = 256;
+const UNSAFE_ANCESTOR_RIGHTS: u32 = GENERIC_ALL
+    | GENERIC_WRITE
+    | DELETE
+    | WRITE_DAC
+    | WRITE_OWNER
+    | FILE_DELETE_CHILD
+    | FILE_WRITE_EA
+    | FILE_WRITE_ATTRIBUTES;
 
 struct Descriptor(PSECURITY_DESCRIPTOR);
 impl Drop for Descriptor {
@@ -33,6 +45,15 @@ impl Drop for Descriptor {
 
 /// Accepts only the writer's protected user/SYSTEM DACL and a trusted owner.
 pub(super) fn verify(file: &File) -> io::Result<()> {
+    verify_access(file, None)
+}
+
+/// Conservatively rejects namespace/security mutation rights granted to untrusted principals.
+pub(super) fn verify_ancestor(file: &File, installer: &str) -> io::Result<()> {
+    verify_access(file, Some(installer))
+}
+
+fn verify_access(file: &File, installer: Option<&str>) -> io::Result<()> {
     let mut descriptor = Descriptor(ptr::null_mut());
     let mut owner = ptr::null_mut();
     let mut acl = ptr::null_mut();
@@ -60,7 +81,11 @@ pub(super) fn verify(file: &File) -> io::Result<()> {
     let user = current_user_sid()?;
     let owner = unsafe { sid_to_string(owner) }?;
     // An elevated token may default new object ownership to Administrators.
-    if ![user.as_str(), SYSTEM_SID, ADMINISTRATORS_SID].contains(&owner.as_str()) {
+    let mut trusted = vec![user.as_str(), SYSTEM_SID, ADMINISTRATORS_SID];
+    if let Some(installer) = installer {
+        trusted.push(installer);
+    }
+    if !trusted.contains(&owner.as_str()) {
         return Err(invalid("journal object owner is not trusted"));
     }
     let mut control = 0;
@@ -68,11 +93,15 @@ pub(super) fn verify(file: &File) -> io::Result<()> {
     if unsafe { GetSecurityDescriptorControl(descriptor.0, &mut control, &mut revision) } == 0 {
         return Err(io::Error::last_os_error());
     }
-    if control & SE_DACL_PROTECTED == 0 || unsafe { (*acl).AceCount } != 2 {
+    let count = unsafe { (*acl).AceCount };
+    if installer.is_none() && (control & SE_DACL_PROTECTED == 0 || count != 2) {
         return Err(invalid("journal DACL must remain protected and private"));
     }
+    if count > MAX_ANCESTOR_ACES {
+        return Err(invalid("storage ancestor ACL exceeds its limit"));
+    }
     let mut observed = Vec::new();
-    for index in 0..2 {
+    for index in 0..u32::from(count) {
         let mut raw = ptr::null_mut();
         if unsafe { GetAce(acl, index, &mut raw) } == 0 {
             return Err(io::Error::last_os_error());
@@ -81,14 +110,24 @@ pub(super) fn verify(file: &File) -> io::Result<()> {
             return Err(invalid("journal DACL contains an invalid ACE"));
         }
         let header = unsafe { &*raw.cast::<windows_sys::Win32::Security::ACE_HEADER>() };
+        if installer.is_some() && u32::from(header.AceType) == ACCESS_DENIED_ACE_TYPE {
+            continue;
+        }
+        let permitted_flags = OBJECT_INHERIT_ACE
+            | CONTAINER_INHERIT_ACE
+            | if installer.is_some() {
+                INHERIT_ONLY_ACE | INHERITED_ACE | NO_PROPAGATE_INHERIT_ACE
+            } else {
+                0
+            };
         if u32::from(header.AceType) != ACCESS_ALLOWED_ACE_TYPE
             || usize::from(header.AceSize) < size_of::<ACCESS_ALLOWED_ACE>()
-            || u32::from(header.AceFlags) & !(OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE) != 0
+            || u32::from(header.AceFlags) & !permitted_flags != 0
         {
             return Err(invalid("journal DACL contains unexpected ACE semantics"));
         }
         let ace = unsafe { &*raw.cast::<ACCESS_ALLOWED_ACE>() };
-        if ace.Mask != FILE_ALL_ACCESS {
+        if installer.is_none() && ace.Mask != FILE_ALL_ACCESS {
             return Err(invalid("journal DACL has unexpected access rights"));
         }
         let sid_offset = std::mem::offset_of!(ACCESS_ALLOWED_ACE, SidStart);
@@ -104,7 +143,22 @@ pub(super) fn verify(file: &File) -> io::Result<()> {
         {
             return Err(invalid("journal ACE SID length is invalid"));
         }
-        observed.push(unsafe { sid_to_string((&ace.SidStart as *const u32).cast_mut().cast()) }?);
+        let sid = unsafe { sid_to_string((&ace.SidStart as *const u32).cast_mut().cast()) }?;
+        if installer.is_some() {
+            if u32::from(header.AceFlags) & INHERIT_ONLY_ACE == 0
+                && !trusted.contains(&sid.as_str())
+                && ace.Mask & UNSAFE_ANCESTOR_RIGHTS != 0
+            {
+                return Err(invalid(
+                    "storage ancestor grants unsafe rights to another principal",
+                ));
+            }
+        } else {
+            observed.push(sid);
+        }
+    }
+    if installer.is_some() {
+        return Ok(());
     }
     observed.sort();
     let mut expected = vec![user, SYSTEM_SID.to_owned()];
@@ -113,4 +167,8 @@ pub(super) fn verify(file: &File) -> io::Result<()> {
         return Err(invalid("journal DACL grants unexpected principals"));
     }
     Ok(())
+}
+
+pub(super) fn invalid(message: &'static str) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidData, message)
 }

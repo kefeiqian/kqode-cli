@@ -3,7 +3,9 @@ use crate::runtime::windows_security::sid_to_string;
 use std::ptr;
 use windows_sys::Win32::{
     Foundation::{ERROR_INSUFFICIENT_BUFFER, LocalFree},
-    Security::{Authorization::ConvertStringSidToSidW, LookupAccountNameW, PSID, SidTypeAlias},
+    Security::{
+        Authorization::ConvertStringSidToSidW, LookupAccountNameW, PSID, SID_NAME_USE, SidTypeAlias,
+    },
     System::WindowsProgramming::GetComputerNameW,
 };
 
@@ -22,7 +24,16 @@ pub(super) fn local_group(name: &str) -> Result<String, Error> {
     }
     let computer = String::from_utf16(&computer[..length as usize])
         .map_err(|_| Error::InvalidNativeData("computer name"))?;
-    let name = wide(&format!("{computer}\\{name}"));
+    lookup(&format!("{computer}\\{name}"), Some(SidTypeAlias))
+}
+
+/// Resolves the fixed OS service principal; no caller-controlled identity is accepted.
+pub(in super::super) fn trusted_installer() -> Result<String, Error> {
+    lookup("NT SERVICE\\TrustedInstaller", None)
+}
+
+fn lookup(name: &str, expected_kind: Option<SID_NAME_USE>) -> Result<String, Error> {
+    let name = wide(name);
     let mut sid_size = 0;
     let mut domain_size = 0;
     let mut kind = 0;
@@ -66,7 +77,7 @@ pub(super) fn local_group(name: &str) -> Result<String, Error> {
     {
         return Err(Error::last_os("LookupAccountNameW"));
     }
-    if kind != SidTypeAlias {
+    if expected_kind.is_some_and(|expected| kind != expected) {
         return Err(Error::InvalidNativeData("local group SID type"));
     }
     unsafe { sid_to_string(sid.as_mut_ptr().cast()) }

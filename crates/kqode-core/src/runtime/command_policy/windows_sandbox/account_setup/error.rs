@@ -27,6 +27,10 @@ pub enum SandboxAccountSetupError {
         operation: &'static str,
         source: io::Error,
     },
+    Storage {
+        operation: &'static str,
+        source: io::Error,
+    },
 }
 
 impl SandboxAccountSetupError {
@@ -84,6 +88,9 @@ impl fmt::Display for SandboxAccountSetupError {
             Self::Journal { operation, source } => {
                 write!(f, "sandbox setup journal {operation} failed: {source}")
             }
+            Self::Storage { operation, source } => {
+                write!(f, "sandbox account storage {operation} failed: {source}")
+            }
         }
     }
 }
@@ -91,7 +98,7 @@ impl fmt::Display for SandboxAccountSetupError {
 impl std::error::Error for SandboxAccountSetupError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::Journal { source, .. } => Some(source),
+            Self::Journal { source, .. } | Self::Storage { source, .. } => Some(source),
             _ => None,
         }
     }

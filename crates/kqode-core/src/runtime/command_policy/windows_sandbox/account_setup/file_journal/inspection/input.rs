@@ -1,16 +1,13 @@
+use super::super::super::private_object::verify as verify_object;
 use super::super::{super::WindowsSandboxAccountPlan, PrivateSandboxAccountJournal, storage};
-use super::{SandboxAccountJournalInspection, acl, invalid, parser};
-use crate::runtime::{windows_file::open_child, windows_streams::has_named_stream};
+use super::{SandboxAccountJournalInspection, invalid, parser};
+use crate::runtime::windows_file::open_child;
 use std::{
     ffi::OsStr,
     fs::File,
     io::{self, Read},
-    os::windows::{fs::MetadataExt, io::AsRawHandle},
 };
-use windows_sys::Win32::Storage::FileSystem::{
-    FILE_ATTRIBUTE_REPARSE_POINT, FILE_SHARE_READ, FILE_STANDARD_INFO, FileStandardInfo,
-    GetFileInformationByHandleEx,
-};
+use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ;
 
 impl PrivateSandboxAccountJournal {
     /// Inspects existing private state without changing files, credentials or SAM objects.
@@ -60,38 +57,4 @@ impl PrivateSandboxAccountJournal {
         verify_object(&directory, true)?;
         Ok(inspection)
     }
-}
-
-fn verify_object(file: &File, directory: bool) -> io::Result<()> {
-    let metadata = file.metadata()?;
-    if metadata.is_dir() != directory
-        || (!directory && !metadata.is_file())
-        || metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
-    {
-        return Err(invalid(
-            "journal object type or reparse attributes are invalid",
-        ));
-    }
-    let mut info = FILE_STANDARD_INFO::default();
-    if unsafe {
-        GetFileInformationByHandleEx(
-            file.as_raw_handle().cast(),
-            FileStandardInfo,
-            (&mut info as *mut FILE_STANDARD_INFO).cast(),
-            size_of::<FILE_STANDARD_INFO>() as u32,
-        )
-    } == 0
-    {
-        return Err(io::Error::last_os_error());
-    }
-    if info.DeletePending || (!directory && info.NumberOfLinks != 1) {
-        return Err(invalid(
-            "journal object is pending deletion or has hardlink aliases",
-        ));
-    }
-    acl::verify(file)?;
-    if has_named_stream(file, directory)? {
-        return Err(invalid("journal object has named streams"));
-    }
-    Ok(())
 }
