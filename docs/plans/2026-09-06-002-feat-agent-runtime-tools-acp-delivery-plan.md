@@ -703,7 +703,7 @@ and secret-environment tests pass.
       stable differences, but fail on query errors, observed drift, cancellation
       or limits. No repair, credential reset, account enablement or execution
       capability is returned.
-- [ ] Add the fixed current-user account-store boundary (implemented; awaiting review).
+- [x] Add the fixed current-user account-store boundary.
       Resolve LocalAppData through the OS known-folder API without environment or
       workspace overrides, preflight direct local-volume mapping, and pin every
       path component while validating ownership and ancestor mutation rights.
@@ -712,6 +712,15 @@ and secret-environment tests pass.
       Derive the installation plan from that validated marker and revalidate the
       store before journal preparation, inspection or reconciliation. This does
       not supply cross-user helper authentication, setup consent or Full isolation.
+- [ ] Reserve account storage during filesystem-scope selection (implemented;
+      awaiting review). Reject overlapping source/destination-parent snapshot
+      roots, command workspace/cwd and extra roots, including ancestors and
+      resolved directory aliases. Reserve the namespace even before initialization;
+      pin trusted storage ancestors through capture or approval/dispatch, and
+      recheck explicit command scopes after approval. Refuse source hardlinks
+      before reading their bytes rather than materializing possible private-file
+      aliases. This guard does not enforce arbitrary script paths or runtime
+      access, and does not promote the backend's protected-path capability.
 - [ ] Implement `allow | ask | deny`, read-only and workspace-write profiles, and
       independent network policy.
 - [x] Add the command authorization gate and immutable context contracts:
@@ -737,11 +746,11 @@ and secret-environment tests pass.
 - [ ] Resolve filesystem alias/protected-path enforcement before using LPAC for
       workspace-write. Do not translate successful token creation or ordinary
       ACL-denial tests into a full filesystem capability.
-- [x] Add native Windows `WorkspaceSnapshot::capture` as an explicit preparation
+- [ ] Add native Windows `WorkspaceSnapshot::capture` as an explicit preparation
       primitive, not a transparent replacement for the real workspace. Create
       fresh file objects beneath a new private user/SYSTEM directory; enumerate
-      and open children relative to directory handles, reject reparse points and
-      named streams, and never copy source ACLs or hard-link topology. Use
+      and open children relative to directory handles, reject reparse points,
+      hard-linked source files and named streams, and never copy source ACLs. Use
       volume-GUID paths for destination containment checks. Bound entry count,
       copied bytes and depth; check cancellation/deadlines between OS operations.
       Report errors and remove partial copies. Exclude `.git` directories and
@@ -1275,15 +1284,43 @@ fixture directories under the validated LocalAppData anchor and remove those
 fixtures afterwards. The native opt-in probe only opened the registered anchor;
 the actual persistent `KQodeSandbox` namespace was not initialized.
 
-Before production dispatch, this store and its aliases must also enter the
-protected-path policy and must never be copied into execution snapshots or
-exposed through model read/write grants. Private storage ACLs do not make an
-intentional host-side copy safe. The current implementation remains scoped to
-the process user: cross-user elevated-service selection/authentication is not
-implemented, and the host must still obtain explicit administrator setup consent.
+**Protected-store scope selection (September 13, 2026):**
+
+Capture and command preparation now reserve the OS-selected `KQodeSandbox`
+namespace even when it does not exist. Resolving this boundary only opens and
+validates trusted ancestors and, if present, the private root; it never creates
+storage or reads marker/journal contents. Unavailable/unsafe storage ancestry and
+redirected/non-private existing roots fail closed without repair.
+
+Snapshot source and destination-parent scopes must be disjoint from that
+namespace. Overlapping ancestors are rejected wholesale, not partially copied.
+Command source/execution workspace/cwd and extra roots have the same check for
+every profile, including danger-full-access. Handle-resolved normalized
+volume-GUID paths and case-insensitive component comparisons cover directory
+aliases rather than relying on the caller's drive spelling or string prefixes.
+The storage boundary stays pinned throughout capture and approval/dispatch;
+explicit command scopes are checked again after approval. This does not pin all
+workspace ancestors or remove the backend's obligation to enforce actual I/O.
+
+Source hardlinks are now refused before reading bytes or creating the
+corresponding destination file, with another link check after reading ordinary
+files. This intentionally supersedes the September 10 probe's hardlink
+materialization behavior: independent destination objects prevent write-through
+but do not prevent disclosure of an aliased private file. The two copy-based
+diagnostic modes now first require capture to reject their generated hardlink,
+then replace only that owned fixture alias with a regular file for their native
+execution phase. The historical LPAC observations above are unchanged; the
+updated native execution phases have not been rerun for this unit.
+
+These are host-side selection/copy guards, not OS-enforced denial of arbitrary
+script paths, all runtime aliases or cross-user storage. The production backend
+must still exclude account storage from effective model read/write authority.
+Private ACLs do not make an intentional host-side copy safe. Cross-user
+elevated-service selection/authentication is not implemented, and the host must
+still obtain explicit administrator setup consent.
 
 The explicit recovery protocol, authenticated privileged helper,
-protected-store integration, logon-right restrictions, ACL/network setup,
+runtime protected-store enforcement, logon-right restrictions, ACL/network setup,
 and readiness activation are still pending. Account mutation tests continue to
 use fake SAM operations with real private temporary journals and non-elevated RNG/DPAPI.
 No system account or group has been created; ACLs are set only on newly owned

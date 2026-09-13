@@ -16,6 +16,7 @@ pub enum SandboxAccountSetupError {
     TimedOut,
     ObservationChanged,
     ObservationLimit,
+    ProtectedStorageOverlap,
     NameAlreadyExists(SandboxAccountRole),
     OwnershipMismatch(SandboxAccountRole),
     InvalidNativeData(&'static str),
@@ -70,6 +71,10 @@ impl fmt::Display for SandboxAccountSetupError {
             Self::ObservationLimit => write!(
                 f,
                 "sandbox account reconciliation exceeds its observation limit"
+            ),
+            Self::ProtectedStorageOverlap => write!(
+                f,
+                "requested filesystem scope overlaps protected sandbox account storage"
             ),
             Self::NameAlreadyExists(role) => {
                 write!(f, "sandbox {role:?} name already exists; refusing adoption")

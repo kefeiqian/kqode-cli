@@ -9,6 +9,8 @@ mod executor;
 mod permissions;
 mod policy;
 mod powershell;
+#[cfg(windows)]
+mod protected_paths;
 mod snapshot_command;
 mod snapshot_execution;
 #[cfg(windows)]
@@ -34,6 +36,8 @@ pub use policy::{CommandPolicy, PolicyDecision, RequireApproval};
 pub use powershell::PowerShellCommandOptions;
 pub use snapshot_command::SnapshotCommand;
 pub use snapshot_execution::SnapshotCommandOutput;
+#[cfg(windows)]
+pub(crate) use windows_sandbox::AccountStoreBoundary;
 #[cfg(windows)]
 pub use windows_sandbox::{
     DisabledSandboxAccounts, LpacDiagnosticOutput, LpacTokenObservation,

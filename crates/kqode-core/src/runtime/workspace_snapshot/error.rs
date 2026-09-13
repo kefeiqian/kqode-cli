@@ -16,6 +16,8 @@ pub enum SnapshotError {
     SourceRootChanged,
     SnapshotChanged(PathBuf),
     SnapshotMoved,
+    #[cfg(windows)]
+    AccountStorage(crate::runtime::SandboxAccountSetupError),
     Io {
         operation: &'static str,
         source: io::Error,
@@ -44,6 +46,8 @@ impl fmt::Display for SnapshotError {
             }
             Self::LimitExceeded(name) => write!(f, "workspace snapshot limit exceeded: {name}"),
             Self::Cancelled => write!(f, "workspace snapshot operation cancelled"),
+            #[cfg(windows)]
+            Self::AccountStorage(error) => error.fmt(f),
             Self::SourceChanged(path) => write!(
                 f,
                 "source changed during snapshot operation: {}",
@@ -71,6 +75,8 @@ impl std::error::Error for SnapshotError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Io { source, .. } => Some(source),
+            #[cfg(windows)]
+            Self::AccountStorage(error) => Some(error),
             _ => None,
         }
     }

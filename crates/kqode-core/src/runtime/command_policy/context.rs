@@ -43,6 +43,7 @@ impl CommandContext {
     ///
     /// Rejects blank scripts, invalid limits/executable, invalid or secret overrides,
     /// and noncanonical/outside cwd paths. Extra roots must be existing directories.
+    /// On Windows, explicit scopes overlapping private account storage are refused.
     pub(super) fn prepare(
         workspace: &WorkspacePolicy,
         original_script: impl Into<String>,
@@ -102,7 +103,7 @@ impl CommandContext {
         permissions.extra_roots.sort();
         permissions.extra_roots.dedup();
         let environment = environment::freeze(&request.environment)?;
-        Ok(Self {
+        let context = Self {
             original_script,
             program,
             arguments: request.arguments,
@@ -111,7 +112,13 @@ impl CommandContext {
             permissions,
             timeout: request.timeout,
             max_output_bytes: request.max_output_bytes,
-        })
+        };
+        #[cfg(windows)]
+        super::protected_paths::prepare(
+            &context,
+            &crate::cancellation::CancellationToken::default(),
+        )?;
+        Ok(context)
     }
 
     pub fn original_script(&self) -> &str {

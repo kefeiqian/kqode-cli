@@ -1,13 +1,14 @@
 use crate::runtime::windows_security::PrivateDescriptor;
 use std::{
     ffi::{OsStr, OsString},
-    fs::File,
+    fs::{File, OpenOptions},
     io,
     os::windows::{
         ffi::{OsStrExt, OsStringExt},
+        fs::{MetadataExt, OpenOptionsExt},
         io::{AsRawHandle, FromRawHandle},
     },
-    path::PathBuf,
+    path::{Path, PathBuf},
     ptr,
 };
 use windows_sys::{
@@ -24,12 +25,28 @@ use windows_sys::{
             STATUS_OBJECT_PATH_NOT_FOUND, UNICODE_STRING,
         },
         Storage::FileSystem::{
-            FILE_ATTRIBUTE_NORMAL, FILE_GENERIC_READ, FILE_GENERIC_WRITE,
-            GetFinalPathNameByHandleW, VOLUME_NAME_GUID,
+            FILE_ATTRIBUTE_NORMAL, FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS,
+            FILE_FLAG_OPEN_REPARSE_POINT, FILE_GENERIC_READ, FILE_GENERIC_WRITE, FILE_SHARE_READ,
+            FILE_SHARE_WRITE, GetFinalPathNameByHandleW, VOLUME_NAME_GUID,
         },
         System::IO::IO_STATUS_BLOCK,
     },
 };
+
+/// Opens a non-reparse directory without ordinary delete sharing.
+pub(crate) fn open_directory(path: &Path, writable: bool) -> io::Result<File> {
+    let file = OpenOptions::new()
+        .read(true)
+        .write(writable)
+        .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(path)?;
+    let metadata = file.metadata()?;
+    if !metadata.is_dir() || metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+        return Err(io::Error::other("expected a non-reparse directory"));
+    }
+    Ok(file)
+}
 
 /// Opens a single validated component, preserving missing-name errors for source checks.
 pub(crate) fn open_child(

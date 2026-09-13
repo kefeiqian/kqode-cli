@@ -3,15 +3,10 @@ use super::support::{Fixture, junction, limits};
 use std::{fs, path::PathBuf};
 
 #[test]
-fn copies_data_into_independent_files_without_mutating_source_or_outside_aliases() {
+fn copies_data_into_independent_files_without_mutating_source() {
     let fixture = Fixture::new();
-    fs::write(fixture.root.join("outside.txt"), "original").unwrap();
-    fs::hard_link(
-        fixture.root.join("outside.txt"),
-        fixture.source.join("a.txt"),
-    )
-    .unwrap();
-    fs::hard_link(fixture.source.join("a.txt"), fixture.source.join("b.txt")).unwrap();
+    fs::write(fixture.source.join("a.txt"), "original").unwrap();
+    fs::write(fixture.source.join("b.txt"), "original").unwrap();
     fs::create_dir(fixture.source.join("nested")).unwrap();
     fs::write(fixture.source.join("nested\\unicode.txt"), "你好").unwrap();
     let snapshot = fixture.capture(limits()).unwrap();
@@ -20,7 +15,6 @@ fn copies_data_into_independent_files_without_mutating_source_or_outside_aliases
     assert_eq!(snapshot.summary().bytes, 22);
     fs::write(snapshot.root().join("a.txt"), "changed").unwrap();
     for path in [
-        fixture.root.join("outside.txt"),
         fixture.source.join("a.txt"),
         fixture.source.join("b.txt"),
         snapshot.root().join("b.txt"),
@@ -29,6 +23,23 @@ fn copies_data_into_independent_files_without_mutating_source_or_outside_aliases
     }
     snapshot.close().unwrap();
     fixture.assert_clean();
+}
+
+#[test]
+fn source_hardlinks_are_rejected_before_reading_potential_private_aliases() {
+    let fixture = Fixture::new();
+    let outside = fixture.root.join("outside.txt");
+    fs::write(&outside, "private fixture").unwrap();
+    fs::hard_link(&outside, fixture.source.join("alias.txt")).unwrap();
+    assert!(matches!(
+        fixture.capture(limits()),
+        Err(SnapshotError::UnsupportedEntry {
+            reason: "hard-linked artifacts are not supported",
+            ..
+        })
+    ));
+    fixture.assert_clean();
+    assert_eq!(fs::read_to_string(outside).unwrap(), "private fixture");
 }
 
 #[test]

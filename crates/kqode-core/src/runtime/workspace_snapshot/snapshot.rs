@@ -51,8 +51,10 @@ impl WorkspaceSnapshot {
     /// The destination parent must exist outside the source workspace, on a volume
     /// supporting GUID paths and the required native file information queries. All child
     /// traversal/creation is relative to open directory handles, not concatenated
-    /// paths. Reparse points and named streams fail closed; source ACLs and hard
-    /// link topology are never copied. Special Win32 filenames are rejected.
+    /// paths. Reparse points, hard-linked source files and named streams fail closed;
+    /// source ACLs are never copied. Special Win32 filenames are rejected.
+    /// Source and destination-parent scopes overlapping the OS-selected private
+    /// account-store namespace (including ancestors) are refused before copying.
     /// Git control entries are explicitly excluded, so this is not a transparent
     /// replacement for the original cwd or a Git worktree.
     /// This is not a transactionally consistent

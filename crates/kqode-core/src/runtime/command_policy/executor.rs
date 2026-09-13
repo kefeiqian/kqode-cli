@@ -76,6 +76,8 @@ impl CommandExecutor {
             return Err(CommandGateError::Cancelled);
         }
         validate_owner(&context, snapshot)?;
+        #[cfg(windows)]
+        let storage_boundary = super::protected_paths::prepare(&context, &cancellation)?;
         let verdict = self.policy.evaluate(&context);
         if verdict == PolicyDecision::Deny {
             return Err(CommandGateError::PolicyDenied);
@@ -125,6 +127,8 @@ impl CommandExecutor {
         // Recheck volatile capability availability without ever widening permissions.
         validate_capabilities(backend.as_ref(), &context)?;
         validate_owner(&context, snapshot)?;
+        #[cfg(windows)]
+        super::protected_paths::check(&storage_boundary, &context, &cancellation)?;
         if approval_deadline.is_some_and(|deadline| tokio::time::Instant::now() >= deadline) {
             return Err(CommandGateError::ApprovalTimedOut);
         }

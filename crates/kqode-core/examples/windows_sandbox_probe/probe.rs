@@ -2,6 +2,7 @@
 mod attributes;
 #[path = "../../src/runtime/command_policy/windows_sandbox/capabilities.rs"]
 mod capabilities;
+mod copy_fixture;
 #[path = "../../src/runtime/command_policy/windows_sandbox/descendants.rs"]
 mod descendants;
 mod fixture;

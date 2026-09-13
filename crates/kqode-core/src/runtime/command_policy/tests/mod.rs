@@ -5,4 +5,4 @@ mod gates;
 mod lifecycle;
 #[cfg(windows)]
 mod snapshots;
-mod support;
+pub(super) mod support;

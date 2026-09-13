@@ -15,6 +15,7 @@ mod tests;
 mod transport;
 
 use super::CommandContext;
+pub(crate) use account_setup::AccountStoreBoundary;
 pub use account_setup::{
     DisabledSandboxAccounts, PrivateSandboxAccountJournal, ProtectedSandboxPasswords,
     SandboxAccountCheckpoint, SandboxAccountDiscrepancy, SandboxAccountIdentity,

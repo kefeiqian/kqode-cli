@@ -1,11 +1,7 @@
 use std::{collections::BTreeMap, error::Error, fs, time::Duration};
 
-use kqode_core::{
-    cancellation::CancellationToken,
-    runtime::{
-        CommandContext, PowerShell, PowerShellCommandOptions, SandboxPermissions, SnapshotLimits,
-        WorkspacePolicy, WorkspaceSnapshot,
-    },
+use kqode_core::runtime::{
+    CommandContext, PowerShell, PowerShellCommandOptions, SandboxPermissions, WorkspacePolicy,
 };
 use serde_json::{Value, json};
 
@@ -35,20 +31,8 @@ const ACCESS_DENIED_HRESULT: i64 = -2_147_024_891;
 
 /// Uses a fresh identity that has never been granted access to the source fixture.
 pub(super) fn run(fixture: &Fixture, shell: &PowerShell) -> Result<Value, Box<dyn Error>> {
-    fixture.reset()?;
+    let snapshot = super::copy_fixture::capture(fixture)?;
     let mut identity = Identity::new()?;
-    let source = WorkspacePolicy::new(fixture.root())?;
-    let snapshot = WorkspaceSnapshot::capture(
-        &source,
-        &std::env::temp_dir(),
-        SnapshotLimits {
-            max_entries: 100,
-            max_bytes: 1024 * 1024,
-            max_depth: 10,
-            timeout: Duration::from_secs(5),
-        },
-        &CancellationToken::default(),
-    )?;
     grant(snapshot.root(), &identity.text()?, "(OI)(CI)(M)")?;
     let workspace = WorkspacePolicy::new(snapshot.root())?;
     let root = snapshot
@@ -110,7 +94,8 @@ pub(super) fn run(fixture: &Fixture, shell: &PowerShell) -> Result<Value, Box<dy
     Ok(json!({
         "source_unchanged": source_unchanged,
         "copy_modified": copy_modified,
-        "copied_peer_alias_unchanged": true,
+        "source_hardlinks_rejected": true,
+        "copied_peer_unchanged": true,
         "direct_source_write_denied": true,
         "profile_removed": true,
         "snapshot_removed": true,

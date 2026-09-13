@@ -27,4 +27,5 @@ pub use model::{
     DisabledSandboxAccounts, SandboxAccountIdentity, SandboxAccountRole, WindowsSandboxAccountPlan,
 };
 pub use reconciliation::{SandboxAccountDiscrepancy, SandboxAccountReconciliation};
+pub(crate) use store::AccountStoreBoundary;
 pub use store::WindowsSandboxAccountStore;

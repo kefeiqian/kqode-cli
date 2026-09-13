@@ -12,7 +12,9 @@ use super::super::{
 use super::{
     directory,
     entry::{inspect, unchanged, unsupported},
-    handles, names,
+    handles,
+    inspection_handles::single_link,
+    names,
 };
 
 const COPY_BUFFER_BYTES: usize = 64 * 1024;
@@ -58,6 +60,9 @@ impl Walker<'_> {
             let child = handles::child(source, name, None)
                 .map_err(|error| SnapshotError::io("open source entry", error))?;
             let metadata = inspect(&child, &child_path)?;
+            if metadata.is_file() {
+                single_link(&child, &child_path)?;
+            }
             let mut output = handles::child(destination, name, Some(metadata.is_dir()))
                 .map_err(|error| SnapshotError::io("create snapshot entry", error))?;
             if metadata.is_dir() {
@@ -117,6 +122,7 @@ impl Walker<'_> {
         if copied != before.len() {
             return Err(SnapshotError::SourceChanged(relative.to_owned()));
         }
+        single_link(&source, relative)?;
         if !unchanged(
             &before,
             &source

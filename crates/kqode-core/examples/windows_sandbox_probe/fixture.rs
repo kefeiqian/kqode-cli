@@ -67,6 +67,11 @@ impl Fixture {
     pub fn outside_alias_changed(&self) -> io::Result<bool> {
         Ok(fs::read_to_string(self.root.join("outside\\linked.txt"))? != "original")
     }
+    /// Only the generated counterexample alias is replaced; no user source is materialized.
+    pub fn replace_fixture_alias(&self) -> io::Result<()> {
+        fs::remove_file(self.root.join("write\\alias.txt"))?;
+        fs::write(self.root.join("write\\alias.txt"), "original")
+    }
     pub fn close(self) -> io::Result<()> {
         fs::remove_dir_all(&self.root)
     }

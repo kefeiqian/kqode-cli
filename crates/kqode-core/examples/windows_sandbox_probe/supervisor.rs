@@ -3,25 +3,14 @@ use kqode_core::{
     cancellation::CancellationToken,
     runtime::{
         PowerShell, PowerShellCommandOptions, SandboxPermissions, SandboxProfile, SnapshotCommand,
-        SnapshotLimits, WindowsSandboxBackend, WorkspacePolicy, WorkspaceSnapshot,
+        WindowsSandboxBackend,
     },
 };
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, error::Error, time::Duration};
 
 pub(super) async fn run(fixture: &Fixture, shell: &PowerShell) -> Result<Value, Box<dyn Error>> {
-    let source = WorkspacePolicy::new(fixture.root())?;
-    let snapshot = WorkspaceSnapshot::capture(
-        &source,
-        &std::env::temp_dir(),
-        SnapshotLimits {
-            max_entries: 100,
-            max_bytes: 1024 * 1024,
-            max_depth: 10,
-            timeout: Duration::from_secs(5),
-        },
-        &CancellationToken::default(),
-    )?;
+    let snapshot = super::copy_fixture::capture(fixture)?;
     let scratch = snapshot
         .root()
         .join("scratch")
@@ -58,6 +47,7 @@ pub(super) async fn run(fixture: &Fixture, shell: &PowerShell) -> Result<Value, 
     let result = json!({
         "native_supervisor_completed": true, "exit_code": process.exit_code,
         "token": output.token, "full_enforcement_claimed": false,
+        "source_hardlinks_rejected": true,
     });
     let (_, snapshot) = output.execution.into_parts();
     snapshot.close()?;
