@@ -30,9 +30,10 @@ mod workspace_snapshot;
 pub use command_policy::{
     DisabledSandboxAccounts, LpacDiagnosticOutput, LpacTokenObservation,
     PrivateSandboxAccountJournal, ProtectedSandboxPasswords, SandboxAccountCheckpoint,
-    SandboxAccountIdentity, SandboxAccountJournal, SandboxAccountJournalInspection,
-    SandboxAccountJournalState, SandboxAccountPendingMutation, SandboxAccountRole,
-    SandboxAccountSetupError, WindowsSandboxAccountPlan, WindowsSandboxBackend,
+    SandboxAccountDiscrepancy, SandboxAccountIdentity, SandboxAccountJournal,
+    SandboxAccountJournalInspection, SandboxAccountJournalState, SandboxAccountPendingMutation,
+    SandboxAccountReconciliation, SandboxAccountRole, SandboxAccountSetupError,
+    WindowsSandboxAccountPlan, WindowsSandboxBackend,
 };
 
 pub use agent::AgentRuntime;

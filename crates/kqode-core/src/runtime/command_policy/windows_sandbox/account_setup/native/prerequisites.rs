@@ -44,6 +44,11 @@ pub(super) fn check() -> Result<(), Error> {
     if elevation.TokenIsElevated == 0 {
         return Err(Error::ElevationRequired);
     }
+    check_local_machine()
+}
+
+/// Read-only callers need no elevation, but must never redirect SAM queries to a domain.
+pub(super) fn check_local_machine() -> Result<(), Error> {
     let mut buffer = NetBuffer::default();
     status("NetServerGetInfo", unsafe {
         NetServerGetInfo(ptr::null(), 101, &mut buffer.0)

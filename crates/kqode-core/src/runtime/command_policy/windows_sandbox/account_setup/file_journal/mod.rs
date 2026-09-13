@@ -6,7 +6,7 @@ mod records;
 mod session;
 mod storage;
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;
 mod writer;
 
 pub use inspection::{

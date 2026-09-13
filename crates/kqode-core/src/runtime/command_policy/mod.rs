@@ -38,8 +38,9 @@ pub use snapshot_execution::SnapshotCommandOutput;
 pub use windows_sandbox::{
     DisabledSandboxAccounts, LpacDiagnosticOutput, LpacTokenObservation,
     PrivateSandboxAccountJournal, ProtectedSandboxPasswords, SandboxAccountCheckpoint,
-    SandboxAccountIdentity, SandboxAccountJournal, SandboxAccountJournalInspection,
-    SandboxAccountJournalState, SandboxAccountPendingMutation, SandboxAccountRole,
-    SandboxAccountSetupError, WindowsSandboxAccountPlan, WindowsSandboxBackend,
+    SandboxAccountDiscrepancy, SandboxAccountIdentity, SandboxAccountJournal,
+    SandboxAccountJournalInspection, SandboxAccountJournalState, SandboxAccountPendingMutation,
+    SandboxAccountReconciliation, SandboxAccountRole, SandboxAccountSetupError,
+    WindowsSandboxAccountPlan, WindowsSandboxBackend,
 };
 pub use workspace::{CommandWorkspace, WorkspaceExecutionMode};

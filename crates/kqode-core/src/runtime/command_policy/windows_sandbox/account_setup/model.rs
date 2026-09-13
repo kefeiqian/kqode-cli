@@ -98,7 +98,7 @@ impl DisabledSandboxAccounts {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 pub(super) struct PrincipalFacts {
     pub identity: SandboxAccountIdentity,
     pub marker: String,

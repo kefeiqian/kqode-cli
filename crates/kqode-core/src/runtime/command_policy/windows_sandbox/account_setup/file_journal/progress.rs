@@ -19,6 +19,7 @@ enum Expected {
 pub(super) struct Progress {
     plan: WindowsSandboxAccountPlan,
     identities: Vec<SandboxAccountIdentity>,
+    membership_receipts: Vec<Role>,
     expected: Expected,
     pub sequence: u32,
 }
@@ -40,6 +41,7 @@ impl Progress {
             record_count: self.sequence + 1,
             identities: self.identities,
             pending_mutation,
+            membership_receipts: self.membership_receipts,
         }
     }
 
@@ -47,6 +49,7 @@ impl Progress {
         Self {
             plan,
             identities: Vec::new(),
+            membership_receipts: Vec::new(),
             expected: Expected::Creating(Role::Group),
             sequence: 0,
         }
@@ -82,6 +85,7 @@ impl Progress {
             (Expected::MemberAdded(expected), Checkpoint::MemberAdded { role })
                 if expected == role =>
             {
+                self.membership_receipts.push(*role);
                 match role {
                     Role::Offline => Expected::AddingMember(Role::Online),
                     Role::Online => Expected::Prepared,

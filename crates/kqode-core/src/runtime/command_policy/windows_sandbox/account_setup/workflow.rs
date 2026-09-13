@@ -3,12 +3,13 @@ use super::{
     SandboxAccountJournal, SandboxAccountRole as Role, SandboxAccountSetupError as Error,
     WindowsSandboxAccountPlan,
     credentials::Passwords,
+    guard::Guard,
     model::{PrincipalFacts, ROLES},
     native::NativeHost,
 };
 use crate::cancellation::CancellationToken;
 use secrecy::SecretString;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// Native mutation surface deliberately has no enable, password-reset or delete operation.
 pub(super) trait Host {
@@ -63,19 +64,8 @@ pub(super) fn run(
     timeout: Duration,
     cancellation: &CancellationToken,
 ) -> Result<DisabledSandboxAccounts, Error> {
-    let deadline = Instant::now()
-        .checked_add(timeout)
-        .filter(|_| !timeout.is_zero())
-        .ok_or(Error::InvalidTimeout)?;
-    let check = || {
-        if cancellation.is_cancelled() {
-            return Err(Error::Cancelled);
-        }
-        if Instant::now() >= deadline {
-            return Err(Error::TimedOut);
-        }
-        Ok(())
-    };
+    let guard = Guard::new(timeout, cancellation)?;
+    let check = || guard.check();
     check()?;
     host.require_elevated()?;
     for role in ROLES {

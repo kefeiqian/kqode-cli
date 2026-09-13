@@ -1,12 +1,14 @@
-//! First-time provisioning only: dedicated identities stay disabled until later setup gates.
+//! Disabled account preparation and read-only inspection, never automatic recovery or execution.
 
 mod credentials;
 mod error;
 mod file_journal;
+mod guard;
 mod journal;
 mod model;
 mod native;
 mod protection;
+mod reconciliation;
 #[cfg(test)]
 mod tests;
 mod workflow;
@@ -21,3 +23,4 @@ pub use journal::{SandboxAccountCheckpoint, SandboxAccountJournal};
 pub use model::{
     DisabledSandboxAccounts, SandboxAccountIdentity, SandboxAccountRole, WindowsSandboxAccountPlan,
 };
+pub use reconciliation::{SandboxAccountDiscrepancy, SandboxAccountReconciliation};

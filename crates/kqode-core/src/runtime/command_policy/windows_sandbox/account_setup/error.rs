@@ -14,6 +14,8 @@ pub enum SandboxAccountSetupError {
     DomainControllerUnsupported,
     Cancelled,
     TimedOut,
+    ObservationChanged,
+    ObservationLimit,
     NameAlreadyExists(SandboxAccountRole),
     OwnershipMismatch(SandboxAccountRole),
     InvalidNativeData(&'static str),
@@ -56,6 +58,14 @@ impl fmt::Display for SandboxAccountSetupError {
             Self::TimedOut => write!(
                 f,
                 "sandbox account setup timed out; inspect its journal before recovery"
+            ),
+            Self::ObservationChanged => write!(
+                f,
+                "sandbox account observations changed during reconciliation"
+            ),
+            Self::ObservationLimit => write!(
+                f,
+                "sandbox account reconciliation exceeds its observation limit"
             ),
             Self::NameAlreadyExists(role) => {
                 write!(f, "sandbox {role:?} name already exists; refusing adoption")

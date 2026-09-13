@@ -685,7 +685,7 @@ and secret-environment tests pass.
       reparse/collision targets, thread impersonation, invalid checkpoint order
       and mismatched identity receipts; poison the writer after any failure.
       Do not reopen, truncate, repair, resume or delete existing setup state.
-      The trusted-parent selector, live reconciliation and authorized privileged
+      The trusted-parent selector, explicit recovery and authorized privileged
       helper remain required before production account setup.
 - [ ] Add strict read-only account-journal inspection (implemented; awaiting review).
       Reopen through trusted parent and child handles with no ordinary write/delete
@@ -695,6 +695,14 @@ and secret-environment tests pass.
       Check the expected installation and password decodability without exporting
       plaintext. Report only recorded receipts and unresolved mutation intents;
       a completed journal is not live SAM verification or authority to resume.
+- [ ] Add read-only journal/SAM reconciliation (implemented; awaiting review).
+      Compare all three generated names against recorded SID receipts and ownership
+      markers, require ordinary users to remain disabled, and compare direct
+      dedicated-group membership with explicit membership receipts. Missing
+      receipts never authorize adoption, even when name and marker match. Report
+      stable differences, but fail on query errors, observed drift, cancellation
+      or limits. No repair, credential reset, account enablement or execution
+      capability is returned.
 - [ ] Implement `allow | ask | deny`, read-only and workspace-write profiles, and
       independent network policy.
 - [x] Add the command authorization gate and immutable context contracts:
@@ -1188,10 +1196,44 @@ mutation occurred. Empty, torn or invalid state is an error, never a silently
 accepted prefix. The reader does not restore passwords, enable/delete/adopt
 accounts, append/repair records or automatically resume setup.
 
-The trusted-parent selection boundary, live SAM reconciliation and explicit
-recovery protocol, authenticated privileged helper, logon-right restrictions, ACL/network setup,
-and readiness activation are still pending. Account workflow tests use fake SAM
-operations with real private temporary journal files and non-elevated RNG/DPAPI.
+**Read-only SAM reconciliation (September 13, 2026):**
+
+`WindowsSandboxAccountPlan::reconcile_disabled_accounts` first inspects the
+expected installation's private journal, then uses a separate read-only native
+interface. It refuses domain-controller hosts without requesting elevation.
+Queries are limited to the three generated principal names and, only when its
+recorded SID and marker match, the dedicated group's direct member SIDs. Account
+creation, membership addition, reset, deletion and enablement are not methods on
+this interface.
+
+Journal inspection now also exposes recorded membership receipts without changing
+the on-disk format. Reconciliation reports incomplete journals, missing recorded
+principals, unrecorded principals, changed identities/markers, unsafe user state,
+missing recorded memberships and unrecorded memberships. Observed identities and
+member SIDs are non-secret; native comments and credential data are not returned.
+An unresolved intent remains unresolved: observing a same-name principal does
+not create the missing ownership receipt or automatically adopt that account.
+
+Identity reads surround two normalized membership samples. Observed identity,
+state or membership drift is an error rather than a partial report. This is not
+an atomic snapshot, a lock retained for later changes, or protection against an
+adversarial authorized owner/administrator's ABA changes. Timeout/cancellation
+are checked around blocking operations, not by preempting native calls. Native
+membership retrieval requests a complete NetAPI result; decoding/reporting is
+capped at 256 members, but the OS allocation size and call latency are not bounded
+by that cap. Other group memberships, effective privileges, logon rights and
+credentials against SAM are not audited by this primitive.
+
+The fixed opt-in native probe exercised real read-only SAM lookups for fresh
+generated names with a synthetic journal, confirming that absent principals are
+reported missing. It did not create accounts or exercise a provisioned group's
+native membership query. Deterministic comparison, drift, error and budget cases
+use the fake read-only interface; native SID copying has a separate fixture test.
+
+The trusted-parent selection boundary, explicit recovery protocol,
+authenticated privileged helper, logon-right restrictions, ACL/network setup,
+and readiness activation are still pending. Account mutation tests continue to
+use fake SAM operations with real private temporary journals and non-elevated RNG/DPAPI.
 No system account or group has been created; ACLs are set only on newly owned
 temporary journal fixtures, not existing host objects. No firewall or Windows
 feature configuration has been changed. `PreparedDisabled` is not U5 completion;

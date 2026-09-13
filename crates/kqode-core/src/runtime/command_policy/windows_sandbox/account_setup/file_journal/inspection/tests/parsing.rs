@@ -34,6 +34,12 @@ fn every_valid_prefix_reports_recorded_receipts_and_uncertain_mutations_only() {
             _ => None,
         };
         assert_eq!(report.pending_mutation(), pending);
+        let expected_members: &[Role] = match count {
+            11.. => &[Role::Offline, Role::Online],
+            9.. => &[Role::Offline],
+            _ => &[],
+        };
+        assert_eq!(report.membership_receipts(), expected_members);
         assert!(!serde_json::to_string(&report).unwrap().contains("password"));
         assert!(!format!("{report:?}").contains("password"));
     }

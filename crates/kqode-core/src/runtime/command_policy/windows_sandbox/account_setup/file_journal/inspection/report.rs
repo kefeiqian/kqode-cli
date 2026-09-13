@@ -25,6 +25,7 @@ pub struct SandboxAccountJournalInspection {
     pub(in super::super) record_count: u32,
     pub(in super::super) identities: Vec<SandboxAccountIdentity>,
     pub(in super::super) pending_mutation: Option<SandboxAccountPendingMutation>,
+    pub(in super::super) membership_receipts: Vec<SandboxAccountRole>,
 }
 
 impl SandboxAccountJournalInspection {
@@ -40,5 +41,10 @@ impl SandboxAccountJournalInspection {
     }
     pub fn pending_mutation(&self) -> Option<SandboxAccountPendingMutation> {
         self.pending_mutation
+    }
+
+    /// Roles with recorded successful membership additions, not live membership assertions.
+    pub fn membership_receipts(&self) -> &[SandboxAccountRole] {
+        &self.membership_receipts
     }
 }
