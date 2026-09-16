@@ -2,7 +2,6 @@ mod agent;
 #[cfg(test)]
 mod agent_tests;
 mod budget;
-mod command_policy;
 mod driver;
 mod event;
 mod event_sink;
@@ -17,36 +16,10 @@ mod repetition;
 mod state;
 mod tool_batch;
 mod turn_queue;
-#[cfg(windows)]
-mod windows_file;
-#[cfg(windows)]
-mod windows_records;
-#[cfg(windows)]
-mod windows_security;
-#[cfg(windows)]
-mod windows_streams;
-mod workspace_snapshot;
-#[cfg(windows)]
-pub use command_policy::{
-    DisabledSandboxAccounts, LpacDiagnosticOutput, LpacTokenObservation,
-    PrivateSandboxAccountJournal, ProtectedSandboxPasswords, SandboxAccountCheckpoint,
-    SandboxAccountDiscrepancy, SandboxAccountIdentity, SandboxAccountJournal,
-    SandboxAccountJournalInspection, SandboxAccountJournalState, SandboxAccountPendingMutation,
-    SandboxAccountReconciliation, SandboxAccountRole, SandboxAccountSetupError,
-    WindowsSandboxAccountPlan, WindowsSandboxAccountStore, WindowsSandboxBackend,
-};
 
 pub use agent::AgentRuntime;
 pub use budget::{
     BudgetError, BudgetErrorKind, BudgetTracker, RepeatAction, TurnBudget, TurnBudgetOverrides,
-};
-pub use command_policy::{
-    ApprovalDecision, ApprovalRequest, ApprovalResponse, AuthorizedCommand, CommandApprovalFuture,
-    CommandApprovalResponder, CommandContext, CommandExecutor, CommandGateError, CommandPolicy,
-    CommandWorkspace, EnvironmentProfile, NetworkPolicy, PolicyDecision, PowerShellCommandOptions,
-    RequireApproval, SandboxBackend, SandboxCapabilities, SandboxCapability, SandboxEnforcement,
-    SandboxFuture, SandboxPermissions, SandboxProfile, SnapshotCommand, SnapshotCommandOutput,
-    WorkspaceExecutionMode,
 };
 pub use event::RuntimeEvent;
 pub use event_sink::{NoopEventSink, RuntimeEventSink};
@@ -57,14 +30,10 @@ pub use input::{
 pub use model_step::{FinishReason, ModelStep, ModelUsage};
 pub use outcome::{StopReason, TurnOutcome, TurnReport, TurnStatus};
 pub use process::{
-    EnvironmentPolicy, PowerShell, PowerShellError, ProcessError, ProcessOutput, ProcessRequest,
-    ProcessSupervisor, WorkspaceError, WorkspacePolicy,
+    EnvironmentPolicy, ProcessError, ProcessOutput, ProcessRequest, ProcessSupervisor,
+    WorkspaceError, WorkspacePolicy,
 };
 pub use provider::{
     ModelProvider, ModelProviderError, ModelProviderErrorKind, ModelProviderFuture,
 };
 pub use turn_queue::{DeleteResult, QueuedTurn, TurnLease, TurnQueue, TurnQueueError};
-pub use workspace_snapshot::{
-    SnapshotChange, SnapshotConflictKind, SnapshotEntry, SnapshotError, SnapshotLimits,
-    SnapshotSourceCheck, SnapshotSourceConflict, SnapshotSummary, WorkspaceSnapshot,
-};
